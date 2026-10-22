@@ -1,0 +1,33 @@
+# Godot
+.godot/
+/android/
+export_credentials.cfg
+/build/
+*.apk
+*.aab
+*.pck
+*.keystore
+*.jks
+*.tmp
+
+# OpenXR Vendors plugin (107 MB of binaries): install from the Asset Library, see README
+/addons/godotopenxrvendors/
+
+# local agent instructions
+AGENTS.md
+CLAUDE.md
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log

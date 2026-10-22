@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="PackedScene" path="res://trials/point_real/point_real.tscn" id="3_scene"]
+
+[sub_resource type="Resource" id="tolerance"]
+script = ExtResource("2_axis")
+name = &"tolerance"
+easy = 10.0
+
+[resource]
+script = ExtResource("1_def")
+title = "Real objects"
+scene = ExtResource("3_scene")
+skill = &"real_object_recognition"
+axes = Array[ExtResource("2_axis")]([SubResource("tolerance")])
+requires = Array[StringName]([&"Detector"])
+notes = "Real objects found by the Detector (CV). No driven axis yet: the level does not change the round. Tolerance is the pointing error allowed, degrees."
+hint_after = 8.0
+hint_fade = 1.0
+max_hint = 2
+time_limit = 60.0

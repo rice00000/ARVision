@@ -1,0 +1,61 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://reality/rooms/living_room.tscn" id="2_room"]
+[ext_resource type="PackedScene" path="res://rig/rig.tscn" id="3_rig"]
+[ext_resource type="Script" path="res://modules/voice/voice.gd" id="4_voice"]
+[ext_resource type="Script" path="res://modules/feedback/feedback.gd" id="5_feedback"]
+[ext_resource type="Script" path="res://modules/cv/detector.gd" id="6_detector"]
+[ext_resource type="Script" path="res://modules/facilitator/facilitator.gd" id="7_facilitator"]
+[ext_resource type="Script" path="res://trials/session.gd" id="8_session"]
+[ext_resource type="Resource" path="res://content/sessions/demo.tres" id="9_plan"]
+[ext_resource type="Resource" path="res://content/views/normal.tres" id="10_normal"]
+[ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="11_contrast"]
+[ext_resource type="Resource" path="res://content/views/greyscale.tres" id="12_grey"]
+[ext_resource type="Resource" path="res://content/views/black_white.tres" id="13_bw"]
+[ext_resource type="Resource" path="res://content/views/edges.tres" id="14_edges"]
+[ext_resource type="Resource" path="res://content/views/dim.tres" id="15_dim"]
+[ext_resource type="Resource" path="res://content/views/spotlight.tres" id="16_spotlight"]
+[ext_resource type="Script" path="res://reality/view.gd" id="17_view"]
+
+[sub_resource type="Environment" id="environment"]
+background_mode = 1
+background_color = Color(0.1, 0.11, 0.13, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 0.45
+
+[node name="Main" type="Node3D"]
+process_mode = 1
+script = ExtResource("1_main")
+sim_room = ExtResource("2_room")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("environment")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-55, 25, 0)
+light_energy = 0.9
+
+[node name="Rig" parent="." instance=ExtResource("3_rig")]
+
+[node name="Stage" type="Node3D" parent="."]
+
+[node name="Modules" type="Node" parent="."]
+
+[node name="Voice" type="Node" parent="Modules"]
+script = ExtResource("4_voice")
+
+[node name="Feedback" type="Node" parent="Modules"]
+script = ExtResource("5_feedback")
+
+[node name="Detector" type="Node" parent="Modules"]
+script = ExtResource("6_detector")
+
+[node name="Facilitator" type="Node" parent="Modules"]
+script = ExtResource("7_facilitator")
+views = Array[ExtResource("17_view")]([ExtResource("10_normal"), ExtResource("11_contrast"), ExtResource("12_grey"), ExtResource("13_bw"), ExtResource("14_edges"), ExtResource("15_dim"), ExtResource("16_spotlight")])
+
+[node name="Session" type="Node" parent="."]
+script = ExtResource("8_session")
+plan = ExtResource("9_plan")

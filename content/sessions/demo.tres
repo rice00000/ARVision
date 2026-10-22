@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="SessionPlan" format=3]
+
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="1_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
+[ext_resource type="Resource" path="res://trials/find/find.tres" id="3_find"]
+[ext_resource type="Resource" path="res://trials/point_real/point_real.tres" id="4_point"]
+[ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="5_contrast"]
+[ext_resource type="Resource" path="res://content/views/spotlight.tres" id="6_spotlight"]
+
+[sub_resource type="Resource" id="probe"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 3
+probe = true
+difficulty = 0.3
+intro = "First, a little check. Find each toy I name."
+
+[sub_resource type="Resource" id="train"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 5
+intro = "Now let's practise. Ask for help with B or Y."
+
+[sub_resource type="Resource" id="contrast"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 3
+view = ExtResource("5_contrast")
+
+[sub_resource type="Resource" id="spotlight"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 3
+view = ExtResource("6_spotlight")
+
+[sub_resource type="Resource" id="real"]
+script = ExtResource("2_block")
+trial = ExtResource("4_point")
+rounds = 3
+intro = "Now look at the real room."
+
+[resource]
+script = ExtResource("1_plan")
+title = "Demo"
+blocks = Array[ExtResource("2_block")]([SubResource("probe"), SubResource("train"), SubResource("contrast"), SubResource("spotlight"), SubResource("real")])

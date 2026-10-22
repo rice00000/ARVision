@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://trials/find/find_trial.gd" id="1_find"]
+
+[node name="Find" type="Node3D"]
+script = ExtResource("1_find")

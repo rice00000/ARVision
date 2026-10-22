@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="PackedScene" path="res://trials/find/find.tscn" id="3_scene"]
+
+[sub_resource type="Resource" id="clutter"]
+script = ExtResource("2_axis")
+name = &"clutter"
+easy = 2.0
+hard = 9.0
+driven = true
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2_axis")
+name = &"size"
+easy = 0.07
+
+[sub_resource type="Resource" id="spacing"]
+script = ExtResource("2_axis")
+name = &"spacing"
+easy = 1.8
+
+[sub_resource type="Resource" id="same_colour"]
+script = ExtResource("2_axis")
+name = &"same_colour"
+easy = 0.0
+
+[resource]
+script = ExtResource("1_def")
+title = "Find it"
+scene = ExtResource("3_scene")
+skill = &"objects_in_clutter"
+axes = Array[ExtResource("2_axis")]([SubResource("clutter"), SubResource("size"), SubResource("spacing"), SubResource("same_colour")])
+notes = "Clutter is the driven axis. Size, spacing and colour stay fixed so a failure points at clutter. Toys sit on the real table (room scan) or a virtual patch in front."
+hint_after = 7.0
+hint_fade = 1.0
+max_hint = 2
+time_limit = 45.0

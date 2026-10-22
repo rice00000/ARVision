@@ -1,0 +1,56 @@
+extends Node
+## Signal bus (autoload "Events"): the only contract modules share.
+##
+## Emitters never know who listens, so any module can be unplugged without
+## breaking the others. Everything a session does passes through here, which is
+## also what the research log and the tests listen to.
+
+# -- the child's input (sent by the rig's Pointers) ---------------------------
+
+## A controller button changed. [param action] is the OpenXR action:
+## trigger_click, grip_click, ax_button, by_button or menu_button.
+signal button(hand: StringName, action: StringName, pressed: bool)
+## The trigger was pulled while pointing. [param target] is the virtual Target
+## the ray hit, or null; the ray itself always comes along, so a trial can judge
+## pointing at a real object that has no collider.
+signal selected(hand: StringName, target: Target, origin: Vector3, direction: Vector3)
+## A fingertip entered a Target.
+signal touched(hand: StringName, target: Target)
+## The child asked for help (B / Y).
+signal help_requested
+
+# -- what the child sees and hears --------------------------------------------
+
+## The guide speaks. Voice shows it as a subtitle and reads it aloud.
+signal said(text: String)
+## A response was judged: &"good", &"bad" or &"hint". Feedback answers with a
+## sound, a mark at [param at] and a vibration: never colour alone.
+signal feedback(kind: StringName, at: Vector3)
+## How the real world is shown changed (passthrough filter, dimming, focus).
+signal view_changed(view: Dictionary)
+
+# -- measurement (sent by Trial and Session) ----------------------------------
+
+## A round starts. [param condition] is TrialCondition.to_log(): everything it runs at.
+signal trial_started(trial: StringName, condition: Dictionary)
+## A scored round is over. Abandoned rounds never send this.
+signal trial_ended(skill: StringName, success: bool, data: Dictionary)
+signal block_started(index: int, info: Dictionary)
+signal session_finished
+
+# -- the rest -----------------------------------------------------------------
+
+## Real objects the CV module sees now (Array of Detection).
+signal detected(detections: Array)
+## The facilitator panel opened or closed. Play pauses while it is open.
+signal facilitator_toggled(open: bool)
+## Any other fact worth a line in the research log.
+signal reported(what: StringName, data: Dictionary)
+
+
+func say(text: String) -> void:
+	said.emit(text)
+
+
+func report(what: StringName, data: Dictionary = {}) -> void:
+	reported.emit(what, data)

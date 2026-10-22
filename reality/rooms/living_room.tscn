@@ -1,0 +1,396 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://reality/sim_surface.gd" id="1_surface"]
+[ext_resource type="Script" path="res://reality/real_object.gd" id="2_object"]
+
+[sub_resource type="StandardMaterial3D" id="floor_mat"]
+albedo_color = Color(0.55, 0.52, 0.48, 1)
+
+[sub_resource type="StandardMaterial3D" id="wall_mat"]
+albedo_color = Color(0.86, 0.85, 0.81, 1)
+
+[sub_resource type="StandardMaterial3D" id="wood_mat"]
+albedo_color = Color(0.55, 0.38, 0.24, 1)
+
+[sub_resource type="StandardMaterial3D" id="cup_mat"]
+albedo_color = Color(0.2, 0.38, 0.75, 1)
+
+[sub_resource type="StandardMaterial3D" id="bottle_mat"]
+albedo_color = Color(0.25, 0.6, 0.35, 1)
+
+[sub_resource type="StandardMaterial3D" id="book_mat"]
+albedo_color = Color(0.9, 0.55, 0.15, 1)
+
+[sub_resource type="StandardMaterial3D" id="apple_mat"]
+albedo_color = Color(0.8, 0.15, 0.12, 1)
+
+[sub_resource type="StandardMaterial3D" id="dark_mat"]
+albedo_color = Color(0.25, 0.25, 0.28, 1)
+
+[sub_resource type="StandardMaterial3D" id="pot_mat"]
+albedo_color = Color(0.7, 0.4, 0.25, 1)
+
+[sub_resource type="StandardMaterial3D" id="leaf_mat"]
+albedo_color = Color(0.2, 0.5, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="screen_mat"]
+albedo_color = Color(0.05, 0.05, 0.06, 1)
+
+[sub_resource type="StandardMaterial3D" id="vase_mat"]
+albedo_color = Color(0.9, 0.9, 0.95, 1)
+
+[sub_resource type="PlaneMesh" id="floor_mesh"]
+material = SubResource("floor_mat")
+size = Vector2(5, 4.5)
+
+[sub_resource type="BoxShape3D" id="floor_shape"]
+size = Vector3(5, 0.1, 4.5)
+
+[sub_resource type="BoxMesh" id="back_wall_mesh"]
+material = SubResource("wall_mat")
+size = Vector3(5, 2.6, 0.1)
+
+[sub_resource type="BoxShape3D" id="back_wall_shape"]
+size = Vector3(5, 2.6, 0.1)
+
+[sub_resource type="BoxMesh" id="side_wall_mesh"]
+material = SubResource("wall_mat")
+size = Vector3(0.1, 2.6, 4.5)
+
+[sub_resource type="BoxShape3D" id="side_wall_shape"]
+size = Vector3(0.1, 2.6, 4.5)
+
+[sub_resource type="BoxMesh" id="table_top_mesh"]
+material = SubResource("wood_mat")
+size = Vector3(1.2, 0.04, 0.7)
+
+[sub_resource type="BoxMesh" id="table_leg_mesh"]
+material = SubResource("wood_mat")
+size = Vector3(0.05, 0.68, 0.05)
+
+[sub_resource type="BoxShape3D" id="table_shape"]
+size = Vector3(1.2, 0.72, 0.7)
+
+[sub_resource type="CylinderMesh" id="cup_mesh"]
+material = SubResource("cup_mat")
+top_radius = 0.042
+bottom_radius = 0.036
+height = 0.1
+
+[sub_resource type="CylinderShape3D" id="cup_shape"]
+height = 0.1
+radius = 0.042
+
+[sub_resource type="CylinderMesh" id="bottle_mesh"]
+material = SubResource("bottle_mat")
+top_radius = 0.035
+bottom_radius = 0.035
+height = 0.24
+
+[sub_resource type="CylinderShape3D" id="bottle_shape"]
+height = 0.24
+radius = 0.035
+
+[sub_resource type="BoxMesh" id="book_mesh"]
+material = SubResource("book_mat")
+size = Vector3(0.16, 0.035, 0.23)
+
+[sub_resource type="BoxShape3D" id="book_shape"]
+size = Vector3(0.16, 0.035, 0.23)
+
+[sub_resource type="SphereMesh" id="apple_mesh"]
+material = SubResource("apple_mat")
+radius = 0.04
+height = 0.08
+
+[sub_resource type="SphereShape3D" id="apple_shape"]
+radius = 0.04
+
+[sub_resource type="BoxMesh" id="seat_mesh"]
+material = SubResource("dark_mat")
+size = Vector3(0.45, 0.05, 0.45)
+
+[sub_resource type="BoxMesh" id="chair_back_mesh"]
+material = SubResource("dark_mat")
+size = Vector3(0.45, 0.5, 0.05)
+
+[sub_resource type="BoxShape3D" id="chair_shape"]
+size = Vector3(0.45, 0.97, 0.45)
+
+[sub_resource type="CylinderMesh" id="pot_mesh"]
+material = SubResource("pot_mat")
+top_radius = 0.15
+bottom_radius = 0.12
+height = 0.3
+
+[sub_resource type="SphereMesh" id="leaves_mesh"]
+material = SubResource("leaf_mat")
+radius = 0.3
+height = 0.6
+
+[sub_resource type="CylinderShape3D" id="plant_shape"]
+height = 0.85
+radius = 0.3
+
+[sub_resource type="BoxMesh" id="cabinet_mesh"]
+material = SubResource("wood_mat")
+size = Vector3(1.6, 0.5, 0.35)
+
+[sub_resource type="BoxShape3D" id="cabinet_shape"]
+size = Vector3(1.6, 0.5, 0.35)
+
+[sub_resource type="BoxMesh" id="tv_mesh"]
+material = SubResource("screen_mat")
+size = Vector3(0.9, 0.55, 0.05)
+
+[sub_resource type="BoxShape3D" id="tv_shape"]
+size = Vector3(0.9, 0.55, 0.05)
+
+[sub_resource type="CylinderMesh" id="vase_mesh"]
+material = SubResource("vase_mat")
+top_radius = 0.05
+bottom_radius = 0.07
+height = 0.25
+
+[sub_resource type="CylinderShape3D" id="vase_shape"]
+height = 0.25
+radius = 0.07
+
+[node name="LivingRoom" type="Node3D"]
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.75)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("floor_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("floor_shape")
+
+[node name="FloorSurface" type="Marker3D" parent="Floor"]
+script = ExtResource("1_surface")
+kind = &"floor"
+size = Vector2(5, 4.5)
+
+[node name="BackWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, -3)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="BackWall"]
+mesh = SubResource("back_wall_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="BackWall"]
+shape = SubResource("back_wall_shape")
+
+[node name="LeftWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 1.3, -0.75)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="LeftWall"]
+mesh = SubResource("side_wall_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="LeftWall"]
+shape = SubResource("side_wall_shape")
+
+[node name="RightWall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.3, -0.75)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="RightWall"]
+mesh = SubResource("side_wall_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="RightWall"]
+shape = SubResource("side_wall_shape")
+
+[node name="Table" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.55)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Top" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+mesh = SubResource("table_top_mesh")
+
+[node name="LegFL" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.34, 0.3)
+mesh = SubResource("table_leg_mesh")
+
+[node name="LegFR" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.34, 0.3)
+mesh = SubResource("table_leg_mesh")
+
+[node name="LegBL" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.55, 0.34, -0.3)
+mesh = SubResource("table_leg_mesh")
+
+[node name="LegBR" type="MeshInstance3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.34, -0.3)
+mesh = SubResource("table_leg_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.36, 0)
+shape = SubResource("table_shape")
+
+[node name="TableSurface" type="Marker3D" parent="Table"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+script = ExtResource("1_surface")
+
+[node name="Cup" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.35, 0.72, -0.8)
+script = ExtResource("2_object")
+
+[node name="Mesh" type="MeshInstance3D" parent="Cup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+mesh = SubResource("cup_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Cup"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Cup/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+shape = SubResource("cup_shape")
+
+[node name="Bottle" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 0.72, -0.8)
+script = ExtResource("2_object")
+label = "bottle"
+
+[node name="Mesh" type="MeshInstance3D" parent="Bottle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+mesh = SubResource("bottle_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Bottle"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Bottle/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.12, 0)
+shape = SubResource("bottle_shape")
+
+[node name="Book" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.12, 0.72, -0.78)
+script = ExtResource("2_object")
+label = "book"
+
+[node name="Mesh" type="MeshInstance3D" parent="Book"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0175, 0)
+mesh = SubResource("book_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Book"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Book/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0175, 0)
+shape = SubResource("book_shape")
+
+[node name="Apple" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.12, 0.72, -0.8)
+script = ExtResource("2_object")
+label = "apple"
+
+[node name="Mesh" type="MeshInstance3D" parent="Apple"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+mesh = SubResource("apple_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Apple"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Apple/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+shape = SubResource("apple_shape")
+
+[node name="Chair" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.3, 0, -1.4)
+script = ExtResource("2_object")
+label = "chair"
+
+[node name="Seat" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+mesh = SubResource("seat_mesh")
+
+[node name="Back" type="MeshInstance3D" parent="Chair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, -0.2)
+mesh = SubResource("chair_back_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Chair"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Chair/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.485, 0)
+shape = SubResource("chair_shape")
+
+[node name="Plant" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.7, 0, -2.4)
+script = ExtResource("2_object")
+label = "potted plant"
+
+[node name="Pot" type="MeshInstance3D" parent="Plant"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+mesh = SubResource("pot_mesh")
+
+[node name="Leaves" type="MeshInstance3D" parent="Plant"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+mesh = SubResource("leaves_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Plant"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Plant/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.425, 0)
+shape = SubResource("plant_shape")
+
+[node name="Cabinet" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.25, -2.75)
+collision_layer = 2
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Cabinet"]
+mesh = SubResource("cabinet_mesh")
+
+[node name="Shape" type="CollisionShape3D" parent="Cabinet"]
+shape = SubResource("cabinet_shape")
+
+[node name="TV" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0.5, -2.8)
+script = ExtResource("2_object")
+label = "tv"
+
+[node name="Mesh" type="MeshInstance3D" parent="TV"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+mesh = SubResource("tv_mesh")
+
+[node name="Body" type="StaticBody3D" parent="TV"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="TV/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+shape = SubResource("tv_shape")
+
+[node name="Vase" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.5, -2.75)
+script = ExtResource("2_object")
+label = "vase"
+
+[node name="Mesh" type="MeshInstance3D" parent="Vase"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.125, 0)
+mesh = SubResource("vase_mesh")
+
+[node name="Body" type="StaticBody3D" parent="Vase"]
+collision_layer = 2
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="Vase/Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.125, 0)
+shape = SubResource("vase_shape")

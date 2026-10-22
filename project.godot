@@ -1,0 +1,70 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="ARVision"
+config/description="AR vision training for children who gained sight late: measured trials over Quest passthrough."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.svg"
+
+[audio]
+
+general/text_to_speech=true
+
+[autoload]
+
+Events="*res://core/events.gd"
+Profile="*res://core/profile.gd"
+Log="*res://core/log.gd"
+App="*res://core/app.gd"
+
+[layer_names]
+
+3d_physics/layer_1="targets"
+3d_physics/layer_2="reality"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=2
+
+[shader_globals]
+
+reality_filter={
+"type": "vec4",
+"value": Vector4(0, 1, 1, 0)
+}
+reality_edges={
+"type": "color",
+"value": Color(0, 0, 0, 0)
+}
+reality_focus={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+reality_dim={
+"type": "float",
+"value": 0.0
+}
+
+[xr]
+
+openxr/enabled=true
+openxr/startup_alert=false
+shaders/enabled=true
+openxr/extensions/meta/passthrough=true
+openxr/extensions/meta/scene_api=true
