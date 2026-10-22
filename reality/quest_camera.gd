@@ -8,6 +8,7 @@ extends SubViewport
 ##
 ## Not yet run on a headset: check the feed choice, colours and FOV there.
 
+const PERMISSION := "horizonos.permission.HEADSET_CAMERA"
 ## Approximate vertical field of view of the passthrough camera, degrees.
 const FOV_Y := 64.0
 const YCBCR := """
@@ -27,9 +28,13 @@ var _feed: CameraFeed
 func _ready() -> void:
 	size = Vector2i(640, 480)
 	render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	OS.request_permission("horizonos.permission.HEADSET_CAMERA")
 	CameraServer.camera_feeds_updated.connect(_open_feed)
-	CameraServer.monitoring_feeds = true
+	if OS.request_permission(PERMISSION):
+		CameraServer.monitoring_feeds = true
+	else: # asked now; feeds appear once the child (or facilitator) allows it
+		get_tree().on_request_permissions_result.connect(func(permission: String, granted: bool) -> void:
+			if permission == PERMISSION and granted:
+				CameraServer.monitoring_feeds = true)
 
 
 ## The newest frame, or null until the camera runs.

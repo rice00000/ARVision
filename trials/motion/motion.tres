@@ -1,0 +1,87 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="PackedScene" path="res://trials/motion/motion.tscn" id="3_scene"]
+
+[sub_resource type="Resource" id="coherence"]
+script = ExtResource("2_axis")
+name = &"coherence"
+easy = 0.9
+hard = 0.15
+driven = true
+
+[sub_resource type="Resource" id="competing"]
+script = ExtResource("2_axis")
+name = &"competing"
+easy = 0.0
+
+[sub_resource type="Resource" id="direction"]
+script = ExtResource("2_axis")
+name = &"direction"
+easy = 0.0
+
+[sub_resource type="Resource" id="dots"]
+script = ExtResource("2_axis")
+name = &"dots"
+easy = 200.0
+
+[sub_resource type="Resource" id="speed"]
+script = ExtResource("2_axis")
+name = &"speed"
+easy = 0.3
+
+[sub_resource type="Resource" id="dot_lifetime"]
+script = ExtResource("2_axis")
+name = &"dot_lifetime"
+easy = 0.8
+
+[sub_resource type="Resource" id="half_width"]
+script = ExtResource("2_axis")
+name = &"half_width"
+easy = 0.8
+
+[sub_resource type="Resource" id="half_height"]
+script = ExtResource("2_axis")
+name = &"half_height"
+easy = 0.5
+
+[sub_resource type="Resource" id="half_depth"]
+script = ExtResource("2_axis")
+name = &"half_depth"
+easy = 0.8
+
+[sub_resource type="Resource" id="distance"]
+script = ExtResource("2_axis")
+name = &"distance"
+easy = 2.2
+
+[sub_resource type="Resource" id="tolerance"]
+script = ExtResource("2_axis")
+name = &"tolerance"
+easy = 40.0
+
+[sub_resource type="Resource" id="min_sweep"]
+script = ExtResource("2_axis")
+name = &"min_sweep"
+easy = 0.12
+
+[sub_resource type="Resource" id="min_seconds"]
+script = ExtResource("2_axis")
+name = &"min_seconds"
+easy = 0.12
+
+[sub_resource type="Resource" id="max_seconds"]
+script = ExtResource("2_axis")
+name = &"max_seconds"
+easy = 4.0
+
+[resource]
+script = ExtResource("1_def")
+title = "Read the flow"
+scene = ExtResource("3_scene")
+skill = &"global_motion"
+axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("competing"), SubResource("direction"), SubResource("dots"), SubResource("speed"), SubResource("dot_lifetime"), SubResource("half_width"), SubResource("half_height"), SubResource("half_depth"), SubResource("distance"), SubResource("tolerance"), SubResource("min_sweep"), SubResource("min_seconds"), SubResource("max_seconds")])
+notes = "Coherence is the driven axis; everything else is fixed so a failure points at coherence. Noise dots move in random directions. Retries are unlimited; the staircase moves on first-try, unaided sweeps, and the log carries every attempt. Help only when asked."
+hint_after = 0.0
+max_hint = 1

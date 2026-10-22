@@ -10,7 +10,9 @@ extends Node3D
 ## tries, help used and the whole condition.
 ##
 ## Input hooks run only while a round is running and the world is not paused,
-## so a trial never sees a press meant for the facilitator panel.
+## so a trial never sees a press meant for the facilitator panel. A press and
+## its release can therefore straddle a pause: drop half-done gestures in
+## [code]_notification(NOTIFICATION_PAUSED)[/code].
 ##
 ## Help: [member TrialDef.hint_after] seconds without progress raise the hint
 ## level by one (later each round, so help fades); B / Y asks for the next level
@@ -49,6 +51,9 @@ func _ready() -> void:
 	Events.button.connect(func(hand: StringName, action: StringName, pressed: bool) -> void:
 		if _live():
 			_on_button(hand, action, pressed))
+	Events.hand_tracking.connect(func(hand: StringName, tracked: bool) -> void:
+		if _live():
+			_on_tracking(hand, tracked))
 	Events.help_requested.connect(func() -> void:
 		if _live():
 			Events.report(&"help_asked", {trial = condition.trial})
@@ -74,7 +79,8 @@ func finish(success: bool, extra: Dictionary = {}) -> void:
 		return
 	_running = false
 	var data := condition.to_log()
-	data.merge({seconds = snappedf(_elapsed, 0.001), tries = tries, hint = hint_level}, true)
+	data.merge({seconds = snappedf(_elapsed, 0.001), tries = tries, hint = hint_level,
+		first_try = success and tries == 0 and hint_level == 0}, true)
 	data.merge(extra, true)
 	_teardown()
 	Events.trial_ended.emit(condition.skill, success, data)
@@ -172,7 +178,16 @@ func _on_button(_hand: StringName, _action: StringName, _pressed: bool) -> void:
 	pass
 
 
+func _on_tracking(_hand: StringName, _tracked: bool) -> void:
+	pass
+
+
 # -- internals ----------------------------------------------------------------
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_EXIT_TREE:
+		_running = false # the app closed mid-round: nothing left to judge
+
 
 func _process(delta: float) -> void:
 	if not _running:

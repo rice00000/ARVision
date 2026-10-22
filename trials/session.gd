@@ -4,8 +4,10 @@ extends Node
 ##
 ## For each round it picks the level (the facilitator's pin, the block's fixed
 ## difficulty, or the child's staircase), and after each scored, non-probe round
-## it moves the staircase. Each block shows the real world through its [View].
-## The facilitator steers it through the public methods.
+## it moves the staircase. A round counts as right for the staircase only when
+## it was solved on the first try without help: trials allow retries, so a
+## solved round alone says little. Each block shows the real world through its
+## [View]. The facilitator steers it through the public methods.
 ##
 ##   godot --path . -- --plan=res://content/sessions/demo.tres
 
@@ -36,14 +38,14 @@ func _ready() -> void:
 
 func run() -> void:
 	running = true
-	Events.say(plan.greeting)
+	await _announce(plan.greeting)
 	for index in plan.blocks.size():
 		block_index = index
 		block = plan.blocks[index]
 		await _run_block()
 	block = null
 	running = false
-	Events.say(plan.farewell)
+	await _announce(plan.farewell)
 	Events.session_finished.emit()
 
 
@@ -86,21 +88,29 @@ func _run_block() -> void:
 	trial = def.scene.instantiate()
 	trial.def = def
 	App.stage.add_child(trial)
-	if not block.intro.is_empty():
-		Events.say(block.intro)
+	await _announce(block.intro)
 	for round_index in block.rounds:
 		if _skip:
 			break
-		var condition := def.condition(level(), round_index, block.probe)
+		var condition := def.condition(level(), round_index, block.probe, block.pins)
 		condition.view = App.reality.view.to_log()
 		trial.begin(condition)
 		var result: Array = await trial.ended
 		if result[1] and not block.probe and block.difficulty < 0.0 and is_nan(pinned):
+			var first_try: bool = result[0] and trial.tries == 0 and trial.hint_level == 0
 			var before := Profile.level(def.skill)
-			Events.report(&"level", {skill = def.skill, before = before,
-				after = Profile.adapt(def.skill, result[0], def.up_after, def.step)})
+			Events.report(&"level", {skill = def.skill, first_try = first_try, before = before,
+				after = Profile.adapt(def.skill, first_try, def.up_after, def.step)})
 		if not _skip:
 			await get_tree().create_timer(block.pause_between, false).timeout
 	trial.queue_free()
 	trial = null
 	_skip = false
+
+
+## Says [param text] and waits about as long as it takes to hear it.
+func _announce(text: String) -> void:
+	if text.is_empty():
+		return
+	Events.say(text)
+	await get_tree().create_timer(clampf(text.length() * 0.06, 1.5, 6.0), false).timeout

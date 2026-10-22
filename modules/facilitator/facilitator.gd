@@ -57,6 +57,8 @@ func toggle() -> void:
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
 	if not is_open or target == null or target.get_parent() != _panel:
 		return
+	if App.session.block == null and target.id in [&"fac_easier", &"fac_harder", &"fac_skip"]:
+		return # nothing running to steer
 	Events.report(&"facilitator", {button = target.id})
 	match target.id:
 		&"fac_easier":

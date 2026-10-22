@@ -1,0 +1,33 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://trials/motion/motion_trial.gd" id="1_motion"]
+[ext_resource type="Shader" path="res://trials/motion/motion_dots.gdshader" id="2_dots"]
+
+[sub_resource type="ShaderMaterial" id="flow"]
+resource_local_to_scene = true
+shader = ExtResource("2_dots")
+
+[sub_resource type="StandardMaterial3D" id="dot_material"]
+shading_mode = 0
+albedo_color = Color(0.75, 0.95, 1, 1)
+
+[sub_resource type="SphereMesh" id="dot"]
+material = SubResource("dot_material")
+radius = 0.02
+height = 0.04
+radial_segments = 8
+rings = 4
+
+[node name="Motion" type="Node3D"]
+script = ExtResource("1_motion")
+
+[node name="Cloud" type="GPUParticles3D" parent="."]
+amount = 200
+lifetime = 1000.0
+explosiveness = 1.0
+fixed_fps = 0
+visibility_aabb = AABB(-1.1, -0.8, -1.1, 2.2, 1.6, 2.2)
+local_coords = true
+process_material = SubResource("flow")
+draw_pass_1 = SubResource("dot")
+cast_shadow = 0

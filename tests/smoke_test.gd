@@ -38,6 +38,17 @@ func test_wrong_pick_then_help() -> void:
 	expect_eq(trial.hint_level, 1, "B asks for the first hint")
 
 
+func test_a_round_solved_after_a_wrong_try_lowers_the_level() -> void:
+	await boot(plan_of(FIND, 1))
+	var ended := record(Events.trial_ended)
+	App.session.run()
+	await until(_round_running)
+	await select((App.session.trial.get("_toys").keys()[1] as Target).global_position)
+	await select((App.session.trial.get("_target") as Target).global_position)
+	expect(ended[0][1] and not ended[0][2].first_try, "solved, but not on the first try")
+	expect(Profile.level(FIND.skill) < Profile.START_LEVEL, "the staircase steps down")
+
+
 func test_probe_rounds_get_no_help_and_keep_the_level() -> void:
 	await boot(plan_of(FIND, 1, true, 0.3))
 	App.session.run()

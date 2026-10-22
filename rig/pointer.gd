@@ -1,8 +1,9 @@
 class_name Pointer
 extends Node3D
 ## One controller's pointing ray and fingertip, turned into [Events]: every
-## button, [signal Events.selected] when the trigger is pulled, and
-## [signal Events.touched] when the fingertip enters a [Target].
+## button, [signal Events.selected] when the trigger is pulled,
+## [signal Events.touched] when the fingertip enters a [Target], and tracking
+## changes.
 ##
 ## The ray only hits Targets (physics layer "targets"): real surfaces never block
 ## it, so pointing works the same over passthrough and in the simulated room.
@@ -27,6 +28,7 @@ func _ready() -> void:
 	side = &"left" if _controller.name == &"LeftHand" else &"right"
 	_controller.button_pressed.connect(_on_button.bind(true))
 	_controller.button_released.connect(_on_button.bind(false))
+	_controller.tracking_changed.connect(func(tracked: bool) -> void: Events.hand_tracking.emit(side, tracked))
 	_build()
 
 

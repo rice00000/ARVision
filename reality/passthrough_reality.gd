@@ -10,6 +10,7 @@ const DimShader := preload("res://reality/dim_sphere.gdshader")
 var _passthrough: OpenXRFbPassthroughExtension
 var _black_white := Gradient.new()
 var _dim := ShaderMaterial.new()
+var _sphere := MeshInstance3D.new()
 var _camera: QuestCamera
 
 
@@ -28,15 +29,14 @@ func _ready() -> void:
 	_black_white.offsets = PackedFloat32Array([0.0, 0.5])
 	_black_white.colors = PackedColorArray([Color.BLACK, Color.WHITE])
 	_dim.shader = DimShader
-	var sphere := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
 	mesh.radius = 30.0
 	mesh.height = 60.0
 	mesh.flip_faces = true
-	sphere.mesh = mesh
-	sphere.material_override = _dim
-	sphere.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	App.rig.head.add_child(sphere)
+	_sphere.mesh = mesh
+	_sphere.material_override = _dim
+	_sphere.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	App.rig.head.add_child(_sphere)
 	var scan: OpenXRFbSceneManager = OpenXRFbSceneManager.new()
 	scan.default_scene = SceneAnchor
 	scan.scene_setup_method = &"setup_scene"
@@ -60,5 +60,6 @@ func _apply() -> void:
 	else:
 		_passthrough.set_passthrough_filter(OpenXRFbPassthroughExtension.PASSTHROUGH_FILTER_DISABLED)
 	_passthrough.set_edge_color(view.edges)
+	_sphere.visible = view.dim > 0.0 # a full-view transparent pass costs frame time on a Quest
 	_dim.set_shader_parameter(&"dim", view.dim)
 	_dim.set_shader_parameter(&"focus", Vector4(_focus.x, _focus.y, _focus.z, view.focus_radius))

@@ -9,6 +9,8 @@ extends Resource
 @export var probe := false
 ## Level for every round, 0-1. Negative = the child's staircase level.
 @export_range(-1.0, 1.0) var difficulty := -1.0
+## Axes fixed for this block, by name (e.g. &"direction": 1.0), over the TrialDef's values.
+@export var pins: Dictionary[StringName, float] = {}
 ## How the real world is shown. Empty = normal.
 @export var view: View
 ## Said once before the first round.

@@ -4,6 +4,7 @@
 [ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
 [ext_resource type="Resource" path="res://trials/find/find.tres" id="3_find"]
 [ext_resource type="Resource" path="res://trials/point_real/point_real.tres" id="4_point"]
+[ext_resource type="Resource" path="res://trials/motion/motion.tres" id="7_motion"]
 [ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="5_contrast"]
 [ext_resource type="Resource" path="res://content/views/spotlight.tres" id="6_spotlight"]
 
@@ -39,7 +40,14 @@ trial = ExtResource("4_point")
 rounds = 3
 intro = "Now look at the real room."
 
+[sub_resource type="Resource" id="motion"]
+script = ExtResource("2_block")
+trial = ExtResource("7_motion")
+rounds = 4
+intro = "Now watch the dots. Sweep your hand the way most of them go."
+pause_between = 2.0
+
 [resource]
 script = ExtResource("1_plan")
 title = "Demo"
-blocks = Array[ExtResource("2_block")]([SubResource("probe"), SubResource("train"), SubResource("contrast"), SubResource("spotlight"), SubResource("real")])
+blocks = Array[ExtResource("2_block")]([SubResource("probe"), SubResource("train"), SubResource("contrast"), SubResource("spotlight"), SubResource("real"), SubResource("motion")])

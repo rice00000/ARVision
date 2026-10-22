@@ -24,7 +24,8 @@ Session ─ Block ─▶ apply View ─▶ instance trial scene ─▶ per round
    ─▶ Events.trial_ended ─▶ Log line, Profile.adapt (2-up / 1-down)
 ```
 
-- **Level:** one 0–1 number per skill (`Profile`). `TrialAxis` maps it to real values; keep one driven axis per trial.
+- **Level:** one 0–1 number per skill (`Profile`). `TrialAxis` maps it to real values; keep one driven axis per trial. `Block.pins` fixes other axes per block.
+- **Staircase:** a round counts as right only when solved on the first try without help (`first_try` in the log); retries and help still end in success for the child.
 - **Probe blocks** are unaided and do not move the level: no-help check-ins.
 - **Help** escalates by itself (`hint_after`, later each round) or on B / Y; every hint is logged.
 - **Log:** `user://profiles/<id>/logs/*.jsonl`, every round with its full condition and view.

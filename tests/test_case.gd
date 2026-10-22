@@ -84,15 +84,19 @@ func select(at: Vector3, side := &"right") -> void:
 	await frames(1)
 
 
-## A one-block plan.
-static func plan_of(def: TrialDef, rounds: int, probe := false, difficulty := -1.0, view: View = null) -> SessionPlan:
+## A one-block plan with no greeting or farewell to sit through.
+static func plan_of(def: TrialDef, rounds: int, probe := false, difficulty := -1.0, view: View = null,
+		pins: Dictionary = {}) -> SessionPlan:
 	var block := Block.new()
 	block.trial = def
 	block.rounds = rounds
 	block.probe = probe
 	block.difficulty = difficulty
 	block.view = view
+	block.pins.assign(pins)
 	block.pause_between = 0.2
 	var plan := SessionPlan.new()
+	plan.greeting = ""
+	plan.farewell = ""
 	plan.blocks.append(block)
 	return plan

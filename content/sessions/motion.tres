@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SessionPlan" format=3]
+
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="1_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
+[ext_resource type="Resource" path="res://trials/motion/motion.tres" id="3_motion"]
+[ext_resource type="Resource" path="res://trials/motion/motion_competing.tres" id="4_competing"]
+
+[sub_resource type="Resource" id="random"]
+script = ExtResource("2_block")
+trial = ExtResource("3_motion")
+rounds = 6
+intro = "Watch the dots. Sweep your hand the way most of them go."
+pause_between = 2.0
+
+[sub_resource type="Resource" id="competing"]
+script = ExtResource("2_block")
+trial = ExtResource("4_competing")
+rounds = 6
+intro = "Now some dots go the other way. Sweep with the bigger group."
+pause_between = 2.0
+
+[resource]
+script = ExtResource("1_plan")
+title = "Motion"
+blocks = Array[ExtResource("2_block")]([SubResource("random"), SubResource("competing")])

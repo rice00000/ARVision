@@ -18,6 +18,8 @@ signal selected(hand: StringName, target: Target, origin: Vector3, direction: Ve
 signal touched(hand: StringName, target: Target)
 ## The child asked for help (B / Y).
 signal help_requested
+## A controller lost or regained tracking.
+signal hand_tracking(hand: StringName, tracked: bool)
 
 # -- what the child sees and hears --------------------------------------------
 
