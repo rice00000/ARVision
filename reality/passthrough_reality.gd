@@ -4,6 +4,11 @@ extends Reality
 ## Meta room scan, Meta's passthrough filters for the View, and passthrough
 ## camera frames for CV. Needs a headset; desktop and tests use SimReality.
 ##
+## The room scan: when the headset has none, Quest's Space Setup is opened once
+## per run. If the room still cannot be read after it, play goes on with the
+## virtual table patch instead of asking again. Each step is logged
+## ("room_..." events, also printed to logcat).
+##
 ## Meta's extensions are engine singletons: call them by name
 ## (OpenXRFbPassthroughExtension.set_...). A variable typed with that name
 ## breaks debug builds ("Internal script error! Opcode: 28").
@@ -15,6 +20,8 @@ var _black_white := Gradient.new()
 var _dim := ShaderMaterial.new()
 var _sphere := MeshInstance3D.new()
 var _camera: QuestCamera
+var _scan := OpenXRFbSceneManager.new()
+var _scan_asked := false
 
 
 func kind() -> String:
@@ -39,15 +46,31 @@ func _ready() -> void:
 	_sphere.material_override = _dim
 	_sphere.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	App.rig.head.add_child(_sphere)
-	var scan: OpenXRFbSceneManager = OpenXRFbSceneManager.new()
-	scan.default_scene = SceneAnchor
-	scan.scene_setup_method = &"setup_scene"
-	scan.auto_create = true
-	scan.openxr_fb_scene_data_missing.connect(scan.request_scene_capture)
-	App.rig.add_child(scan)
+	_scan.default_scene = SceneAnchor
+	_scan.scene_setup_method = &"setup_scene"
+	_scan.auto_create = true
+	_scan.openxr_fb_scene_data_missing.connect(_on_room_missing)
+	_scan.openxr_fb_scene_capture_completed.connect(func(success: bool) -> void:
+		note(&"room_scan_done", {success = success}))
+	App.rig.add_child(_scan)
 	_camera = QuestCamera.new()
 	add_child(_camera)
 	_apply()
+
+
+## Logs a step of reading the room, and prints it for adb logcat.
+static func note(what: StringName, data: Dictionary = {}) -> void:
+	print("ARVision %s %s" % [what, data])
+	Events.report(what, data)
+
+
+func _on_room_missing() -> void:
+	if _scan_asked:
+		note(&"room_missing", {after_scan = true})
+		return
+	_scan_asked = true
+	note(&"room_missing", {after_scan = false})
+	_scan.request_scene_capture()
 
 
 func camera_frame() -> CameraFrame:

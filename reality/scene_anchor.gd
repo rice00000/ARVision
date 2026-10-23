@@ -31,3 +31,4 @@ func setup_scene(entity: OpenXRFbSpatialEntity) -> void:
 	var extent := Vector2(box.size[(axis + 1) % 3], box.size[(axis + 2) % 3])
 	var centre := global_transform * box.get_center()
 	App.reality.add_surface(Surface.new(StringName(label), Transform3D(frame, centre), extent, self))
+	PassthroughReality.note(&"room_surface", {kind = label, size = extent, centre = centre})
