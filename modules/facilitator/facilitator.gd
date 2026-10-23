@@ -73,7 +73,7 @@ func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _directio
 		&"fac_skip":
 			App.session.skip_block()
 		&"fac_close":
-			toggle()
+			toggle.call_deferred() # after this press has reached every listener: a trial must not take it as an answer
 			return
 	_refresh()
 

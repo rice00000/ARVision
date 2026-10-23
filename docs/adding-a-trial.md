@@ -13,6 +13,6 @@
 3. **Scene** whose root has the script. Child nodes are fine; the instance lives for one block. Mark materials the script changes `resource_local_to_scene`.
 4. **TrialDef** `.tres`: `scene`, `skill`, `axes` (one `driven`), help timing, `time_limit`, and `requires` (e.g. `&"Detector"`).
 5. **Plan:** add a `Block` to a `content/sessions/` plan (`Block.pins` fixes axes for that block), or test it alone with `TestCase.plan_of(def, rounds, ...)`.
-6. **Test:** a `tests/<kind>_test.gd` extending `TestCase` that plays rounds through `input` (SimInput).
+6. **Test:** a `tests/<kind>_test.gd` extending `TestCase` that plays rounds through `input` (SimInput). For whole sessions, teach `tools/sim/child.py` how to answer it and add a scenario in `tests/sim/` ([testing](testing.md)).
 
 Use only `Events`, `App` and the Reality API. No headset checks, no input polling, no own logging.

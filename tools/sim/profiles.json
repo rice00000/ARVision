@@ -1,0 +1,20 @@
+{
+  "assumptions": "Synthetic seated profiles and perception settings for regression tests. Not measured children, not clinical limits, not a model of vision. Calibrate against headset sessions.",
+  "bodies": [
+    {"name": "small", "eye_height": 1.02, "shoulder_half_width": 0.13, "shoulder_drop": 0.20, "arm_length": 0.48, "comfortable_reach": 0.42,
+     "hand_speed": 1.5, "head_speed": 120, "max_yaw": 70, "max_pitch_up": 35, "max_pitch_down": 60, "max_lean": 0.12, "reaction": 0.6},
+    {"name": "medium", "eye_height": 1.12, "shoulder_half_width": 0.15, "shoulder_drop": 0.22, "arm_length": 0.56, "comfortable_reach": 0.49,
+     "hand_speed": 2.0, "head_speed": 150, "max_yaw": 75, "max_pitch_up": 40, "max_pitch_down": 60, "max_lean": 0.15, "reaction": 0.45},
+    {"name": "large", "eye_height": 1.22, "shoulder_half_width": 0.18, "shoulder_drop": 0.25, "arm_length": 0.66, "comfortable_reach": 0.58,
+     "hand_speed": 2.5, "head_speed": 180, "max_yaw": 80, "max_pitch_up": 40, "max_pitch_down": 65, "max_lean": 0.18, "reaction": 0.35}
+  ],
+  "limits": {"fov_h": 100, "fov_v": 90, "view_margin": 4, "hand_radius": 0.04, "torso_radius": 0.11, "path_step": 0.02},
+  "perceptions": [
+    {"name": "strong", "acuity": 0.8, "accuracy": 0.99, "clutter_cost": 0.002, "motion_threshold": 0.12, "motion_slope": 0.03, "depth_cost": 0.02,
+     "aim_error": 0.8, "asks_help_after": 2, "freeze": 0.0, "touch": 0.3, "search": 0.15, "fumble": 0.0},
+    {"name": "typical", "acuity": 1.5, "accuracy": 0.85, "clutter_cost": 0.025, "motion_threshold": 0.35, "motion_slope": 0.08, "depth_cost": 0.08,
+     "aim_error": 1.5, "asks_help_after": 2, "freeze": 0.03, "touch": 0.3, "search": 0.3, "fumble": 0.05},
+    {"name": "weak", "acuity": 3.0, "accuracy": 0.25, "clutter_cost": 0.08, "motion_threshold": 0.95, "motion_slope": 0.05, "depth_cost": 0.1,
+     "aim_error": 2.5, "asks_help_after": 0, "freeze": 0.0, "touch": 0.0, "search": 0.5, "fumble": 0.0}
+  ]
+}

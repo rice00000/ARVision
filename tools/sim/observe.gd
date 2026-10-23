@@ -1,0 +1,201 @@
+extends RefCounted
+## Engine facts for the sim client: poses, the session, the running trial's
+## stimuli, the room, detections and the facilitator panel. Read-only: nothing
+## here changes the game. The client decides what a child could perceive.
+
+const REALITY_LAYER := 2
+
+
+static func everything(clock: float, seq: int) -> Dictionary:
+	var detector := App.module(&"Detector")
+	var facilitator := App.module(&"Facilitator")
+	return Log.plain({
+		t = clock, seq = seq, paused = App.get_tree().paused, profile = Profile.id,
+		profile_dir = ProjectSettings.globalize_path(Profile.path()),
+		log_path = ProjectSettings.globalize_path(Log.file_path) if not Log.file_path.is_empty() else "",
+		modules = App.get_tree().get_nodes_in_group(Module.GROUP).map(func(node: Node) -> String: return node.name),
+		reality = App.reality.kind(),
+		rig = frame(App.rig.global_transform),
+		head = head(),
+		hands = {left = hand(&"left"), right = hand(&"right")},
+		view = App.reality.view.to_log(),
+		focus = App.reality.get("_focus"), # where a spotlight view is centred
+		work_surface = surface(App.reality.work_surface()),
+		session = session(),
+		levels = levels(),
+		stimuli = stimuli(),
+		real_objects = real_objects(),
+		detections = detector.detections.map(func(found: Detection) -> Dictionary: return found.to_log()) if detector else [],
+		facilitator = panel(facilitator) if facilitator else null,
+		subtitle = subtitle(),
+	})
+
+
+static func frame(pose: Transform3D) -> Dictionary:
+	return {position = pose.origin, x = pose.basis.x, y = pose.basis.y, z = pose.basis.z, forward = -pose.basis.z}
+
+
+static func head() -> Dictionary:
+	var camera := App.head()
+	var result := frame(camera.global_transform)
+	result.fov = camera.fov
+	return result
+
+
+static func hand(side: StringName) -> Dictionary:
+	var controller := App.rig.hand(side)
+	var pointer := App.rig.pointer(side)
+	var result := frame(controller.global_transform)
+	var aimed := pointer.cast() # what a trigger pull would select now (Pointer.aimed lags a frame)
+	result.merge({tracked = controller.get_has_tracking_data(), tip = pointer.tip(), aimed = aimed.id if aimed else ""})
+	return result
+
+
+static func surface(found: Surface) -> Dictionary:
+	var result := frame(found.transform)
+	result.merge({kind = found.kind, size = found.size})
+	return result
+
+
+static func session() -> Dictionary:
+	var running := App.session
+	var result := {running = running.running, block_index = running.block_index, blocks = running.plan.blocks.size(),
+		pinned = null if is_nan(running.pinned) else running.pinned, block = null, level = null, trial = null}
+	if running.block:
+		var block := running.block
+		result.block = {trial = block.trial.id, title = block.trial.title, skill = block.trial.skill, rounds = block.rounds,
+			probe = block.probe, difficulty = block.difficulty, pins = block.pins,
+			view = block.view.title if block.view else "Normal", pause_between = block.pause_between}
+		result.level = running.level()
+	var trial := running.trial
+	if trial and trial.condition:
+		result.trial = {id = trial.condition.trial, running = trial.is_running(), round = trial.condition.round_index,
+			tries = trial.tries, hint = trial.hint_level, seconds = trial.seconds(), condition = trial.condition.to_log(),
+			hint_after = trial.def.hint_after, hint_fade = trial.def.hint_fade, max_hint = trial.def.max_hint,
+			time_limit = trial.def.time_limit}
+	return result
+
+
+## Staircase level of every skill the plan trains.
+static func levels() -> Dictionary:
+	var result := {}
+	for block in App.session.plan.blocks:
+		result[block.trial.skill] = Profile.level(block.trial.skill)
+	return result
+
+
+## What the running trial shows: its Targets, any plain markers, a dot cloud.
+static func stimuli() -> Dictionary:
+	var trial := App.session.trial
+	if trial == null:
+		return {targets = [], markers = [], cloud = null, named = ""}
+	var targets := []
+	var markers := []
+	for node: Node3D in trial.find_children("*", "Node3D", true, false):
+		if node is Target:
+			targets.append(target(node))
+		elif node is MeshInstance3D and not node.get_parent() is Target:
+			markers.append({position = node.global_position, visible = node.is_visible_in_tree()})
+	var named := ""
+	if trial.condition:
+		named = String(trial.condition.value(&"target", trial.condition.value(&"object", "")))
+	var cloud: GPUParticles3D = trial.get_node_or_null(^"Cloud")
+	return {targets = targets, markers = markers, named = named, cloud = dots(cloud) if cloud else null}
+
+
+static func target(node: Target) -> Dictionary:
+	var box := AABB()
+	var glow := false
+	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		var part := mesh.global_transform * mesh.get_aabb()
+		box = part if box.size == Vector3.ZERO else box.merge(part)
+		var material := mesh.material_override as StandardMaterial3D
+		glow = glow or (material != null and material.emission_enabled)
+	var radius := 0.0
+	for shape: CollisionShape3D in node.find_children("*", "CollisionShape3D", false, false):
+		if shape.shape is SphereShape3D:
+			radius = (shape.shape as SphereShape3D).radius
+		elif shape.shape is BoxShape3D:
+			radius = (shape.shape as BoxShape3D).size.length() * 0.5
+	return {id = node.id, position = node.global_position, centre = box.get_center(), extent = box.size,
+		radius = radius, glow = glow, visible = node.is_visible_in_tree()}
+
+
+static func dots(cloud: GPUParticles3D) -> Dictionary:
+	var material := cloud.process_material as ShaderMaterial
+	var flow: Vector3 = material.get_shader_parameter(&"flow_direction")
+	var result := frame(cloud.global_transform)
+	result.merge({amount = cloud.amount, flow = flow, flow_world = cloud.global_basis * flow,
+		dot_count = material.get_shader_parameter(&"dot_count"), signal_count = material.get_shader_parameter(&"signal_count"),
+		half_size = material.get_shader_parameter(&"half_size"), competing = material.get_shader_parameter(&"competing_flow"),
+		alignment = material.get_shader_parameter(&"alignment"), speed = material.get_shader_parameter(&"speed")})
+	return result
+
+
+## The simulated room's recognisable things, with whether the eyes have a clear line to them.
+static func real_objects() -> Array:
+	var eye := App.head().global_position
+	var space := App.head().get_world_3d().direct_space_state
+	var found := []
+	for object in (App.reality as SimReality).objects():
+		var centre := object.centre()
+		var box := AABB()
+		for mesh: MeshInstance3D in object.find_children("*", "MeshInstance3D", true, false):
+			var part := mesh.global_transform * mesh.get_aabb()
+			box = part if box.size == Vector3.ZERO else box.merge(part)
+		var query := PhysicsRayQueryParameters3D.create(eye, centre, REALITY_LAYER, object.bodies())
+		var hit := space.intersect_ray(query)
+		found.append({label = object.label, centre = centre, extent = box.size, clear = hit.is_empty(),
+			blocker = _name(hit.collider) if hit else ""})
+	return found
+
+
+static func panel(facilitator: Node) -> Dictionary:
+	var result := {open = facilitator.is_open, status = "", buttons = []}
+	if facilitator.is_open:
+		var node := facilitator.get_node(^"FacilitatorPanel")
+		result.status = (facilitator.get("_status") as Label3D).text
+		for button: Target in node.get_children().filter(func(child: Node) -> bool: return child is Target):
+			result.buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z})
+	return result
+
+
+static func subtitle() -> Variant:
+	var voice := App.module(&"Voice")
+	if voice == null:
+		return null
+	var label: Label3D = voice.get("_label")
+	return {text = label.text, visible = label.visible}
+
+
+## Sweeps a sphere of [param radius] along [param points] against the real room.
+static func sweep(points: Array, radius: float) -> Dictionary:
+	var sphere := SphereShape3D.new()
+	sphere.radius = radius
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = sphere
+	query.collision_mask = REALITY_LAYER
+	var space := App.head().get_world_3d().direct_space_state
+	for i in points.size():
+		var at := Vector3(points[i][0], points[i][1], points[i][2])
+		query.transform.origin = at
+		query.motion = Vector3.ZERO
+		var hits := space.intersect_shape(query, 1)
+		if not hits.is_empty():
+			return {clear = false, segment = i, at = at, blocker = _name(hits[0].collider)}
+		if i + 1 < points.size():
+			query.motion = Vector3(points[i + 1][0], points[i + 1][1], points[i + 1][2]) - at
+			var fraction := space.cast_motion(query)
+			if fraction[0] < 1.0:
+				query.transform.origin = at + query.motion * fraction[1]
+				query.motion = Vector3.ZERO
+				var blockers := space.intersect_shape(query, 1)
+				return {clear = false, segment = i, at = query.transform.origin,
+					blocker = _name(blockers[0].collider) if blockers else ""}
+	return {clear = true}
+
+
+## A real object's collider is its child "Body"; name the object.
+static func _name(collider: Object) -> String:
+	var node := collider as Node
+	return String(node.get_parent().name if node.name == &"Body" else node.name)

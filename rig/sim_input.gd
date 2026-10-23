@@ -49,10 +49,15 @@ func click(side: StringName, action: StringName) -> void:
 	press(side, action, false)
 
 
+## Moves the head to [param world] at once.
+func set_head(world: Transform3D) -> void:
+	rig.head.global_transform = world
+
+
 ## Turns the head to look at [param at] from where it is.
 func look_at(at: Vector3) -> void:
 	var eye := rig.head.global_position
-	rig.head.global_basis = Basis.looking_at(at - eye)
+	set_head(Transform3D(Basis.looking_at(at - eye), eye))
 
 
 ## The controller loses (or regains) tracking.

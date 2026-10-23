@@ -19,7 +19,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 python tools/test.py
 ```
 
-Runs every suite headlessly on a `test` profile. One GDScript suite: `godot --headless --xr-mode off --path . res://tests/run.tscn -- --profile=test --only=smoke`. Screenshots of every view: `godot --xr-mode off --path . res://tools/capture.tscn -- --profile=test_capture` → `build/captures/`.
+Runs every suite headlessly on `test` profiles: GDScript unit tests and whole sessions played by a simulated child ([testing](docs/testing.md)). One GDScript suite: `godot --headless --xr-mode off --fixed-fps 60 --path . res://tests/run.tscn -- --profile=test --only=smoke`. Rendered walkthrough with screenshots: `python tools/sim/walkthrough.py` → `build/walkthrough/review.html`. Screenshots of every view: `godot --xr-mode off --path . res://tools/capture.tscn -- --profile=test_capture` → `build/captures/`.
 
 ## Where things are
 
@@ -30,7 +30,7 @@ reality/   Reality API: PassthroughReality (Quest), SimReality + rooms/ (no head
 modules/   voice, feedback, cv (Detector), facilitator: each one unpluggable
 trials/    Trial, TrialDef, Session; one folder per trial
 content/   views/ and sessions/ presets
-tests/     headless tests       tools/  test runner, captures, CV server
+tests/     unit tests, sim/ scenarios      tools/  test runner, sim/ simulated child, CV server
 ```
 
 See [architecture](docs/architecture.md), [anticipated experiments](docs/experiments.md) and [adding a trial](docs/adding-a-trial.md).

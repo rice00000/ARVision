@@ -1,8 +1,10 @@
 extends Node
-## Headless test runner: every test_* method of every tests/**/*_test.gd.
+## Test runner: every test_* method of every tests/**/*_test.gd.
 ##
-##   godot --headless --xr-mode off --path . res://tests/run.tscn -- --profile=test [--only=find]
+##   godot --headless --xr-mode off --fixed-fps 60 --path . res://tests/run.tscn -- --profile=test [--only=find]
 ##
+## --fixed-fps 60 runs game time as fast as the machine allows. Without --headless
+## it runs only tests/rendered/ (they need rendered frames); headless skips them.
 ## Uses (and wipes) a "test..." profile. Exit code = number of failed tests.
 
 
@@ -17,8 +19,9 @@ func _ready() -> void:
 			only = arg.trim_prefix("--only=")
 	var passed := 0
 	var failed: Array[String] = []
+	var rendered := DisplayServer.get_name() != "headless"
 	for path in _scripts("res://tests"):
-		if not only.is_empty() and not path.contains(only):
+		if path.begins_with("res://tests/rendered/") != rendered or (not only.is_empty() and not path.contains(only)):
 			continue
 		var script: Script = load(path)
 		for method in script.get_script_method_list():
