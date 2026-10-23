@@ -8,6 +8,8 @@ extends Node3D
 ## world is shown (a [View]: passthrough filter, dimming, focus) and camera
 ## frames for computer vision.
 
+## Physics layer of real things: room-scan colliders, simulated furniture and objects.
+const REALITY_LAYER := 2
 ## Without a table in reach, tabletop stimuli go on a virtual patch this far in
 ## front of the eyes and below them, metres.
 const REACH := 0.45
@@ -48,6 +50,18 @@ func work_surface() -> Surface:
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	var centre := eye.origin + forward * REACH + Vector3.DOWN * BELOW_EYE
 	return Surface.new(&"table", Transform3D(Basis.looking_at(forward), centre), Vector2(0.8, 0.5))
+
+
+## No real thing inside a ball of [param radius] resting on [param point]: room
+## for something virtual of that size, e.g. a toy on the table between real objects.
+func is_free(point: Vector3, radius: float) -> bool:
+	var ball := SphereShape3D.new()
+	ball.radius = radius
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = ball
+	query.transform = Transform3D(Basis.IDENTITY, point + Vector3.UP * (radius + 0.005))
+	query.collision_mask = REALITY_LAYER
+	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
 
 
 func add_surface(surface: Surface) -> void:

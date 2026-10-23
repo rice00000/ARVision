@@ -2,8 +2,9 @@ class_name Pointer
 extends Node3D
 ## One controller's pointing ray and fingertip, turned into [Events]: every
 ## button, [signal Events.selected] when the trigger is pulled,
-## [signal Events.touched] when the fingertip enters a [Target], and tracking
-## changes.
+## [signal Events.touched] when the moving fingertip enters a [Target], and
+## tracking changes. A resting hand touches nothing: a toy that appears under
+## it, or hops into it, was not reached for.
 ##
 ## The ray only hits Targets (physics layer "targets"): real surfaces never block
 ## it, so pointing works the same over passthrough and in the simulated room.
@@ -13,6 +14,10 @@ const TARGET_LAYER := 1
 @export var length := 4.0
 ## How far in front of the controller the fingertip sits.
 @export var tip_reach := 0.05
+## The fingertip rests once it has stayed within [member rest_radius] metres
+## for [member rest_seconds].
+@export var rest_radius := 0.015
+@export var rest_seconds := 0.3
 
 ## &"left" or &"right".
 var side: StringName
@@ -22,6 +27,9 @@ var aimed: Target
 @onready var _controller := get_parent() as XRController3D
 var _beam: MeshInstance3D
 var _distance := 0.0
+## Where the fingertip last moved to, and for how long it has stayed near it.
+var _rest_at := Vector3.INF
+var _rest_for := 0.0
 
 
 func _ready() -> void:
@@ -36,6 +44,19 @@ func _process(_delta: float) -> void:
 	aimed = cast()
 	_beam.scale.z = _distance
 	_beam.position.z = -_distance * 0.5
+
+
+func _physics_process(delta: float) -> void:
+	if tip().distance_to(_rest_at) > rest_radius:
+		_rest_at = tip()
+		_rest_for = 0.0
+	else:
+		_rest_for += delta
+
+
+## The fingertip has not moved for [member rest_seconds].
+func resting() -> bool:
+	return _rest_for >= rest_seconds
 
 
 ## The Target under the ray, or null.
@@ -92,6 +113,6 @@ func _build() -> void:
 	(ball.mesh as SphereMesh).material = material
 	finger.add_child(ball)
 	finger.area_entered.connect(func(area: Area3D) -> void:
-		if area is Target:
+		if area is Target and not resting():
 			Events.touched.emit(side, area))
 	add_child(finger)

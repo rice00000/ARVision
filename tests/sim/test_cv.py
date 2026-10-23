@@ -69,14 +69,16 @@ class Detector(SimCase):
         self.assertTrue(all(e["success"] and e["data"]["tries"] == 1 for e in ends))
         for end in ends:
             attempts = end["data"]["attempts"]
+            named, tolerance = end["data"]["values"]["object"], end["data"]["values"]["tolerance"]
             self.assertEqual(len(attempts), 2)
-            self.assertGreater(attempts[0]["angle"], end["data"]["values"]["tolerance"])
-            self.assertLessEqual(attempts[1]["angle"], end["data"]["values"]["tolerance"])
+            self.assertTrue(attempts[0]["object"] != named or attempts[0]["angle"] > tolerance, attempts[0])
+            self.assertEqual(attempts[1]["object"], named)
+            self.assertLessEqual(attempts[1]["angle"], tolerance)
             self.assertEqual(end["data"]["object"], end["data"]["values"]["object"])
         objects = [e["data"]["object"] for e in ends]
         self.assertTrue(all(a != b for a, b in zip(objects, objects[1:])), f"not the same object twice: {objects}")
         self.assertEqual([f["kind"] for f in sim.events("feedback")], ["bad", "good"] * 3)
-        self.assertTrue(any(e["text"].startswith("Not quite. Find the ") for e in sim.events("said")))
+        self.assertTrue(any(e["text"].startswith(("Not quite. Find the ", "That's the ")) for e in sim.events("said")))
         self.assert_log_ok(sim)
 
     def test_help_marks_the_object_then_says_where(self):
@@ -91,7 +93,9 @@ class Detector(SimCase):
         self.assertEqual(len(markers), 1, "hint 1: a marker")
         offset = [m - c for m, c in zip(markers[0]["position"], named["centre"])]
         self.assertLess(abs(offset[0]) + abs(offset[2]), 1e-3, "right above the object")
-        self.assertTrue(0.19 <= offset[1] <= 0.26, offset)
+        height = math.dist(observation["head"]["position"], named["centre"]) * math.tan(math.radians(6.0))
+        self.assertTrue(0.15 + height - 1e-3 <= offset[1] <= 0.15 + 1.7 * height + 1e-3,
+                        f"as tall as 6 degrees, at any distance: {offset[1]}, {height}")
         child.actor.help()
         self.assertRegex(sim.events("said")[-1]["text"], r"^The .+ is on your (left|right|front)\.$")
         child.play_round(started, ["right"])

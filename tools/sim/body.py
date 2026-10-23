@@ -165,8 +165,9 @@ class Body:
 
     def check_head(self, eye, forward):
         yaw, pitch = self.head_angles(forward)
-        require(abs(yaw) <= self.profile.max_yaw, "head_yaw", degrees=round(yaw, 1), limit=self.profile.max_yaw)
-        require(-self.profile.max_pitch_down <= pitch <= self.profile.max_pitch_up, "head_pitch",
+        # face() turns to exactly a limit; the engine's float32 pose lands a hair past it.
+        require(abs(yaw) <= self.profile.max_yaw + 1e-3, "head_yaw", degrees=round(yaw, 1), limit=self.profile.max_yaw)
+        require(-self.profile.max_pitch_down - 1e-3 <= pitch <= self.profile.max_pitch_up + 1e-3, "head_pitch",
                 degrees=round(pitch, 1), up=self.profile.max_pitch_up, down=self.profile.max_pitch_down)
         lean = distance(eye, self.neck)
         require(lean <= self.profile.max_lean + 1e-6, "head_lean", metres=round(lean, 3), limit=self.profile.max_lean)

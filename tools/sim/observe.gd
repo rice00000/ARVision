@@ -3,8 +3,6 @@ extends RefCounted
 ## stimuli, the room, detections and the facilitator panel. Read-only: nothing
 ## here changes the game. The client decides what a child could perceive.
 
-const REALITY_LAYER := 2
-
 
 static func everything(clock: float, seq: int) -> Dictionary:
 	var detector := App.module(&"Detector")
@@ -139,11 +137,8 @@ static func real_objects() -> Array:
 	var found := []
 	for object in (App.reality as SimReality).objects():
 		var centre := object.centre()
-		var box := AABB()
-		for mesh: MeshInstance3D in object.find_children("*", "MeshInstance3D", true, false):
-			var part := mesh.global_transform * mesh.get_aabb()
-			box = part if box.size == Vector3.ZERO else box.merge(part)
-		var query := PhysicsRayQueryParameters3D.create(eye, centre, REALITY_LAYER, object.bodies())
+		var box := object.box()
+		var query := PhysicsRayQueryParameters3D.create(eye, centre, Reality.REALITY_LAYER, object.bodies())
 		var hit := space.intersect_ray(query)
 		found.append({label = object.label, centre = centre, extent = box.size, clear = hit.is_empty(),
 			blocker = _name(hit.collider) if hit else ""})
@@ -165,7 +160,7 @@ static func subtitle() -> Variant:
 	if voice == null:
 		return null
 	var label: Label3D = voice.get("_label")
-	return {text = label.text, visible = label.visible}
+	return {text = label.text, visible = label.visible, position = label.global_position}
 
 
 ## Sweeps a sphere of [param radius] along [param points] against the real room.
@@ -174,7 +169,7 @@ static func sweep(points: Array, radius: float) -> Dictionary:
 	sphere.radius = radius
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = sphere
-	query.collision_mask = REALITY_LAYER
+	query.collision_mask = Reality.REALITY_LAYER
 	var space := App.head().get_world_3d().direct_space_state
 	for i in points.size():
 		var at := Vector3(points[i][0], points[i][1], points[i][2])

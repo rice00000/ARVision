@@ -80,7 +80,7 @@ func test_real_object_found_by_cv() -> void:
 	App.session.run()
 	await until(_round_running)
 	expect(await until(func() -> bool: return App.session.trial.get("_label") != ""), "an object in view is named")
-	await select(App.session.trial.get("_place"))
+	await select((App.session.trial.get("_named") as Detection).position)
 	expect(ended.size() == 1 and ended[0][1], "pointing at it succeeds")
 
 

@@ -93,7 +93,7 @@ class Help(SimCase):
         sim = self.launch(plan(block("motion", rounds=1, difficulty=1.0, pins={"direction": 2})))
         child = Child(sim, seed=5)
         started = sim.run_until("trial_started")
-        child.actor.wait(30)
+        child.actor.wait(20)
         self.assertEqual(self.reports(sim, "hint"), [], "no help by itself")
         cloud = sim.observe()["stimuli"]["cloud"]
         self.assertEqual(cloud["signal_count"], 30)
@@ -102,6 +102,16 @@ class Help(SimCase):
         self.assertEqual(cloud["signal_count"], cloud["dot_count"], "help: every dot follows the flow")
         child.play_round(started, ["right"])
         self.assertEqual(self.round_ends(sim)[0]["data"]["hint"], 1)
+
+    def test_motion_ends_when_the_child_does_not_respond(self):
+        sim = self.launch(plan(block("motion", rounds=1)))
+        child = Child(sim, seed=8)
+        started = sim.run_until("trial_started")
+        child.play_round(started, ["freeze"])
+        end = self.round_ends(sim)[0]
+        self.assertTrue(end["data"]["timed_out"] and not end["success"])
+        self.assert_close(end["t"] - started["t"], 30.0, 2 * FRAME, "motion time limit")
+        self.assertEqual(self.reports(sim, "hint"), [], "still no help by itself")
 
     def test_motion_check_in_ignores_help(self):
         sim = self.launch(plan(block("motion", rounds=1, probe=True, difficulty=0.5)))

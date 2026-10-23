@@ -102,3 +102,34 @@ func test_headless_remote_backend_sends_nothing() -> void:
 	await wait(1.2)
 	expect(not detector.get("_waiting"), "no camera frame headless, so no request")
 	expect(App.reality.camera_frame() == null, "SimReality has no frame headless")
+
+
+func test_a_pick_goes_to_the_object_whose_outline_the_ray_passes() -> void:
+	await boot(plan_of(POINT, 1))
+	var ended := record(Events.trial_ended)
+	var said := record(Events.said)
+	App.session.run()
+	var trial: Trial
+	expect(await until(func() -> bool:
+		trial = App.session.trial
+		return trial != null and trial.is_running() and trial.get("_label") != ""), "an object is named")
+	_detector().process_mode = Node.PROCESS_MODE_DISABLED
+	var label: String = trial.get("_label")
+	var named := Detection.new(label, (trial.get("_named") as Detection).position, 0.04, 0.9)
+	var eye := App.head().global_position
+	var away := (named.position - eye).normalized()
+	var aside := away.cross(Vector3.UP).normalized()
+	var far := eye.distance_to(named.position) + 1.0
+	var beside := eye + away * far + aside * far * tan(deg_to_rad(8.0)) # a metre behind, just clear of it
+	var hidden := named.position + away # right behind it
+	var other := "vase" if label != "vase" else "tv"
+	trial.set("_named", named)
+	_detector().detections.assign([named, Detection.new(other, beside, 0.04, 0.9), Detection.new("chair", hidden, 0.3, 0.9)])
+	await select(beside)
+	expect(ended.is_empty(), "aimed at the %s beside and behind it: not the %s" % [other, label])
+	expect_eq(trial.tries, 1, "a wrong pick")
+	expect_eq(said.back()[0], "That's the %s. Find the %s!" % [other, label], "says what was picked")
+	await select(hidden)
+	expect(ended.size() == 1 and ended[0][1], "through it, with a chair on the same line: the %s" % label)
+	expect_eq(ended[0][2].attempts.map(func(attempt: Dictionary) -> String: return attempt.object), [other, label],
+		"the log says what each pick was")

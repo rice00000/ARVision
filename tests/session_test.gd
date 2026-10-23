@@ -5,13 +5,6 @@ extends TestCase
 const FIND := preload("res://trials/find/find.tres")
 
 
-## Hands off the table: SimInput starts them above its near edge, where a toy can
-## spawn under the fingertip or hop into it, which counts as a touch.
-func _park() -> void:
-	for side: StringName in [&"left", &"right"]:
-		input.set_hand(side, Transform3D(Basis.IDENTITY, Vector3(0.3 if side == &"right" else -0.3, 1.0, 0.1)))
-
-
 func _round_running() -> bool:
 	return App.session.trial != null and App.session.trial.is_running()
 
@@ -105,7 +98,6 @@ func test_a_nudge_starts_from_a_blocks_fixed_difficulty() -> void:
 func test_hints_come_after_hint_after_and_fade_round_by_round() -> void:
 	await boot(plan_of(FIND, 3))
 	var hints := _hint_clock()
-	_park()
 	App.session.run()
 	for round_index in 3:
 		await until(_round_is.bind(round_index), 60.0)
@@ -121,7 +113,6 @@ func test_hints_come_after_hint_after_and_fade_round_by_round() -> void:
 func test_a_wrong_try_restarts_the_clock_and_help_stops_at_max_hint() -> void:
 	await boot(plan_of(FIND, 1))
 	var hints := _hint_clock()
-	_park()
 	App.session.run()
 	await until(_round_running)
 	await wait(5.0)
@@ -140,7 +131,6 @@ func test_time_limit_ends_the_round_as_a_failure_and_pauses_do_not_count() -> vo
 	await boot(plan_of(FIND, 1))
 	var ended := record(Events.trial_ended)
 	var touched := record(Events.touched)
-	_park()
 	App.session.run()
 	await until(_round_running)
 	await wait(10.0)
@@ -163,7 +153,6 @@ func test_no_help_by_itself_when_hint_after_is_zero() -> void:
 	def.time_limit = 0.0
 	await boot(plan_of(def, 1))
 	var hints := _hint_clock()
-	_park()
 	App.session.run()
 	await until(_round_running)
 	await wait(120.0)

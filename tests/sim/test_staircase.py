@@ -54,10 +54,10 @@ class Staircase(SimCase):
     def test_a_strong_child_climbs_and_a_weak_one_descends(self):
         finals = {}
         for perception in ("strong", "weak"):
-            sim = self.launch(plan(block("find", rounds=10)), profile=f"test_sim_climb_{perception}")
+            sim = self.launch(plan(block("find", rounds=14)), profile=f"test_sim_climb_{perception}")
             Child(sim, perception=perception, seed=7).play()
             levels = self.reports(sim, "level")
-            self.assertEqual(len(levels), 10)
+            self.assertEqual(len(levels), 14)
             finals[perception] = levels[-1]["after"]
             self.assert_log_ok(sim)
         self.assertGreaterEqual(finals["strong"], START + 3 * STEP - 1e-6, finals)

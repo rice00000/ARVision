@@ -13,13 +13,24 @@ func _enter_tree() -> void:
 	add_to_group(GROUP)
 
 
-## Centre of its meshes, world space.
-func centre() -> Vector3:
-	var box := AABB()
+## World-space box around its meshes.
+func box() -> AABB:
+	var found := AABB()
 	for mesh: MeshInstance3D in find_children("*", "MeshInstance3D", true, false):
 		var part := mesh.global_transform * mesh.get_aabb()
-		box = part if box.size == Vector3.ZERO else box.merge(part)
-	return box.get_center()
+		found = part if found.size == Vector3.ZERO else found.merge(part)
+	return found
+
+
+func centre() -> Vector3:
+	return box().get_center()
+
+
+## Half its middle extent: about how wide it looks (a bottle is as wide as it
+## is deep, not as tall).
+func radius() -> float:
+	var size := box().size
+	return (size.x + size.y + size.z - size[size.max_axis_index()] - size[size.min_axis_index()]) * 0.5
 
 
 ## The object's own colliders, which must not count as hiding it.

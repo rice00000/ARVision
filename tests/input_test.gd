@@ -80,6 +80,26 @@ func test_the_fingertip_touches_targets() -> void:
 	expect(pointer.tip().is_equal_approx(target.global_position), "tip() is the fingertip")
 
 
+func test_a_resting_fingertip_touches_nothing() -> void:
+	await boot(plan_of(FIND, 1))
+	var touched := record(Events.touched)
+	var pointer := App.rig.pointer(&"left")
+	var spot := Vector3(0.3, 0.9, -0.5)
+	input.point(&"left", spot + Vector3(0, 0, pointer.tip_reach), spot)
+	await wait(pointer.rest_seconds + 0.1)
+	expect(pointer.resting(), "the hand has been still")
+	var target := Target.sphere(&"probe", 0.05)
+	app.add_child(target)
+	target.global_position = spot
+	await frames(3)
+	expect(touched.is_empty(), "a target that appears under a resting fingertip is not touched")
+	input.point(&"left", spot + Vector3(0, 0, 0.3), spot)
+	await frames(3)
+	input.point(&"left", spot + Vector3(0, 0, pointer.tip_reach), spot)
+	await frames(3)
+	expect_eq(touched.size(), 1, "reaching in touches it")
+
+
 func test_buttons_help_and_tracking_become_events() -> void:
 	await boot(plan_of(FIND, 1))
 	var buttons := record(Events.button)

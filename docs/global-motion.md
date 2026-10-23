@@ -8,6 +8,7 @@
 - **Axes:** coherence (driven, 0.9 to 0.15), then fixed: `direction` (0 random, 1-4 right, left, toward, away), `dots`, `speed`, `dot_lifetime`, cloud `half_*`, `distance`, `tolerance`, `min_sweep`, `min_seconds`, `max_seconds`.
 - **Logged per round:** `heading`, `plane` (lateral / depth), `flow`, `signal_dots`, `seed`, `tries`, `hint`, `first_attempt_correct`, `attempts` (angle, distance, duration, onset, hand, help, coherence shown), `invalid_gestures`. Invalid sweeps and attempts also go out as `motion_invalid` / `motion_attempt` events. Onset means trigger press.
 - **Help:** only on B / Y, one level: every dot follows the flow. Never in probes. A sweep begun before it is dropped.
+- **Time limit:** 30 s without a right sweep ends the round as a miss (`timed_out`).
 - **Sweeps** are judged in the cloud's frame frozen at round start. Pausing and losing tracking cancel an unfinished sweep.
 - **Staircase:** moves on `first_try` (solved by the first valid sweep, no help), like every trial. Pin a level with the facilitator or `Block.difficulty`; pin a direction with `Block.pins`.
 

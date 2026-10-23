@@ -3,8 +3,6 @@ extends Node3D
 ## manager calls [method setup_scene]; it becomes a [Surface] and a collider on
 ## the "reality" physics layer.
 
-const REALITY_LAYER := 2
-
 
 func setup_scene(entity: OpenXRFbSpatialEntity) -> void:
 	if not is_inside_tree():
@@ -12,7 +10,7 @@ func setup_scene(entity: OpenXRFbSpatialEntity) -> void:
 	var labels := entity.get_semantic_labels()
 	var label := labels[0].to_lower() if not labels.is_empty() else "other"
 	var body := StaticBody3D.new()
-	body.collision_layer = REALITY_LAYER
+	body.collision_layer = Reality.REALITY_LAYER
 	body.collision_mask = 0
 	body.add_child(entity.create_collision_shape())
 	add_child(body)

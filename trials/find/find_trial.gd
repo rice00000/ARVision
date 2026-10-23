@@ -28,7 +28,8 @@ func _setup(round_condition: TrialCondition) -> void:
 	var size: float = round_condition.value(&"size", 0.07)
 	var count := int(round_condition.value(&"clutter", 3.0)) + 1
 	var surface := App.reality.work_surface()
-	var spots := surface.scatter(count, size * round_condition.value(&"spacing", 1.8), size, _rng)
+	var spots := surface.scatter(count, size * round_condition.value(&"spacing", 1.8), size, _rng,
+		App.reality.is_free.bind(size * 0.6))
 	var shapes := SHAPES.duplicate()
 	shapes.shuffle()
 	var target_colour := COLOURS[_rng.randi_range(0, COLOURS.size() - 1)]

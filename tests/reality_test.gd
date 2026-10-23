@@ -118,6 +118,17 @@ func test_the_table_in_reach_is_the_work_surface() -> void:
 	expect(tables.size() == 2 and tables[0].size.is_equal_approx(Vector2(1.2, 0.7)), "nearest first")
 
 
+func test_toys_are_scattered_only_where_no_real_thing_stands() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	expect(not App.reality.is_free(Vector3(-0.35, 0.72, -0.8), 0.04), "the cup stands there")
+	expect(App.reality.is_free(Vector3(0.0, 0.72, -0.35), 0.04), "an empty spot on the table")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var points := App.reality.work_surface().scatter(12, 0.1, 0.05, rng, App.reality.is_free.bind(0.04))
+	expect(points.size() >= 8, "most still fit: %d" % points.size())
+	expect(points.all(func(point: Vector3) -> bool: return App.reality.is_free(point, 0.04)), "none on a real thing")
+
+
 func test_without_a_table_in_reach_a_patch_goes_in_front() -> void:
 	await boot(plan_of(load("res://trials/find/find.tres"), 1))
 	App.rig.global_position = Vector3(0, 0, 1.5) # the table is now 2 m away

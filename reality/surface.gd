@@ -27,15 +27,17 @@ func point(u: float, v: float) -> Vector3:
 	return transform * Vector3(u * size.x * 0.5, 0.0, v * size.y * 0.5)
 
 
-## Up to [param count] random points on the top, at least [param spacing] apart
-## and [param margin] from the edges. Fewer when they do not fit.
-func scatter(count: int, spacing: float, margin: float, rng: RandomNumberGenerator) -> Array[Vector3]:
+## Up to [param count] random points on the top, at least [param spacing] apart,
+## [param margin] from the edges and where [param free] (a point -> bool) allows,
+## e.g. not on a real cup. Fewer when they do not fit.
+func scatter(count: int, spacing: float, margin: float, rng: RandomNumberGenerator,
+		free: Callable = func(_point: Vector3) -> bool: return true) -> Array[Vector3]:
 	var half := (size * 0.5 - Vector2.ONE * margin).max(Vector2.ZERO)
 	var points: Array[Vector3] = []
 	for attempt in count * 60:
 		if points.size() == count:
 			break
 		var candidate := transform * Vector3(rng.randf_range(-half.x, half.x), 0.0, rng.randf_range(-half.y, half.y))
-		if points.all(func(other: Vector3) -> bool: return other.distance_to(candidate) >= spacing):
+		if points.all(func(other: Vector3) -> bool: return other.distance_to(candidate) >= spacing) and free.call(candidate):
 			points.append(candidate)
 	return points

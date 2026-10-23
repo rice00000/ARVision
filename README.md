@@ -11,7 +11,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<child>`, `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Quest controls:** point and pull the trigger to choose (a fingertip touch also works). B / Y asks for help. Left Menu opens the facilitator panel, which pauses play.
+**Quest controls:** point and pull the trigger to choose (a fingertip touch also works; a resting hand touches nothing). B / Y asks for help. Left Menu opens the facilitator panel, which pauses play.
 
 ## Test
 

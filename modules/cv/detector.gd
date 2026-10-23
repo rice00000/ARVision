@@ -10,8 +10,6 @@ extends Module
 
 enum Backend { AUTO, SIM, REMOTE }
 
-const REALITY_LAYER := 2
-
 @export var backend := Backend.AUTO
 ## tools/cv_server.py as the headset reaches it, e.g. after
 ## `adb reverse tcp:8765 tcp:8765` over USB.
@@ -67,10 +65,10 @@ func _see_sim() -> Array[Detection]:
 		var centre := object.centre()
 		if rad_to_deg((centre - eye.origin).angle_to(-eye.basis.z)) > view_angle:
 			continue
-		var query := PhysicsRayQueryParameters3D.create(eye.origin, centre, REALITY_LAYER, object.bodies())
+		var query := PhysicsRayQueryParameters3D.create(eye.origin, centre, Reality.REALITY_LAYER, object.bodies())
 		if space.intersect_ray(query):
 			continue # something real is in the way
-		seen.append(Detection.new(object.label, centre, 1.0))
+		seen.append(Detection.new(object.label, centre, object.radius(), 1.0))
 	return seen
 
 
@@ -94,13 +92,16 @@ func _on_reply(result: int, code: int, _headers: PackedStringArray, body: Packed
 		if item.confidence < min_confidence:
 			continue
 		var box: Array = item.box # x0, y0, x1, y1, 0..1 from the top left
-		var direction := _frame.ray((box[0] + box[2]) * 0.5, (box[1] + box[3]) * 0.5)
-		found.append(Detection.new(item.label, _locate(_frame.pose.origin, direction), item.confidence))
+		var middle: float = (box[1] + box[3]) * 0.5
+		var direction := _frame.ray((box[0] + box[2]) * 0.5, middle)
+		var at := _locate(_frame.pose.origin, direction)
+		var half_width := _frame.ray(box[0], middle).angle_to(_frame.ray(box[2], middle)) * 0.5
+		found.append(Detection.new(item.label, at, at.distance_to(_frame.pose.origin) * tan(half_width), item.confidence))
 	_publish(found)
 
 
 ## Where a seen object probably is: where its ray meets something scanned, else 1 m out.
 func _locate(origin: Vector3, direction: Vector3) -> Vector3:
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 4.0, REALITY_LAYER)
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 4.0, Reality.REALITY_LAYER)
 	var hit := App.head().get_world_3d().direct_space_state.intersect_ray(query)
 	return hit.position if hit else origin + direction
