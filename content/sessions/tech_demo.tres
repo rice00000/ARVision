@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="SessionPlan" format=3]
+
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="1_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
+[ext_resource type="Resource" path="res://trials/find/find.tres" id="3_find"]
+[ext_resource type="Resource" path="res://trials/motion/motion_demo.tres" id="4_motion"]
+[ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="5_contrast"]
+[ext_resource type="Resource" path="res://content/views/edges.tres" id="6_edges"]
+[ext_resource type="Resource" path="res://content/views/spotlight.tres" id="7_spotlight"]
+
+[sub_resource type="Resource" id="find"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 2
+difficulty = 0.2
+intro = "Find the toy I name. Point and pinch, or just touch it. Raise your hand if you need help."
+pause_between = 1.0
+
+[sub_resource type="Resource" id="contrast"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 1
+difficulty = 0.4
+view = ExtResource("5_contrast")
+intro = "Now I turn up the contrast of your room."
+pause_between = 1.0
+
+[sub_resource type="Resource" id="edges"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 1
+difficulty = 0.4
+view = ExtResource("6_edges")
+intro = "Now you only see the edges of things."
+pause_between = 1.0
+
+[sub_resource type="Resource" id="spotlight"]
+script = ExtResource("2_block")
+trial = ExtResource("3_find")
+rounds = 1
+difficulty = 0.6
+view = ExtResource("7_spotlight")
+intro = "Now everything is dim except the table."
+pause_between = 1.0
+
+[sub_resource type="Resource" id="wall"]
+script = ExtResource("2_block")
+trial = ExtResource("4_motion")
+rounds = 3
+difficulty = 0.0
+intro = "Last one. Watch the dots. Pinch, sweep your hand the way they flow, and let go. Get it right and you break the wall!"
+pause_between = 3.0
+
+[resource]
+script = ExtResource("1_plan")
+title = "Tech demo"
+greeting = "Welcome to AR Vision. Let's play!"
+farewell = "That's the demo. Thanks for playing!"
+blocks = Array[ExtResource("2_block")]([SubResource("find"), SubResource("contrast"), SubResource("edges"), SubResource("spotlight"), SubResource("wall")])

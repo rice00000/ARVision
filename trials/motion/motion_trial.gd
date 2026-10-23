@@ -12,6 +12,7 @@ extends Trial
 ## perceptual error and counts no try. A wrong valid sweep counts a try; the
 ## flow stays the same until the child finds it.
 ## Hint 1 (only when asked): every dot follows the flow.
+## With [member break_wall] (the tech demo), a right sweep also breaks the wall ahead.
 
 const HEADINGS: Array[StringName] = [&"right", &"left", &"toward", &"away"]
 ## Flow of each heading in the cloud's frame: its -Z points away from the child.
@@ -23,6 +24,9 @@ const INVALID_SAY := {
 	too_small = "Sweep your hand a little farther.",
 	timing = "Pinch, sweep, then let go.",
 }
+
+## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
+@export var break_wall := false
 
 var _rng := RandomNumberGenerator.new()
 ## The cloud's frame, frozen at the start of the round; sweeps are judged in it.
@@ -139,6 +143,9 @@ func _judge(hand: StringName, end: Vector3) -> void:
 		return
 	judge(&"good", _cloud.global_position)
 	say("Yes! Now they all go together.")
+	if break_wall:
+		var eye := App.head().global_position
+		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow)
 	_align = create_tween()
 	_align.tween_method(_set_alignment, 0.0, 1.0, ALIGN_SECONDS)
 	finish(true, {attempts = _attempts.duplicate(), invalid_gestures = _invalid,

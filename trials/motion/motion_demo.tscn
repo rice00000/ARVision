@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://trials/motion/motion.tscn" id="1_motion"]
+
+[node name="Motion" instance=ExtResource("1_motion")]
+break_wall = true

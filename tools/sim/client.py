@@ -27,7 +27,8 @@ TRIALS = {
     "motion_competing": "res://trials/motion/motion_competing.tres",
 }
 VIEWS = ["normal", "high_contrast", "greyscale", "black_white", "edges", "dim", "spotlight"]
-PLANS = {"demo": "res://content/sessions/demo.tres", "motion": "res://content/sessions/motion.tres"}
+PLANS = {"demo": "res://content/sessions/demo.tres", "motion": "res://content/sessions/motion.tres",
+         "tech_demo": "res://content/sessions/tech_demo.tres"}
 
 
 def block(trial, rounds=1, probe=False, difficulty=-1.0, pins=None, view=None, intro="", pause_between=0.5):
