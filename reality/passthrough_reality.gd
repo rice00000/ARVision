@@ -22,6 +22,8 @@ var _sphere := MeshInstance3D.new()
 var _camera: QuestCamera
 var _scan := OpenXRFbSceneManager.new()
 var _scan_asked := false
+var _hands_flat := 0.0
+var _hand_table := false
 
 
 func kind() -> String:
@@ -61,6 +63,11 @@ func _ready() -> void:
 
 ## Seconds after start at which the room is summed up ("room_ready").
 const ROOM_READY_AFTER := 4.0
+## Without a scanned table in reach, both hands held flat on the real table this
+## long mark it there. Quest refuses the room scan to an app not registered with
+## Meta (ERROR_PACKAGE_UNTRUSTED), so this keeps the toys on the real table.
+const HAND_TABLE_SECONDS := 1.0
+const HAND_TABLE_SIZE := Vector2(1.0, 0.6)
 
 
 ## Logs a step of reading the room, and prints it as one JSON line (adb logcat, tools/xrsim.py).
@@ -69,8 +76,34 @@ static func note(what: StringName, data: Dictionary = {}) -> void:
 	Events.report(what, data)
 
 
+func _physics_process(delta: float) -> void:
+	if _hand_table or work_surface() in _surfaces:
+		return
+	var eye := App.head().global_position
+	var tips: Array[Vector3] = []
+	for side: StringName in [&"left", &"right"]:
+		var pointer := App.rig.pointer(side)
+		var tip := pointer.tip()
+		var ahead := Vector2(tip.x - eye.x, tip.z - eye.z).length()
+		if App.rig.hand(side).get_has_tracking_data() and pointer.resting() and ahead > 0.25 				and eye.y - tip.y > 0.25 and eye.y - tip.y < 0.8:
+			tips.append(tip)
+	var flat := tips.size() == 2 and absf(tips[0].y - tips[1].y) < 0.06
+	_hands_flat = _hands_flat + delta if flat else 0.0
+	if _hands_flat < HAND_TABLE_SECONDS:
+		return
+	_hand_table = true
+	var forward := -App.head().global_basis.z
+	forward = Vector3(forward.x, 0.0, forward.z).normalized()
+	var centre := (tips[0] + tips[1]) * 0.5 + forward * 0.15 + Vector3.DOWN * 0.015
+	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), centre), HAND_TABLE_SIZE))
+	Events.say("Got it. That's your table.")
+	note(&"room_hand_table", {centre = centre})
+
+
 func _room_ready() -> void:
 	var surface := work_surface()
+	if not surface in _surfaces:
+		Events.say("Put both hands flat on the table for a moment.")
 	note(&"room_ready", {head = App.head().global_position, surfaces = _surfaces.size(),
 		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
 		work_surface = {kind = surface.kind, scanned = surface in _surfaces, centre = surface.transform.origin,

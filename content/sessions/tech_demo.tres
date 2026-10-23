@@ -11,14 +11,16 @@
 [sub_resource type="Resource" id="find"]
 script = ExtResource("2_block")
 trial = ExtResource("3_find")
+ray = false
 rounds = 2
 difficulty = 0.2
-intro = "Find the toy I name. Point and pinch, or just touch it. Raise your hand if you need help."
+intro = "Find the toy I name. Reach out and grab it. Raise your hand if you need help."
 pause_between = 1.0
 
 [sub_resource type="Resource" id="contrast"]
 script = ExtResource("2_block")
 trial = ExtResource("3_find")
+ray = false
 rounds = 1
 difficulty = 0.4
 view = ExtResource("5_contrast")
@@ -28,6 +30,7 @@ pause_between = 1.0
 [sub_resource type="Resource" id="edges"]
 script = ExtResource("2_block")
 trial = ExtResource("3_find")
+ray = false
 rounds = 1
 difficulty = 0.4
 view = ExtResource("6_edges")
@@ -37,6 +40,7 @@ pause_between = 1.0
 [sub_resource type="Resource" id="spotlight"]
 script = ExtResource("2_block")
 trial = ExtResource("3_find")
+ray = false
 rounds = 1
 difficulty = 0.6
 view = ExtResource("7_spotlight")

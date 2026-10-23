@@ -5,12 +5,15 @@ extends Node3D
 ## trigger_click), [signal Events.touched] when the moving fingertip enters a
 ## [Target], [signal Events.help_requested] when the hand is raised, and
 ## tracking changes. A resting hand touches nothing: a toy that appears under
-## it, or hops into it, was not reached for.
+## it, or hops into it, was not reached for. In blocks without the ray
+## ([member Block.ray]) a pinch or a closed hand on a Target takes it, like a touch.
 ##
 ## The ray only hits Targets (physics layer "targets"): real surfaces never block
 ## it, so pointing works the same over passthrough and in the simulated room.
 
 const TARGET_LAYER := 1
+## How close the fingertip must be to a Target to grab it, metres.
+const GRAB_RADIUS := 0.07
 
 @export var length := 4.0
 ## How far in front of the hand's aim point the fingertip sits.
@@ -49,9 +52,18 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	aimed = cast()
+	_beam.visible = ray_on()
+	aimed = cast() if _beam.visible else null
 	_beam.scale.z = _distance
 	_beam.position.z = -_distance * 0.5
+
+
+## The ray points: while the facilitator panel is open, and in blocks that use it.
+func ray_on() -> bool:
+	var panel := App.module(&"Facilitator")
+	if panel and panel.is_open:
+		return true
+	return App.session == null or App.session.block == null or App.session.block.ray
 
 
 func _physics_process(delta: float) -> void:
@@ -93,8 +105,29 @@ func _on_button(action: String, pressed: bool) -> void:
 	Events.button.emit(side, StringName(action), pressed)
 	if not pressed:
 		return
-	if action == "trigger_click":
+	if action == "trigger_click" and ray_on():
 		Events.selected.emit(side, cast(), global_position, -global_basis.z)
+	elif action in ["trigger_click", "grip_click"]:
+		_grab()
+
+
+## Takes the Target nearest the fingertip, if one is within [constant GRAB_RADIUS].
+func _grab() -> void:
+	var ball := SphereShape3D.new()
+	ball.radius = GRAB_RADIUS
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = ball
+	query.transform = Transform3D(Basis.IDENTITY, tip())
+	query.collision_mask = TARGET_LAYER
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var near: Target
+	for hit in get_world_3d().direct_space_state.intersect_shape(query, 8):
+		var target := hit.collider as Target
+		if target and (near == null or target.global_position.distance_to(tip()) < near.global_position.distance_to(tip())):
+			near = target
+	if near:
+		Events.touched.emit(side, near)
 
 
 func _build() -> void:

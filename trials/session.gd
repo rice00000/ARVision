@@ -87,6 +87,7 @@ func _run_block() -> void:
 	Events.block_started.emit(block_index, {trial = def.id, rounds = block.rounds, probe = block.probe})
 	trial = def.scene.instantiate()
 	trial.def = def
+	trial.grab = not block.ray
 	App.stage.add_child(trial)
 	await _announce(block.intro)
 	for round_index in block.rounds:

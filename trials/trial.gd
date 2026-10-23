@@ -26,6 +26,8 @@ const GROUP := &"trial"
 
 ## Set by the Session before the scene enters the tree.
 var def: TrialDef
+## The block has no ray ([member Block.ray]): the child must reach what it picks.
+var grab := false
 ## Settings of the round in progress.
 var condition: TrialCondition
 ## Wrong attempts this round.

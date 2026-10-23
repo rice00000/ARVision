@@ -15,5 +15,9 @@ extends Resource
 @export var view: View
 ## Said once before the first round.
 @export var intro := ""
+## Point and pinch from afar with the hand ray. Off: the child reaches out and
+## grabs (touch, pinch on it, or close the hand on it); the ray then shows only
+## for the facilitator panel.
+@export var ray := true
 ## Seconds between rounds.
 @export var pause_between := 1.5
