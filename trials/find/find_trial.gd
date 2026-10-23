@@ -10,7 +10,7 @@ extends Trial
 ## Without the ray ([member Trial.grab]) toys lie only within a seated child's reach.
 
 ## Reach of a small seated child from the middle of the shoulders, metres.
-const REACH := 0.42
+const REACH := 0.48
 ## Shoulders sit this far below the eyes, metres.
 const SHOULDERS := 0.2
 
@@ -35,9 +35,11 @@ func _setup(round_condition: TrialCondition) -> void:
 	var count := int(round_condition.value(&"clutter", 3.0)) + 1
 	var surface := App.reality.work_surface()
 	var shoulders := App.head().global_position + Vector3.DOWN * SHOULDERS
-	var spots := surface.scatter(count, size * round_condition.value(&"spacing", 1.8), size, _rng,
-		func(point: Vector3) -> bool:
-			return App.reality.is_free(point, size * 0.6) and (not grab or point.distance_to(shoulders) < REACH))
+	var spacing: float = size * round_condition.value(&"spacing", 1.8)
+	var spots := surface.scatter(count, spacing, size, _rng, func(point: Vector3) -> bool:
+		return App.reality.is_free(point, size * 0.6) and (not grab or point.distance_to(shoulders) < REACH))
+	if spots.size() < 2: # the surface is mostly out of reach: better far toys than none
+		spots = surface.scatter(count, spacing, size, _rng, App.reality.is_free.bind(size * 0.6))
 	var shapes := SHAPES.duplicate()
 	shapes.shuffle()
 	var target_colour := COLOURS[_rng.randi_range(0, COLOURS.size() - 1)]

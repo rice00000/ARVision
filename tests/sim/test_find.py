@@ -117,7 +117,7 @@ class FindIt(SimCase):
         eye = observation["head"]["position"]
         self.assertEqual([round(v, 5) for v in surface["size"]], [0.8, 0.5])
         self.assertAlmostEqual(surface["position"][1], eye[1] - 0.4, places=4)
-        self.assertAlmostEqual(eye[2] - surface["position"][2], 0.45, places=4)
+        self.assertAlmostEqual(eye[2] - surface["position"][2], 0.4, places=4)
         for toy in observation["stimuli"]["targets"]:
             self.assertAlmostEqual(toy["position"][1], eye[1] - 0.4 + 0.035, places=4)
         child.play_round(started, ["right"])

@@ -12,7 +12,7 @@ extends Node3D
 const REALITY_LAYER := 2
 ## Without a table in reach, tabletop stimuli go on a virtual patch this far in
 ## front of the eyes and below them, metres.
-const REACH := 0.45
+const REACH := 0.4
 const BELOW_EYE := 0.4
 ## A table farther than this from the eyes is out of reach, metres.
 const TABLE_REACH := 1.2
