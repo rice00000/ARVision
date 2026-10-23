@@ -7,11 +7,11 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 ## Run it
 
 - **Quest 3:** put the Vendors plugin in `addons/godotopenxrvendors/` and install the Android build template, then run the **Meta Quest 3** export preset. The first run asks to scan the room; tables become work surfaces.
-- **PC, no headset:** run the project. A simulated living room stands in for the real one. Mouse: right-drag looks, left click points and pulls the trigger, left-drag sweeps (wheel: nearer / farther). **H** help, **M** facilitator panel.
+- **PC, no headset:** run the project. A simulated living room stands in for the real one. Mouse: right-drag looks, left click points and pinches, left-drag sweeps (wheel: nearer / farther). **H** raises a hand (help), **M** facilitator panel.
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<child>`, `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Quest controls:** point and pull the trigger to choose (a fingertip touch also works; a resting hand touches nothing). B / Y asks for help. Left Menu opens the facilitator panel, which pauses play.
+**Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Raise a hand above your eyes to ask for help. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
 
 ## Test
 

@@ -44,8 +44,8 @@ class Motion(SimCase):
         self.assertEqual([r["hand"] for r in invalid], ["right", "right", "left"])
         self.assertEqual(sim.events("feedback"), [], "no right or wrong for an unusable sweep")
         said = [e["text"] for e in sim.events("said")][-3:]
-        self.assertEqual(said, ["Sweep your hand a little farther.", "Hold the trigger, sweep, then let go.",
-                                "Hold the trigger, sweep, then let go."])
+        self.assertEqual(said, ["Sweep your hand a little farther.", "Pinch, sweep, then let go.",
+                                "Pinch, sweep, then let go."])
         trial = sim.observe()["session"]["trial"]
         self.assertTrue(trial["running"])
         self.assertEqual(trial["tries"], 0)

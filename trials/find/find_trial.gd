@@ -1,6 +1,6 @@
 extends Trial
 ## Find it: virtual toys on the real table. The guide names one; the child
-## points at it and pulls the trigger, or touches it. Trains objects in clutter.
+## points at it and pinches, or touches it. Trains objects in clutter.
 ##
 ## Axes: clutter (other toys, driven), size (metres), spacing (gap between toy
 ## centres, in toy sizes: lower = more crowded), same_colour (1 = every toy

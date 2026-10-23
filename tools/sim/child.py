@@ -20,7 +20,7 @@ from body import PROFILES, ConstraintError, add, degrees_between, distance, mul,
 from policy import FLOWS, Perception, Policy
 
 FIND_LINE = re.compile(r"^Find the (.+)!$")
-POINT_LINE = re.compile(r"^Point at the (.+) and pull the trigger\.$")
+POINT_LINE = re.compile(r"^Point at the (.+) and pinch your fingers\.$")
 SCAN = [0, -35, 35, -60, 60]
 
 

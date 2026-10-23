@@ -1,7 +1,7 @@
 extends Module
-## The facilitator's panel, hidden from the child: left Menu opens and closes
-## it (desktop: M), and play pauses while it is open. Point and pull the
-## trigger to press a button.
+## The facilitator's panel, hidden from the child: the left-hand menu pinch
+## (palm facing you, pinch) opens and closes it (desktop: M), and play pauses
+## while it is open. Point and pinch to press a button.
 ##
 ##   Easier / Harder   pin the level 0.1 lower / higher for the rest of the session
 ##   Auto level        back to the child's staircase
@@ -28,7 +28,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build()
 	Events.button.connect(func(hand: StringName, action: StringName, pressed: bool) -> void:
-		if hand == &"left" and action == &"menu_button" and pressed:
+		if hand == &"left" and action == &"menu_pressed" and pressed:
 			toggle())
 	Events.selected.connect(_on_selected)
 

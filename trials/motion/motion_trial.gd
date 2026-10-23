@@ -1,7 +1,7 @@
 extends Trial
 ## Read the flow: a seated 3D random-dot motion task. A cloud of dots floats
 ## ahead; some of them (coherence) move one way, the rest are noise. The child
-## holds the trigger, sweeps the controller the way the flow goes, and lets go.
+## pinches, sweeps the hand the way the flow goes, and lets go.
 ## Original design and shader by Megan (Mgharv), ported from XRVision.
 ##
 ## Axes: coherence (driven), competing (1 = the noise is one opposite flow, 0 =
@@ -21,7 +21,7 @@ const NEAR := 0.6
 const ALIGN_SECONDS := 0.6
 const INVALID_SAY := {
 	too_small = "Sweep your hand a little farther.",
-	timing = "Hold the trigger, sweep, then let go.",
+	timing = "Pinch, sweep, then let go.",
 }
 
 var _rng := RandomNumberGenerator.new()
@@ -37,10 +37,10 @@ var _max_seconds := 0.0
 var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
 var _invalid := 0
-## The hand whose trigger is held for a sweep, or &"".
+## The hand pinching for a sweep, or &"".
 var _hand: StringName = &""
 var _start := Vector3.ZERO
-## Round time at which the trigger went down.
+## Round time at which the pinch began.
 var _onset := 0.0
 var _align: Tween
 
@@ -100,7 +100,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	round_condition.set_value(&"flow", _flow)
 	round_condition.set_value(&"signal_dots", signal_dots)
 	round_condition.set_value(&"seed", trial_seed)
-	say("Which way do the dots go? Hold the trigger, sweep your hand that way, then let go.")
+	say("Which way do the dots go? Pinch your fingers, sweep your hand that way, then let go.")
 
 
 func focus_point() -> Vector3:

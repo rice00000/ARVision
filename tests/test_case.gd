@@ -75,7 +75,17 @@ func until(condition: Callable, timeout := 5.0) -> bool:
 	return true
 
 
-## Points [param side]'s hand at [param at] from just below the eyes and pulls the trigger.
+## Raises [param side]'s hand above the eyes until it asks for help, then puts it back.
+func raise_hand(side := &"right") -> void:
+	var down := App.rig.hand(side).global_transform
+	var eye := App.head().global_position
+	input.set_hand(side, Transform3D(Basis.IDENTITY, eye + Vector3(0.2 if side == &"right" else -0.2, 0.2, -0.3)))
+	await wait(App.rig.pointer(side).raise_seconds + 0.1)
+	input.set_hand(side, down)
+	await frames(2)
+
+
+## Points [param side]'s hand at [param at] from just below the eyes and pinches.
 func select(at: Vector3, side := &"right") -> void:
 	var eye := App.head().global_position
 	input.point(side, eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)

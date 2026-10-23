@@ -12,7 +12,7 @@ var rig: Rig
 var reality: Reality
 var stage: Node3D
 var session: Session
-## Synthetic controllers when there is no headset (desktop and tests). Null in XR.
+## Synthetic hands when there is no headset (desktop and tests). Null in XR.
 var sim_input: SimInput
 
 ## Who holds the world paused (&"facilitator", &"headset"). Paused while anyone does.

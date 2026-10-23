@@ -2,14 +2,15 @@
 
 Actor is the seated child: every action is checked against its Body first and
 refused with ConstraintError before anything is sent. Facilitator is the adult
-at the panel: left Menu, then point the left controller and pull the trigger.
+at the panel: the left-hand menu pinch, then point the left hand and pinch.
 """
 
 import math
 
 from body import Body, ConstraintError, add, distance, load, mul, require, sub, unit
 
-TIP_REACH = 0.05  # rig/pointer.gd: the fingertip is this far ahead of the controller
+TIP_REACH = 0.05  # rig/pointer.gd: the fingertip is this far ahead of the hand's aim point
+RAISE = (0.14, 0.4)  # rig/pointer.gd: raise_height (+ a margin) and raise_seconds
 # Where a child moves the hand (body frame, from the ready pose) when the ray lands on the wrong thing.
 REAIM = [(0, 0.08, 0), (0, 0.16, 0), (-0.08, 0.1, 0), (0.08, 0.1, 0), (0, 0.16, 0.08)]
 
@@ -126,7 +127,14 @@ class Actor:
         self.wait(1 / 60)
 
     def help(self, side="right"):
-        self.sim.click(side, "by_button")
+        """Raises the hand above the eyes, holds it there and brings it back down."""
+        hand = self.observe()["hands"][side]
+        down, ahead = tuple(hand["position"]), add(tuple(hand["position"]), tuple(hand["forward"]))
+        x = self.body.profile.shoulder_half_width * (-1 if side == "left" else 1)
+        up = self.body.world((x, self.body.profile.eye_height + RAISE[0], -0.25))
+        self.move_hand(side, up, at=add(up, self.body.direction((0, 1, -1))))
+        self.wait(RAISE[1] + 0.1)
+        self.move_hand(side, down, at=ahead)
 
     def rest(self, side):
         rest = self.body.rest(side)
@@ -150,7 +158,7 @@ class Facilitator:
         return self.sim.observe()["facilitator"]
 
     def toggle(self):
-        self.sim.click(self.side, "menu_button")
+        self.sim.click("menu", "menu_pressed")
 
     def open(self):
         if not self.panel()["open"]:

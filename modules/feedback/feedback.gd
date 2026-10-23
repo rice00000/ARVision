@@ -1,7 +1,7 @@
 extends Module
-## A judged response, felt three ways: a sound, a mark where it happened, and a
-## vibration. Never colour alone: good is a rising chime and a ring, bad a soft
-## falling tone and a cross, hint a single note and a dot.
+## A judged response, given two ways: a sound and a mark where it happened
+## (tracked hands cannot vibrate). Never colour alone: good is a rising chime and
+## a ring, bad a soft falling tone and a cross, hint a single note and a dot.
 
 const RATE := 22050
 ## Notes (Hz) of each kind's sound, played one after another.
@@ -25,7 +25,6 @@ func _on_feedback(kind: StringName, at: Vector3) -> void:
 	player.finished.connect(player.queue_free)
 	player.play()
 	_mark(kind, at)
-	App.rig.pulse(0.5 if kind == &"good" else 0.3, 0.08 if kind == &"good" else 0.2)
 
 
 ## A shape that pops up at [param at], faces the eyes and fades.

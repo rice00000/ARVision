@@ -1,4 +1,4 @@
-"""The facilitator's panel, used the way a facilitator does: left Menu, point, pull the trigger."""
+"""The facilitator's panel, used the way a facilitator does: left-hand menu pinch, point, pinch."""
 
 import unittest
 

@@ -12,14 +12,14 @@ extends Node
 ## client thinks. With --fixed-fps every frame is 1/60 s of game time.
 ##
 ## It acts only through the child's real input path: SimInput head and hand
-## poses (moved over time), controller buttons and tracking. It never emits
+## poses (moved over time), hand inputs and tracking. It never emits
 ## events, never calls trial or session methods and runs no client code; it
 ## only reads engine facts (see observe.gd).
 
 const Observe := preload("res://tools/sim/observe.gd")
 ## Seconds without a command (real time) before the server gives up and quits.
 const IDLE_LIMIT := 300.0
-const ACTIONS: Array[StringName] = [&"trigger_click", &"grip_click", &"ax_button", &"by_button", &"menu_button"]
+const ACTIONS: Array[StringName] = [&"trigger_click", &"grip_click", &"menu_pressed"]
 
 var _server := TCPServer.new()
 var _peer: StreamPeerTCP

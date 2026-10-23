@@ -121,10 +121,10 @@ func test_a_wrong_try_restarts_the_clock_and_help_stops_at_max_hint() -> void:
 	var tried_at := trial.seconds()
 	await wait(FIND.hint_after + 0.5)
 	expect(absf(hints[0][1] - (tried_at + FIND.hint_after)) < 0.05, "hint %.1f s after the try, got %s" % [FIND.hint_after, hints])
-	input.click(&"right", &"by_button")
-	input.click(&"right", &"by_button")
+	await raise_hand()
+	await raise_hand()
 	expect_eq(trial.hint_level, FIND.max_hint, "never above max_hint")
-	expect_eq(hints.size(), 2, "the extra press adds no level")
+	expect_eq(hints.size(), 2, "the extra raise adds no level")
 
 
 func test_time_limit_ends_the_round_as_a_failure_and_pauses_do_not_count() -> void:
@@ -158,5 +158,5 @@ func test_no_help_by_itself_when_hint_after_is_zero() -> void:
 	await wait(120.0)
 	expect(hints.is_empty(), "none in two minutes")
 	expect(App.session.trial.is_running(), "and no time limit either")
-	input.click(&"left", &"by_button")
-	expect_eq(hints.size(), 1, "Y still asks")
+	await raise_hand(&"left")
+	expect_eq(hints.size(), 1, "a raised hand still asks")

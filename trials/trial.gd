@@ -15,7 +15,7 @@ extends Node3D
 ## [code]_notification(NOTIFICATION_PAUSED)[/code].
 ##
 ## Help: [member TrialDef.hint_after] seconds without progress raise the hint
-## level by one (later each round, so help fades); B / Y asks for the next level
+## level by one (later each round, so help fades); a raised hand asks for the next level
 ## at once; probe rounds get none. What each level shows is up to [method _hint].
 
 ## The round is over. [param scored] is false for an abandoned round, which

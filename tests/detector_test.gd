@@ -109,10 +109,10 @@ func test_a_pick_goes_to_the_object_whose_outline_the_ray_passes() -> void:
 	var ended := record(Events.trial_ended)
 	var said := record(Events.said)
 	App.session.run()
-	var trial: Trial
 	expect(await until(func() -> bool:
-		trial = App.session.trial
-		return trial != null and trial.is_running() and trial.get("_label") != ""), "an object is named")
+		return App.session.trial != null and App.session.trial.is_running() and App.session.trial.get("_label") != ""),
+		"an object is named")
+	var trial := App.session.trial
 	_detector().process_mode = Node.PROCESS_MODE_DISABLED
 	var label: String = trial.get("_label")
 	var named := Detection.new(label, (trial.get("_named") as Detection).position, 0.04, 0.9)

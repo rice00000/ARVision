@@ -10,7 +10,7 @@ Trials never touch the headset. They ask **`App.reality`** for the real world:
 | How it looks (`apply_view(View)`, `focus_on()`) | Meta passthrough filter + dim sphere | the same grading as a screen overlay |
 | Camera frames (`camera_frame()`) | `QuestCamera` (Passthrough Camera API) | the rendered view |
 
-Input works the same way: on a Quest the headset moves the `Rig`; without one, `SimInput` sets synthetic trackers, so trials get identical controller events. The desktop driver and the tests both use `SimInput`.
+Input works the same way: on a Quest the headset moves the `Rig`; without one, `SimInput` sets synthetic trackers, so trials get identical hand events. The desktop driver and the tests both use `SimInput`.
 
 ## Layers
 
@@ -27,7 +27,7 @@ Session ─ Block ─▶ apply View ─▶ instance trial scene ─▶ per round
 - **Level:** one 0–1 number per skill (`Profile`). `TrialAxis` maps it to real values; keep one driven axis per trial. `Block.pins` fixes other axes per block.
 - **Staircase:** a round counts as right only when solved on the first try without help (`first_try` in the log); retries and help still end in success for the child.
 - **Probe blocks** are unaided and do not move the level: no-help check-ins.
-- **Help** escalates by itself (`hint_after`, later each round) or on B / Y; every hint is logged.
+- **Help** escalates by itself (`hint_after`, later each round) or when the child raises a hand; every hint is logged.
 - **Log:** `user://profiles/<id>/logs/*.jsonl`, every round with its full condition and view.
 
 ## Modules

@@ -1,8 +1,9 @@
 class_name Pointer
 extends Node3D
-## One controller's pointing ray and fingertip, turned into [Events]: every
-## button, [signal Events.selected] when the trigger is pulled,
-## [signal Events.touched] when the moving fingertip enters a [Target], and
+## One tracked hand's pointing ray and fingertip, turned into [Events]: every
+## button, [signal Events.selected] on a pinch (the OpenXR action
+## trigger_click), [signal Events.touched] when the moving fingertip enters a
+## [Target], [signal Events.help_requested] when the hand is raised, and
 ## tracking changes. A resting hand touches nothing: a toy that appears under
 ## it, or hops into it, was not reached for.
 ##
@@ -12,12 +13,17 @@ extends Node3D
 const TARGET_LAYER := 1
 
 @export var length := 4.0
-## How far in front of the controller the fingertip sits.
+## How far in front of the hand's aim point the fingertip sits.
 @export var tip_reach := 0.05
 ## The fingertip rests once it has stayed within [member rest_radius] metres
 ## for [member rest_seconds].
 @export var rest_radius := 0.015
 @export var rest_seconds := 0.3
+## A hand held [member raise_height] metres above the eyes for
+## [member raise_seconds] asks for help, like a raised hand in class. It asks
+## again only after coming down. Raised in front, it stays in the cameras' view.
+@export var raise_height := 0.1
+@export var raise_seconds := 0.4
 
 ## &"left" or &"right".
 var side: StringName
@@ -30,6 +36,8 @@ var _distance := 0.0
 ## Where the fingertip last moved to, and for how long it has stayed near it.
 var _rest_at := Vector3.INF
 var _rest_for := 0.0
+var _raised_for := 0.0
+var _asked := false
 
 
 func _ready() -> void:
@@ -52,6 +60,12 @@ func _physics_process(delta: float) -> void:
 		_rest_for = 0.0
 	else:
 		_rest_for += delta
+	var up := _controller.get_has_tracking_data() and global_position.y > App.head().global_position.y + raise_height
+	_raised_for = _raised_for + delta if up else 0.0
+	_asked = _asked and up
+	if _raised_for >= raise_seconds and not _asked:
+		_asked = true
+		Events.help_requested.emit()
 
 
 ## The fingertip has not moved for [member rest_seconds].
@@ -81,8 +95,6 @@ func _on_button(action: String, pressed: bool) -> void:
 		return
 	if action == "trigger_click":
 		Events.selected.emit(side, cast(), global_position, -global_basis.z)
-	elif action == "by_button":
-		Events.help_requested.emit()
 
 
 func _build() -> void:

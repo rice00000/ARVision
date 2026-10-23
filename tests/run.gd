@@ -6,6 +6,22 @@ extends Node
 ## --fixed-fps 60 runs game time as fast as the machine allows. Without --headless
 ## it runs only tests/rendered/ (they need rendered frames); headless skips them.
 ## Uses (and wipes) a "test..." profile. Exit code = number of failed tests.
+## A script error fails the test it happens in: it stops the test silently, so
+## the expects after it would never run.
+
+
+## Counts script errors from any thread.
+class ScriptErrors:
+	extends Logger
+	var count := 0
+	var _lock := Mutex.new()
+
+	func _log_error(_function: String, _file: String, _line: int, _code: String, _rationale: String,
+			_editor_notify: bool, error_type: int, _backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type == ERROR_TYPE_SCRIPT:
+			_lock.lock()
+			count += 1
+			_lock.unlock()
 
 
 func _ready() -> void:
@@ -20,6 +36,8 @@ func _ready() -> void:
 	var passed := 0
 	var failed: Array[String] = []
 	var rendered := DisplayServer.get_name() != "headless"
+	var errors := ScriptErrors.new()
+	OS.add_logger(errors)
 	for path in _scripts("res://tests"):
 		if path.begins_with("res://tests/rendered/") != rendered or (not only.is_empty() and not path.contains(only)):
 			continue
@@ -31,8 +49,11 @@ func _ready() -> void:
 			var case: TestCase = script.new()
 			add_child(case)
 			print("%s :: %s" % [path.get_file(), method.name])
+			var before := errors.count
 			await case.call(method.name)
 			await case.shutdown()
+			if errors.count > before:
+				case.failures.append("%d script error(s)" % (errors.count - before))
 			if case.failures.is_empty():
 				passed += 1
 			else:

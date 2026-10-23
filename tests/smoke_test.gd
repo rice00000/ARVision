@@ -34,8 +34,8 @@ func test_wrong_pick_then_help() -> void:
 	expect(trial.is_running(), "a wrong pick keeps the round going")
 	expect_eq(trial.tries, 1, "wrong pick counted")
 	expect_eq(feedback.back()[0], &"bad", "bad feedback")
-	input.click(&"right", &"by_button")
-	expect_eq(trial.hint_level, 1, "B asks for the first hint")
+	await raise_hand()
+	expect_eq(trial.hint_level, 1, "a raised hand asks for the first hint")
 
 
 func test_a_round_solved_after_a_wrong_try_lowers_the_level() -> void:
@@ -53,7 +53,7 @@ func test_probe_rounds_get_no_help_and_keep_the_level() -> void:
 	await boot(plan_of(FIND, 1, true, 0.3))
 	App.session.run()
 	await until(_round_running)
-	input.click(&"left", &"by_button")
+	await raise_hand(&"left")
 	expect_eq(App.session.trial.hint_level, 0, "no help in a probe")
 	await select((App.session.trial.get("_toys").keys()[1] as Target).global_position)
 	await select((App.session.trial.get("_target") as Target).global_position)
@@ -65,7 +65,7 @@ func test_facilitator_pauses_and_pins_the_level() -> void:
 	App.session.run()
 	await until(_round_running)
 	var before := App.session.level()
-	input.click(&"left", &"menu_button")
+	input.menu()
 	expect(get_tree().paused, "panel pauses play")
 	var panel := App.module(&"Facilitator").get_node(^"FacilitatorPanel")
 	await select((panel.get_node(^"fac_harder") as Node3D).global_position)

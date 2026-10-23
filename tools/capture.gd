@@ -26,7 +26,7 @@ func _ready() -> void:
 			App.reality.apply_view(load(VIEWS + file))
 			await _save(out.path_join(file.get_basename() + ".png"))
 	App.reality.apply_view(View.new())
-	App.sim_input.click(&"left", &"menu_button")
+	App.sim_input.menu()
 	await _save(out.path_join("facilitator.png"))
 	print("CAPTURED ", out)
 	get_tree().quit()

@@ -7,18 +7,18 @@ extends Node
 
 # -- the child's input (sent by the rig's Pointers) ---------------------------
 
-## A controller button changed. [param action] is the OpenXR action:
-## trigger_click, grip_click, ax_button, by_button or menu_button.
+## A hand input changed. [param action] is the OpenXR action: trigger_click
+## (pinch), grip_click (grasp), or menu_pressed (left-hand menu pinch).
 signal button(hand: StringName, action: StringName, pressed: bool)
-## The trigger was pulled while pointing. [param target] is the virtual Target
+## The child pinched while pointing. [param target] is the virtual Target
 ## the ray hit, or null; the ray itself always comes along, so a trial can judge
 ## pointing at a real object that has no collider.
 signal selected(hand: StringName, target: Target, origin: Vector3, direction: Vector3)
 ## A fingertip entered a Target.
 signal touched(hand: StringName, target: Target)
-## The child asked for help (B / Y).
+## The child asked for help (raised a hand).
 signal help_requested
-## A controller lost or regained tracking.
+## A hand lost or regained tracking.
 signal hand_tracking(hand: StringName, tracked: bool)
 
 # -- what the child sees and hears --------------------------------------------
@@ -26,7 +26,7 @@ signal hand_tracking(hand: StringName, tracked: bool)
 ## The guide speaks. Voice shows it as a subtitle and reads it aloud.
 signal said(text: String)
 ## A response was judged: &"good", &"bad" or &"hint". Feedback answers with a
-## sound, a mark at [param at] and a vibration: never colour alone.
+## sound and a mark at [param at]: never colour alone.
 signal feedback(kind: StringName, at: Vector3)
 ## How the real world is shown changed (passthrough filter, dimming, focus).
 signal view_changed(view: Dictionary)

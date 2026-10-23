@@ -25,3 +25,6 @@ pose = &"aim"
 
 [node name="Pointer" type="Node3D" parent="RightHand"]
 script = ExtResource("2_pointer")
+
+[node name="Menu" type="XRController3D" parent="."]
+tracker = &"/user/fbhandaim/left"

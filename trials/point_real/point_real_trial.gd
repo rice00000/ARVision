@@ -1,6 +1,6 @@
 extends Trial
 ## Real objects: the guide names a real object the camera sees; the child
-## points at it and pulls the trigger. Needs the Detector module (CV).
+## points at it and pinches. Needs the Detector module (CV).
 ##
 ## A pick goes to the seen object whose outline the pointing ray misses least.
 ## It is right when that is the named one, missed by at most
@@ -60,7 +60,7 @@ func _choose(detections: Array) -> void:
 	_named = pick
 	condition.set_value(&"object", _label)
 	App.reality.focus_on(_named.position)
-	say("Point at the %s and pull the trigger." % _label)
+	say("Point at the %s and pinch your fingers." % _label)
 
 
 func _on_selected(_hand: StringName, _target: Target, origin: Vector3, direction: Vector3) -> void:

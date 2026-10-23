@@ -1,13 +1,13 @@
 class_name DesktopDriver
 extends Node
 ## Play without a headset: the mouse drives the right hand through SimInput, so
-## trials get exactly the controller input a Quest would send.
+## trials get exactly the hand input a Quest would send.
 ##
 ##   Right drag            look around
-##   Left press / release  pull / let go of the trigger where the cursor points
+##   Left press / release  pinch / let go where the cursor points
 ##   Left drag             sweep the hand across the view (wheel: nearer / farther)
-##   H                     help (B / Y)
-##   M                     facilitator panel (left Menu)
+##   H                     raise the left hand (help)
+##   M                     left-hand menu pinch (facilitator panel)
 
 ## How far in front of the eye the hand sits, metres.
 var depth := 0.45
@@ -36,9 +36,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			_place_hand(event.position)
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_H:
-			input.click(&"right", &"by_button")
+			_raise_left_hand()
 		elif event.keycode == KEY_M:
-			input.click(&"left", &"menu_button")
+			input.menu()
+
+
+func _raise_left_hand() -> void:
+	var input := App.sim_input
+	var down := App.rig.left.global_transform
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	var up := eye.origin + ahead * 0.3 + ahead.cross(Vector3.UP) * -0.2 + Vector3.UP * 0.25
+	input.set_hand(&"left", Transform3D(Basis.looking_at(ahead), up))
+	await get_tree().create_timer(App.rig.pointer(&"left").raise_seconds + 0.2).timeout
+	input.set_hand(&"left", down)
 
 
 func _place_hand(cursor: Vector2) -> void:
