@@ -56,12 +56,25 @@ func _ready() -> void:
 	_camera = QuestCamera.new()
 	add_child(_camera)
 	_apply()
+	get_tree().create_timer(ROOM_READY_AFTER).timeout.connect(_room_ready)
 
 
-## Logs a step of reading the room, and prints it for adb logcat.
+## Seconds after start at which the room is summed up ("room_ready").
+const ROOM_READY_AFTER := 4.0
+
+
+## Logs a step of reading the room, and prints it as one JSON line (adb logcat, tools/xrsim.py).
 static func note(what: StringName, data: Dictionary = {}) -> void:
-	print("ARVision %s %s" % [what, data])
+	print("ARVision ", JSON.stringify(Log.plain({what = what, data = data})))
 	Events.report(what, data)
+
+
+func _room_ready() -> void:
+	var surface := work_surface()
+	note(&"room_ready", {head = App.head().global_position, surfaces = _surfaces.size(),
+		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
+		work_surface = {kind = surface.kind, scanned = surface in _surfaces, centre = surface.transform.origin,
+			normal = surface.transform.basis.y, size = surface.size}})
 
 
 func _on_room_missing() -> void:

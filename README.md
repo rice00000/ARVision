@@ -42,4 +42,5 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
+- **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).
 - **CV on a Quest:** `pip install ultralytics`, `python tools/cv_server.py`, `adb reverse tcp:8765 tcp:8765`.

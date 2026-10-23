@@ -10,6 +10,10 @@ extends Module
 
 enum Backend { AUTO, SIM, REMOTE }
 
+## Debug builds on a Quest keep the frames they send, at most this many per run,
+## in user://frames/<start time>/ (tools/frames.py pulls and checks them).
+const RECORD_LIMIT := 240
+
 @export var backend := Backend.AUTO
 ## tools/cv_server.py as the headset reaches it, e.g. after
 ## `adb reverse tcp:8765 tcp:8765` over USB.
@@ -26,6 +30,8 @@ var _http := HTTPRequest.new()
 var _frame: CameraFrame
 var _waiting := false
 var _since := 0.0
+var _recorded := 0
+var _record_folder := ""
 
 
 func _ready() -> void:
@@ -76,9 +82,19 @@ func _send_frame() -> void:
 	_frame = App.reality.camera_frame()
 	if _frame == null:
 		return
+	if OS.is_debug_build() and App.reality.kind() == "passthrough" and _recorded < RECORD_LIMIT:
+		_record(_frame)
 	_waiting = true
 	_http.request_raw(server, PackedStringArray(["Content-Type: image/jpeg"]), HTTPClient.METHOD_POST,
 		_frame.image.save_jpg_to_buffer(0.8))
+
+
+func _record(frame: CameraFrame) -> void:
+	if _record_folder.is_empty():
+		_record_folder = "user://frames/" + Time.get_datetime_string_from_system().replace(":", "-")
+		DirAccess.make_dir_recursive_absolute(_record_folder)
+	frame.save(_record_folder.path_join("%04d" % _recorded))
+	_recorded += 1
 
 
 func _on_reply(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
