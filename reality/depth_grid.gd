@@ -13,6 +13,8 @@ const RANGE := Vector2(0.25, 6.0)
 ## Table points: 0.15-0.9 m below the eyes, within 1 m around them, binned by height.
 const BIN := 0.02
 const MIN_TABLE := 40
+## [method around] counts points this close to a height as on it, metres.
+const LEVEL := 0.04
 ## The table's extent is measured between these shares of its area, then scaled
 ## back to the whole: stray points (an arm, a sleeve at the same height) do not
 ## stretch it. A depth pixel on a level top covers area growing with distance cubed
@@ -127,6 +129,20 @@ static func _span(values: Array[Vector2]) -> Vector2:
 			span.y = value.x
 			break
 	return span
+
+
+## Points around [param point] within [param radius] (horizontally): x those at its
+## height (within [constant LEVEL]), y all of them at any height. A level surface
+## there shows as many of the first; hands held in the air show the floor or the
+## lap below instead (the depth leaves hands out).
+func around(point: Vector3, radius: float) -> Vector2i:
+	var found := Vector2i.ZERO
+	for i in points.size():
+		if valid[i] and Vector2(points[i].x - point.x, points[i].z - point.z).length() < radius:
+			found.y += 1
+			if absf(points[i].y - point.y) < LEVEL:
+				found.x += 1
+	return found
 
 
 ## The surface normal at a point from its four neighbours (unoriented), or zero

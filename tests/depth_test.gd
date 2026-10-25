@@ -80,6 +80,16 @@ func test_the_table_is_measured_the_way_the_child_faces() -> void:
 	expect(table.size.x >= 0.4 and table.size.y >= 0.3, "a usable size: %s" % table.size)
 
 
+func test_hands_on_the_table_have_a_surface_around_them_hands_in_the_air_do_not() -> void:
+	var grid := _room_grid()
+	var on_table := grid.around(Vector3(0.0, TABLE_Y, -0.7), PassthroughReality.HAND_TABLE_RADIUS)
+	expect(on_table.x >= PassthroughReality.HAND_TABLE_POINTS, "the top around resting hands: %s" % on_table)
+	var in_air := grid.around(Vector3(0.0, TABLE_Y + 0.2, -0.7), PassthroughReality.HAND_TABLE_RADIUS)
+	expect(in_air.y >= PassthroughReality.HAND_TABLE_POINTS and in_air.x < PassthroughReality.HAND_TABLE_POINTS,
+		"seen, but nothing at the height of raised hands: %s" % in_air)
+	expect_eq(grid.around(Vector3(3.0, TABLE_Y, 2.0), 0.35), Vector2i.ZERO, "a place the depth does not see")
+
+
 func test_camera_uv_inverts_its_rays() -> void:
 	var image := Image.create(640, 480, false, Image.FORMAT_RGB8)
 	var pose := Transform3D(Basis(Vector3.UP, 0.6) * Basis(Vector3.RIGHT, -0.2), Vector3(0.3, 1.1, -0.2))

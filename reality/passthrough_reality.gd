@@ -23,6 +23,7 @@ var _sphere := MeshInstance3D.new()
 var _camera: QuestCamera
 var _scan := OpenXRFbSceneManager.new()
 var _hands_flat := 0.0
+var _hands_asked := false
 var _found_table := false
 var _depth := DepthSensor.new()
 
@@ -63,11 +64,19 @@ func _ready() -> void:
 
 ## Seconds after start at which the room is summed up ("room_ready").
 const ROOM_READY_AFTER := 4.0
-## Without a scanned table in reach, both hands held flat on the real table this
-## long mark it there. Quest refuses the room scan to an app not registered with
-## Meta (ERROR_PACKAGE_UNTRUSTED), so this keeps the toys on the real table.
+## When neither the scan nor the depth gives a table, the child is asked to put
+## both hands flat on it; held there this long, they mark it. Only after asking,
+## and when the depth sees the place, only where it sees a surface at hand
+## height (around the hands, which the depth leaves out): hands held level in
+## the air are no table.
 const HAND_TABLE_SECONDS := 1.0
 const HAND_TABLE_SIZE := Vector2(1.0, 0.6)
+## Seconds after "room_ready" without a table before the child is asked for the hands.
+const ASK_HANDS_AFTER := 6.0
+## The depth looks this far around the hands for the table top, metres.
+const HAND_TABLE_RADIUS := 0.35
+## Points on the table top around the hands it must see, when it sees the place at all.
+const HAND_TABLE_POINTS := 12
 
 
 ## Logs a step of reading the room, and prints it as one JSON line (adb logcat, tools/xrsim.py).
@@ -77,7 +86,7 @@ static func note(what: StringName, data: Dictionary = {}) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _found_table or work_surface() in _surfaces:
+	if not _hands_asked or _found_table or work_surface() in _surfaces:
 		return
 	var eye := App.head().global_position
 	var tips: Array[Vector3] = []
@@ -91,9 +100,16 @@ func _physics_process(delta: float) -> void:
 	_hands_flat = _hands_flat + delta if flat else 0.0
 	if _hands_flat < HAND_TABLE_SECONDS:
 		return
+	_hands_flat = 0.0
+	var top := (tips[0] + tips[1]) * 0.5 + Vector3.DOWN * 0.015
+	if _depth.grid:
+		var seen := _depth.grid.around(top, HAND_TABLE_RADIUS)
+		if seen.y >= HAND_TABLE_POINTS and seen.x < HAND_TABLE_POINTS:
+			note(&"room_hands_in_air", {at = top, on_level = seen.x, around = seen.y})
+			return
 	var ahead := -App.head().global_basis.z
 	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
-	_set_table((tips[0] + tips[1]) * 0.5 + ahead * 0.15 + Vector3.DOWN * 0.015, HAND_TABLE_SIZE, &"room_hand_table")
+	_set_table(top + ahead * 0.15, HAND_TABLE_SIZE, &"room_hand_table")
 
 
 ## The real thing along a ray: the room scan's colliders first, else the live depth.
@@ -131,8 +147,9 @@ func _room_ready() -> void:
 	if not surface in _surfaces:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
 		_depth.refreshed.connect(_look_for_table)
-		get_tree().create_timer(6.0).timeout.connect(func() -> void:
+		get_tree().create_timer(ASK_HANDS_AFTER).timeout.connect(func() -> void:
 			if not _found_table:
+				_hands_asked = true
 				Events.say("Put both hands flat on the table for a moment."))
 	note(&"room_ready", {head = App.head().global_position, surfaces = _surfaces.size(),
 		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
