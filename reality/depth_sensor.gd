@@ -3,8 +3,12 @@ extends Node3D
 ## The room as live points from the Quest 3's environment depth, which needs no
 ## room scan (Quest refuses that to unregistered apps: ERROR_PACKAGE_UNTRUSTED).
 ## A child of the Rig (XROrigin3D). Twice a second a shader turns an N x N grid
-## of left-eye depth pixels into play-space points (the plugin's own CPU readback
-## is broken on Vulkan, #517); [member grid] is the latest look.
+## of left-eye depth pixels into points (the plugin's own CPU readback is broken
+## on Vulkan, #517); [member grid] is the latest look.
+##
+## Meta's depth comes in the raw OpenXR play space, without the recentring Godot
+## adds on top (XRServer reference frame, see App's pose_recentered). This node
+## carries that frame, so its children and the points stay on the real room.
 
 signal refreshed
 
@@ -30,6 +34,7 @@ var grid: DepthGrid
 
 var _view := SubViewport.new()
 var _looks := 0
+var _read_ms := 0.0
 
 
 ## Starts the depth and looks every [constant INTERVAL] seconds from now on.
@@ -39,6 +44,41 @@ func start() -> void:
 		return
 	OpenXRMetaEnvironmentDepthExtension.start_environment_depth()
 	OpenXRMetaEnvironmentDepthExtension.set_hand_removal_enabled(true)
+	var timer := Timer.new()
+	timer.wait_time = INTERVAL
+	timer.timeout.connect(_look)
+	add_child(timer)
+	timer.start()
+
+
+## One look now: renders the grid and reads it back. The depth globals must exist.
+func read_once() -> DepthGrid:
+	if not _view.is_inside_tree():
+		_build_view()
+	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var began := Time.get_ticks_usec()
+	var image := _view.get_texture().get_image()
+	_read_ms = (Time.get_ticks_usec() - began) / 1000.0
+	var to_world := global_transform
+	var points := PackedVector3Array()
+	var valid := PackedByteArray()
+	points.resize(N * N)
+	valid.resize(N * N)
+	for y in N:
+		for x in N:
+			var pixel := image.get_pixel(x, y)
+			points[y * N + x] = to_world * Vector3(pixel.r, pixel.g, pixel.b)
+			valid[y * N + x] = 1 if pixel.a > 0.5 else 0
+	return DepthGrid.new(N, points, valid)
+
+
+func _process(_delta: float) -> void:
+	transform = XRServer.get_reference_frame()
+
+
+func _build_view() -> void:
 	var material := ShaderMaterial.new()
 	material.shader = Shader.new()
 	material.shader.code = SHADER # after start: the depth globals exist only then
@@ -51,11 +91,6 @@ func start() -> void:
 	rect.material = material
 	_view.add_child(rect)
 	add_child(_view)
-	var timer := Timer.new()
-	timer.wait_time = INTERVAL
-	timer.timeout.connect(_look)
-	add_child(timer)
-	timer.start()
 
 
 ## The first real surface along a ray ([method DepthGrid.hit]), or empty.
@@ -64,25 +99,10 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 
 func _look() -> void:
-	_view.render_target_update_mode = SubViewport.UPDATE_ONCE
-	await RenderingServer.frame_post_draw
-	await RenderingServer.frame_post_draw
-	var began := Time.get_ticks_usec()
-	var image := _view.get_texture().get_image()
-	var read_ms := (Time.get_ticks_usec() - began) / 1000.0
-	var to_world := (get_parent() as Node3D).global_transform
-	var points := PackedVector3Array()
-	var valid := PackedByteArray()
-	points.resize(N * N)
-	valid.resize(N * N)
-	for y in N:
-		for x in N:
-			var pixel := image.get_pixel(x, y)
-			points[y * N + x] = to_world * Vector3(pixel.r, pixel.g, pixel.b)
-			valid[y * N + x] = 1 if pixel.a > 0.5 else 0
-	grid = DepthGrid.new(N, points, valid)
+	grid = await read_once()
 	if _looks % LOG_EVERY == 0:
-		PassthroughReality.note(&"depth", {points = grid.count(), read_ms = read_ms,
-			ahead = hit(App.head().global_position, -App.head().global_basis.z)})
+		PassthroughReality.note(&"depth", {points = grid.count(), read_ms = _read_ms,
+			ahead = hit(App.head().global_position, -App.head().global_basis.z),
+			recentre = {yaw = rad_to_deg(transform.basis.get_euler().y), offset = transform.origin}})
 	_looks += 1
 	refreshed.emit()

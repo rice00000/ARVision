@@ -57,6 +57,7 @@ func _ready() -> void:
 	_scan.openxr_fb_scene_capture_completed.connect(func(success: bool) -> void:
 		note(&"room_scan_done", {success = success}))
 	App.rig.add_child(_scan)
+	App.rig.add_child(_depth)
 	_camera = QuestCamera.new()
 	add_child(_camera)
 	_apply()
@@ -115,19 +116,19 @@ func _look_for_table() -> void:
 		_set_table(table.centre, table.size, &"room_depth_table")
 
 
-## A table found without the room scan (hands or depth); toys go on it from the next round.
+## A table found without the room scan (hands or depth); toys go on it from the
+## next round. It hangs on the depth sensor, so it stays put when the headset recentres.
 func _set_table(at: Vector3, size: Vector2, how: StringName) -> void:
 	_found_table = true
 	var forward := -App.head().global_basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
-	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), at), size))
+	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), at), size, _depth))
 	Events.say("Got it. That's your table.")
 	note(how, {centre = at, size = size})
 
 
 func _room_ready() -> void:
 	var surface := work_surface()
-	App.rig.add_child(_depth)
 	_depth.start()
 	if not surface in _surfaces:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
