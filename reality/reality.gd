@@ -16,6 +16,8 @@ const REACH := 0.4
 const BELOW_EYE := 0.4
 ## A table farther than this from the eyes is out of reach, metres.
 const TABLE_REACH := 1.2
+## [method hit] looks this far along a ray, metres.
+const HIT_RANGE := 6.0
 
 ## How the real world is shown now. Change it with [method apply_view].
 var view := View.new()
@@ -62,6 +64,14 @@ func is_free(point: Vector3, radius: float) -> bool:
 	query.transform = Transform3D(Basis.IDENTITY, point + Vector3.UP * (radius + 0.005))
 	query.collision_mask = REALITY_LAYER
 	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()
+
+
+## The first real thing along the ray from [param from]: {position, normal}, the
+## normal facing [param from]. Empty when nothing real is known there.
+func hit(from: Vector3, direction: Vector3) -> Dictionary:
+	var query := PhysicsRayQueryParameters3D.create(from, from + direction * HIT_RANGE, REALITY_LAYER)
+	var found := get_world_3d().direct_space_state.intersect_ray(query)
+	return {position = found.position, normal = found.normal} if found else {}
 
 
 func add_surface(surface: Surface) -> void:

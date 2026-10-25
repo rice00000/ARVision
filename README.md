@@ -6,7 +6,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 
 ## Run it
 
-- **Quest 3:** put the Vendors plugin in `addons/godotopenxrvendors/` and install the Android build template, then run the **Meta Quest 3** export preset. The first run asks to scan the room; tables become work surfaces.
+- **Quest 3:** put the Vendors plugin in `addons/godotopenxrvendors/` and install the Android build template, then run the **Meta Quest 3** export preset. The first run asks to scan the room; tables become work surfaces. A build not registered with Meta cannot read the scan (`ERROR_PACKAGE_UNTRUSTED`); tables and walls then come from the live depth.
 - **PC, no headset:** run the project. A simulated living room stands in for the real one. Mouse: right-drag looks, left click points and pinches, left-drag sweeps (wheel: nearer / farther). **H** raises a hand (help), **M** facilitator panel.
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<child>`, `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).

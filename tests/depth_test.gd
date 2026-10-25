@@ -1,0 +1,95 @@
+extends TestCase
+## Finding the room without the scan: DepthGrid on a synthetic depth image (a
+## wall 2.5 m ahead, a table top below), CameraFrame.uv, Reality.hit and the
+## wall break on the simulated room.
+
+const EYE := Vector3(0.0, 1.2, 0.0)
+const N := 48
+const WALL_Z := -2.5
+const TABLE_Y := 0.7
+
+
+## What a 90 degree depth camera at EYE looking along -Z sees: a wall at
+## WALL_Z, and a 1 x 0.7 m table top at TABLE_Y in front of the eyes.
+func _room_grid(with_table := true) -> DepthGrid:
+	var points := PackedVector3Array()
+	var valid := PackedByteArray()
+	for y in N:
+		for x in N:
+			var ray := Vector3((x + 0.5) / N * 2.0 - 1.0, 1.0 - (y + 0.5) / N * 2.0, -1.0).normalized()
+			var at := EYE + ray * ((WALL_Z - EYE.z) / ray.z)
+			if with_table and ray.y < 0.0:
+				var on_table := EYE + ray * ((TABLE_Y - EYE.y) / ray.y)
+				if absf(on_table.x) < 0.5 and on_table.z < -0.3 and on_table.z > -1.0:
+					at = on_table
+			points.append(at)
+			valid.append(1)
+	return DepthGrid.new(N, points, valid)
+
+
+func test_a_ray_finds_the_wall_ahead_and_its_normal() -> void:
+	var grid := _room_grid()
+	var ahead := grid.hit(EYE, Vector3.FORWARD)
+	expect(ahead.position.is_equal_approx(Vector3(0.0, 1.2, WALL_Z)), "on the wall, on the ray: %s" % ahead.position)
+	expect(ahead.normal.dot(Vector3.BACK) > 0.99, "facing the eyes: %s" % ahead.normal)
+	var slanted := Vector3(0.3, 0.1, -1.0).normalized()
+	var off := grid.hit(EYE, slanted)
+	expect(absf(off.position.z - WALL_Z) < 0.01 and (off.position - EYE).normalized().dot(slanted) > 0.9999,
+		"a slanted ray meets the wall where it points: %s" % off.position)
+
+
+func test_a_ray_stops_at_the_nearer_table() -> void:
+	var down := (Vector3(0.0, TABLE_Y, -0.6) - EYE).normalized()
+	var found := _room_grid().hit(EYE, down)
+	expect(absf(found.position.y - TABLE_Y) < 0.01, "on the table top: %s" % found.position)
+	expect(found.normal.dot(Vector3.UP) > 0.99, "pointing up: %s" % found.normal)
+
+
+func test_nothing_seen_means_no_hit() -> void:
+	var grid := _room_grid()
+	grid.valid.fill(0)
+	expect(grid.hit(EYE, Vector3.FORWARD).is_empty(), "no points")
+	expect(_room_grid().hit(EYE, Vector3.BACK).is_empty(), "nothing behind the eyes")
+
+
+func test_the_table_top_is_found_from_the_depth() -> void:
+	var table := _room_grid().table(EYE)
+	expect(table.has("centre"), "found, %d points on it" % table.support)
+	expect(absf(table.centre.y - TABLE_Y) < 0.02, "at its height: %s" % table.centre)
+	expect(absf(table.centre.x) < 0.05 and table.centre.z < -0.3 and table.centre.z > -1.0, "in front: %s" % table.centre)
+	expect(not _room_grid(false).table(EYE).has("centre"), "a bare wall is no table")
+
+
+func test_camera_uv_inverts_its_rays() -> void:
+	var image := Image.create(640, 480, false, Image.FORMAT_RGB8)
+	var pose := Transform3D(Basis(Vector3.UP, 0.6) * Basis(Vector3.RIGHT, -0.2), Vector3(0.3, 1.1, -0.2))
+	var frame := CameraFrame.new(image, pose, 64.0)
+	for uv: Vector2 in [Vector2(0.5, 0.5), Vector2(0.1, 0.8), Vector2(0.9, 0.2)]:
+		var back := frame.uv(pose.origin + frame.ray(uv.x, uv.y) * 2.3)
+		expect(back.is_equal_approx(uv), "%s comes back as %s" % [uv, back])
+
+
+func test_reality_hit_finds_the_simulated_back_wall() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	var eye := App.head().global_position
+	var found := App.reality.hit(eye, Vector3.FORWARD)
+	expect(not found.is_empty() and is_equal_approx(found.position.z, -2.95), "the back wall's face: %s" % found)
+	expect(found.normal.is_equal_approx(Vector3.BACK), "its normal faces the room")
+	expect(App.reality.hit(eye, Vector3.UP).is_empty(), "no ceiling in the simulated room")
+
+
+func test_the_wall_breaks_where_the_wall_is_and_cleans_up() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	var events := record(Events.reported)
+	var eye := App.head().global_position
+	WallBreak.burst(eye, Vector3.FORWARD, Vector3.RIGHT)
+	var reports := events.filter(func(args: Array) -> bool: return args[0] == &"wall_break")
+	expect_eq(reports.size(), 1, "reported once")
+	var report: Dictionary = reports[0][1]
+	expect(report.found and is_equal_approx(report.at.z, -2.95), "on the wall: %s" % report)
+	expect(report.hole.x < WallBreak.HOLE_SIZE.x, "a nearer wall gets a smaller hole: %s" % report.hole)
+	var effect: WallBreak = App.stage.get_children().filter(func(node: Node) -> bool: return node is WallBreak)[0]
+	var shards := effect.get_children().filter(func(node: Node) -> bool: return node is MeshInstance3D).size() - 1
+	expect(shards > 40, "many pieces: %d" % shards)
+	expect(await until(func() -> bool: return not App.stage.get_children().any(func(node: Node) -> bool: return node is WallBreak),
+		WallBreak.HOLE_SECONDS + 2.0), "gone after the hole closes")

@@ -24,6 +24,16 @@ func ray(u: float, v: float) -> Vector3:
 	return (pose.basis * local).normalized()
 
 
+## Where world [param point] lands in the image, 0..1 from the top left (the
+## inverse of [method ray]); outside 0..1 when it is out of view.
+func uv(point: Vector3) -> Vector2:
+	var local := pose.basis.inverse() * (point - pose.origin)
+	var half := tan(deg_to_rad(fov_y) * 0.5)
+	var aspect := float(image.get_width()) / image.get_height()
+	var depth := maxf(-local.z, 0.001)
+	return Vector2((local.x / depth / (half * aspect) + 1.0) * 0.5, (1.0 - local.y / depth / half) * 0.5)
+
+
 ## Saves the image and where it was taken as [param path].jpg and .json (read by
 ## [method open] and tools/frames.py).
 func save(path: String) -> void:

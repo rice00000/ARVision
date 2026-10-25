@@ -1,8 +1,9 @@
 class_name PassthroughReality
 extends Reality
 ## Reality on a Quest: the passthrough image behind the app, surfaces from the
-## Meta room scan, Meta's passthrough filters for the View, and passthrough
-## camera frames for CV. Needs a headset; desktop and tests use SimReality.
+## Meta room scan or else the live depth ([DepthSensor]), Meta's passthrough
+## filters for the View, and passthrough camera frames for CV. Needs a headset;
+## desktop and tests use SimReality.
 ##
 ## The room scan: when the headset has none, Quest's Space Setup is opened once
 ## per run. If the room still cannot be read after it, play goes on with the
@@ -23,7 +24,8 @@ var _camera: QuestCamera
 var _scan := OpenXRFbSceneManager.new()
 var _scan_asked := false
 var _hands_flat := 0.0
-var _hand_table := false
+var _found_table := false
+var _depth := DepthSensor.new()
 
 
 func kind() -> String:
@@ -77,7 +79,7 @@ static func note(what: StringName, data: Dictionary = {}) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if _hand_table or work_surface() in _surfaces:
+	if _found_table or work_surface() in _surfaces:
 		return
 	var eye := App.head().global_position
 	var tips: Array[Vector3] = []
@@ -91,19 +93,48 @@ func _physics_process(delta: float) -> void:
 	_hands_flat = _hands_flat + delta if flat else 0.0
 	if _hands_flat < HAND_TABLE_SECONDS:
 		return
-	_hand_table = true
+	var ahead := -App.head().global_basis.z
+	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
+	_set_table((tips[0] + tips[1]) * 0.5 + ahead * 0.15 + Vector3.DOWN * 0.015, HAND_TABLE_SIZE, &"room_hand_table")
+
+
+## The real thing along a ray: the room scan's colliders first, else the live depth.
+func hit(from: Vector3, direction: Vector3) -> Dictionary:
+	var found := super(from, direction)
+	return found if found else _depth.hit(from, direction)
+
+
+func _look_for_table() -> void:
+	if _found_table:
+		_depth.refreshed.disconnect(_look_for_table)
+		return
+	var table := _depth.grid.table(App.head().global_position)
+	note(&"depth_table", {support = table.support})
+	if table.has("centre"):
+		_depth.refreshed.disconnect(_look_for_table)
+		_set_table(table.centre, table.size, &"room_depth_table")
+
+
+## A table found without the room scan (hands or depth); toys go on it from the next round.
+func _set_table(at: Vector3, size: Vector2, how: StringName) -> void:
+	_found_table = true
 	var forward := -App.head().global_basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
-	var centre := (tips[0] + tips[1]) * 0.5 + forward * 0.15 + Vector3.DOWN * 0.015
-	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), centre), HAND_TABLE_SIZE))
+	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), at), size))
 	Events.say("Got it. That's your table.")
-	note(&"room_hand_table", {centre = centre})
+	note(how, {centre = at, size = size})
 
 
 func _room_ready() -> void:
 	var surface := work_surface()
+	App.rig.add_child(_depth)
+	_depth.start()
 	if not surface in _surfaces:
-		Events.say("Put both hands flat on the table for a moment.")
+		# No scanned table: find it in the depth, and ask for the hands if that fails.
+		_depth.refreshed.connect(_look_for_table)
+		get_tree().create_timer(6.0).timeout.connect(func() -> void:
+			if not _found_table:
+				Events.say("Put both hands flat on the table for a moment."))
 	note(&"room_ready", {head = App.head().global_position, surfaces = _surfaces.size(),
 		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
 		work_surface = {kind = surface.kind, scanned = surface in _surfaces, centre = surface.transform.origin,
