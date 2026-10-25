@@ -18,8 +18,8 @@
 `python tools/xrsim.py test` runs the real Quest path (`PassthroughReality`, the Meta room scan, hands) on Meta XR Simulator in injected rooms, about 10 s per room, no headset. `python tools/xrsim.py run <room.json>` prints what the app read. Needs the simulator in `C:\Program Files\MetaXRSimulator\v207.1` (or `XRSIM`); the system's OpenXR runtime is left alone.
 
 - Rooms are the simulator's scene-anchor JSON, built in tests with `xrsim.room(plane(...), volume(...))`. They need a FLOOR and a CEILING, floats only. Record a real room with the simulator's `scene_data_recorder/SceneDataRecorder.apk`.
-- The app prints `ARVision {json}` lines (`room_missing`, `room_scan_done`, `room_surface`, `room_ready`, `depth`, `depth_table`), also in adb logcat on a Quest.
-- Not simulated: Space Setup itself (scene capture fails there) and the passthrough camera.
+- The app prints `ARVision {json}` lines (`room_missing`, `room_surface`, `room_ready`, `depth`, `depth_table`), also in adb logcat on a Quest.
+- Not simulated: the live depth and the passthrough camera.
 
 ## Quest camera frames
 

@@ -42,7 +42,7 @@ func save(path: String) -> void:
 	FileAccess.open(path + ".json", FileAccess.WRITE).store_string(JSON.stringify({
 		origin = [pose.origin.x, pose.origin.y, pose.origin.z],
 		basis = [[basis.x.x, basis.x.y, basis.x.z], [basis.y.x, basis.y.y, basis.y.z], [basis.z.x, basis.z.y, basis.z.z]],
-		fov_y = fov_y, size = [image.get_width(), image.get_height()]}))
+		fov_y = fov_y, size = [image.get_width(), image.get_height()], msec = Time.get_ticks_msec()}))
 
 
 ## A frame saved with [method save].

@@ -53,11 +53,31 @@ func test_nothing_seen_means_no_hit() -> void:
 
 
 func test_the_table_top_is_found_from_the_depth() -> void:
-	var table := _room_grid().table(EYE)
+	var table := _room_grid().table(EYE, Vector3.FORWARD)
 	expect(table.has("centre"), "found, %d points on it" % table.support)
 	expect(absf(table.centre.y - TABLE_Y) < 0.02, "at its height: %s" % table.centre)
-	expect(absf(table.centre.x) < 0.05 and table.centre.z < -0.3 and table.centre.z > -1.0, "in front: %s" % table.centre)
-	expect(not _room_grid(false).table(EYE).has("centre"), "a bare wall is no table")
+	# A 90 degree camera 0.5 m above the top sees it from 0.5 m ahead: 1 x 0.5 m of it.
+	expect(absf(table.centre.x) < 0.05 and absf(table.centre.z + 0.75) < 0.1, "in the middle of what is seen: %s" % table.centre)
+	expect(table.size.x > 0.85 and table.size.y > 0.4, "most of the 1 x 0.5 m in view: %s" % table.size)
+	expect(not _room_grid(false).table(EYE, Vector3.FORWARD).has("centre"), "a bare wall is no table")
+
+
+func test_stray_points_do_not_stretch_the_table() -> void:
+	var grid := _room_grid()
+	var stray := 0
+	for i in grid.points.size():
+		if grid.points[i].y == TABLE_Y and stray < 6: # an arm at table height, right under the eyes
+			grid.points[i] = Vector3(0.0, TABLE_Y, -0.05)
+			stray += 1
+	var table := grid.table(EYE, Vector3.FORWARD)
+	expect(table.centre.z < -0.55, "the centre stays on the top: %s" % table.centre)
+
+
+func test_the_table_is_measured_the_way_the_child_faces() -> void:
+	var turned := Vector3(1.0, 0.0, -1.0).normalized()
+	var table := _room_grid().table(EYE, turned)
+	expect(absf(table.centre.x) < 0.5 and table.centre.z < -0.3 and table.centre.z > -1.0, "still on the top: %s" % table.centre)
+	expect(table.size.x >= 0.4 and table.size.y >= 0.3, "a usable size: %s" % table.size)
 
 
 func test_camera_uv_inverts_its_rays() -> void:

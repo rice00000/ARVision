@@ -5,10 +5,10 @@ extends Reality
 ## filters for the View, and passthrough camera frames for CV. Needs a headset;
 ## desktop and tests use SimReality.
 ##
-## The room scan: when the headset has none, Quest's Space Setup is opened once
-## per run. If the room still cannot be read after it, play goes on with the
-## virtual table patch instead of asking again. Each step is logged
-## ("room_..." events, also printed to logcat).
+## The room scan is read when the headset has one and Quest lets this app read
+## it (an unregistered build may not: ERROR_PACKAGE_UNTRUSTED). The app never
+## opens Space Setup itself. Each step is logged ("room_..." and "depth..."
+## events, also printed to logcat).
 ##
 ## Meta's extensions are engine singletons: call them by name
 ## (OpenXRFbPassthroughExtension.set_...). A variable typed with that name
@@ -22,7 +22,6 @@ var _dim := ShaderMaterial.new()
 var _sphere := MeshInstance3D.new()
 var _camera: QuestCamera
 var _scan := OpenXRFbSceneManager.new()
-var _scan_asked := false
 var _hands_flat := 0.0
 var _found_table := false
 var _depth := DepthSensor.new()
@@ -53,9 +52,7 @@ func _ready() -> void:
 	_scan.default_scene = SceneAnchor
 	_scan.scene_setup_method = &"setup_scene"
 	_scan.auto_create = true
-	_scan.openxr_fb_scene_data_missing.connect(_on_room_missing)
-	_scan.openxr_fb_scene_capture_completed.connect(func(success: bool) -> void:
-		note(&"room_scan_done", {success = success}))
+	_scan.openxr_fb_scene_data_missing.connect(note.bind(&"room_missing", {}))
 	App.rig.add_child(_scan)
 	App.rig.add_child(_depth)
 	_camera = QuestCamera.new()
@@ -109,7 +106,8 @@ func _look_for_table() -> void:
 	if _found_table:
 		_depth.refreshed.disconnect(_look_for_table)
 		return
-	var table := _depth.grid.table(App.head().global_position)
+	var forward := -App.head().global_basis.z
+	var table := _depth.grid.table(App.head().global_position, Vector3(forward.x, 0.0, forward.z).normalized())
 	note(&"depth_table", {support = table.support})
 	if table.has("centre"):
 		_depth.refreshed.disconnect(_look_for_table)
@@ -140,15 +138,6 @@ func _room_ready() -> void:
 		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
 		work_surface = {kind = surface.kind, scanned = surface in _surfaces, centre = surface.transform.origin,
 			normal = surface.transform.basis.y, size = surface.size}})
-
-
-func _on_room_missing() -> void:
-	if _scan_asked:
-		note(&"room_missing", {after_scan = true})
-		return
-	_scan_asked = true
-	note(&"room_missing", {after_scan = false})
-	_scan.request_scene_capture()
 
 
 func camera_frame() -> CameraFrame:

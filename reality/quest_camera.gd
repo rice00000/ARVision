@@ -8,14 +8,19 @@ extends SubViewport
 ## this uses the left one. A shader turns the feed (RGB, or separate Y and CbCr
 ## images) into RGB in this viewport, which is read back when a frame is asked for.
 ##
-## Still to check on a headset: colours and FOV.
+## Where the camera sits and how wide it sees come from its Camera2 calibration
+## (adb shell dumpsys media.camera, camera 50 on a Quest 3): tilted 11 degrees
+## down from the head, 3 cm left, 2 cm down and 6 cm ahead of it; focal length
+## 864.6 px on the 1280 x 1280 sensor, which 640 x 480 crops to 1280 x 960 and halves.
 
 const PERMISSION := "horizonos.permission.HEADSET_CAMERA"
 ## The left passthrough camera's feed name starts with its Camera2 id.
 const LEFT_CAMERA := "50"
 const SIZE := Vector2i(640, 480)
-## Approximate vertical field of view of the passthrough camera, degrees.
-const FOV_Y := 64.0
+## Vertical field of view of a 640 x 480 frame: 2 atan(240 / 432.3), degrees.
+const FOV_Y := 58.1
+## The left camera in the head's frame.
+const IN_HEAD := Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-11.1)), Vector3(-0.032, -0.018, -0.063))
 const YCBCR := """
 shader_type canvas_item;
 uniform sampler2D luma_plane;
@@ -52,7 +57,7 @@ func _ready() -> void:
 func frame() -> CameraFrame:
 	if _feed == null:
 		return null
-	return CameraFrame.new(get_texture().get_image(), App.head().global_transform, FOV_Y)
+	return CameraFrame.new(get_texture().get_image(), App.head().global_transform * IN_HEAD, FOV_Y)
 
 
 func _process(_delta: float) -> void:

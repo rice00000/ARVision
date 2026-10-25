@@ -13,6 +13,11 @@ const RANGE := Vector2(0.25, 6.0)
 ## Table points: 0.15-0.9 m below the eyes, within 1 m around them, binned by height.
 const BIN := 0.02
 const MIN_TABLE := 40
+## The table's extent is measured between these shares of its area, then scaled
+## back to the whole: stray points (an arm, a sleeve at the same height) do not
+## stretch it. A depth pixel on a level top covers area growing with distance cubed
+## (squared for the distance, once more for the slant).
+const TABLE_SPAN := Vector2(0.1, 0.9)
 
 var size: int
 var points: PackedVector3Array
@@ -65,8 +70,9 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 
 ## The table top: {support} (points on the fullest level), plus {centre, size}
-## once enough points agree.
-func table(eye: Vector3) -> Dictionary:
+## once enough points agree. The size runs across and along [param forward]
+## (horizontal), the way the child faces.
+func table(eye: Vector3, forward: Vector3) -> Dictionary:
 	var bins := {}
 	for i in points.size():
 		var point := points[i]
@@ -84,15 +90,43 @@ func table(eye: Vector3) -> Dictionary:
 			best = level
 	if best.size() < MIN_TABLE:
 		return {support = best.size()}
-	var low := Vector3.INF
-	var high := -Vector3.INF
-	var height := 0.0
+	var right := forward.cross(Vector3.UP).normalized()
+	var across: Array[Vector2] = [] # (position, area)
+	var along: Array[Vector2] = []
+	var heights := PackedFloat32Array()
 	for point in best:
-		low = low.min(point)
-		high = high.max(point)
-		height += point.y
-	return {support = best.size(), centre = Vector3((low.x + high.x) * 0.5, height / best.size(), (low.z + high.z) * 0.5),
-		size = Vector2(clampf(high.x - low.x, 0.4, 1.2), clampf(high.z - low.z, 0.3, 0.8))}
+		var area := pow((point - eye).length(), 3.0)
+		across.append(Vector2((point - eye).dot(right), area))
+		along.append(Vector2((point - eye).dot(forward), area))
+		heights.append(point.y)
+	heights.sort()
+	var width := _span(across)
+	var depth := _span(along)
+	var centre := eye + right * (width.x + width.y) * 0.5 + forward * (depth.x + depth.y) * 0.5
+	centre.y = heights[heights.size() / 2]
+	var whole := 1.0 / (TABLE_SPAN.y - TABLE_SPAN.x)
+	return {support = best.size(), centre = centre,
+		size = Vector2(clampf((width.y - width.x) * whole, 0.4, 1.2), clampf((depth.y - depth.x) * whole, 0.3, 0.8))}
+
+
+## The positions at [constant TABLE_SPAN] of the total area; [param values] are (position, area).
+static func _span(values: Array[Vector2]) -> Vector2:
+	values.sort()
+	var total := 0.0
+	for value in values:
+		total += value.y
+	var span := Vector2(values[0].x, values[-1].x)
+	var running := 0.0
+	var low_done := false
+	for value in values:
+		running += value.y
+		if not low_done and running >= total * TABLE_SPAN.x:
+			span.x = value.x
+			low_done = true
+		if running >= total * TABLE_SPAN.y:
+			span.y = value.x
+			break
+	return span
 
 
 ## The surface normal at a point from its four neighbours (unoriented), or zero

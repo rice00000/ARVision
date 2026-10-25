@@ -16,6 +16,10 @@ const N := 48
 const INTERVAL := 0.5
 ## Every this many looks, the cost of reading the grid back is logged.
 const LOG_EVERY := 20
+## Debug builds save the first this many looks in user://depth/<start time>/
+## (with the head pose and Time.get_ticks_msec(), like the camera frames in
+## user://frames/), to check depth against the camera afterwards.
+const RECORD_LIMIT := 120
 const SHADER := """
 shader_type canvas_item;
 render_mode unshaded, blend_disabled;
@@ -35,6 +39,7 @@ var grid: DepthGrid
 var _view := SubViewport.new()
 var _looks := 0
 var _read_ms := 0.0
+var _record_folder := ""
 
 
 ## Starts the depth and looks every [constant INTERVAL] seconds from now on.
@@ -100,9 +105,26 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 func _look() -> void:
 	grid = await read_once()
+	if OS.is_debug_build() and _looks < RECORD_LIMIT:
+		_record()
 	if _looks % LOG_EVERY == 0:
 		PassthroughReality.note(&"depth", {points = grid.count(), read_ms = _read_ms,
 			ahead = hit(App.head().global_position, -App.head().global_basis.z),
 			recentre = {yaw = rad_to_deg(transform.basis.get_euler().y), offset = transform.origin}})
 	_looks += 1
 	refreshed.emit()
+
+
+func _record() -> void:
+	if _record_folder.is_empty():
+		_record_folder = "user://depth/" + Time.get_datetime_string_from_system().replace(":", "-")
+		DirAccess.make_dir_recursive_absolute(_record_folder)
+	var head := App.head().global_transform
+	var flat := PackedFloat32Array()
+	for point in grid.points:
+		flat.append_array([point.x, point.y, point.z])
+	FileAccess.open(_record_folder.path_join("%04d.json" % _looks), FileAccess.WRITE).store_string(JSON.stringify({
+		msec = Time.get_ticks_msec(), size = N, points = flat, valid = grid.valid,
+		head = {origin = [head.origin.x, head.origin.y, head.origin.z],
+			basis = [[head.basis.x.x, head.basis.x.y, head.basis.x.z], [head.basis.y.x, head.basis.y.y, head.basis.y.z],
+				[head.basis.z.x, head.basis.z.y, head.basis.z.z]]}}))

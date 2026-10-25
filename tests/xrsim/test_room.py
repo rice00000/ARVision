@@ -46,7 +46,7 @@ class Room(unittest.TestCase):
         self.assert_near(surface["normal"], (0, 1, 0), what="facing up")
         self.assert_near(surface["size"], (1.2, 0.7), what="its width and depth")
         self.assertEqual(len(self.surfaces(notes, "floor")), 1)
-        self.assertFalse(any(n["what"] == "room_missing" for n in notes), "the room was read: no scan asked for")
+        self.assertFalse(any(n["what"] == "room_missing" for n in notes), "the room was read")
 
     def test_a_desk_scanned_as_a_box_uses_its_top(self):
         notes = self.play(FLOOR, CEILING, volume("TABLE", (0, -1.15, -0.55), (1.2, 0.7, 0.73)), name="desk_box")
@@ -70,12 +70,9 @@ class Room(unittest.TestCase):
         surface = self.ready(notes)["work_surface"]
         self.assertFalse(surface["scanned"], f"but too far to play on: {surface}")
 
-    def test_no_room_asks_for_one_scan_and_plays_on(self):
+    def test_no_room_plays_on_without_asking_for_a_scan(self):
         notes = self.play(name="no_room")
-        missing = [n["data"]["after_scan"] for n in notes if n["what"] == "room_missing"]
-        self.assertEqual(missing[0], False, "asks for a scan")
-        self.assertLessEqual(missing.count(False), 1, f"only once: {missing}")
-        self.assertLessEqual(len(missing), 2, f"no loop: {missing}")
+        self.assertTrue(any(n["what"] == "room_missing" for n in notes), "notices there is no room")
         self.assertFalse(self.ready(notes)["work_surface"]["scanned"], "the virtual patch")
 
     def test_metas_furnished_room(self):
