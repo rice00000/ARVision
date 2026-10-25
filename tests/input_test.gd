@@ -154,14 +154,25 @@ func test_a_brisk_hand_move_is_a_sweep_a_jump_or_a_creep_is_not() -> void:
 	await _glide(&"right", start, start + Vector3.RIGHT * 0.3, 0.3)
 	await _glide(&"right", start + Vector3.RIGHT * 0.3, start, 0.3)
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 2, "the wave out was reported as soon as the hand turned back")
-	expect(swept[1][2].is_equal_approx(start + Vector3.RIGHT * 0.3), "to its farthest point: %s" % swept[1][2])
+	expect_eq(swept.size(), 2, "one sweep for the whole wave")
+	expect(swept[1][1].is_equal_approx(start) and swept[1][2].is_equal_approx(start + Vector3.RIGHT * 0.3),
+		"the way out, to its farthest point: %s" % [swept[1]])
+	# A wind-up: a short pull back, then the sweep the other way without a stop.
+	await _glide(&"right", start, start + Vector3.LEFT * 0.12, 0.12)
+	await _glide(&"right", start + Vector3.LEFT * 0.12, start + Vector3.RIGHT * 0.3, 0.4)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 3, "one sweep")
+	expect(swept[2][1].is_equal_approx(start + Vector3.LEFT * 0.12) and swept[2][2].is_equal_approx(start + Vector3.RIGHT * 0.3),
+		"the longer leg, from the end of the wind-up: %s" % [swept[2]])
+	expect(absf(swept[2][3] - 0.4) < 0.05, "taking the leg's own time: %s" % swept[2][3])
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
 	# A hand that keeps going after a stop starts another sweep.
 	await _glide(&"right", start, start + Vector3.FORWARD * 0.2, 0.2)
 	await wait(pointer.sweep_stop_seconds + 0.1)
 	await _glide(&"right", start + Vector3.FORWARD * 0.2, start + Vector3.FORWARD * 0.4, 0.2)
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 4, "two sweeps with a stop between")
+	expect_eq(swept.size(), 5, "two sweeps with a stop between")
 	input.track(&"right", false)
 	await frames(2)
 	input.track(&"right", true)
@@ -170,7 +181,7 @@ func test_a_brisk_hand_move_is_a_sweep_a_jump_or_a_creep_is_not() -> void:
 	await frames(2)
 	input.track(&"right", true)
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 4, "a sweep cut by a tracking loss is dropped")
+	expect_eq(swept.size(), 5, "a sweep cut by a tracking loss is dropped")
 
 
 ## Moves a hand from [param from] to [param to] over [param seconds], a step per physics tick.

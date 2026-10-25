@@ -159,4 +159,4 @@ func test_the_wall_breaks_where_the_wall_is_and_cleans_up() -> void:
 	var shards := effect.get_children().filter(func(node: Node) -> bool: return node is MeshInstance3D).size() - 1
 	expect(shards > 40, "many pieces: %d" % shards)
 	expect(await until(func() -> bool: return not App.stage.get_children().any(func(node: Node) -> bool: return node is WallBreak),
-		WallBreak.HOLE_SECONDS + 2.0), "gone after the hole closes")
+		WallBreak.STAY_SECONDS[WallBreak.Style.CRACK] + 2.0), "gone after the hole closes")

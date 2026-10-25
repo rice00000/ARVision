@@ -95,6 +95,35 @@ func test_direction_is_random_across_rounds_when_not_pinned() -> void:
 		App.session.trial.begin(condition)
 		seen[condition.value(&"heading")] = true
 	expect_eq(seen.keys().size(), 4, "all four headings come up: %s" % [seen.keys()])
+	seen.clear()
+	for i in 40:
+		var condition := RANDOM.condition(0.5, i, false)
+		condition.set_value(&"direction", 5.0)
+		App.session.trial.begin(condition)
+		seen[condition.value(&"heading")] = true
+	expect_eq(seen.keys(), [&"right", &"left"] as Array, "5 draws only lateral headings: %s" % [seen.keys()])
+	expect_eq(load("res://trials/motion/motion_demo.tres").condition(0.0, 0, false).value(&"direction"), 5.0, "the tech demo is lateral")
+
+
+func test_sweeps_as_the_round_starts_are_not_answers() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var ended := record(Events.trial_ended)
+	var reports := record(Events.reported)
+	App.session.run()
+	await until(_round_is.bind(0))
+	var trial := App.session.trial
+	var frame: Transform3D = trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	await _glide(&"right", start, start + frame.basis.x * 0.25, 0.3) # a hand settling, 0.3 s into the round
+	await wait(SETTLE)
+	expect(trial.is_running() and ended.is_empty(), "not judged, right as it was")
+	expect_eq(trial.tries, 0, "no try")
+	var early := reports.filter(func(args: Array) -> bool: return args[0] == &"motion_invalid")
+	expect(early.size() == 1 and early[0][1].reason == &"early", "logged as early: %s" % [early])
+	await _sweep(&"right", Vector3.RIGHT)
+	expect_eq(ended.size(), 1, "the same sweep once the round is under way")
 
 
 func test_wrong_sweeps_count_tries_and_the_flow_stays() -> void:
@@ -265,7 +294,7 @@ func test_cloud_is_placed_ahead_and_judged_in_its_frozen_frame() -> void:
 	expect(cloud.global_transform.is_equal_approx(frozen), "the cloud stays put")
 	var start := eye + Vector3(0.2, -0.4, -0.4)
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	await frames(2)
+	await wait(MotionTrial.ARM_SECONDS)
 	await _glide(&"right", start, start + cloud.global_basis.x * 0.25, 0.3)
 	await wait(SETTLE)
 	expect(ended.size() == 1 and ended[0][1], "right is the cloud's right, not the turned head's")
@@ -345,7 +374,9 @@ func _material() -> ShaderMaterial:
 ## cloud's frame) at 0.8 m/s, then holds it still until judged.
 func _sweep(side: StringName, flow: Vector3, length := 0.25) -> void:
 	var seconds := length / 0.8
-	var frame: Transform3D = App.session.trial.get("_frame")
+	var trial := App.session.trial
+	await until(func() -> bool: return not trial.is_running() or trial.seconds() >= MotionTrial.ARM_SECONDS)
+	var frame: Transform3D = trial.get("_frame")
 	var start := App.head().global_position + Vector3(-0.2 if side == &"left" else 0.2, -0.4, -0.4)
 	input.set_hand(side, Transform3D(Basis.IDENTITY, start)) # a jump: the rig never takes it for a sweep
 	await frames(2)

@@ -5,14 +5,16 @@ extends Trial
 ## Original design and shader by Megan (Mgharv), ported from XRVision.
 ##
 ## Axes: coherence (driven), competing (1 = the noise is one opposite flow, 0 =
-## random directions), direction (0 random, 1-4 right, left, toward, away),
+## random directions), direction (0 random, 1-4 right, left, toward, away, 5
+## random lateral),
 ## dots, speed, dot_lifetime, half_width / half_height / half_depth (cloud, m),
 ## distance (m), tolerance (degrees), min_sweep (m).
 ## Sweeps come from the rig ([signal Events.swept]): one brisk move of a hand,
 ## no pinch. A sweep that is too small, or mostly up or down (a hand raised for
 ## help, or put down), is invalid: it is not a perceptual error and counts no
-## try. A wrong valid sweep counts a try; the flow stays the same until the
-## child finds it.
+## try. So is one in the first [constant ARM_SECONDS] of a round: hands still
+## settling from the last round, before the dots could be read. A wrong valid
+## sweep counts a try; the flow stays the same until the child finds it.
 ## Hint 1 (only when asked): every dot follows the flow.
 ## With [member break_wall] (the tech demo), a right sweep also breaks the wall ahead.
 
@@ -25,12 +27,14 @@ const ALIGN_SECONDS := 0.6
 ## A sweep whose direction rises or falls more than this (the sine of 50
 ## degrees) is not an answer: the flow never goes up or down.
 const VERTICAL := 0.77
+const ARM_SECONDS := 0.8
 const INVALID_SAY := {
 	too_small = "Sweep your hand a little farther.",
 }
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
+@export var wall_style: WallBreak.Style = WallBreak.Style.CRACK
 
 var _rng := RandomNumberGenerator.new()
 ## The cloud's frame, frozen at the start of the round; sweeps are judged in it.
@@ -69,7 +73,9 @@ func _setup(round_condition: TrialCondition) -> void:
 	_invalid = 0
 	_rng.randomize()
 	var pinned := int(round_condition.value(&"direction"))
-	var heading := _rng.randi_range(0, HEADINGS.size() - 1) if pinned == 0 else pinned - 1
+	var heading := pinned - 1
+	if pinned == 0 or pinned == 5:
+		heading = _rng.randi_range(0, 1 if pinned == 5 else HEADINGS.size() - 1)
 	_flow = FLOWS[heading]
 	_dots = int(round_condition.value(&"dots"))
 	var coherence: float = round_condition.value(&"coherence")
@@ -107,6 +113,8 @@ func focus_point() -> Vector3:
 
 func _on_swept(hand: StringName, from: Vector3, to: Vector3, duration: float) -> void:
 	var result := classify(_frame.basis.inverse() * (to - from), _flow, _min_sweep, _tolerance)
+	if seconds() < ARM_SECONDS:
+		result.merge({valid = false, reason = &"early"}, true)
 	result.merge({trial = condition.trial, round = condition.round_index, hand = hand,
 		onset_seconds = seconds() - duration, duration_seconds = duration,
 		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
@@ -127,7 +135,7 @@ func _on_swept(hand: StringName, from: Vector3, to: Vector3, duration: float) ->
 	say("Yes! Now they all go together.")
 	if break_wall:
 		var eye := App.head().global_position
-		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow)
+		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow, wall_style)
 	_align = create_tween()
 	_align.tween_method(_set_alignment, 0.0, 1.0, ALIGN_SECONDS)
 	finish(true, {attempts = _attempts.duplicate(), invalid_gestures = _invalid,

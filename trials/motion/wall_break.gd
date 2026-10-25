@@ -1,16 +1,21 @@
 class_name WallBreak
 extends Node3D
-## Demo effect: the real wall ahead cracks with glowing seams, its pieces burst
-## out the way the flow went and a hole into space opens for a few seconds.
-## [method Reality.hit] finds the wall (room scan, else the live depth); with
-## nothing found it breaks 3 m ahead. The pieces wear the camera's picture of
-## that wall, so it is the real wall that seems to break.
+## Demo effect: the real wall ahead breaks and its pieces burst out the way the
+## flow went. [method Reality.hit] finds the wall (room scan, else the live
+## depth); with nothing found it breaks 3 m ahead. The pieces wear the camera's
+## picture of that wall, so it is the real wall that seems to break.
+##
+## Two looks ([enum Style]): CRACK, the wall's own picture rippling from the
+## blow with glowing cracks spreading over it, then dimming; SPACE, a hole into
+## purple space that stays open a few seconds.
 
-## Hole size at 3 m; nearer walls get a smaller hole, so it fills about the same view.
+enum Style {CRACK, SPACE}
+
+## Patch size at 3 m; nearer walls get a smaller patch, so it fills about the same view.
 const HOLE_SIZE := Vector2(2.4, 1.7)
 const FULL_SIZE_AT := 3.0
 const GRID := Vector2i(9, 7)
-## Pieces this far inside the hole's rim (1 = the rim) break out.
+## Pieces this far inside the patch's rim (1 = the rim) break out.
 const INSIDE := 0.8
 const THICKNESS := 0.04
 const GAP := 0.06
@@ -18,8 +23,10 @@ const WALL_COLOUR := Color(0.82, 0.8, 0.76)
 const GRAVITY := Vector3(0.0, -6.0, 0.0)
 const CRACK_SECONDS := 0.3
 const SHARD_SECONDS := 1.6
-const HOLE_SECONDS := 6.0
-const HOLE := """
+const SHOCK_SECONDS := 0.8
+## How long each look stays before it goes.
+const STAY_SECONDS := {Style.CRACK: 3.0, Style.SPACE: 6.0}
+const SPACE := """
 shader_type spatial;
 render_mode unshaded, cull_disabled;
 uniform float open = 0.0;
@@ -41,43 +48,108 @@ void fragment() {
 	ALBEDO = mix(space, seam, crack);
 }
 """
+## The wall's picture (or a flat wall colour) over the patch, a ripple running
+## out from the blow, and cracks (cell edges) spreading from the centre: glowing
+## while they open, dark once the pieces are gone. The patch fades at its rim.
+const CRACK := """
+shader_type spatial;
+render_mode unshaded, cull_disabled;
+uniform sampler2D picture : source_color;
+uniform bool has_picture = false;
+uniform vec3 wall_colour : source_color = vec3(0.82, 0.8, 0.76);
+uniform vec2 uv_centre = vec2(0.5, 0.5);
+uniform vec2 uv_across = vec2(0.3, 0.0);
+uniform vec2 uv_down = vec2(0.0, 0.3);
+uniform float crack = 0.0;
+uniform float shock = 0.0;
+uniform float glow = 1.0;
+uniform float fade = 1.0;
+vec2 hash2(vec2 p) {
+	return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+}
+// Distance to the nearest border between cells: thin where a crack runs.
+float border(vec2 p) {
+	vec2 cell = floor(p);
+	float first = 8.0;
+	float second = 8.0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 seed = cell + vec2(float(x), float(y));
+			float d = length(seed + hash2(seed) - p);
+			if (d < first) { second = first; first = d; } else if (d < second) { second = d; }
+		}
+	}
+	return second - first;
+}
+void fragment() {
+	vec2 p = UV * 2.0 - 1.0;
+	float r = length(p);
+	float ripple = sin(r * 16.0 - shock * 22.0) * exp(-r * 2.5) * (1.0 - shock) * 0.04;
+	vec2 q = UV + (p / max(r, 0.001)) * ripple;
+	vec3 colour = has_picture ? texture(picture, uv_centre + (q.x - 0.5) * uv_across + (q.y - 0.5) * uv_down).rgb
+		: wall_colour;
+	float line = smoothstep(0.05, 0.0, border(p * 3.5 + vec2(0.37, 0.71)));
+	float spread = smoothstep(crack * 1.3, crack * 1.3 - 0.25, r);
+	vec3 seam = mix(vec3(0.04, 0.03, 0.03), vec3(1.0, 0.6, 0.2) * 2.5, glow);
+	ALBEDO = mix(colour, seam, line * spread);
+	ALPHA = (1.0 - smoothstep(0.7, 1.0, r)) * fade;
+}
+"""
 
+var _style := Style.CRACK
 var _shards: Array[MeshInstance3D] = []
 var _velocity: Array[Vector3] = []
 var _spin: Array[Vector3] = []
 var _age := 0.0
 var _flying := false
-var _hole_material := ShaderMaterial.new()
+var _patch_material := ShaderMaterial.new()
 var _shard_material := StandardMaterial3D.new()
 var _dust := CPUParticles3D.new()
 
 
 ## Breaks the wall in front of [param eye] along [param look]; pieces fly along [param flow] (world).
-static func burst(eye: Vector3, look: Vector3, flow: Vector3) -> void:
+static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRACK) -> void:
 	var hit := App.reality.hit(eye, look)
 	var at: Vector3 = hit.position if hit else eye + look * 3.0
 	var normal: Vector3 = hit.normal if hit else -look
 	var effect := WallBreak.new()
+	effect._style = style
 	App.stage.add_child(effect)
 	effect.global_transform = Transform3D(Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.FORWARD),
 		at + normal * 0.02)
 	var hole := HOLE_SIZE * clampf(eye.distance_to(at) / FULL_SIZE_AT, 0.4, 1.0)
 	Events.report(&"wall_break", {found = not hit.is_empty(), at = at, normal = normal,
-		distance = eye.distance_to(at), hole = hole})
+		distance = eye.distance_to(at), hole = hole, style = Style.keys()[style].to_lower()})
 	effect._build(hole, effect.global_basis.inverse() * flow, App.reality.camera_frame())
 
 
 func _build(hole_size: Vector2, flow: Vector3, frame: CameraFrame) -> void:
-	var hole := MeshInstance3D.new()
+	var patch := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = hole_size
-	hole.mesh = quad
-	_hole_material.shader = Shader.new()
-	_hole_material.shader.code = HOLE
-	_hole_material.set_shader_parameter(&"open", 1.0)
-	_hole_material.set_shader_parameter(&"crack", 1.0)
-	hole.material_override = _hole_material
-	add_child(hole)
+	patch.mesh = quad
+	_patch_material.shader = Shader.new()
+	if _style == Style.SPACE:
+		_patch_material.shader.code = SPACE
+		_patch_material.set_shader_parameter(&"open", 1.0)
+		_patch_material.set_shader_parameter(&"crack", 1.0)
+	else:
+		_patch_material.shader.code = CRACK
+		_patch_material.set_shader_parameter(&"wall_colour", WALL_COLOUR)
+		if frame:
+			# The picture's uv across the patch, from its centre and its half-extents.
+			var centre := frame.uv(global_position)
+			var across := frame.uv(global_transform * Vector3(hole_size.x * 0.5, 0.0, 0.0)) - centre
+			var down := frame.uv(global_transform * Vector3(0.0, -hole_size.y * 0.5, 0.0)) - centre
+			_patch_material.set_shader_parameter(&"has_picture", true)
+			_patch_material.set_shader_parameter(&"picture", ImageTexture.create_from_image(frame.image))
+			_patch_material.set_shader_parameter(&"uv_centre", centre)
+			_patch_material.set_shader_parameter(&"uv_across", across * 2.0)
+			_patch_material.set_shader_parameter(&"uv_down", down * 2.0)
+		create_tween().tween_method(func(amount: float) -> void:
+			_patch_material.set_shader_parameter(&"crack", amount), 0.0, 1.0, CRACK_SECONDS)
+	patch.material_override = _patch_material
+	add_child(patch)
 	_shard_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_shard_material.vertex_color_use_as_albedo = true
 	_shard_material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -93,7 +165,7 @@ func _build(hole_size: Vector2, flow: Vector3, frame: CameraFrame) -> void:
 	_crash()
 
 
-## Triangles of a jittered grid over the hole, those well inside its rim.
+## Triangles of a jittered grid over the patch, those well inside its rim.
 func _pieces(hole_size: Vector2) -> Array[PackedVector2Array]:
 	var cell := hole_size / Vector2(GRID)
 	var corners: Array[Vector2] = []
@@ -211,8 +283,14 @@ func _process(delta: float) -> void:
 		if _age >= CRACK_SECONDS:
 			_flying = true
 			_dust.emitting = true
-			create_tween().tween_method(func(amount: float) -> void:
-				_hole_material.set_shader_parameter(&"crack", amount), 1.0, 0.0, 0.4)
+			if _style == Style.SPACE:
+				create_tween().tween_method(func(amount: float) -> void:
+					_patch_material.set_shader_parameter(&"crack", amount), 1.0, 0.0, 0.4)
+			else:
+				create_tween().tween_method(func(amount: float) -> void:
+					_patch_material.set_shader_parameter(&"shock", amount), 0.0, 1.0, SHOCK_SECONDS)
+				create_tween().tween_method(func(amount: float) -> void:
+					_patch_material.set_shader_parameter(&"glow", amount), 1.0, 0.0, SHARD_SECONDS)
 		return
 	var flight := _age - CRACK_SECONDS
 	var gravity := global_basis.inverse() * GRAVITY
@@ -225,15 +303,15 @@ func _process(delta: float) -> void:
 		for shard in _shards:
 			shard.queue_free()
 		_shards.clear()
-	if _age > HOLE_SECONDS:
+	if _age > STAY_SECONDS[_style]:
 		var close := create_tween()
-		close.tween_method(_open, 1.0, 0.0, 0.5)
+		close.tween_method(_close, 1.0, 0.0, 0.5)
 		close.tween_callback(queue_free)
 		set_process(false)
 
 
-func _open(amount: float) -> void:
-	_hole_material.set_shader_parameter(&"open", amount)
+func _close(amount: float) -> void:
+	_patch_material.set_shader_parameter(&"open" if _style == Style.SPACE else &"fade", amount)
 
 
 ## A short crash: falling-pitch rumble under a burst of noise.
