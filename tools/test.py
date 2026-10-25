@@ -15,7 +15,8 @@ import time
 import godot
 
 SCENARIOS = godot.ROOT / "tests" / "sim"
-suites = [("GDScript unit tests", godot.headless("--fixed-fps", "60", "res://tests/run.tscn", "--", "--profile=test"))]
+suites = [("baked speech is fresh", [sys.executable, str(godot.ROOT / "tools" / "bake_speech.py"), "--check"]),
+          ("GDScript unit tests", godot.headless("--fixed-fps", "60", "res://tests/run.tscn", "--", "--profile=test"))]
 suites += [(f"scenarios {path.stem}", [sys.executable, "-m", "unittest", path.stem])
            for path in sorted(SCENARIOS.glob("test_*.py"))]
 

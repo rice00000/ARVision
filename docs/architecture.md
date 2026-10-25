@@ -35,7 +35,7 @@ Session ─ Block ─▶ apply View ─▶ instance trial scene ─▶ per round
 
 Children of `Main/Modules`; delete a node to unplug it. A trial that needs one lists it in `TrialDef.requires` and the session skips its blocks.
 
-- **Voice:** subtitles + system text-to-speech.
+- **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
 - **Feedback:** sound, shape mark and vibration for good / bad / hint.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; remote backend posts frames to `tools/cv_server.py` (YOLO). Labels are COCO names in both.
 - **Facilitator:** in-headset panel: level, view, skip; pauses play.

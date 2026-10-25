@@ -1,0 +1,48 @@
+extends TestCase
+## Baked speech: every line the guide can say has files, and Voice plays them.
+
+const FIND := preload("res://trials/find/find_trial.gd")
+const POINT := preload("res://trials/point_real/point_real.tscn")
+
+
+func _baked(text: String) -> void:
+	var paths := BakedSpeech.paths_for(text)
+	expect(not paths.is_empty(), "baked: %s" % text)
+	for path in paths:
+		expect(ResourceLoader.exists(path), "imported: %s" % path)
+
+
+func test_every_session_line_is_baked() -> void:
+	var defaults := SessionPlan.new()
+	_baked(defaults.greeting)
+	_baked(defaults.farewell)
+	for file in DirAccess.get_files_at("res://content/sessions"):
+		var plan: SessionPlan = load("res://content/sessions/" + file)
+		_baked(plan.greeting)
+		_baked(plan.farewell)
+		for block in plan.blocks:
+			if not block.intro.is_empty():
+				_baked(block.intro)
+
+
+func test_named_things_are_baked_in_their_lines() -> void:
+	for shape in FIND.SHAPES:
+		_baked("Find the %s!" % shape)
+		_baked("Look for the %s, on your %s." % [shape, "left"])
+	var trial := POINT.instantiate()
+	var labels: PackedStringArray = trial.labels
+	trial.free()
+	for label in labels:
+		_baked("Point at the %s and pinch your fingers." % label)
+		_baked("The %s is on your %s." % [label, "front"])
+	_baked("That's the %s. Find the %s!" % ["teddy bear", labels[0]])
+
+
+func test_voice_plays_the_line_and_cuts_off_the_last() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	var player: AudioStreamPlayer = App.module(&"Voice").get("_player")
+	Events.say("Find the ball!")
+	expect(player.playing and player.stream is AudioStreamPlaylist, "two baked phrases play as one line")
+	expect(player.stream.get_length() > 0.5, "with real audio")
+	Events.say("Look around the room.")
+	expect(player.playing and player.stream is AudioStreamOggVorbis, "a newer line replaces it")

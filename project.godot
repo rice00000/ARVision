@@ -16,16 +16,16 @@ run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 
-[audio]
-
-general/text_to_speech=true
-
 [autoload]
 
 Events="*res://core/events.gd"
 Profile="*res://core/profile.gd"
 Log="*res://core/log.gd"
 App="*res://core/app.gd"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/speech_baker/plugin.cfg")
 
 [layer_names]
 

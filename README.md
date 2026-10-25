@@ -42,6 +42,7 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Trial:** `trials/<kind>/` with a scene whose root extends `Trial` and a `TrialDef` `.tres`; add a `Block` to a session plan.
 - **View preset:** a `View` `.tres` in `content/views/`.
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
+- **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
 - **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).
