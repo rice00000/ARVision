@@ -73,6 +73,43 @@ func test_stray_points_do_not_stretch_the_table() -> void:
 	expect(table.centre.z < -0.55, "the centre stays on the top: %s" % table.centre)
 
 
+func test_a_lap_or_a_slope_at_table_height_is_no_table() -> void:
+	# A level patch right under the eyes (the child's own lap or chest).
+	var lap := _room_grid(false)
+	for i in lap.points.size():
+		var point := lap.points[i]
+		if point.y < EYE.y - 0.3 and point.y > EYE.y - 0.6:
+			var ray := (point - EYE).normalized()
+			lap.points[i] = EYE + ray * ((EYE.y - 0.45 - EYE.y) / ray.y)
+	var near := lap.table(EYE, Vector3.FORWARD)
+	expect(not near.has("centre"), "nothing within %.1f m of the eyes counts: %s" % [DepthGrid.TABLE_AROUND.x, near])
+	# A slope at the right height and distance: level points only.
+	var slope := _room_grid(false)
+	for i in slope.points.size():
+		var ray := (slope.points[i] - EYE).normalized()
+		if ray.y < -0.2:
+			var plane_y := TABLE_Y
+			var t := 0.0
+			for step in 20: # the plane y = TABLE_Y + 0.5 * (z + 0.6), by iteration
+				t = (plane_y - EYE.y) / ray.y
+				plane_y = TABLE_Y + 0.5 * (EYE.z + ray.z * t + 0.6)
+			slope.points[i] = EYE + ray * t
+	expect(not slope.table(EYE, Vector3.FORWARD).has("centre"), "a 27 degree slope is no table")
+
+
+func test_the_depth_table_is_believed_once_the_looks_agree() -> void:
+	var low := {support = 80, centre = Vector3(0, 0.70, -0.7), size = Vector2(0.8, 0.5)}
+	var high := {support = 120, centre = Vector3(0, 0.90, -0.7), size = Vector2(0.8, 0.5)}
+	var best := {support = 140, centre = Vector3(0, 0.71, -0.7), size = Vector2(0.8, 0.5)}
+	var none := {support = 12}
+	var looks: Array[Dictionary] = [none, high, high, high]
+	expect(PassthroughReality.agreeing(looks, 4, 0.03).is_empty(), "three of five are not enough")
+	looks.assign([high, low, best, none, low])
+	expect(PassthroughReality.agreeing(looks, 4, 0.03).is_empty(), "the tops disagree")
+	looks.assign([high, low, best, low, none])
+	expect_eq(PassthroughReality.agreeing(looks, 3, 0.03), best, "the fullest of the agreeing looks")
+
+
 func test_the_table_is_measured_the_way_the_child_faces() -> void:
 	var turned := Vector3(1.0, 0.0, -1.0).normalized()
 	var table := _room_grid().table(EYE, turned)

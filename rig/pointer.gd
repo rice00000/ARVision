@@ -27,6 +27,21 @@ const GRAB_RADIUS := 0.07
 ## again only after coming down. Raised in front, it stays in the cameras' view.
 @export var raise_height := 0.1
 @export var raise_seconds := 0.4
+## A sweep: the hand moving faster than [member sweep_speed] from where it last
+## moved slower, until it slows below [member sweep_stop_speed] for
+## [member sweep_stop_seconds] or comes [member sweep_return] metres back from
+## its farthest point (a wave back is not part of the sweep). No pinch is
+## involved: hand tracking drops a pinch as the hand moves. After a sweep the
+## hand must slow down before the next one begins, so the way back is never one.
+## A step too long for a hand in one tick is tracking finding the hand again,
+## never a sweep, and a pause drops one in progress.
+@export var sweep_speed := 0.3
+@export var sweep_stop_speed := 0.12
+@export var sweep_stop_seconds := 0.12
+@export var sweep_return := 0.06
+@export var sweep_jump := 0.08
+## Seconds the speed is smoothed over.
+@export var sweep_smoothing := 0.05
 
 ## &"left" or &"right".
 var side: StringName
@@ -41,6 +56,21 @@ var _rest_at := Vector3.INF
 var _rest_for := 0.0
 var _raised_for := 0.0
 var _asked := false
+var _last_position := Vector3.INF
+var _velocity := Vector3.ZERO
+## Where the hand last moved slower than [member sweep_speed]: a sweep starts there.
+var _slow_at := Vector3.ZERO
+## Seconds of this hand's clock (pauses do not count).
+var _clock := 0.0
+## The sweep in progress: where it began and when, the farthest point and when.
+var _sweeping := false
+var _sweep_from := Vector3.ZERO
+var _sweep_began := 0.0
+var _sweep_far := Vector3.ZERO
+var _sweep_far_at := 0.0
+var _sweep_slow_for := 0.0
+## The hand has still to slow down after a sweep.
+var _settling := false
 
 
 func _ready() -> void:
@@ -78,6 +108,43 @@ func _physics_process(delta: float) -> void:
 	if _raised_for >= raise_seconds and not _asked:
 		_asked = true
 		Events.help_requested.emit()
+	_track_sweep(delta)
+
+
+func _track_sweep(delta: float) -> void:
+	var here := global_position
+	var step := here - _last_position
+	_last_position = here
+	if get_tree().paused or not _controller.get_has_tracking_data() or step.length() > sweep_jump:
+		_sweeping = false
+		_settling = false
+		_velocity = Vector3.ZERO
+		_slow_at = here
+		return
+	_clock += delta
+	_velocity = _velocity.lerp(step / delta, minf(1.0, delta / sweep_smoothing))
+	var speed := _velocity.length()
+	if not _sweeping:
+		if step.length() / delta < sweep_speed:
+			_slow_at = here
+		if speed < sweep_stop_speed:
+			_settling = false
+		elif speed >= sweep_speed and not _settling:
+			_sweeping = true
+			_sweep_from = _slow_at
+			_sweep_began = _clock
+			_sweep_far = here
+			_sweep_far_at = _clock
+			_sweep_slow_for = 0.0
+		return
+	if here.distance_to(_sweep_from) > _sweep_far.distance_to(_sweep_from):
+		_sweep_far = here
+		_sweep_far_at = _clock
+	_sweep_slow_for = _sweep_slow_for + delta if speed < sweep_stop_speed else 0.0
+	if _sweep_slow_for >= sweep_stop_seconds or here.distance_to(_sweep_far) > sweep_return:
+		_sweeping = false
+		_settling = true
+		Events.swept.emit(side, _sweep_from, _sweep_far, _sweep_far_at - _sweep_began)
 
 
 ## The fingertip has not moved for [member rest_seconds].

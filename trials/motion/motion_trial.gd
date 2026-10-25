@@ -1,16 +1,18 @@
 extends Trial
 ## Read the flow: a seated 3D random-dot motion task. A cloud of dots floats
 ## ahead; some of them (coherence) move one way, the rest are noise. The child
-## pinches, sweeps the hand the way the flow goes, and lets go.
+## sweeps a hand the way the flow goes and holds still.
 ## Original design and shader by Megan (Mgharv), ported from XRVision.
 ##
 ## Axes: coherence (driven), competing (1 = the noise is one opposite flow, 0 =
 ## random directions), direction (0 random, 1-4 right, left, toward, away),
 ## dots, speed, dot_lifetime, half_width / half_height / half_depth (cloud, m),
-## distance (m), tolerance (degrees), min_sweep (m), min_seconds, max_seconds.
-## A sweep that is too small, too brief or too long is invalid: it is not a
-## perceptual error and counts no try. A wrong valid sweep counts a try; the
-## flow stays the same until the child finds it.
+## distance (m), tolerance (degrees), min_sweep (m).
+## Sweeps come from the rig ([signal Events.swept]): one brisk move of a hand,
+## no pinch. A sweep that is too small, or mostly up or down (a hand raised for
+## help, or put down), is invalid: it is not a perceptual error and counts no
+## try. A wrong valid sweep counts a try; the flow stays the same until the
+## child finds it.
 ## Hint 1 (only when asked): every dot follows the flow.
 ## With [member break_wall] (the tech demo), a right sweep also breaks the wall ahead.
 
@@ -20,13 +22,11 @@ const FLOWS: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector
 ## The cloud's near face stays at least this far from the eyes, metres.
 const NEAR := 0.6
 const ALIGN_SECONDS := 0.6
-## Hand tracking drops the pinch for a moment as the hand sweeps (on a Quest 3
-## pinches lasted 0.03-0.16 s mid-sweep). A pinch back within this many seconds
-## continues the same sweep; a longer let-go ends it.
-const RELEASE_GRACE := 0.3
+## A sweep whose direction rises or falls more than this (the sine of 50
+## degrees) is not an answer: the flow never goes up or down.
+const VERTICAL := 0.77
 const INVALID_SAY := {
 	too_small = "Sweep your hand a little farther.",
-	timing = "Pinch, sweep, then let go.",
 }
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
@@ -40,40 +40,29 @@ var _dots := 0
 ## Dots following the flow now (all of them once help is on).
 var _signal_dots := 0
 var _min_sweep := 0.0
-var _min_seconds := 0.0
-var _max_seconds := 0.0
 var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
 var _invalid := 0
-## The hand pinching for a sweep, or &"".
-var _hand: StringName = &""
-var _start := Vector3.ZERO
-## Round time at which the pinch began.
-var _onset := 0.0
-## Round time and hand position of a let-go still within RELEASE_GRACE, or -1.
-var _let_go_at := -1.0
-var _let_go_where := Vector3.ZERO
 var _align: Tween
 
 @onready var _cloud: GPUParticles3D = $Cloud
 @onready var _material := _cloud.process_material as ShaderMaterial
 
 
-## Judges one sweep: [param displacement] in the cloud's frame, held for [param duration] seconds.
-static func classify(displacement: Vector3, duration: float, expected: Vector3,
-		min_sweep: float, min_seconds: float, max_seconds: float, tolerance: float) -> Dictionary:
-	if displacement.length() < min_sweep:
-		return {valid = false, reason = &"too_small", distance_metres = displacement.length(), duration_seconds = duration}
-	if duration < min_seconds or duration > max_seconds:
-		return {valid = false, reason = &"timing", distance_metres = displacement.length(), duration_seconds = duration}
-	var direction := displacement.normalized()
+## Judges one sweep: [param displacement] in the cloud's frame.
+static func classify(displacement: Vector3, expected: Vector3, min_sweep: float, tolerance: float) -> Dictionary:
+	var distance := displacement.length()
+	if distance < min_sweep:
+		return {valid = false, reason = &"too_small", distance_metres = distance}
+	var direction := displacement / distance
+	if absf(direction.y) > VERTICAL:
+		return {valid = false, reason = &"vertical", distance_metres = distance, direction = direction}
 	var angle := rad_to_deg(direction.angle_to(expected.normalized()))
 	return {valid = true, correct = angle <= tolerance, angle_degrees = angle, direction = direction,
-		distance_metres = displacement.length(), duration_seconds = duration}
+		distance_metres = distance}
 
 
 func _setup(round_condition: TrialCondition) -> void:
-	_cancel_sweep()
 	if _align:
 		_align.kill()
 	_attempts.clear()
@@ -86,8 +75,6 @@ func _setup(round_condition: TrialCondition) -> void:
 	var coherence: float = round_condition.value(&"coherence")
 	var signal_dots := roundi(coherence * _dots)
 	_min_sweep = round_condition.value(&"min_sweep")
-	_min_seconds = round_condition.value(&"min_seconds")
-	_max_seconds = round_condition.value(&"max_seconds")
 	_tolerance = round_condition.value(&"tolerance")
 	var half := Vector3(round_condition.value(&"half_width"), round_condition.value(&"half_height"),
 		round_condition.value(&"half_depth"))
@@ -111,46 +98,23 @@ func _setup(round_condition: TrialCondition) -> void:
 	round_condition.set_value(&"flow", _flow)
 	round_condition.set_value(&"signal_dots", signal_dots)
 	round_condition.set_value(&"seed", trial_seed)
-	say("Which way do the dots go? Pinch your fingers, sweep your hand that way, then let go.")
+	say("Which way do the dots go? Sweep your hand that way, then hold still.")
 
 
 func focus_point() -> Vector3:
 	return _cloud.global_position
 
 
-func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
-	if action != &"trigger_click":
-		return
-	if pressed:
-		if _hand == &"":
-			_hand = hand
-			_start = App.rig.hand(hand).global_position
-			_onset = seconds()
-		elif hand == _hand:
-			_let_go_at = -1.0 # the pinch came back: the same sweep goes on
-	elif hand == _hand:
-		_let_go_at = seconds()
-		_let_go_where = App.rig.hand(hand).global_position
-
-
-func _process(delta: float) -> void:
-	super(delta)
-	if _hand != &"" and _let_go_at >= 0.0 and seconds() - _let_go_at > RELEASE_GRACE:
-		var hand := _hand
-		var duration := _let_go_at - _onset
-		_cancel_sweep()
-		_judge(hand, _let_go_where, duration)
-
-
-func _judge(hand: StringName, end: Vector3, duration: float) -> void:
-	var result := classify(_frame.basis.inverse() * (end - _start), duration, _flow,
-		_min_sweep, _min_seconds, _max_seconds, _tolerance)
-	result.merge({trial = condition.trial, round = condition.round_index, hand = hand, onset_seconds = _onset,
+func _on_swept(hand: StringName, from: Vector3, to: Vector3, duration: float) -> void:
+	var result := classify(_frame.basis.inverse() * (to - from), _flow, _min_sweep, _tolerance)
+	result.merge({trial = condition.trial, round = condition.round_index, hand = hand,
+		onset_seconds = seconds() - duration, duration_seconds = duration,
 		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
 	if not result.valid:
 		_invalid += 1
 		Events.report(&"motion_invalid", result)
-		say(INVALID_SAY[result.reason])
+		if INVALID_SAY.has(result.reason):
+			say(INVALID_SAY[result.reason])
 		return
 	_attempts.append(result)
 	Events.report(&"motion_attempt", result)
@@ -172,32 +136,11 @@ func _judge(hand: StringName, end: Vector3, duration: float) -> void:
 		angle_degrees = result.angle_degrees})
 
 
-## Help: every dot follows the flow. A sweep begun before it is dropped.
+## Help: every dot follows the flow.
 func _hint(_level: int) -> void:
-	_cancel_sweep()
 	_show_signal(_dots)
 	judge(&"hint", _cloud.global_position)
 	say("Now every dot goes the same way. Watch, then sweep.")
-
-
-func _teardown() -> void:
-	_cancel_sweep()
-
-
-## The world paused (facilitator panel, system menu): a release now would never arrive.
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PAUSED:
-		_cancel_sweep()
-
-
-func _on_tracking(hand: StringName, tracked: bool) -> void:
-	if not tracked and hand == _hand:
-		_cancel_sweep()
-
-
-func _cancel_sweep() -> void:
-	_hand = &""
-	_let_go_at = -1.0
 
 
 func _show_signal(count: int) -> void:

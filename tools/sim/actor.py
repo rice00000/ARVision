@@ -11,6 +11,7 @@ from body import Body, ConstraintError, add, distance, load, mul, require, sub, 
 
 TIP_REACH = 0.05  # rig/pointer.gd: the fingertip is this far ahead of the hand's aim point
 RAISE = (0.14, 0.4)  # rig/pointer.gd: raise_height (+ a margin) and raise_seconds
+CREEP_SPEED = 0.15  # m/s, under rig/pointer.gd's sweep_speed: a hand moved this slowly never sweeps
 # Where a child moves the hand (body frame, from the ready pose) when the ray lands on the wrong thing.
 REAIM = [(0, 0.08, 0), (0, 0.16, 0), (-0.08, 0.1, 0), (0.08, 0.1, 0), (0, 0.16, 0.08)]
 
@@ -109,22 +110,24 @@ class Actor:
         self.wait(0.15)
         self.move_hand(side, ready, at=point)
 
-    def sweep(self, side, direction, length=0.25, seconds=0.35, hold=0.0):
-        """Holds the trigger and moves the hand `length` metres along `direction` (world) in
-        `seconds`, after holding still for `hold` seconds, then lets go and waits to be judged."""
+    def sweep(self, side, direction, length=0.25, seconds=0.35):
+        """Sweeps the hand `length` metres along `direction` (world) in `seconds`, then holds
+        still and waits to be judged. The hand first creeps to the start (slower than a sweep)."""
         ready = self.body.ready(side)
         start = sub(ready, mul(direction, length / 2))
         end = add(ready, mul(direction, length / 2))
-        self.body.path(side, start, end)  # all of it before the trigger goes down
+        self.body.path(side, start, end)  # all of it before the sweep begins
         self.body.hand_seconds(start, end, seconds)
         aim = self.body.direction((0, -0.3, -1))
-        self.move_hand(side, start, at=add(start, aim))
-        self.sim.button(side, "trigger_click", True)
-        if hold:
-            self.wait(hold)
+        self.creep(side, start, at=add(start, aim))
         self.move_hand(side, end, at=add(end, aim), seconds=seconds)
-        self.sim.button(side, "trigger_click", False)
-        self.wait(0.4)  # the trial judges a sweep once the pinch has been let go 0.3 s (RELEASE_GRACE)
+        self.wait(0.4)  # the rig reports a sweep once the hand has held still 0.12 s (Pointer.sweep_stop_seconds)
+
+    def creep(self, side, end, at):
+        """Moves a hand slower than a sweep (CREEP_SPEED), then rests it a moment."""
+        hand = self.observe()["hands"][side]
+        self.move_hand(side, end, at=at, seconds=max(distance(tuple(hand["position"]), end) / CREEP_SPEED, 0.05))
+        self.wait(0.2)
 
     def help(self, side="right"):
         """Raises the hand above the eyes, holds it there and brings it back down."""

@@ -36,23 +36,40 @@ class Motion(SimCase):
         sim.run_until("trial_started")
         actor = child.actor
         right = self.cloud_direction(sim, "right")
-        actor.sweep("right", right, length=0.05)  # too small
-        actor.sweep("right", right, length=0.13, seconds=0.06)  # too brief
-        actor.sweep("left", right, hold=4.2)  # too long
+        actor.sweep("right", right, length=0.05, seconds=0.08)  # brisk but too small
+        actor.sweep("left", (0, 1, 0), length=0.2)  # up: a hand raised, not an answer
         invalid = self.reports(sim, "motion_invalid")
-        self.assertEqual([r["reason"] for r in invalid], ["too_small", "timing", "timing"])
-        self.assertEqual([r["hand"] for r in invalid], ["right", "right", "left"])
+        self.assertEqual([r["reason"] for r in invalid], ["too_small", "vertical"])
+        self.assertEqual([r["hand"] for r in invalid], ["right", "left"])
         self.assertEqual(sim.events("feedback"), [], "no right or wrong for an unusable sweep")
-        said = [e["text"] for e in sim.events("said")][-3:]
-        self.assertEqual(said, ["Sweep your hand a little farther.", "Pinch, sweep, then let go.",
-                                "Pinch, sweep, then let go."])
+        said = [e["text"] for e in sim.events("said")]
+        self.assertEqual(said[-1], "Sweep your hand a little farther.")
+        self.assertEqual(said.count("Sweep your hand a little farther."), 1, "nothing said of a vertical move")
         trial = sim.observe()["session"]["trial"]
         self.assertTrue(trial["running"])
         self.assertEqual(trial["tries"], 0)
         actor.sweep("right", right)
         end = self.round_ends(sim)[0]
-        self.assertEqual(end["data"]["invalid_gestures"], 3)
+        self.assertEqual(end["data"]["invalid_gestures"], 2)
         self.assertTrue(end["data"]["first_attempt_correct"] and end["data"]["first_try"])
+
+    def test_a_wave_back_is_part_of_no_sweep(self):
+        sim = self.launch(plan(block("motion", pins={"direction": 1}, pause_between=2.0)))
+        child = Child(sim, seed=6)
+        sim.run_until("trial_started")
+        actor = child.actor
+        right = self.cloud_direction(sim, "right")
+        ready = actor.body.ready("right")
+        aim = actor.body.direction((0, -0.3, -1))
+        start, end = add(ready, mul(right, -0.125)), add(ready, mul(right, 0.125))
+        actor.creep("right", start, at=add(start, aim))
+        actor.move_hand("right", end, at=add(end, aim), seconds=0.3)
+        actor.move_hand("right", start, at=add(start, aim), seconds=0.3)  # straight back, no stop
+        actor.wait(0.4)
+        attempts = self.reports(sim, "motion_attempt")
+        self.assertEqual(len(attempts), 1, "the sweep out was judged, the way back was not")
+        self.assertTrue(attempts[0]["correct"])
+        self.assertTrue(self.round_ends(sim)[0]["success"])
 
     def test_wrong_sweeps_count_tries_and_the_stimulus_stays(self):
         sim = self.launch(plan(block("motion", pins={"direction": 3}, pause_between=2.0)))
@@ -72,12 +89,11 @@ class Motion(SimCase):
         self.assertEqual(sim.observe()["stimuli"]["cloud"]["alignment"], 1.0, "success: the dots align into streaks")
 
     def half_sweep(self, actor, side, direction):
-        """Trigger down at the start of a sweep, hand halfway along it. Returns the end point."""
+        """A hand halfway through a sweep, still moving. Returns the end point and where to aim."""
         ready = actor.body.ready(side)
         start, end = add(ready, mul(direction, -0.125)), add(ready, mul(direction, 0.125))
         aim = add(start, actor.body.direction((0, -0.3, -1)))
-        actor.move_hand(side, start, at=aim)
-        actor.sim.button(side, "trigger_click", True)
+        actor.creep(side, start, at=aim)
         actor.move_hand(side, ready, at=aim, seconds=0.2)
         return end, aim
 
@@ -90,17 +106,10 @@ class Motion(SimCase):
         end, aim = self.half_sweep(child.actor, "right", left)
         facilitator.open()
         child.actor.move_hand("right", end, at=aim, seconds=0.2)  # finished while paused
-        sim.button("right", "trigger_click", False)
+        sim.wait(0.3)
         facilitator.press("fac_close")
         sim.wait(0.4)
-        self.assertEqual(self.motion_reports(sim), [], "a release during the pause is never judged")
-        end, aim = self.half_sweep(child.actor, "right", left)
-        facilitator.open()
-        facilitator.press("fac_close")
-        child.actor.move_hand("right", end, at=aim, seconds=0.2)  # held through the pause
-        sim.button("right", "trigger_click", False)
-        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
-        self.assertEqual(self.motion_reports(sim), [], "a sweep held through a pause is dropped")
+        self.assertEqual(self.motion_reports(sim), [], "a sweep through a pause is never judged")
         self.assertTrue(sim.observe()["session"]["trial"]["running"])
         child.actor.sweep("left", left)
         self.assertTrue(self.round_ends(sim)[0]["success"], "the next sweep counts")
@@ -116,18 +125,16 @@ class Motion(SimCase):
         self.assertFalse(sim.observe()["hands"]["right"]["tracked"])
         child.actor.regain_tracking("right")
         sim.wait(0.1)
-        child.actor.move_hand("right", end, at=aim, seconds=0.2)
-        sim.button("right", "trigger_click", False)
-        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
+        child.actor.creep("right", end, at=aim)
+        sim.wait(0.3)
         self.assertEqual([(e["hand"], e["tracked"]) for e in sim.events("hand_tracking")][-2:],
                          [("right", False), ("right", True)])
         self.assertEqual(self.motion_reports(sim), [], "a sweep through a tracking loss is dropped")
         end, aim = self.half_sweep(child.actor, "right", right)
         child.actor.lose_tracking("left")  # the other hand does not matter
-        sim.wait(0.2)
-        child.actor.move_hand("right", end, at=aim, seconds=0.2)
-        sim.button("right", "trigger_click", False)
-        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
+        sim.wait(0.1)
+        child.actor.move_hand("right", end, at=aim, seconds=0.1)
+        sim.wait(0.4)
         self.assertTrue(self.round_ends(sim)[0]["success"])
 
 

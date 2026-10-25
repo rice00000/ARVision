@@ -5,7 +5,7 @@
 1. **Folder** `trials/<kind>/` holding `<kind>_trial.gd`, `<kind>.tscn`, `<kind>.tres`.
 2. **Script** `extends Trial`:
    - `_setup(condition)`: build the round from `condition.value(&"axis")`; `condition.set_value()` anything else you choose (target, seed) so the log can replay it; `say()` the instruction. Never `finish()` here.
-   - Judge input in `_on_selected(hand, target, origin, direction)`, `_on_touched(hand, target)`, `_on_button(hand, action, pressed)` or `_on_tracking(hand, tracked)`. They only run during a live, unpaused round, so drop half-done gestures in `_notification(NOTIFICATION_PAUSED)`.
+   - Judge input in `_on_selected(hand, target, origin, direction)`, `_on_touched(hand, target)`, `_on_swept(hand, from, to, seconds)`, `_on_button(hand, action, pressed)` or `_on_tracking(hand, tracked)`. They only run during a live, unpaused round, so drop half-done gestures in `_notification(NOTIFICATION_PAUSED)`.
    - Right: `judge(&"good", at)` then `finish(true, extra)`. Wrong: `judge(&"bad", at)` and `count_try()`. The staircase only counts rounds solved on the first try without help.
    - `_hint(level)`: help from gentlest (1) to `max_hint`. `_teardown()`: stop what the round started.
    - Place things with `App.reality.work_surface()`, `surfaces(kind)` or `in_front(distance)`. Clickable things are `Target`s.

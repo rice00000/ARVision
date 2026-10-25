@@ -50,6 +50,9 @@ func _ready() -> void:
 	Events.touched.connect(func(hand: StringName, target: Target) -> void:
 		if _live():
 			_on_touched(hand, target))
+	Events.swept.connect(func(hand: StringName, from: Vector3, to: Vector3, seconds: float) -> void:
+		if _live():
+			_on_swept(hand, from, to, seconds))
 	Events.button.connect(func(hand: StringName, action: StringName, pressed: bool) -> void:
 		if _live():
 			_on_button(hand, action, pressed))
@@ -173,6 +176,10 @@ func _on_selected(_hand: StringName, _target: Target, _origin: Vector3, _directi
 
 
 func _on_touched(_hand: StringName, _target: Target) -> void:
+	pass
+
+
+func _on_swept(_hand: StringName, _from: Vector3, _to: Vector3, _seconds: float) -> void:
 	pass
 
 

@@ -132,6 +132,55 @@ func test_pinches_raised_hands_the_menu_pinch_and_tracking_become_events() -> vo
 	expect_eq(tracking.filter(func(args: Array) -> bool: return args[0] == &"right"), [[&"right", false], [&"right", true]], "lost, found")
 
 
+func test_a_brisk_hand_move_is_a_sweep_a_jump_or_a_creep_is_not() -> void:
+	await boot(plan_of(FIND, 1))
+	var swept := record(Events.swept)
+	var pointer := App.rig.pointer(&"right")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	expect(swept.is_empty(), "a jump (tracking finding the hand) is no sweep")
+	await _glide(&"right", start, start + Vector3.RIGHT * 0.3, 0.3)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 1, "one sweep once the hand holds still")
+	expect_eq(swept[0][0], &"right", "by the right hand")
+	expect(swept[0][1].is_equal_approx(start), "from where it left rest: %s" % swept[0][1])
+	expect(swept[0][2].is_equal_approx(start + Vector3.RIGHT * 0.3), "to where it stopped: %s" % swept[0][2])
+	expect(absf(swept[0][3] - 0.3) < 0.05, "taking about 0.3 s: %s" % swept[0][3])
+	await _glide(&"right", start + Vector3.RIGHT * 0.3, start, 2.0) # 0.15 m/s: a creep
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 1, "a slow move is no sweep")
+	# Out and straight back without a stop: the way out is the sweep, the way back is not.
+	await _glide(&"right", start, start + Vector3.RIGHT * 0.3, 0.3)
+	await _glide(&"right", start + Vector3.RIGHT * 0.3, start, 0.3)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 2, "the wave out was reported as soon as the hand turned back")
+	expect(swept[1][2].is_equal_approx(start + Vector3.RIGHT * 0.3), "to its farthest point: %s" % swept[1][2])
+	# A hand that keeps going after a stop starts another sweep.
+	await _glide(&"right", start, start + Vector3.FORWARD * 0.2, 0.2)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	await _glide(&"right", start + Vector3.FORWARD * 0.2, start + Vector3.FORWARD * 0.4, 0.2)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 4, "two sweeps with a stop between")
+	input.track(&"right", false)
+	await frames(2)
+	input.track(&"right", true)
+	await _glide(&"right", start + Vector3.FORWARD * 0.4, start + Vector3.FORWARD * 0.4 + Vector3.RIGHT * 0.15, 0.15)
+	input.track(&"right", false)
+	await frames(2)
+	input.track(&"right", true)
+	await wait(pointer.sweep_stop_seconds + 0.1)
+	expect_eq(swept.size(), 4, "a sweep cut by a tracking loss is dropped")
+
+
+## Moves a hand from [param from] to [param to] over [param seconds], a step per physics tick.
+func _glide(side: StringName, from: Vector3, to: Vector3, seconds: float) -> void:
+	var steps := maxi(1, roundi(seconds * Engine.physics_ticks_per_second))
+	for i in steps:
+		input.set_hand(side, Transform3D(Basis.IDENTITY, from.lerp(to, float(i + 1) / steps)))
+		await get_tree().physics_frame
+
+
 func test_the_desktop_mouse_drives_the_right_hand() -> void:
 	get_window().size = Vector2i(1280, 800) # headless windows start at 64 x 64
 	Input.use_accumulated_input = false

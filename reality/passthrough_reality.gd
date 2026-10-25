@@ -26,6 +26,8 @@ var _hands_flat := 0.0
 var _hands_asked := false
 var _found_table := false
 var _depth := DepthSensor.new()
+## The last TABLE_LOOKS looks' tables ({support} or {support, centre, size}).
+var _tables: Array[Dictionary] = []
 
 
 func kind() -> String:
@@ -64,6 +66,13 @@ func _ready() -> void:
 
 ## Seconds after start at which the room is summed up ("room_ready").
 const ROOM_READY_AFTER := 4.0
+## The depth's table is believed once TABLE_AGREE of the last TABLE_LOOKS looks
+## put its top within TABLE_TOLERANCE metres of one height: one look can show
+## the room before tracking has settled (a headset just put on), or the child
+## looking somewhere else. The look with the most points on it sets the table.
+const TABLE_LOOKS := 5
+const TABLE_AGREE := 4
+const TABLE_TOLERANCE := 0.03
 ## When neither the scan nor the depth gives a table, the child is asked to put
 ## both hands flat on it; held there this long, they mark it. Only after asking,
 ## and when the depth sees the place, only where it sees a surface at hand
@@ -125,9 +134,28 @@ func _look_for_table() -> void:
 	var forward := -App.head().global_basis.z
 	var table := _depth.grid.table(App.head().global_position, Vector3(forward.x, 0.0, forward.z).normalized())
 	note(&"depth_table", {support = table.support})
-	if table.has("centre"):
-		_depth.refreshed.disconnect(_look_for_table)
-		_set_table(table.centre, table.size, &"room_depth_table")
+	_tables.append(table)
+	if _tables.size() > TABLE_LOOKS:
+		_tables.pop_front()
+	var agreed := agreeing(_tables, TABLE_AGREE, TABLE_TOLERANCE)
+	if agreed.is_empty():
+		return
+	_depth.refreshed.disconnect(_look_for_table)
+	_set_table(agreed.centre, agreed.size, &"room_depth_table")
+
+
+## The table most of [param looks] agree on: the one with the most points among
+## at least [param needed] whose tops lie within [param tolerance] metres of it.
+static func agreeing(looks: Array[Dictionary], needed: int, tolerance: float) -> Dictionary:
+	var best := {}
+	for candidate in looks:
+		if not candidate.has("centre"):
+			continue
+		var near := looks.filter(func(other: Dictionary) -> bool:
+			return other.has("centre") and absf(other.centre.y - candidate.centre.y) <= tolerance)
+		if near.size() >= needed and (best.is_empty() or candidate.support > best.support):
+			best = candidate
+	return best
 
 
 ## A table found without the room scan (hands or depth); toys go on it from the

@@ -19,7 +19,7 @@
 
 - Rooms are the simulator's scene-anchor JSON, built in tests with `xrsim.room(plane(...), volume(...))`. They need a FLOOR and a CEILING, floats only. Record a real room with the simulator's `scene_data_recorder/SceneDataRecorder.apk`.
 - The app prints `ARVision {json}` lines (`room_missing`, `room_surface`, `room_ready`, `depth`, `depth_table`, `room_hands_in_air`), also in adb logcat on a Quest.
-- Not simulated: the live depth and the passthrough camera.
+- Not simulated: the live depth and the passthrough camera. Debug builds on a Quest keep the first 60 s of depth looks in `user://depth/<run>/` (pull with `adb exec-out run-as edu.mit.arvision tar -C files -cf - depth`); `DepthGrid.table` can be replayed on them.
 
 ## Quest camera frames
 

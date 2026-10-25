@@ -66,22 +66,12 @@ script = ExtResource("2_axis")
 name = &"min_sweep"
 easy = 0.12
 
-[sub_resource type="Resource" id="min_seconds"]
-script = ExtResource("2_axis")
-name = &"min_seconds"
-easy = 0.12
-
-[sub_resource type="Resource" id="max_seconds"]
-script = ExtResource("2_axis")
-name = &"max_seconds"
-easy = 4.0
-
 [resource]
 script = ExtResource("1_def")
 title = "Read the flow (competing)"
 scene = ExtResource("3_scene")
 skill = &"global_motion_competing"
-axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("competing"), SubResource("direction"), SubResource("dots"), SubResource("speed"), SubResource("dot_lifetime"), SubResource("half_width"), SubResource("half_height"), SubResource("half_depth"), SubResource("distance"), SubResource("tolerance"), SubResource("min_sweep"), SubResource("min_seconds"), SubResource("max_seconds")])
+axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("competing"), SubResource("direction"), SubResource("dots"), SubResource("speed"), SubResource("dot_lifetime"), SubResource("half_width"), SubResource("half_height"), SubResource("half_depth"), SubResource("distance"), SubResource("tolerance"), SubResource("min_sweep")])
 notes = "Same scene as motion.tres, but the noise is one flow opposite to the answer. Coherence stays a strict majority (0.55 at the hard end of 200 dots), otherwise the answer would be the minority flow."
 hint_after = 0.0
 max_hint = 1

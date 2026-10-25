@@ -8,28 +8,28 @@ const RANDOM := preload("res://trials/motion/motion.tres")
 const COMPETING := preload("res://trials/motion/motion_competing.tres")
 const HEADINGS := [&"right", &"left", &"toward", &"away"]
 const SIDES := [&"right", &"left"]
-## A sweep is judged once the pinch has been let go this long.
-const SETTLE := MotionTrial.RELEASE_GRACE + 0.1
+## A sweep is reported once the hand has held still this long.
+const SETTLE := 0.3
 
 # -- the classifier -----------------------------------------------------------
 
 func test_classifier_judges_valid_sweeps() -> void:
 	for flow: Vector3 in MotionTrial.FLOWS:
-		var result := _classify(flow * 0.2, 0.5, flow)
+		var result := _classify(flow * 0.2, flow)
 		expect(result.valid and result.correct, "a sweep along %s is right" % flow)
 		expect(is_zero_approx(result.angle_degrees), "no angle error along %s" % flow)
-		expect(not _classify(-flow * 0.2, 0.5, flow).correct, "the opposite sweep is wrong")
-	expect(_classify(Vector3(0.2, 0.15, 0.0), 0.5, Vector3.RIGHT).correct, "a 37 degree drift is within tolerance")
-	expect(not _classify(Vector3(0.2, 0.18, 0.0), 0.5, Vector3.RIGHT).correct, "a 42 degree drift is not")
-	expect(not _classify(Vector3.UP * 0.2, 0.5, Vector3.RIGHT).correct, "a sweep at right angles is wrong")
+		expect(not _classify(-flow * 0.2, flow).correct, "the opposite sweep is wrong")
+	expect(_classify(Vector3(0.2, 0.15, 0.0), Vector3.RIGHT).correct, "a 37 degree drift is within tolerance")
+	expect(not _classify(Vector3(0.2, 0.18, 0.0), Vector3.RIGHT).correct, "a 42 degree drift is not")
+	expect(not _classify(Vector3(0.0, 0.0, 0.2), Vector3.RIGHT).correct, "a sweep at right angles is wrong")
 
 
 func test_classifier_calls_unusable_sweeps_invalid_not_wrong() -> void:
-	expect_eq(_classify(Vector3.RIGHT * 0.05, 0.5, Vector3.RIGHT).get("reason"), &"too_small", "a small sweep")
-	expect_eq(_classify(Vector3.LEFT * 0.05, 0.5, Vector3.RIGHT).get("reason"), &"too_small", "a small wrong-way sweep is still just small")
-	expect_eq(_classify(Vector3.RIGHT * 0.2, 0.05, Vector3.RIGHT).get("reason"), &"timing", "a very brief sweep")
-	expect_eq(_classify(Vector3.RIGHT * 0.2, 5.0, Vector3.RIGHT).get("reason"), &"timing", "an overlong sweep")
-	expect(not _classify(Vector3.RIGHT * 0.2, 5.0, Vector3.RIGHT).has("correct"), "an invalid sweep is not judged")
+	expect_eq(_classify(Vector3.RIGHT * 0.05, Vector3.RIGHT).get("reason"), &"too_small", "a small sweep")
+	expect_eq(_classify(Vector3.LEFT * 0.05, Vector3.RIGHT).get("reason"), &"too_small", "a small wrong-way sweep is still just small")
+	expect_eq(_classify(Vector3.UP * 0.3, Vector3.RIGHT).get("reason"), &"vertical", "a hand raised")
+	expect_eq(_classify(Vector3(0.1, -0.3, 0.0), Vector3.RIGHT).get("reason"), &"vertical", "a hand put down")
+	expect(not _classify(Vector3.UP * 0.3, Vector3.RIGHT).has("correct"), "an invalid sweep is not judged")
 
 
 # -- the task definitions -----------------------------------------------------
@@ -122,29 +122,30 @@ func test_wrong_sweeps_count_tries_and_the_flow_stays() -> void:
 	expect_eq(data.attempts.map(func(attempt: Dictionary) -> bool: return attempt.correct), [false, false, true] as Array, "every valid attempt is kept")
 	expect_eq(data.invalid_gestures, 0, "none invalid")
 	expect(data.first_onset_seconds < data.response_onset_seconds, "onset of the first attempt differs from the last")
-	expect(data.gesture_seconds >= 0.12, "gesture duration is logged")
+	expect(data.gesture_seconds > 0.2 and data.gesture_seconds < 0.5, "the sweep's own duration is logged: %s" % data.gesture_seconds)
 
 
 func test_unusable_sweeps_are_invalid_not_tries() -> void:
-	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0, &"max_seconds": 0.4}))
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
 	var ended := record(Events.trial_ended)
 	var feedback := record(Events.feedback)
 	var reports := record(Events.reported)
+	var said := record(Events.said)
 	App.session.run()
 	await until(_round_is.bind(0))
 	var trial := App.session.trial
 	await _sweep(&"right", Vector3.RIGHT, 0.05)
-	await _sweep(&"right", Vector3.RIGHT, 0.25, 0.0)
-	await _sweep(&"right", Vector3.RIGHT, 0.25, 0.6)
+	await _sweep(&"right", Vector3.UP, 0.3)
 	await _sweep(&"left", Vector3.LEFT, 0.05)
 	expect(trial.is_running(), "invalid sweeps leave the round going")
 	expect_eq(trial.tries, 0, "no tries")
 	expect(feedback.is_empty(), "no good or bad feedback")
 	var invalid := reports.filter(func(args: Array) -> bool: return args[0] == &"motion_invalid")
-	expect_eq(invalid.map(func(args: Array) -> StringName: return args[1].reason), [&"too_small", &"timing", &"timing", &"too_small"] as Array, "reasons")
+	expect_eq(invalid.map(func(args: Array) -> StringName: return args[1].reason), [&"too_small", &"vertical", &"too_small"] as Array, "reasons")
+	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == "Sweep your hand a little farther.").size(), 2, "small sweeps are answered, a raised hand is not")
 	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_attempt"), "no valid attempt yet")
 	await _sweep(&"right", Vector3.RIGHT)
-	expect_eq(ended[0][2].invalid_gestures, 4, "invalid sweeps are totalled")
+	expect_eq(ended[0][2].invalid_gestures, 3, "invalid sweeps are totalled")
 	expect_eq(ended[0][2].first_attempt_correct, true, "invalid sweeps do not spoil the first attempt")
 
 
@@ -174,20 +175,6 @@ func test_help_makes_every_dot_coherent_and_is_logged() -> void:
 	expect_eq(data.attempts.map(func(attempt: Dictionary) -> float: return attempt.coherence_shown), [0.15, 1.0] as Array, "coherence shown with each attempt")
 
 
-func test_help_drops_a_sweep_begun_before_it() -> void:
-	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
-	var reports := record(Events.reported)
-	App.session.run()
-	await until(_round_is.bind(0))
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, App.head().global_position + Vector3(0.2, -0.4, -0.4)))
-	input.press(&"right", &"trigger_click", true)
-	await raise_hand(&"left")
-	input.press(&"right", &"trigger_click", false)
-	await wait(SETTLE)
-	expect(App.session.trial.get("_attempts").is_empty(), "nothing judged")
-	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_invalid"), "and nothing invalid either")
-
-
 func test_probe_rounds_get_no_help() -> void:
 	await boot(plan_of(RANDOM, 1, true, 0.5))
 	var reports := record(Events.reported)
@@ -209,29 +196,18 @@ func test_pause_cancels_an_unfinished_sweep() -> void:
 	var trial := App.session.trial
 	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
 	var end: Vector3 = start + (trial.get("_frame") as Transform3D).basis.x * 0.25
-	# Released during the pause: the trial never hears it.
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
+	await frames(2)
+	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
 	input.menu()
 	expect(get_tree().paused, "the panel pauses play")
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
-	input.press(&"right", &"trigger_click", false)
+	await _glide(&"right", start.lerp(end, 0.5), end, 0.15) # finished while paused
+	await wait(SETTLE)
 	input.menu()
 	expect(not get_tree().paused, "closed again")
-	await frames(2)
-	# Still held through the pause, released after it.
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
-	input.menu()
-	input.menu()
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
-	input.press(&"right", &"trigger_click", false)
 	await wait(SETTLE)
-	expect(trial.is_running() and ended.is_empty(), "the cancelled sweeps scored nothing")
-	expect(trial.get("_attempts").is_empty() and trial.get("_invalid") == 0, "and were not judged as invalid either")
-	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "nothing logged")
+	expect(trial.is_running() and ended.is_empty(), "the sweep through the pause scored nothing")
+	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "and was not judged as invalid either")
 	await _sweep(&"left", Vector3.RIGHT)
 	expect_eq(ended.size(), 1, "the next sweep still works")
 
@@ -246,70 +222,23 @@ func test_tracking_loss_cancels_an_unfinished_sweep() -> void:
 	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
 	var end: Vector3 = start + (trial.get("_frame") as Transform3D).basis.x * 0.25
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
+	await frames(2)
+	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
 	input.track(&"right", false)
 	await frames(2)
 	input.track(&"right", true)
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
-	input.press(&"right", &"trigger_click", false)
+	await _glide(&"right", start.lerp(end, 0.5), end, 1.0) # the hand creeps on to where it was going
 	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "a sweep through a tracking loss scores nothing")
 	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "and is not judged")
 	# The other hand losing tracking does not matter.
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
-	input.track(&"left", false)
 	await frames(2)
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
-	input.press(&"right", &"trigger_click", false)
+	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
+	input.track(&"left", false)
+	await _glide(&"right", start.lerp(end, 0.5), end, 0.15)
 	await wait(SETTLE)
 	expect_eq(ended.size(), 1, "the other hand's tracking loss changes nothing")
-
-
-func test_the_second_trigger_does_not_end_or_restart_a_sweep() -> void:
-	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
-	var ended := record(Events.trial_ended)
-	App.session.run()
-	await until(_round_is.bind(0))
-	var frame: Transform3D = App.session.trial.get("_frame")
-	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
-	input.press(&"left", &"trigger_click", true)
-	input.press(&"left", &"trigger_click", false)
-	expect(ended.is_empty(), "the other hand's trigger does nothing")
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + frame.basis.x * 0.25))
-	input.press(&"right", &"trigger_click", false)
-	await wait(SETTLE)
-	expect_eq(ended.size(), 1, "the first hand's sweep is judged")
-
-
-func test_a_pinch_that_flickers_mid_sweep_is_one_sweep() -> void:
-	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
-	var ended := record(Events.trial_ended)
-	var reports := record(Events.reported)
-	App.session.run()
-	await until(_round_is.bind(0))
-	var frame: Transform3D = App.session.trial.get("_frame")
-	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
-	# As on a Quest 3: the pinch drops for a moment several times as the hand moves.
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	for step in 5:
-		await wait(0.06)
-		input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + frame.basis.x * 0.05 * (step + 1)))
-		input.press(&"right", &"trigger_click", false)
-		await wait(0.1)
-		input.press(&"right", &"trigger_click", true)
-	input.press(&"right", &"trigger_click", false)
-	expect(ended.is_empty(), "not judged while the let-go may still be a flicker")
-	await wait(SETTLE)
-	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_invalid"), "no small pieces")
-	expect(ended.size() == 1 and ended[0][1], "one right sweep")
-	expect(absf(ended[0][2].attempts[0].distance_metres - 0.25) < 0.01, "the whole 25 cm: %s" % ended[0][2].attempts[0])
 
 
 # -- stimulus -----------------------------------------------------------------
@@ -336,10 +265,8 @@ func test_cloud_is_placed_ahead_and_judged_in_its_frozen_frame() -> void:
 	expect(cloud.global_transform.is_equal_approx(frozen), "the cloud stays put")
 	var start := eye + Vector3(0.2, -0.4, -0.4)
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
-	input.press(&"right", &"trigger_click", true)
-	await wait(0.2)
-	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + cloud.global_basis.x * 0.25))
-	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	await _glide(&"right", start, start + cloud.global_basis.x * 0.25, 0.3)
 	await wait(SETTLE)
 	expect(ended.size() == 1 and ended[0][1], "right is the cloud's right, not the turned head's")
 
@@ -402,8 +329,8 @@ func test_round_data_is_valid_json() -> void:
 
 # -- helpers ------------------------------------------------------------------
 
-func _classify(displacement: Vector3, duration: float, expected: Vector3) -> Dictionary:
-	return MotionTrial.classify(displacement, duration, expected, 0.12, 0.12, 4.0, 40.0)
+func _classify(displacement: Vector3, expected: Vector3) -> Dictionary:
+	return MotionTrial.classify(displacement, expected, 0.12, 40.0)
 
 
 func _round_is(index: int) -> bool:
@@ -414,15 +341,21 @@ func _material() -> ShaderMaterial:
 	return (App.session.trial.get_node(^"Cloud") as GPUParticles3D).process_material
 
 
-## Holds [param side]'s trigger for [param hold] seconds while the hand moves
-## [param length] metres along [param flow] (in the cloud's frame), then lets go.
-func _sweep(side: StringName, flow: Vector3, length := 0.25, hold := 0.2) -> void:
+## Sweeps [param side]'s hand [param length] metres along [param flow] (in the
+## cloud's frame) at 0.8 m/s, then holds it still until judged.
+func _sweep(side: StringName, flow: Vector3, length := 0.25) -> void:
+	var seconds := length / 0.8
 	var frame: Transform3D = App.session.trial.get("_frame")
 	var start := App.head().global_position + Vector3(-0.2 if side == &"left" else 0.2, -0.4, -0.4)
-	input.set_hand(side, Transform3D(Basis.IDENTITY, start))
-	input.press(side, &"trigger_click", true)
-	if hold > 0.0:
-		await wait(hold)
-	input.set_hand(side, Transform3D(Basis.IDENTITY, start + frame.basis * flow * length))
-	input.press(side, &"trigger_click", false)
+	input.set_hand(side, Transform3D(Basis.IDENTITY, start)) # a jump: the rig never takes it for a sweep
+	await frames(2)
+	await _glide(side, start, start + frame.basis * flow * length, seconds)
 	await wait(SETTLE)
+
+
+## Moves a hand from [param from] to [param to] over [param seconds], a step per physics tick.
+func _glide(side: StringName, from: Vector3, to: Vector3, seconds: float) -> void:
+	var steps := maxi(1, roundi(seconds * Engine.physics_ticks_per_second))
+	for i in steps:
+		input.set_hand(side, Transform3D(Basis.IDENTITY, from.lerp(to, float(i + 1) / steps)))
+		await get_tree().physics_frame

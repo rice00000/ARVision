@@ -175,7 +175,7 @@ class Child:
         self.actor.face(tuple(cloud["position"]))
         self.actor.wait(1.0)  # watch the dots
         if name == "invalid":
-            self.actor.sweep(side, self.world(cloud, FLOWS[heading]), length=0.05)
+            self.actor.sweep(side, self.world(cloud, FLOWS[heading]), length=0.05, seconds=0.08)
             return
         if name == "wrong":
             heading = self.policy.wrong_heading(heading, cloud["competing"])

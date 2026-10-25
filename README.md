@@ -13,7 +13,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 
 **Tech demo** (the default session, `content/sessions/tech_demo.tres`, about 2 min): find toys under four views, then sweep with the dots to break the wall. For the training session, set `Session.plan` in `main.tscn` back to `demo.tres`.
 
-**Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Raise a hand above your eyes to ask for help. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
+**Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
 
 ## Test
 

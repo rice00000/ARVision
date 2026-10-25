@@ -10,7 +10,12 @@ const MIN_HIT := 6
 ## Gathered points this far beyond the nearest are behind the hit surface, metres.
 const SURFACE_DEPTH := 0.2
 const RANGE := Vector2(0.25, 6.0)
-## Table points: 0.15-0.9 m below the eyes, within 1 m around them, binned by height.
+## Table points: this far below the eyes and this far around them (nearer is
+## the child's own body), on a level patch (the normal within LEVEL_TILT of
+## straight up: an arm, a keyboard or a lap at one height is no table), binned by height.
+const TABLE_BELOW := Vector2(0.2, 0.9)
+const TABLE_AROUND := Vector2(0.3, 1.2)
+const LEVEL_TILT := 0.8
 const BIN := 0.02
 const MIN_TABLE := 40
 ## [method around] counts points this close to a height as on it, metres.
@@ -71,15 +76,17 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 	return {position = position, normal = normal}
 
 
-## The table top: {support} (points on the fullest level), plus {centre, size}
-## once enough points agree. The size runs across and along [param forward]
-## (horizontal), the way the child faces.
+## The table top in this one look: {support} (points on the fullest level), plus
+## {centre, size} once enough points agree. The size runs across and along
+## [param forward] (horizontal), the way the child faces.
 func table(eye: Vector3, forward: Vector3) -> Dictionary:
 	var bins := {}
 	for i in points.size():
 		var point := points[i]
 		var below := eye.y - point.y
-		if not valid[i] or below < 0.15 or below > 0.9 or Vector2(point.x - eye.x, point.z - eye.z).length() > 1.0:
+		var around := Vector2(point.x - eye.x, point.z - eye.z).length()
+		if not valid[i] or below < TABLE_BELOW.x or below > TABLE_BELOW.y \
+				or around < TABLE_AROUND.x or around > TABLE_AROUND.y or absf(_normal_at(i).y) < LEVEL_TILT:
 			continue
 		var key := int(roundf(point.y / BIN))
 		if not bins.has(key):

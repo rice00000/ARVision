@@ -16,6 +16,9 @@ signal button(hand: StringName, action: StringName, pressed: bool)
 signal selected(hand: StringName, target: Target, origin: Vector3, direction: Vector3)
 ## A fingertip entered a Target.
 signal touched(hand: StringName, target: Target)
+## A hand swept: one brisk move from [param from] to [param to] (its farthest
+## point) that took [param seconds]. No pinch needed; the way back is not one.
+signal swept(hand: StringName, from: Vector3, to: Vector3, seconds: float)
 ## The child asked for help (raised a hand).
 signal help_requested
 ## A hand lost or regained tracking.
