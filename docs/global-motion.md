@@ -6,7 +6,7 @@
 
 - **Defs:** `motion.tres` (random-direction noise, skill `global_motion`) and `motion_competing.tres` (noise is one opposite flow, skill `global_motion_competing`, coherence never below 0.55). Plan: `-- --plan=res://content/sessions/motion.tres`.
 - **Axes:** coherence (driven, 0.9 to 0.15), then fixed: `direction` (0 random, 1-4 right, left, toward, away), `dots`, `speed`, `dot_lifetime`, cloud `half_*`, `distance`, `tolerance`, `min_sweep`, `min_seconds`, `max_seconds`.
-- **Logged per round:** `heading`, `plane` (lateral / depth), `flow`, `signal_dots`, `seed`, `tries`, `hint`, `first_attempt_correct`, `attempts` (angle, distance, duration, onset, hand, help, coherence shown), `invalid_gestures`. Invalid sweeps and attempts also go out as `motion_invalid` / `motion_attempt` events. Onset means the pinch.
+- **Logged per round:** `heading`, `plane` (lateral / depth), `flow`, `signal_dots`, `seed`, `tries`, `hint`, `first_attempt_correct`, `attempts` (angle, distance, duration, onset, hand, help, coherence shown), `invalid_gestures`. Invalid sweeps and attempts also go out as `motion_invalid` / `motion_attempt` events. Onset means the pinch. Hand tracking drops the pinch for a moment mid-sweep; a pinch back within 0.3 s continues the same sweep, so a sweep is judged 0.3 s after the let-go.
 - **Help:** only when the child raises a hand, one level: every dot follows the flow. Never in probes. A sweep begun before it is dropped.
 - **Time limit:** 30 s without a right sweep ends the round as a miss (`timed_out`).
 - **Sweeps** are judged in the cloud's frame frozen at round start. Pausing and losing tracking cancel an unfinished sweep.

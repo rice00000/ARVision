@@ -111,7 +111,7 @@ class Actor:
 
     def sweep(self, side, direction, length=0.25, seconds=0.35, hold=0.0):
         """Holds the trigger and moves the hand `length` metres along `direction` (world) in
-        `seconds`, after holding still for `hold` seconds, then lets go."""
+        `seconds`, after holding still for `hold` seconds, then lets go and waits to be judged."""
         ready = self.body.ready(side)
         start = sub(ready, mul(direction, length / 2))
         end = add(ready, mul(direction, length / 2))
@@ -124,7 +124,7 @@ class Actor:
             self.wait(hold)
         self.move_hand(side, end, at=add(end, aim), seconds=seconds)
         self.sim.button(side, "trigger_click", False)
-        self.wait(1 / 60)
+        self.wait(0.4)  # the trial judges a sweep once the pinch has been let go 0.3 s (RELEASE_GRACE)
 
     def help(self, side="right"):
         """Raises the hand above the eyes, holds it there and brings it back down."""

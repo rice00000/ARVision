@@ -20,6 +20,10 @@ const FLOWS: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector
 ## The cloud's near face stays at least this far from the eyes, metres.
 const NEAR := 0.6
 const ALIGN_SECONDS := 0.6
+## Hand tracking drops the pinch for a moment as the hand sweeps (on a Quest 3
+## pinches lasted 0.03-0.16 s mid-sweep). A pinch back within this many seconds
+## continues the same sweep; a longer let-go ends it.
+const RELEASE_GRACE := 0.3
 const INVALID_SAY := {
 	too_small = "Sweep your hand a little farther.",
 	timing = "Pinch, sweep, then let go.",
@@ -46,6 +50,9 @@ var _hand: StringName = &""
 var _start := Vector3.ZERO
 ## Round time at which the pinch began.
 var _onset := 0.0
+## Round time and hand position of a let-go still within RELEASE_GRACE, or -1.
+var _let_go_at := -1.0
+var _let_go_where := Vector3.ZERO
 var _align: Tween
 
 @onready var _cloud: GPUParticles3D = $Cloud
@@ -56,9 +63,9 @@ var _align: Tween
 static func classify(displacement: Vector3, duration: float, expected: Vector3,
 		min_sweep: float, min_seconds: float, max_seconds: float, tolerance: float) -> Dictionary:
 	if displacement.length() < min_sweep:
-		return {valid = false, reason = &"too_small"}
+		return {valid = false, reason = &"too_small", distance_metres = displacement.length(), duration_seconds = duration}
 	if duration < min_seconds or duration > max_seconds:
-		return {valid = false, reason = &"timing"}
+		return {valid = false, reason = &"timing", distance_metres = displacement.length(), duration_seconds = duration}
 	var direction := displacement.normalized()
 	var angle := rad_to_deg(direction.angle_to(expected.normalized()))
 	return {valid = true, correct = angle <= tolerance, angle_degrees = angle, direction = direction,
@@ -119,13 +126,24 @@ func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
 			_hand = hand
 			_start = App.rig.hand(hand).global_position
 			_onset = seconds()
+		elif hand == _hand:
+			_let_go_at = -1.0 # the pinch came back: the same sweep goes on
 	elif hand == _hand:
-		_hand = &""
-		_judge(hand, App.rig.hand(hand).global_position)
+		_let_go_at = seconds()
+		_let_go_where = App.rig.hand(hand).global_position
 
 
-func _judge(hand: StringName, end: Vector3) -> void:
-	var result := classify(_frame.basis.inverse() * (end - _start), seconds() - _onset, _flow,
+func _process(delta: float) -> void:
+	super(delta)
+	if _hand != &"" and _let_go_at >= 0.0 and seconds() - _let_go_at > RELEASE_GRACE:
+		var hand := _hand
+		var duration := _let_go_at - _onset
+		_cancel_sweep()
+		_judge(hand, _let_go_where, duration)
+
+
+func _judge(hand: StringName, end: Vector3, duration: float) -> void:
+	var result := classify(_frame.basis.inverse() * (end - _start), duration, _flow,
 		_min_sweep, _min_seconds, _max_seconds, _tolerance)
 	result.merge({trial = condition.trial, round = condition.round_index, hand = hand, onset_seconds = _onset,
 		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
@@ -179,6 +197,7 @@ func _on_tracking(hand: StringName, tracked: bool) -> void:
 
 func _cancel_sweep() -> void:
 	_hand = &""
+	_let_go_at = -1.0
 
 
 func _show_signal(count: int) -> void:

@@ -8,6 +8,8 @@ const RANDOM := preload("res://trials/motion/motion.tres")
 const COMPETING := preload("res://trials/motion/motion_competing.tres")
 const HEADINGS := [&"right", &"left", &"toward", &"away"]
 const SIDES := [&"right", &"left"]
+## A sweep is judged once the pinch has been let go this long.
+const SETTLE := MotionTrial.RELEASE_GRACE + 0.1
 
 # -- the classifier -----------------------------------------------------------
 
@@ -181,6 +183,7 @@ func test_help_drops_a_sweep_begun_before_it() -> void:
 	input.press(&"right", &"trigger_click", true)
 	await raise_hand(&"left")
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect(App.session.trial.get("_attempts").is_empty(), "nothing judged")
 	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_invalid"), "and nothing invalid either")
 
@@ -225,6 +228,7 @@ func test_pause_cancels_an_unfinished_sweep() -> void:
 	input.menu()
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "the cancelled sweeps scored nothing")
 	expect(trial.get("_attempts").is_empty() and trial.get("_invalid") == 0, "and were not judged as invalid either")
 	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "nothing logged")
@@ -249,6 +253,7 @@ func test_tracking_loss_cancels_an_unfinished_sweep() -> void:
 	input.track(&"right", true)
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "a sweep through a tracking loss scores nothing")
 	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "and is not judged")
 	# The other hand losing tracking does not matter.
@@ -259,6 +264,7 @@ func test_tracking_loss_cancels_an_unfinished_sweep() -> void:
 	await frames(2)
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, end))
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect_eq(ended.size(), 1, "the other hand's tracking loss changes nothing")
 
 
@@ -277,7 +283,33 @@ func test_the_second_trigger_does_not_end_or_restart_a_sweep() -> void:
 	expect(ended.is_empty(), "the other hand's trigger does nothing")
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + frame.basis.x * 0.25))
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect_eq(ended.size(), 1, "the first hand's sweep is judged")
+
+
+func test_a_pinch_that_flickers_mid_sweep_is_one_sweep() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var ended := record(Events.trial_ended)
+	var reports := record(Events.reported)
+	App.session.run()
+	await until(_round_is.bind(0))
+	var frame: Transform3D = App.session.trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	# As on a Quest 3: the pinch drops for a moment several times as the hand moves.
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	input.press(&"right", &"trigger_click", true)
+	for step in 5:
+		await wait(0.06)
+		input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + frame.basis.x * 0.05 * (step + 1)))
+		input.press(&"right", &"trigger_click", false)
+		await wait(0.1)
+		input.press(&"right", &"trigger_click", true)
+	input.press(&"right", &"trigger_click", false)
+	expect(ended.is_empty(), "not judged while the let-go may still be a flicker")
+	await wait(SETTLE)
+	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_invalid"), "no small pieces")
+	expect(ended.size() == 1 and ended[0][1], "one right sweep")
+	expect(absf(ended[0][2].attempts[0].distance_metres - 0.25) < 0.01, "the whole 25 cm: %s" % ended[0][2].attempts[0])
 
 
 # -- stimulus -----------------------------------------------------------------
@@ -308,6 +340,7 @@ func test_cloud_is_placed_ahead_and_judged_in_its_frozen_frame() -> void:
 	await wait(0.2)
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + cloud.global_basis.x * 0.25))
 	input.press(&"right", &"trigger_click", false)
+	await wait(SETTLE)
 	expect(ended.size() == 1 and ended[0][1], "right is the cloud's right, not the turned head's")
 
 
@@ -392,4 +425,4 @@ func _sweep(side: StringName, flow: Vector3, length := 0.25, hold := 0.2) -> voi
 		await wait(hold)
 	input.set_hand(side, Transform3D(Basis.IDENTITY, start + frame.basis * flow * length))
 	input.press(side, &"trigger_click", false)
-	await frames(1)
+	await wait(SETTLE)

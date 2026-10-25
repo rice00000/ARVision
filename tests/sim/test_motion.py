@@ -92,13 +92,14 @@ class Motion(SimCase):
         child.actor.move_hand("right", end, at=aim, seconds=0.2)  # finished while paused
         sim.button("right", "trigger_click", False)
         facilitator.press("fac_close")
+        sim.wait(0.4)
         self.assertEqual(self.motion_reports(sim), [], "a release during the pause is never judged")
         end, aim = self.half_sweep(child.actor, "right", left)
         facilitator.open()
         facilitator.press("fac_close")
         child.actor.move_hand("right", end, at=aim, seconds=0.2)  # held through the pause
         sim.button("right", "trigger_click", False)
-        sim.wait(0.1)
+        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
         self.assertEqual(self.motion_reports(sim), [], "a sweep held through a pause is dropped")
         self.assertTrue(sim.observe()["session"]["trial"]["running"])
         child.actor.sweep("left", left)
@@ -117,7 +118,7 @@ class Motion(SimCase):
         sim.wait(0.1)
         child.actor.move_hand("right", end, at=aim, seconds=0.2)
         sim.button("right", "trigger_click", False)
-        sim.wait(0.1)
+        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
         self.assertEqual([(e["hand"], e["tracked"]) for e in sim.events("hand_tracking")][-2:],
                          [("right", False), ("right", True)])
         self.assertEqual(self.motion_reports(sim), [], "a sweep through a tracking loss is dropped")
@@ -126,7 +127,7 @@ class Motion(SimCase):
         sim.wait(0.2)
         child.actor.move_hand("right", end, at=aim, seconds=0.2)
         sim.button("right", "trigger_click", False)
-        sim.wait(0.1)
+        sim.wait(0.4)  # past RELEASE_GRACE: judged by now if ever
         self.assertTrue(self.round_ends(sim)[0]["success"])
 
 
