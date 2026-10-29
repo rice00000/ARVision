@@ -6,7 +6,7 @@ Trials never touch the headset. They ask **`App.reality`** for the real world:
 
 | Reality gives | `PassthroughReality` (Quest) | `SimReality` (no headset, tests) |
 |---|---|---|
-| Surfaces (`work_surface()`, `surfaces(kind)`) | Meta room scan, else live depth (`DepthSensor`) or both hands flat on the table | `SimSurface` markers in `reality/rooms/` |
+| Surfaces (`work_surface()`, `surfaces(kind)`) | Meta room scan, else live depth (`DepthSensor`, `TableFinder`: found, then re-checked every look) or both hands flat on the table | `SimSurface` markers in `reality/rooms/` |
 | The real thing along a ray (`hit()`) | room-scan colliders, else live depth | room colliders |
 | How it looks (`apply_view(View)`, `focus_on()`) | Meta passthrough filter + dim sphere | the same grading as a screen overlay |
 | Camera frames (`camera_frame()`) | `QuestCamera` (Passthrough Camera API) | the rendered view |
@@ -48,3 +48,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 ## Not verified on a headset yet
 
 On a Quest 3 so far: the passthrough camera gives frames (left camera, feed `50`) and the live depth gives points at full frame rate. Not yet checked with the headset worn: that depth points and camera frames line up (the camera pose is the head pose, FOV approximate), passthrough filters.
+
+## The room frame
+
+Everything lives in OpenXR's Stage space, which stays on the room. The app never recentres (`center_on_hmd`): Quest asks on every headset off and on, and recentring left menus and the treasure cabinet behind while the table moved. A Quest that is off still reports the head as tracked, from a placeholder pose; a table found then is dropped once worn looks contradict it (`TableFinder`).

@@ -103,11 +103,11 @@ func test_the_depth_table_is_believed_once_the_looks_agree() -> void:
 	var best := {support = 140, centre = Vector3(0, 0.71, -0.7), size = Vector2(0.8, 0.5)}
 	var none := {support = 12}
 	var looks: Array[Dictionary] = [none, high, high, high]
-	expect(PassthroughReality.agreeing(looks, 4, 0.03).is_empty(), "three of five are not enough")
+	expect(TableFinder.agreeing(looks, 4, 0.03).is_empty(), "three of five are not enough")
 	looks.assign([high, low, best, none, low])
-	expect(PassthroughReality.agreeing(looks, 4, 0.03).is_empty(), "the tops disagree")
+	expect(TableFinder.agreeing(looks, 4, 0.03).is_empty(), "the tops disagree")
 	looks.assign([high, low, best, low, none])
-	expect_eq(PassthroughReality.agreeing(looks, 3, 0.03), best, "the fullest of the agreeing looks")
+	expect_eq(TableFinder.agreeing(looks, 3, 0.03), best, "the fullest of the agreeing looks")
 
 
 func test_the_table_is_measured_the_way_the_child_faces() -> void:

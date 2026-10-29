@@ -18,8 +18,8 @@
 `python tools/xrsim.py test` runs the real Quest path (`PassthroughReality`, the Meta room scan, hands) on Meta XR Simulator in injected rooms, about 10 s per room, no headset. `python tools/xrsim.py run <room.json>` prints what the app read. Needs the simulator in `C:\Program Files\MetaXRSimulator\v207.1` (or `XRSIM`); the system's OpenXR runtime is left alone.
 
 - Rooms are the simulator's scene-anchor JSON, built in tests with `xrsim.room(plane(...), volume(...))`. They need a FLOOR and a CEILING, floats only. Record a real room with the simulator's `scene_data_recorder/SceneDataRecorder.apk`.
-- The app prints `ARVision {json}` lines (`room_missing`, `room_surface`, `room_ready`, `depth`, `depth_table`, `room_hands_in_air`), also in adb logcat on a Quest.
-- Not simulated: the live depth and the passthrough camera. Debug builds on a Quest keep the first 60 s of depth looks in `user://depth/<run>/` (pull with `adb exec-out run-as edu.mit.arvision tar -C files -cf - depth`); `DepthGrid.table` can be replayed on them.
+- The app prints `ARVision {json}` lines (`room_missing`, `room_surface`, `room_ready`, `depth`, `depth_table`, `room_depth_table`, `room_table_lost`, `room_hands_in_air`), also in adb logcat on a Quest.
+- Not simulated: the live depth and the passthrough camera. Debug builds on a Quest keep the first 60 s of depth looks in `user://depth/<run>/` (pull with `adb exec-out run-as edu.mit.arvision tar -C files -cf - depth`); `DepthGrid.table` can be replayed on them. `tests/table_finder_test.gd` replays a real session (headset off and on again, then play) from `tests/data/headset_off_on.depth.gz`.
 
 ## Quest camera frames
 

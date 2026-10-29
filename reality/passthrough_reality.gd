@@ -24,10 +24,10 @@ var _camera: QuestCamera
 var _scan := OpenXRFbSceneManager.new()
 var _hands_flat := 0.0
 var _hands_asked := false
-var _found_table := false
 var _depth := DepthSensor.new()
-## The last TABLE_LOOKS looks' tables ({support} or {support, centre, size}).
-var _tables: Array[Dictionary] = []
+var _finder := TableFinder.new()
+## The table found without the room scan (depth or hands); null while none.
+var _table: Surface
 
 
 func kind() -> String:
@@ -67,13 +67,6 @@ func _ready() -> void:
 
 ## Seconds after start at which the room is summed up ("room_ready").
 const ROOM_READY_AFTER := 4.0
-## The depth's table is believed once TABLE_AGREE of the last TABLE_LOOKS looks
-## put its top within TABLE_TOLERANCE metres of one height: one look can show
-## the room before tracking has settled (a headset just put on), or the child
-## looking somewhere else. The look with the most points on it sets the table.
-const TABLE_LOOKS := 5
-const TABLE_AGREE := 4
-const TABLE_TOLERANCE := 0.03
 ## When neither the scan nor the depth gives a table, the child is asked to put
 ## both hands flat on it; held there this long, they mark it. Only after asking,
 ## and when the depth sees the place, only where it sees a surface at hand
@@ -99,7 +92,7 @@ static func note(what: StringName, data: Dictionary = {}) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not _hands_asked or _found_table or work_surface() in _surfaces:
+	if not _hands_asked or _table or work_surface() in _surfaces:
 		return
 	var eye := App.head().global_position
 	var tips: Array[Vector3] = []
@@ -122,7 +115,8 @@ func _physics_process(delta: float) -> void:
 			return
 	var ahead := -App.head().global_basis.z
 	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
-	_set_table(top + ahead * 0.15, HAND_TABLE_SIZE, &"room_hand_table")
+	_finder.hold(top + ahead * 0.15, HAND_TABLE_SIZE, ahead)
+	_set_table(&"room_hand_table")
 
 
 ## The real thing along a ray: the room scan's colliders first, else the live depth.
@@ -131,46 +125,27 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 	return found if found else _depth.hit(from, direction)
 
 
+## Every depth look: finds the table, or checks the one found ([TableFinder]).
 func _look_for_table() -> void:
-	if _found_table:
-		_depth.refreshed.disconnect(_look_for_table)
-		return
-	var forward := -App.head().global_basis.z
-	var table := _depth.grid.table(App.head().global_position, Vector3(forward.x, 0.0, forward.z).normalized())
-	note(&"depth_table", {support = table.support})
-	_tables.append(table)
-	if _tables.size() > TABLE_LOOKS:
-		_tables.pop_front()
-	var agreed := agreeing(_tables, TABLE_AGREE, TABLE_TOLERANCE)
-	if agreed.is_empty():
-		return
-	_depth.refreshed.disconnect(_look_for_table)
-	_set_table(agreed.centre, agreed.size, &"room_depth_table")
+	match _finder.look(_depth.grid, App.head().global_transform):
+		&"found":
+			_set_table(&"room_depth_table")
+		&"lost":
+			note(&"room_table_lost", {centre = _table.transform.origin})
+			_surfaces.erase(_table)
+			_table = null
+	if not _table:
+		note(&"depth_table", {support = _finder.support})
 
 
-## The table most of [param looks] agree on: the one with the most points among
-## at least [param needed] whose tops lie within [param tolerance] metres of it.
-static func agreeing(looks: Array[Dictionary], needed: int, tolerance: float) -> Dictionary:
-	var best := {}
-	for candidate in looks:
-		if not candidate.has("centre"):
-			continue
-		var near := looks.filter(func(other: Dictionary) -> bool:
-			return other.has("centre") and absf(other.centre.y - candidate.centre.y) <= tolerance)
-		if near.size() >= needed and (best.is_empty() or candidate.support > best.support):
-			best = candidate
-	return best
-
-
-## A table found without the room scan (hands or depth); toys go on it from the
-## next round. It hangs on the depth sensor, so it stays put when the headset recentres.
-func _set_table(at: Vector3, size: Vector2, how: StringName) -> void:
-	_found_table = true
-	var forward := -App.head().global_basis.z
-	forward = Vector3(forward.x, 0.0, forward.z).normalized()
-	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), at), size, _depth))
+## The finder's table, found without the room scan (hands or depth); toys go on
+## it from the next round. The world is never recentred, so it stays on the room.
+func _set_table(how: StringName) -> void:
+	var found := _finder.table
+	_table = Surface.new(&"table", Transform3D(Basis.looking_at(found.forward), found.centre), found.size)
+	add_surface(_table)
 	Events.say("Got it. That's your table.")
-	note(how, {centre = at, size = size})
+	note(how, {centre = found.centre, size = found.size})
 	_settle()
 
 
@@ -183,7 +158,7 @@ func _room_ready() -> void:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
 		_depth.refreshed.connect(_look_for_table)
 		get_tree().create_timer(ASK_HANDS_AFTER).timeout.connect(func() -> void:
-			if not _found_table:
+			if not _table:
 				_hands_asked = true
 				Events.say("Put both hands flat on the table for a moment."))
 		get_tree().create_timer(ASK_HANDS_AFTER + GIVE_UP_AFTER).timeout.connect(_settle)

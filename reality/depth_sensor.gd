@@ -6,9 +6,8 @@ extends Node3D
 ## of left-eye depth pixels into points (the plugin's own CPU readback is broken
 ## on Vulkan, #517); [member grid] is the latest look.
 ##
-## Meta's depth comes in the raw OpenXR play space, without the recentring Godot
-## adds on top (XRServer reference frame, see App's pose_recentered). This node
-## carries that frame, so its children and the points stay on the real room.
+## Meta's depth comes in the OpenXR Stage space, which stays on the room; the
+## app never recentres the world, so the points line up with everything else.
 
 signal refreshed
 
@@ -82,10 +81,6 @@ func read_once() -> DepthGrid:
 	return DepthGrid.new(N, points, valid)
 
 
-func _process(_delta: float) -> void:
-	transform = XRServer.get_reference_frame()
-
-
 func _build_view() -> void:
 	var material := ShaderMaterial.new()
 	material.shader = Shader.new()
@@ -112,8 +107,7 @@ func _look() -> void:
 		_record()
 	if _looks % LOG_EVERY == 0:
 		PassthroughReality.note(&"depth", {points = grid.count(), read_ms = _read_ms,
-			ahead = hit(App.head().global_position, -App.head().global_basis.z),
-			recentre = {yaw = rad_to_deg(transform.basis.get_euler().y), offset = transform.origin}})
+			ahead = hit(App.head().global_position, -App.head().global_basis.z)})
 	_looks += 1
 	refreshed.emit()
 
