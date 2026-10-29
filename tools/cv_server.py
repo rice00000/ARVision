@@ -4,8 +4,8 @@ POST /detect with a JPEG body. Reply:
     {"detections": [{"label": "cup", "confidence": 0.91, "box": [x0, y0, x1, y1]}]}
 Box corners run 0..1 from the image's top left; labels are COCO class names.
 
-    pip install ultralytics
-    python tools/cv_server.py                 # YOLO11n on 127.0.0.1:8765
+    pip install ultralytics onnxruntime
+    python tools/cv_server.py                 # the headset's YOLO11n on 127.0.0.1:8765
     adb reverse tcp:8765 tcp:8765             # a USB-connected Quest reaches it as 127.0.0.1
 
 --fake answers every frame with one centred "cup", for tests without a model.
@@ -15,13 +15,17 @@ import argparse
 import io
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+## The model the headset runs (modules/cv/detector.gd), so both give the same answers.
+MODEL = str(Path(__file__).resolve().parents[1] / "modules" / "cv" / "yolo11n.onnx")
 
 
 def yolo(weights):
     from PIL import Image
     from ultralytics import YOLO
 
-    model = YOLO(weights)
+    model = YOLO(weights, task="detect")
 
     def detect(jpeg):
         result = model(Image.open(io.BytesIO(jpeg)).convert("RGB"), verbose=False)[0]
@@ -63,7 +67,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default="127.0.0.1", help="0.0.0.0 to serve a headset over Wi-Fi")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--model", default="yolo11n.pt")
+    parser.add_argument("--model", default=MODEL)
     parser.add_argument("--fake", action="store_true")
     args = parser.parse_args()
     serve(fake if args.fake else yolo(args.model), args.host, args.port)

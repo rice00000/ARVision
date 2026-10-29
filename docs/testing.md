@@ -23,4 +23,4 @@
 
 ## Quest camera frames
 
-Debug builds on a Quest keep the frames the Detector sends (`user://frames/<run>/`, 240 per run). `python tools/frames.py pull` copies them to `build/frames/`; `python tools/frames.py check build/frames/<run>` flags black frames, colour casts, size or field-of-view mismatches, runs YOLO (`pip install ultralytics`; `--fake` without) and writes `review.html`.
+Debug builds on a Quest keep the frames the Detector sends (`user://frames/<run>/`, 240 per run). `python tools/frames.py pull` copies them to `build/frames/`; `python tools/frames.py check build/frames/<run>` flags black frames, colour casts, size or field-of-view mismatches, runs YOLO (`pip install ultralytics onnxruntime`; `--fake` without), compares it with what the headset's own YOLO saw (`<frame>.seen.json`, with timing) and writes `review.html`. On-device check: install a debug build, `adb shell am broadcast -a com.oculus.vrpowermanager.prox_close` so it runs unworn, launch, wait 2 min, `pull`, `check`.

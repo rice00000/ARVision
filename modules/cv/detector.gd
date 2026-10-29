@@ -3,12 +3,17 @@ extends Module
 ## list in [member detections] and sends it as [signal Events.detected] a few
 ## times a second.
 ##
-## Two backends. [b]Sim[/b] reads the simulated room's RealObjects: those in the
-## field of view and not hidden behind anything real. [b]Remote[/b] posts camera
-## frames to tools/cv_server.py (YOLO on a laptop) and turns its boxes back into
-## places in the room. Auto uses sim in the simulated room and remote on a Quest.
+## Three backends. [b]Sim[/b] reads the simulated room's RealObjects: those in the
+## field of view and not hidden behind anything real. [b]Headset[/b] runs YOLO on
+## the Quest itself (addons/yolo, an Android plugin). [b]Remote[/b] posts camera
+## frames to tools/cv_server.py (YOLO on a PC; the rendered tests use it). Both
+## YOLO backends' boxes are turned back into places in the room. Auto uses sim in
+## the simulated room and headset on a Quest.
 
-enum Backend { AUTO, SIM, REMOTE }
+enum Backend { AUTO, SIM, REMOTE, HEADSET }
+
+## YOLO11n (Ultralytics, COCO), exported to ONNX at 640 px; run by the headset backend.
+const MODEL := "res://modules/cv/yolo11n.onnx"
 
 ## Debug builds on a Quest keep the frames they send, at most this many per run,
 ## in user://frames/<start time>/ (tools/frames.py pulls and checks them).
@@ -27,16 +32,23 @@ const RECORD_LIMIT := 240
 var detections: Array[Detection] = []
 
 var _http := HTTPRequest.new()
+## The Yolo Android plugin; null off Android.
+var _yolo: Object = Engine.get_singleton(&"Yolo") if Engine.has_singleton(&"Yolo") else null
 var _frame: CameraFrame
 var _waiting := false
 var _since := 0.0
 var _recorded := 0
 var _record_folder := ""
+## The recorded frame now being looked at; empty when it is not recorded.
+var _record_path := ""
 
 
 func _ready() -> void:
 	add_child(_http)
 	_http.request_completed.connect(_on_reply)
+	if _yolo:
+		_yolo.open(FileAccess.get_file_as_bytes(MODEL))
+		_yolo.connect(&"detected", func(reply: String) -> void: _on_seen(JSON.parse_string(reply)))
 
 
 func _process(delta: float) -> void:
@@ -82,18 +94,23 @@ func _send_frame() -> void:
 	_frame = App.reality.camera_frame()
 	if _frame == null:
 		return
+	_record_path = ""
 	if OS.is_debug_build() and App.reality.kind() == "passthrough" and _recorded < RECORD_LIMIT:
 		_record(_frame)
 	_waiting = true
-	_http.request_raw(server, PackedStringArray(["Content-Type: image/jpeg"]), HTTPClient.METHOD_POST,
-		_frame.image.save_jpg_to_buffer(0.8))
+	var jpeg := _frame.jpeg()
+	if backend == Backend.REMOTE:
+		_http.request_raw(server, PackedStringArray(["Content-Type: image/jpeg"]), HTTPClient.METHOD_POST, jpeg)
+	else:
+		_yolo.detect(jpeg)
 
 
 func _record(frame: CameraFrame) -> void:
 	if _record_folder.is_empty():
 		_record_folder = "user://frames/" + Time.get_datetime_string_from_system().replace(":", "-")
 		DirAccess.make_dir_recursive_absolute(_record_folder)
-	frame.save(_record_folder.path_join("%04d" % _recorded))
+	_record_path = _record_folder.path_join("%04d" % _recorded)
+	frame.save(_record_path)
 	_recorded += 1
 
 
@@ -102,7 +119,15 @@ func _on_reply(result: int, code: int, _headers: PackedStringArray, body: Packed
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		Events.report(&"cv_error", {result = result, code = code})
 		return
-	var reply: Dictionary = JSON.parse_string(body.get_string_from_utf8())
+	_on_seen(JSON.parse_string(body.get_string_from_utf8()))
+
+
+## A YOLO reply (tools/cv_server.py or the Yolo plugin): boxes to places in the room.
+## A recorded frame keeps it as <frame>.seen.json (tools/frames.py compares it).
+func _on_seen(reply: Dictionary) -> void:
+	_waiting = false
+	if not _record_path.is_empty():
+		FileAccess.open(_record_path + ".seen.json", FileAccess.WRITE).store_string(JSON.stringify(reply))
 	var found: Array[Detection] = []
 	for item: Dictionary in reply.detections:
 		if item.confidence < min_confidence:

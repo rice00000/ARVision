@@ -8,8 +8,10 @@ then iterate on CV here without the headset.
 
 check looks at every frame: size and field of view, brightness and colour balance
 (a red or green cast means the YCbCr conversion is off), and what YOLO finds
-(tools/cv_server.py; --fake skips the model). It writes <run>/review.html with the
-boxes drawn and exits non-zero when the camera looks broken.
+(tools/cv_server.py; --fake skips the model). Frames the headset's own YOLO looked
+at (<frame>.seen.json) are compared with the PC's answer, with its timing. It writes
+<run>/review.html with the boxes drawn and exits non-zero when the camera looks
+broken or the headset disagrees with the PC.
 """
 
 import argparse
@@ -83,10 +85,12 @@ def check(run, fake=False):
         detect = cv_server.fake
     else:
         try:
-            detect = cv_server.yolo("yolo11n.pt")
+            detect = cv_server.yolo(cv_server.MODEL)
         except ImportError:
-            sys.exit("YOLO needs: pip install ultralytics   (or use --fake to check the frames only)")
+            sys.exit("YOLO needs: pip install ultralytics onnxruntime   (or use --fake to check the frames only)")
     rows, labels, broken = [], {}, 0
+    agree = differ = 0
+    times = []
     frames = sorted(run.glob("*.jpg"))
     for path in frames:
         meta = json.loads(path.with_suffix(".json").read_text())
@@ -96,15 +100,41 @@ def check(run, fake=False):
         found = detect(path.read_bytes())
         for item in found:
             labels[item["label"]] = labels.get(item["label"], 0) + 1
+        seen = path.with_suffix(".seen.json")
+        if seen.exists() and not fake:
+            headset = json.loads(seen.read_text())
+            times.append(headset["ms"])
+            missed = unmatched(found, headset["detections"])
+            agree += not missed
+            differ += bool(missed)
+            if missed:
+                issues.append("headset differs: " + ", ".join(missed))
         rows.append((path.name, image.size, issues, found))
     print(f"{len(frames)} frames, {broken} with problems")
     print("seen:", ", ".join(f"{k} x{v}" for k, v in sorted(labels.items(), key=lambda kv: -kv[1])) or "nothing")
+    if times:
+        times.sort()
+        print(f"headset YOLO: {agree} of {agree + differ} frames agree with the PC; "
+              f"{times[len(times) // 2]} ms median, {times[-1]} ms slowest")
     for name, _size, issues, _found in rows:
         if issues:
             print(f"  {name}: {'; '.join(issues)}")
     (run / "review.html").write_text(review(rows), encoding="utf-8")
     print("review:", run / "review.html")
-    return 0 if frames and broken < len(frames) and labels else 1
+    return 0 if frames and broken < len(frames) and labels and differ <= agree // 10 else 1
+
+
+def unmatched(pc, headset):
+    """Confident objects one side found and the other did not (same label, boxes overlapping)."""
+    def missing(found, other):
+        return [d["label"] for d in found if d["confidence"] >= 0.5 and not any(
+            o["label"] == d["label"] and o["confidence"] >= 0.3 and overlap(o["box"], d["box"]) > 0.5 for o in other)]
+    return [f"PC only {label}" for label in missing(pc, headset)] + [f"headset only {label}" for label in missing(headset, pc)]
+
+
+def overlap(a, b):
+    inter = max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter)
 
 
 def review(rows):

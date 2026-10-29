@@ -31,3 +31,8 @@ desktop.ini
 .vscode/
 .idea/
 *.log
+
+# YOLO plugin build (yolo.aar is committed)
+addons/yolo/android/build/
+addons/yolo/android/.gradle/
+addons/yolo/android/local.properties

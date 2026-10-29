@@ -36,10 +36,15 @@ func uv(point: Vector3) -> Vector2:
 	return Vector2((local.x / depth / (half * aspect) + 1.0) * 0.5, (1.0 - local.y / depth / half) * 0.5)
 
 
-## Saves the image and where it was taken as [param path].jpg and .json (read by
+## The image as a JPEG, as the Detector sends it to YOLO (same bytes every call).
+func jpeg() -> PackedByteArray:
+	return image.save_jpg_to_buffer(0.8)
+
+
+## Saves [method jpeg] and where it was taken as [param path].jpg and .json (read by
 ## [method open] and tools/frames.py).
 func save(path: String) -> void:
-	image.save_jpg(path + ".jpg", 0.9)
+	FileAccess.open(path + ".jpg", FileAccess.WRITE).store_buffer(jpeg())
 	var basis := pose.basis
 	FileAccess.open(path + ".json", FileAccess.WRITE).store_string(JSON.stringify({
 		origin = [pose.origin.x, pose.origin.y, pose.origin.z],

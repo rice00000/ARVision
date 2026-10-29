@@ -50,4 +50,4 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
 - **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).
 - **Pick data:** every pick is a row in `<save>/picks.csv` (time, save, game, round, target, picked, correct, seconds, accuracy; see [Picks](modules/picks/picks.gd)). One file for all saves: `python tools/picks.py pull` (Quest) or `local` → `build/picks.csv`.
-- **CV on a Quest:** `pip install ultralytics`, `python tools/cv_server.py`, `adb reverse tcp:8765 tcp:8765`.
+- **CV on a Quest:** YOLO11n runs on the headset (`addons/yolo`, ONNX Runtime; about 0.3 s a look), no PC needed. The committed `addons/yolo/yolo.aar` is built from `addons/yolo/android/`; after changing the Kotlin, rebuild it with `./gradlew assembleRelease` there (JDK 17, `ANDROID_HOME`). Another model: export it with `yolo export model=<pt> format=onnx imgsz=640` to `modules/cv/yolo11n.onnx`.
