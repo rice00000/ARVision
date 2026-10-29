@@ -3,6 +3,7 @@ play it, follow the guide round to the wall behind, play there, get colour back,
 again after a relaunch."""
 
 import csv
+import math
 from pathlib import Path
 import unittest
 
@@ -59,6 +60,14 @@ class Adventure(SimCase):
             picks = list(csv.DictReader(file))
         self.assertEqual({row["game"] for row in picks}, {"Find the toys, level 1"}, "every pick in the CSV")
         self.assertEqual(sum(row["correct"] == "1" for row in picks), sum(e["success"] for e in ends), "a right pick per solved round")
+        found = [e["data"]["found"] for e in ends if e["success"]][-1]
+        world = sim.observe()["world"]
+        self.assertEqual(world["treasures"], {"find_toys:0": found}, "the last thing found goes in the cabinet")
+        head = sim.observe()["head"]["position"]
+        table = sim.observe()["work_surface"]["position"]
+        cabinet = world["cabinet"]["position"]
+        angle = math.degrees(math.atan2(*[t - h for t, h in zip(table, head)][::-2]) - math.atan2(*[c - h for c, h in zip(cabinet, head)][::-2]))
+        self.assertTrue(world["cabinet"]["visible"] and 40 < abs(angle) % 360 < 50, f"beside the table, not on it: {angle}")
 
         world = self.menu_at(sim, "Alchemy table")
         self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (1, "A little colour"))

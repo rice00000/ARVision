@@ -83,7 +83,8 @@ static func levels() -> Dictionary:
 		plans.append(App.session.plan)
 	else:
 		for place in App.world.adventure.places:
-			plans.append_array(place.tasks.map(func(task: Task) -> SessionPlan: return task.plan))
+			for task in place.tasks:
+				plans.append_array(task.levels)
 	var result := {}
 	for plan in plans:
 		for block in plan.blocks:
@@ -95,7 +96,9 @@ static func levels() -> Dictionary:
 static func world() -> Dictionary:
 	var world := App.world
 	var guide: Node3D = world.get("_guide")
-	var result := {done = world.done, colour = world.colour,
+	var cabinet: Cabinet = world.get("_cabinet")
+	var result := {done = world.done, colour = world.colour, treasures = world.treasures,
+		cabinet = {visible = cabinet.visible, position = cabinet.global_position} if cabinet else null,
 		place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
 		menu = null}
 	if world.menu and world.menu.is_inside_tree():

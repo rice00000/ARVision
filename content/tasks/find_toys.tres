@@ -10,7 +10,7 @@ script = ExtResource("3_block")
 trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.1
-intro = "Find the ingredient I name. Reach out and grab it. Raise your hand if you need help."
+intro = "Find the treasure I name. Reach out and grab it. Raise your hand if you need help."
 ray = false
 pause_between = 1.0
 
@@ -26,7 +26,7 @@ script = ExtResource("3_block")
 trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.5
-intro = "A bigger potion needs more ingredients. Find the one I name and grab it."
+intro = "More treasures this time. Find the one I name and grab it."
 ray = false
 pause_between = 1.0
 
@@ -43,7 +43,7 @@ trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.6
 pins = Dictionary[StringName, float]({&"same_colour": 1.0, &"spacing": 1.4})
-intro = "These ingredients all share one colour. Look at the shapes!"
+intro = "These treasures all share one colour. Look at the shapes!"
 ray = false
 pause_between = 1.0
 
@@ -60,7 +60,7 @@ trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.3
 pins = Dictionary[StringName, float]({&"same_shape": 1.0, &"colour_gap": 0.08})
-intro = "Magic stones that look alike! One has a different colour. Find it and grab it!"
+intro = "Treasures that look alike! One has a different colour. Find it and grab it!"
 ray = false
 pause_between = 1.0
 
@@ -77,7 +77,7 @@ trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.45
 pins = Dictionary[StringName, float]({&"same_shape": 1.0, &"colour_gap": 0.04})
-intro = "A tricky spell: one stone's colour is only a little different. Look closely!"
+intro = "A tricky one: one treasure's colour is only a little different. Look closely!"
 ray = false
 pause_between = 1.0
 
@@ -90,6 +90,6 @@ blocks = Array[ExtResource("3_block")]([SubResource("find_5")])
 
 [resource]
 script = ExtResource("1_task")
-title = "Potion ingredients"
+title = "Treasure hunt"
 levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2"), SubResource("level_3"), SubResource("level_4"), SubResource("level_5")])
 colour = 1

@@ -30,10 +30,18 @@ func _ready() -> void:
 	magic.sparkle((App.session.trial.get("_target") as Node3D).global_position, magic.GOLD, 24)
 	await get_tree().create_timer(0.3).timeout
 	await _save(out.path_join("sparkles.png"))
-	Events.report(&"task_done", {task = &"find_toys", level = 1, colour = 1})
-	await get_tree().create_timer(1.3).timeout
-	await _save(out.path_join("potion.png"))
-	await get_tree().create_timer(2.5).timeout
+	var cabinet := App.world.cabinet()
+	var eye := App.head().global_position
+	var to_table := App.reality.work_surface().transform.origin - eye
+	cabinet.place_beside(eye, Vector3(to_table.x, 0.0, to_table.z).normalized())
+	App.world._found = {shape = "ring", colour = "ff8040"}
+	App.world._complete(load("res://content/tasks/find_toys.tres"), 0)
+	await get_tree().create_timer(0.7).timeout
+	await _save(out.path_join("treasure.png"))
+	await get_tree().create_timer(2.0).timeout
+	App.sim_input.look_at(cabinet.global_position)
+	await _save(out.path_join("cabinet.png"))
+	App.sim_input.look_at(App.reality.work_surface().transform.origin + Vector3(0, 0.0, -0.3))
 	App.sim_input.menu()
 	await _save(out.path_join("facilitator.png"))
 	App.module(&"Facilitator").call(&"_show", &"Saves")

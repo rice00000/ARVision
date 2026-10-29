@@ -11,6 +11,7 @@ extends Trial
 ## 2 it glows and the guide says where it is.
 ## Without the ray ([member Trial.grab]) toys lie only where the child reaches
 ## without stretching, in front; when the table has no room there, on a patch in front.
+## A solved round logs what was found (shape, colour): the World keeps it as a treasure.
 
 ## Comfortable reach from a shoulder, in seated eye heights above the floor
 ## (0.41 m at 1.02 m; tools/sim/profiles.json's small child reaches 0.42).
@@ -115,7 +116,7 @@ func _pick(toy: Target) -> void:
 		say("Yes! That's the one." if _odd else "Yes! That's the %s." % _toys[toy])
 		_stop_hop()
 		create_tween().tween_property(toy, ^"position", toy.position + toy.basis.y * 0.12, 0.3)
-		finish(true, {picks = _picks.duplicate()})
+		finish(true, {picks = _picks.duplicate(), found = {shape = String(_toys[toy]), colour = _target_material.albedo_color.to_html(false)}})
 	else:
 		judge(&"bad", toy.global_position)
 		count_try()
@@ -165,30 +166,7 @@ func _make_toy(shape: StringName, colour: Color, size: float, toy_id: String) ->
 	material.albedo_color = colour
 	toy.set_meta(&"material", material)
 	var instance := MeshInstance3D.new()
-	instance.mesh = _mesh(shape, size)
+	instance.mesh = Shapes.mesh(shape, size)
 	instance.material_override = material
 	toy.add_child(instance)
 	return toy
-
-
-func _mesh(shape: StringName, size: float) -> Mesh:
-	match shape:
-		&"ball", &"egg":
-			var sphere := SphereMesh.new()
-			sphere.radius = size * (0.5 if shape == &"ball" else 0.38)
-			sphere.height = size
-			return sphere
-		&"block":
-			var box := BoxMesh.new()
-			box.size = Vector3.ONE * size
-			return box
-		&"ring":
-			var ring := TorusMesh.new()
-			ring.inner_radius = size * 0.28
-			ring.outer_radius = size * 0.5
-			return ring
-	var cylinder := CylinderMesh.new() # cone, drum
-	cylinder.top_radius = 0.0 if shape == &"cone" else size * 0.45
-	cylinder.bottom_radius = size * 0.5 if shape == &"cone" else size * 0.45
-	cylinder.height = size if shape == &"cone" else size * 0.8
-	return cylinder

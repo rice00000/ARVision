@@ -133,3 +133,26 @@ func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	await select(_button("task_break_wall_1").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")
 	expect_eq(App.session.plan, WALL.levels[0], "level 1's plan")
+
+
+func test_a_level_done_the_first_time_puts_what_was_found_in_the_cabinet() -> void:
+	await boot()
+	var world := App.world
+	var reports := record(Events.reported)
+	world._found = {shape = "cone", colour = "3366ff"}
+	await world._complete(FIND, 0)
+	expect_eq(world.treasures, {"find_toys:0": {shape = "cone", colour = "3366ff"}}, "what was found")
+	var done: Dictionary = reports.filter(func(args: Array) -> bool: return args[0] == &"task_done").back()[1]
+	expect(done.slot.is_equal_approx(world.cabinet().slot_position(FIND, 0)), "Magic is told where it goes")
+	await wait(Cabinet.ARRIVE + 0.1)
+	var slot := world.cabinet().find_child("find_toys_1", true, false)
+	expect_eq(slot.get_child(0).name, "Treasure", "it shows once it has arrived")
+	world._found = {shape = "ball", colour = "ff0000"}
+	await world._complete(FIND, 0)
+	expect_eq(world.treasures["find_toys:0"].shape, "cone", "done again: the first treasure stays")
+	world._found = {}
+	await world._complete(WALL, 0)
+	expect_eq(world.treasures["break_wall:0"].shape, "gem", "nothing to find: a gem")
+	world.treasures = {}
+	Save.reload()
+	expect_eq(world.treasures.size(), 2, "saved")
