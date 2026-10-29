@@ -15,6 +15,7 @@ config/description="AR vision training for children who gained sight late: measu
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
+run/main_scene.recorder="res://tools/record/record.tscn"
 
 [autoload]
 

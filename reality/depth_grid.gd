@@ -37,6 +37,19 @@ func _init(grid_size: int, grid_points: PackedVector3Array, grid_valid: PackedBy
 	valid = grid_valid
 
 
+## Saves the look as [param path].json, with [param head] (the head's pose) and
+## Time.get_ticks_msec().
+func save(path: String, head: Transform3D) -> void:
+	var flat := PackedFloat32Array()
+	for point in points:
+		flat.append_array([point.x, point.y, point.z])
+	FileAccess.open(path + ".json", FileAccess.WRITE).store_string(JSON.stringify({
+		msec = Time.get_ticks_msec(), size = size, points = flat, valid = Array(valid),
+		head = {origin = [head.origin.x, head.origin.y, head.origin.z],
+			basis = [[head.basis.x.x, head.basis.x.y, head.basis.x.z], [head.basis.y.x, head.basis.y.y, head.basis.y.z],
+				[head.basis.z.x, head.basis.z.y, head.basis.z.z]]}}))
+
+
 ## Points that saw something.
 func count() -> int:
 	return valid.count(1)

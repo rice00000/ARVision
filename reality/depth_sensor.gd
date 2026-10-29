@@ -13,12 +13,11 @@ extends Node3D
 signal refreshed
 
 const N := 48
-const INTERVAL := 0.5
 ## Every this many looks, the cost of reading the grid back is logged.
 const LOG_EVERY := 20
 ## Debug builds save the first this many looks in user://depth/<start time>/
-## (with the head pose and Time.get_ticks_msec(), like the camera frames in
-## user://frames/), to check depth against the camera afterwards.
+## ([method DepthGrid.save], like the camera frames in user://frames/), to check
+## depth against the camera afterwards.
 const RECORD_LIMIT := 120
 const SHADER := """
 shader_type canvas_item;
@@ -35,6 +34,10 @@ void fragment() {
 
 ## The latest look, or null before the first.
 var grid: DepthGrid
+## Seconds between looks.
+var interval := 0.5
+## Saves the first [constant RECORD_LIMIT] looks (the recorder saves its own).
+var record := OS.is_debug_build()
 
 var _view := SubViewport.new()
 var _looks := 0
@@ -42,7 +45,7 @@ var _read_ms := 0.0
 var _record_folder := ""
 
 
-## Starts the depth and looks every [constant INTERVAL] seconds from now on.
+## Starts the depth and looks every [member interval] seconds from now on.
 func start() -> void:
 	if not OpenXRMetaEnvironmentDepthExtension.is_environment_depth_supported():
 		PassthroughReality.note(&"depth", {supported = false})
@@ -50,7 +53,7 @@ func start() -> void:
 	OpenXRMetaEnvironmentDepthExtension.start_environment_depth()
 	OpenXRMetaEnvironmentDepthExtension.set_hand_removal_enabled(true)
 	var timer := Timer.new()
-	timer.wait_time = INTERVAL
+	timer.wait_time = interval
 	timer.timeout.connect(_look)
 	add_child(timer)
 	timer.start()
@@ -105,7 +108,7 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 func _look() -> void:
 	grid = await read_once()
-	if OS.is_debug_build() and _looks < RECORD_LIMIT:
+	if record and _looks < RECORD_LIMIT:
 		_record()
 	if _looks % LOG_EVERY == 0:
 		PassthroughReality.note(&"depth", {points = grid.count(), read_ms = _read_ms,
@@ -119,12 +122,4 @@ func _record() -> void:
 	if _record_folder.is_empty():
 		_record_folder = "user://depth/" + Time.get_datetime_string_from_system().replace(":", "-")
 		DirAccess.make_dir_recursive_absolute(_record_folder)
-	var head := App.head().global_transform
-	var flat := PackedFloat32Array()
-	for point in grid.points:
-		flat.append_array([point.x, point.y, point.z])
-	FileAccess.open(_record_folder.path_join("%04d.json" % _looks), FileAccess.WRITE).store_string(JSON.stringify({
-		msec = Time.get_ticks_msec(), size = N, points = flat, valid = grid.valid,
-		head = {origin = [head.origin.x, head.origin.y, head.origin.z],
-			basis = [[head.basis.x.x, head.basis.x.y, head.basis.x.z], [head.basis.y.x, head.basis.y.y, head.basis.y.z],
-				[head.basis.z.x, head.basis.z.y, head.basis.z.z]]}}))
+	grid.save(_record_folder.path_join("%04d" % _looks), App.head().global_transform)

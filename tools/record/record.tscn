@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/record/record.gd" id="1_record"]
+[ext_resource type="PackedScene" path="res://rig/rig.tscn" id="2_rig"]
+
+[node name="Record" type="Node3D"]
+script = ExtResource("1_record")
+
+[node name="Rig" parent="." instance=ExtResource("2_rig")]
