@@ -81,7 +81,7 @@ func run() -> void:
 			continue
 		var task: Task = picked[0]
 		var level: int = picked[1]
-		await App.session.play(task.plan, task.levels[level])
+		await App.session.play(task.levels[level])
 		await _complete(task, level)
 
 

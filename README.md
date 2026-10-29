@@ -9,9 +9,9 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Quest 3:** put the Vendors plugin in `addons/godotopenxrvendors/` and install the Android build template, then run the **Meta Quest 3** export preset. Tables in the headset's room scan become work surfaces. A build not registered with Meta cannot read the scan (`ERROR_PACKAGE_UNTRUSTED`); tables and walls then come from the live depth. The app never opens Space Setup itself.
 - **PC, no headset:** run the project. A simulated living room stands in for the real one. Mouse: right-drag looks, left click points and pinches, left-drag sweeps (wheel: nearer / farther). **H** raises a hand (help), **M** facilitator panel.
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
-- Options after `--`: `--profile=<child>`, `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
+- Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**The adventure** (default, `content/adventure.tres`; [world](docs/world.md)): the room starts black and white. A yellow orb points the way; turn to face a place and its menu unfolds: the table (find the toys) and behind you (break the wall), two levels each. Touch a number (or point and pinch) to play. Each game done the first time brings colour back; the next level, and the wall, unlock as you go. Progress is saved per child. A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` (find toys under four views, then break the wall) or `demo.tres` (training).
+**The adventure** (default, `content/adventure.tres`; [world](docs/world.md)): the room starts black and white. A yellow orb points the way; turn to face a place and its menu unfolds: the table (find the toys, five levels) and behind you (break the wall, two). Touch a number (or point and pinch) to play. Each game done the first time brings colour back; the next level, and the wall, unlock as you go. Progress is saved per save; the facilitator panel's **Saves** tab makes, names, copies and switches saves (one per child, as in XRVision). A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` (find toys under four views, then break the wall) or `demo.tres` (training).
 
 **Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, touch the yellow ball to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
 
@@ -43,7 +43,7 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Trial:** `trials/<kind>/` with a scene whose root extends `Trial` and a `TrialDef` `.tres`; add a `Block` to a session plan.
 - **View preset:** a `View` `.tres` in `content/views/`.
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
-- **Task:** a `Task` `.tres` in `content/tasks/` (a plan, levels, what it needs, rewards); add it to a `Place` in `content/places/`.
+- **Task:** a `Task` `.tres` in `content/tasks/` (one plan per level, what it needs, rewards); add it to a `Place` in `content/places/`.
 - **Saved state:** `save_state()` / `load_state()` on a node ([Save](core/save.gd), as in XRVision).
 - **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.

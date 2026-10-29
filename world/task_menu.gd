@@ -1,7 +1,7 @@
 class_name TaskMenu
 extends Node3D
-## A place's tasks, unfolded in reach between the child and the place: one row
-## per task, its title and one big button per level. It leans back like a
+## A place's tasks, unfolded in reach between the child and the place: per
+## task its title, and under it one big button per level. It leans back like a
 ## console on the table, so reaching a near row never brushes a far one. Touch a button, or point
 ## and pinch. Open levels show their number; a done level carries a gold medal;
 ## a locked one is grey, sunk back and shows a dash, and only says it is locked.
@@ -77,8 +77,9 @@ func _press(target: Target) -> void:
 
 func _build() -> void:
 	var rows := _place.tasks.size()
-	var width := TITLE_WIDTH + GAP * 2 + 0.02
-	var height := ROW * (rows + 1)
+	var most := _place.tasks.map(func(task: Task) -> int: return task.levels.size()).max() as int
+	var width := maxf(TITLE_WIDTH, GAP * most) + 0.02
+	var height := ROW * (rows * 2 + 1)
 	for layer in [[0.012, Color(0.85, 0.85, 0.8), -1], [0.0, Color(0.08, 0.09, 0.12), 0]]: # a light rim, dark or light behind
 		var back := MeshInstance3D.new()
 		var quad := QuadMesh.new()
@@ -93,15 +94,14 @@ func _build() -> void:
 	add_child(header)
 	for row in rows:
 		var task := _place.tasks[row]
-		var y := top - ROW * (row + 1)
+		var y := top - ROW * (row * 2 + 1)
 		var title := _label(task.title, 44)
-		title.position = Vector3(-width * 0.5 + 0.01, y, 0.0)
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		title.position = Vector3(0.0, y, 0.0)
 		title.modulate = Color.WHITE if _world.is_unlocked(task) else Color(0.6, 0.6, 0.6)
 		add_child(title)
 		for level in task.levels.size():
 			var button := _button(task, level)
-			button.position = Vector3(-width * 0.5 + TITLE_WIDTH + GAP * (level + 0.5), y, 0.0)
+			button.position = Vector3(GAP * (level - (task.levels.size() - 1) * 0.5), y - ROW, 0.0)
 			add_child(button)
 
 

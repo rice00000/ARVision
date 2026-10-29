@@ -6,25 +6,41 @@
 [ext_resource type="Resource" path="res://trials/motion/motion_demo.tres" id="4_motion"]
 [ext_resource type="Resource" path="res://content/tasks/find_toys.tres" id="5_find_toys"]
 
-[sub_resource type="Resource" id="wall"]
+[sub_resource type="Resource" id="wall_1"]
 script = ExtResource("3_block")
 trial = ExtResource("4_motion")
-ray = false
 rounds = 3
+difficulty = 0.0
 intro = "Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"
+ray = false
 pause_between = 3.0
 
-[sub_resource type="Resource" id="plan"]
+[sub_resource type="Resource" id="level_1"]
 script = ExtResource("2_plan")
-title = "Break the wall"
+title = "Break the wall, level 1"
 greeting = ""
 farewell = ""
-blocks = Array[ExtResource("3_block")]([SubResource("wall")])
+blocks = Array[ExtResource("3_block")]([SubResource("wall_1")])
+
+[sub_resource type="Resource" id="wall_2"]
+script = ExtResource("3_block")
+trial = ExtResource("4_motion")
+rounds = 3
+difficulty = 0.4
+intro = "Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"
+ray = false
+pause_between = 3.0
+
+[sub_resource type="Resource" id="level_2"]
+script = ExtResource("2_plan")
+title = "Break the wall, level 2"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("wall_2")])
 
 [resource]
 script = ExtResource("1_task")
 title = "Break the wall"
-plan = SubResource("plan")
-levels = PackedFloat32Array(0.0, 0.4)
+levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2")])
 requires = Array[ExtResource("1_task")]([ExtResource("5_find_toys")])
 colour = 1

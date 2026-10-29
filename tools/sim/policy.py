@@ -32,6 +32,7 @@ class Perception:
     touch: float            # chance of touching a toy in reach instead of pointing
     search: float           # seconds of looking per toy
     fumble: float           # chance a sweep is too small to count
+    colour_gap: float       # hue difference (fraction of the wheel) told apart half the time
 
 
 def logistic(x):
@@ -61,12 +62,15 @@ class Policy:
 
     # -- find it ---------------------------------------------------------------
 
-    def find_odds(self, eye, target, others, view, hint, glow, same_colour, focus):
+    def find_odds(self, eye, target, others, view, hint, glow, same_colour, focus, colour_gap=None):
+        """colour_gap: the target differs from the others only by this much hue."""
         p = self.perception
         size = Body.angular_size(eye, target["centre"], max(target["extent"]))
         odds = p.accuracy * logistic((size - p.acuity) / (0.25 * p.acuity))
         odds *= (1.0 - p.clutter_cost) ** len(others)
-        if not same_colour and view["saturation"] < 1.0:
+        if colour_gap is not None:
+            odds *= logistic((colour_gap - p.colour_gap) / (0.25 * p.colour_gap))
+        elif not same_colour and view["saturation"] < 1.0:
             odds *= 0.9 + 0.1 * view["saturation"]  # colour no longer tells the toys apart
         at_focus = view["focus_radius"] > 0 and distance(target["centre"], focus) <= view["focus_radius"]
         odds *= view_factor(view, at_focus)

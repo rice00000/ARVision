@@ -279,6 +279,7 @@ func _plan(spec: Dictionary) -> SessionPlan:
 		if entry.has("view"):
 			block.view = load(entry.view)
 		block.intro = entry.get("intro", "")
+		block.ray = entry.get("ray", true)
 		block.pause_between = entry.get("pause_between", 1.5)
 		plan.blocks.append(block)
 	return plan

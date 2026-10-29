@@ -2,7 +2,7 @@
 
 import unittest
 
-from support import Child, Facilitator, SimCase, block, plan
+from support import Actor, Child, Facilitator, SimCase, block, plan
 
 
 class Panel(SimCase):
@@ -167,6 +167,75 @@ class Panel(SimCase):
         ends = self.round_ends(sim)
         self.assertEqual([e["data"]["view"]["title"] for e in ends], ["Edges"])
         self.assertEqual(self.reports(sim, "round_abandoned"), [], "no round had started")
+
+    def test_saves_tab_makes_switches_and_copies_saves(self):
+        sim = self.start(None, profile="test_sim_saves")
+        actor = Actor(sim)
+        menu = self.menu(sim)
+        actor.touch("right", tuple(next(b for b in menu["buttons"] if b["id"] == "task_find_toys_1")["position"]), radius=0.01)
+        Child(sim, seed=3).play()
+        self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
+        self.menu(sim)
+        self.facilitator.open()
+        self.facilitator.press("fac_saves")
+        panel = self.facilitator.panel()
+        self.assertEqual(panel["playing"], "Playing: test_sim_saves")
+        self.assertEqual(self.slots(panel), [("test_sim_saves", True)], "only this save, which cannot be opened again")
+        self.facilitator.press("fac_new_save")
+        for key in ("fac_key_B", "fac_key_E", "fac_key_N", "fac_erase", "fac_key_N"):
+            self.facilitator.press(key)
+        self.assertEqual(self.facilitator.panel()["name"], "Name: BEN_")
+        self.facilitator.press("fac_create")
+        sim.wait(0.5)
+        observation = sim.observe()
+        self.assertEqual((observation["profile"], observation["paused"], observation["facilitator"]["open"]),
+                         ("test_sim_saves_s1", False, False), "plays the new save at once")
+        self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({}, "Black and white"), "from the start")
+        self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, False, False, False, False])
+
+        self.facilitator.open()
+        self.facilitator.press("fac_saves")
+        panel = self.facilitator.panel()
+        self.assertEqual(panel["playing"], "Playing: BEN")
+        self.assertEqual(self.slots(panel), [("test_sim_saves_s1", True), ("test_sim_saves", False)], "the one playing on top")
+        self.facilitator.press("fac_slot_test_sim_saves")
+        sim.wait(0.5)
+        observation = sim.observe()
+        self.assertEqual(observation["profile"], "test_sim_saves")
+        self.assertEqual((observation["world"]["done"], observation["world"]["colour"]), ({"find_toys": [0]}, 1), "where it was left")
+        self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, True, False, False, False])
+
+        self.facilitator.open()
+        self.facilitator.press("fac_saves")
+        self.facilitator.press("fac_new_save")
+        self.facilitator.press("fac_copy")
+        panel = self.facilitator.panel()
+        self.assertTrue(panel["open"] and panel["playing"] == "Playing: test_sim_saves", "a copy does not switch")
+        self.assertEqual(sorted(slot for slot, _ in self.slots(panel)), ["test_sim_saves", "test_sim_saves_s1", "test_sim_saves_s2"])
+        self.facilitator.press("fac_slot_test_sim_saves_s2")
+        sim.wait(0.5)
+        observation = sim.observe()
+        self.assertEqual(observation["profile"], "test_sim_saves_s2", observation["facilitator"])
+        self.assertEqual(observation["world"]["done"], {"find_toys": [0]}, "the copy carries the progress")
+        self.assertEqual([(r["from"], r["to"]) for r in self.reports(sim, "save_switched")],
+                         [("test_sim_saves", "test_sim_saves_s1"), ("test_sim_saves_s1", "test_sim_saves"),
+                          ("test_sim_saves", "test_sim_saves_s2")])
+        self.assert_log_ok(sim)
+
+    def menu(self, sim):
+        """Faces the table and waits for its menu."""
+        Actor(sim).look_at(tuple(sim.observe()["work_surface"]["position"]))
+        for _ in range(40):
+            menu = sim.observe()["world"]["menu"]
+            if menu and menu["open"]:
+                return menu
+            sim.wait(0.5)
+        self.fail(f"no menu: {sim.observe()['world']} {[e['text'] for e in sim.events('said')][-4:]}")
+
+    @staticmethod
+    def slots(panel):
+        """(save id, cannot be pressed) for each row on the Saves page, top first."""
+        return [(b["id"].removeprefix("fac_slot_"), b["disabled"]) for b in panel["buttons"] if b["id"].startswith("fac_slot_")]
 
 
 if __name__ == "__main__":

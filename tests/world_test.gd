@@ -87,7 +87,7 @@ func test_turning_to_the_table_unfolds_its_menu() -> void:
 	expect(reports.any(func(args: Array) -> bool: return args[0] == &"place_entered"), "logged")
 	var menu := App.world.menu
 	expect(menu.global_position.distance_to(App.head().global_position) < 0.5, "within reach")
-	expect_eq(menu.find_children("task_*", "Target", false, false).size(), 2, "the table's one task, two levels")
+	expect_eq(menu.find_children("task_*", "Target", false, false).size(), FIND.levels.size(), "the table's one task, every level")
 
 
 func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
@@ -101,8 +101,8 @@ func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
 	expect(App.world.menu != null and not App.session.running, "nothing starts")
 	await select(_button("task_find_toys_1").global_position)
 	expect(await until(func() -> bool: return started.size() == 1, 15.0), "the task plays")
-	expect_eq(App.session.plan, FIND.plan, "its plan")
-	expect(is_equal_approx(App.session.level(), FIND.levels[0]), "at level 1's difficulty")
+	expect_eq(App.session.plan, FIND.levels[0], "level 1's plan")
+	expect(is_equal_approx(App.session.level(), FIND.levels[0].blocks[0].difficulty), "at level 1's difficulty")
 	expect(App.world.menu == null, "the menu folded away")
 	expect_eq(started[0][1].view.title, "Black and white", "still in black and white")
 
@@ -132,4 +132,4 @@ func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	expect(_button("task_break_wall_1") != null and _button("task_find_toys_1") == null, "the wall's list only")
 	await select(_button("task_break_wall_1").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")
-	expect_eq(App.session.plan, WALL.plan, "its plan")
+	expect_eq(App.session.plan, WALL.levels[0], "level 1's plan")

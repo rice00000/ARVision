@@ -8,6 +8,7 @@ extends Node
 ## The OpenXR interface, or null when there is no runtime.
 var xr: OpenXRInterface
 ## Set by main.tscn's pieces as they become ready.
+var main: Main
 var rig: Rig
 var reality: Reality
 var stage: Node3D

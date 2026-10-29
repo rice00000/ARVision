@@ -31,10 +31,10 @@ PLANS = {"demo": "res://content/sessions/demo.tres", "motion": "res://content/se
          "tech_demo": "res://content/sessions/tech_demo.tres"}
 
 
-def block(trial, rounds=1, probe=False, difficulty=-1.0, pins=None, view=None, intro="", pause_between=0.5):
-    """One Block of a plan spec (see server.gd)."""
+def block(trial, rounds=1, probe=False, difficulty=-1.0, pins=None, view=None, intro="", pause_between=0.5, ray=True):
+    """One Block of a plan spec (see server.gd). ray=False: the child must reach what it picks."""
     spec = {"trial": TRIALS[trial], "rounds": rounds, "probe": probe, "difficulty": difficulty,
-            "pins": pins or {}, "intro": intro, "pause_between": pause_between}
+            "pins": pins or {}, "intro": intro, "pause_between": pause_between, "ray": ray}
     if view:
         spec["view"] = f"res://content/views/{view}.tres"
     return spec

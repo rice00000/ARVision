@@ -16,6 +16,18 @@ def rise(head, point):
 ROUND = {"cup", "bottle", "apple", "vase"}  # cylinders and balls in the simulated room
 
 
+def ok_hue(colour):
+    """OKLab hue of an sRGB colour, as a fraction of the wheel (what Color.from_ok_hsl takes)."""
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in colour[:3])
+    l, m, s = (math.copysign(abs(v) ** (1 / 3), v) for v in (
+        0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b,
+        0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b,
+        0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b))
+    a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s
+    b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    return math.atan2(b, a) / (2 * math.pi) % 1.0
+
+
 def footprint_gap(point, thing):
     """Metres from `point` to the edge of `thing`'s footprint on the table (negative inside)."""
     dx, dz = (abs(point[i] - thing["centre"][i]) for i in (0, 2))
@@ -46,8 +58,8 @@ class FindIt(SimCase):
                 local = [sum((toy["position"][i] - surface["position"][i]) * surface[axis][i] for i in range(3))
                          for axis in ("x", "y", "z")]
                 self.assertAlmostEqual(local[1], values["size"] / 2, places=4)
-                self.assertLessEqual(abs(local[0]), surface["size"][0] / 2 - values["size"] + 1e-6)
-                self.assertLessEqual(abs(local[2]), surface["size"][1] / 2 - values["size"] + 1e-6)
+                self.assertLessEqual(abs(local[0]), surface["size"][0] / 2 - values["size"] / 2 + 1e-6, "on the table")
+                self.assertLessEqual(abs(local[2]), surface["size"][1] / 2 - values["size"] / 2 + 1e-6, "on the table")
             gaps = [math.dist(a["position"], b["position"]) for i, a in enumerate(toys) for b in toys[i + 1:]]
             self.assertGreaterEqual(min(gaps), values["size"] * values["spacing"] - 1e-6)
             seeds.add(values["seed"])
@@ -107,6 +119,53 @@ class FindIt(SimCase):
         self.assertTrue(all(e["success"] and e["data"]["first_try"] for e in self.round_ends(sim)))
         self.assertGreater(touched, 0, "some named toys lay within reach")
         self.assertEqual(touched + pointed, 10)
+
+    def test_toys_lie_within_easy_reach_of_every_body(self):
+        for body in ("small", "medium", "large"):
+            with self.subTest(body=body):
+                sim = self.launch(plan(block("find", rounds=3, difficulty=0.6, pins={"spacing": 1.4}, ray=False)),
+                                  profile=f"test_sim_find_reach_{body}", body=body)
+                child = Child(sim, body=body, seed=6)
+                for _ in range(3):
+                    started = sim.run_until("trial_started")
+                    toys = sim.observe()["stimuli"]["targets"]
+                    self.assertEqual(len(toys), int(started["condition"]["values"]["clutter"]) + 1, "a crowded level still fits")
+                    for toy in toys:
+                        self.assertTrue(self.easy(child.actor.body, tuple(toy["centre"])), f"{body}: {toy['id']} without stretching")
+                    child.play_round(started, ["right"])
+                sim.close()
+
+    @staticmethod
+    def easy(body, point):
+        for side in ("left", "right"):
+            try:
+                body.check_reach(side, point, comfortable=True)
+                return True
+            except ConstraintError:
+                pass
+        return False
+
+    def test_same_toys_but_one_colour_a_little_different(self):
+        sim = self.launch(plan(block("find", rounds=3, difficulty=0.45, pins={"same_shape": 1.0, "colour_gap": 0.04})))
+        child = Child(sim, seed=7)
+        for _ in range(3):
+            started = sim.run_until("trial_started")
+            toys = sim.observe()["stimuli"]["targets"]
+            said = [e["text"] for e in sim.events("said", since=started["seq"] - 2)]
+            self.assertTrue(any(text.endswith(" with a different colour!") for text in said), said)
+            odd = [toy for toy in toys if toy["id"].endswith("_odd")]
+            others = [toy for toy in toys if toy not in odd]
+            self.assertEqual((len(odd), started["condition"]["values"]["target"]), (1, "odd"))
+            self.assertEqual(len({toy["id"].split("_", 2)[2] for toy in others}), 1, "one shape")
+            self.assertTrue(all(math.dist(toy["extent"], odd[0]["extent"]) < 1e-4 for toy in others), "the different one too")
+            self.assertEqual(len({tuple(round(c, 4) for c in toy["colour"]) for toy in others}), 1, "one colour")
+            gap = abs(ok_hue(odd[0]["colour"]) - ok_hue(others[0]["colour"]))
+            self.assert_close(min(gap, 1.0 - gap), 0.04, 0.002, "a little round the colour wheel")
+            child.play_round(started, ["wrong", "right"])
+            self.assertIn("That one is like the others. Find the different one!", [e["text"] for e in sim.events("said", since=started["seq"])])
+        ends = self.round_ends(sim)
+        self.assertTrue(all(e["success"] and e["data"]["picks"][-1] == "odd" for e in ends))
+        self.assert_log_ok(sim)
 
     def test_without_a_table_in_reach_toys_go_on_a_patch_in_front(self):
         sim = self.launch(plan(block("find", rounds=1)), seat=(0.0, 1.0, 0))

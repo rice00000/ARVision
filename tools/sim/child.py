@@ -20,6 +20,7 @@ from body import PROFILES, ConstraintError, add, degrees_between, distance, mul,
 from policy import FLOWS, Perception, Policy
 
 FIND_LINE = re.compile(r"^Find the (.+)!$")
+ODD_LINE = re.compile(r"^Find the (.+) with a different colour!$")
 POINT_LINE = re.compile(r"^Point at the (.+) and pinch your fingers\.$")
 SCAN = [0, -35, 35, -60, 60]
 
@@ -102,9 +103,10 @@ class Child:
             target, others = self.toys(started, observation)
             if target is None:
                 return 1.0 / (len(others) or 1)  # never heard which: a guess
-            same = trial["condition"]["values"]["same_colour"] > 0.5
-            return self.policy.find_odds(eye, target, others, view, trial["hint"], target["glow"], same,
-                                         observation["work_surface"]["position"])
+            values = trial["condition"]["values"]
+            gap = values["colour_gap"] if values["same_shape"] > 0.5 else None
+            return self.policy.find_odds(eye, target, others, view, trial["hint"], target["glow"],
+                                         values["same_colour"] > 0.5, observation["work_surface"]["position"], gap)
         if kind.startswith("motion"):
             cloud = observation["stimuli"]["cloud"]
             values = trial["condition"]["values"]
@@ -162,7 +164,7 @@ class Child:
     def toys(self, started, observation):
         """The named toy (None if the child did not hear or see which) and the others."""
         toys = observation["stimuli"]["targets"]
-        heard = self.heard(started, FIND_LINE)
+        heard = "odd" if self.heard(started, ODD_LINE) else self.heard(started, FIND_LINE)
         hinted = observation["session"]["trial"]["hint"] > 0 and observation["stimuli"]["named"]
         named = heard or hinted  # the guide said it, or the help shows it
         target = next((toy for toy in toys if named and toy["id"].endswith("_" + named)), None)

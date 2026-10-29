@@ -130,11 +130,14 @@ static func stimuli() -> Dictionary:
 static func target(node: Target) -> Dictionary:
 	var box := AABB()
 	var glow := false
+	var colour := Color.TRANSPARENT
 	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
 		var part := mesh.global_transform * mesh.get_aabb()
 		box = part if box.size == Vector3.ZERO else box.merge(part)
 		var material := mesh.material_override as StandardMaterial3D
 		glow = glow or (material != null and material.emission_enabled)
+		if material:
+			colour = material.albedo_color
 	var radius := 0.0
 	for shape: CollisionShape3D in node.find_children("*", "CollisionShape3D", false, false):
 		if shape.shape is SphereShape3D:
@@ -142,7 +145,7 @@ static func target(node: Target) -> Dictionary:
 		elif shape.shape is BoxShape3D:
 			radius = (shape.shape as BoxShape3D).size.length() * 0.5
 	return {id = node.id, position = node.global_position, centre = box.get_center(), extent = box.size,
-		radius = radius, glow = glow, visible = node.is_visible_in_tree()}
+		radius = radius, glow = glow, colour = colour, visible = node.is_visible_in_tree()}
 
 
 static func dots(cloud: GPUParticles3D) -> Dictionary:
@@ -172,12 +175,17 @@ static func real_objects() -> Array:
 
 
 static func panel(facilitator: Node) -> Dictionary:
-	var result := {open = facilitator.is_open, status = "", buttons = []}
+	var result := {open = facilitator.is_open, status = "", playing = "", name = "", buttons = []}
 	if facilitator.is_open:
 		var node := facilitator.get_node(^"FacilitatorPanel")
 		result.status = (facilitator.get("_status") as Label3D).text
-		for button: Target in node.get_children().filter(func(child: Node) -> bool: return child is Target):
-			result.buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z})
+		result.playing = (facilitator.get("_playing") as Label3D).text
+		result.name = (facilitator.get("_name") as Label3D).text
+		var disabled: Dictionary = facilitator.get("_disabled")
+		for button: Target in node.find_children("*", "Target", true, false):
+			result.buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
+				text = (button.find_children("*", "Label3D", false, false)[0] as Label3D).text,
+				disabled = disabled.get(button, false)})
 	return result
 
 

@@ -42,7 +42,7 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Table", timeout=5)
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
-                         [("task_find_toys_1", True), ("task_find_toys_2", False)], "the table's own list")
+                         [(f"task_find_toys_{n}", n == 1) for n in range(1, 6)], "the table's own list")
         self.press(sim, actor, "task_find_toys_2")
         self.assertIn("still locked", self.last_said(sim))
         self.press(sim, actor, "task_find_toys_1")
@@ -58,7 +58,8 @@ class Adventure(SimCase):
         self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (1, "A little colour"))
         self.assertTrue(world["guide"]["visible"], "the wall opened: the guide points behind")
         self.assertIn("behind you", self.last_said(sim))
-        self.assertEqual([b["open"] for b in world["menu"]["buttons"]], [True, True], "level 2 opened here too")
+        self.assertEqual([b["open"] for b in world["menu"]["buttons"]], [True, True, False, False, False],
+                         "level 2 opened here too")
 
         actor.swivel(180)
         world = self.menu_at(sim, "Behind you", timeout=5)

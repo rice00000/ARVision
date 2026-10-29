@@ -68,9 +68,9 @@ func test_facilitator_pauses_and_pins_the_level() -> void:
 	input.menu()
 	expect(get_tree().paused, "panel pauses play")
 	var panel := App.module(&"Facilitator").get_node(^"FacilitatorPanel")
-	await select((panel.get_node(^"fac_harder") as Node3D).global_position)
+	await select((panel.find_child("fac_harder", true, false) as Node3D).global_position)
 	expect(is_equal_approx(App.session.level(), before + 0.1), "Harder pins the level up")
-	await select((panel.get_node(^"fac_close") as Node3D).global_position)
+	await select((panel.find_child("fac_close", true, false) as Node3D).global_position)
 	expect(not get_tree().paused, "Close resumes play")
 
 

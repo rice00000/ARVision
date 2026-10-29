@@ -26,13 +26,23 @@ script = ExtResource("2_axis")
 name = &"same_colour"
 easy = 0.0
 
+[sub_resource type="Resource" id="same_shape"]
+script = ExtResource("2_axis")
+name = &"same_shape"
+easy = 0.0
+
+[sub_resource type="Resource" id="colour_gap"]
+script = ExtResource("2_axis")
+name = &"colour_gap"
+easy = 0.08
+
 [resource]
 script = ExtResource("1_def")
 title = "Find it"
 scene = ExtResource("3_scene")
 skill = &"objects_in_clutter"
-axes = Array[ExtResource("2_axis")]([SubResource("clutter"), SubResource("size"), SubResource("spacing"), SubResource("same_colour")])
-notes = "Clutter is the driven axis. Size, spacing and colour stay fixed so a failure points at clutter. Toys sit on the real table (room scan) or a virtual patch in front."
+axes = Array[ExtResource("2_axis")]([SubResource("clutter"), SubResource("size"), SubResource("spacing"), SubResource("same_colour"), SubResource("same_shape"), SubResource("colour_gap")])
+notes = "Clutter is the driven axis. Size, spacing and colour stay fixed within a block so a failure points at clutter; task levels pin same_colour (shape only), same_shape and colour_gap (colour only). Toys sit on the real table (room scan) or a virtual patch in front."
 hint_after = 7.0
 hint_fade = 1.0
 max_hint = 2

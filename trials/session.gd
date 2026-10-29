@@ -26,8 +26,7 @@ var block_index := -1
 var block: Block
 ## Its trial scene, or null between blocks.
 var trial: Trial
-## Level pinned for the rest of this play, by the level the child chose or by
-## the facilitator; NAN = not pinned (the staircase moves).
+## Level pinned for the rest of this play by the facilitator; NAN = not pinned.
 var pinned := NAN
 var running := false
 
@@ -49,11 +48,10 @@ func run() -> void:
 	_offer_replay()
 
 
-## Plays [param session_plan] once, every round at [param at_level] when given
-## (a level the child chose), else as [method level] says.
-func play(session_plan: SessionPlan, at_level := NAN) -> void:
+## Plays [param session_plan] once, every round as [method level] says.
+func play(session_plan: SessionPlan) -> void:
 	plan = session_plan
-	pinned = at_level
+	pinned = NAN
 	running = true
 	await _announce(plan.greeting)
 	if not App.reality.is_settled:

@@ -34,7 +34,7 @@ func scatter(count: int, spacing: float, margin: float, rng: RandomNumberGenerat
 		free: Callable = func(_point: Vector3) -> bool: return true) -> Array[Vector3]:
 	var half := (size * 0.5 - Vector2.ONE * margin).max(Vector2.ZERO)
 	var points: Array[Vector3] = []
-	for attempt in count * 60:
+	for attempt in count * 200:
 		if points.size() == count:
 			break
 		var candidate := transform * Vector3(rng.randf_range(-half.x, half.x), 0.0, rng.randf_range(-half.y, half.y))

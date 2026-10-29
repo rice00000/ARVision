@@ -30,9 +30,9 @@ Session ─ waits for App.reality.settled (the table is known, or the search gav
 - **Probe blocks** are unaided and do not move the level: no-help check-ins.
 - **Help** escalates by itself (`hint_after`, later each round) or when the child raises a hand; every hint is logged.
 - **Log:** `user://profiles/<id>/logs/*.jsonl`, every round with its full condition and view.
-- **Save:** `user://profiles/<id>/save.json` (staircase levels, the adventure's progress), written through a temporary file.
+- **Save:** `user://profiles/<id>/save.json` (staircase levels, the adventure's progress), written through a temporary file. `user://profiles.cfg` lists the saves and the one in use (`Profile`, as in XRVision). Opening another save writes everything, then `Main.restart` frees the Session, World and stage and builds them fresh on the new files; room, rig and modules stay.
 
-Without a plan the [World](world.md) chooses: it plays one `Task` at a time with `Session.play(plan, level)`.
+Without a plan the [World](world.md) chooses: it plays one `Task` level (a plan) at a time with `Session.play(plan)`.
 
 ## Modules
 
@@ -41,7 +41,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
 - **Feedback:** sound, shape mark and vibration for good / bad / hint.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; remote backend posts frames to `tools/cv_server.py` (YOLO). Labels are COCO names in both.
-- **Facilitator:** in-headset panel: level, view, skip; pauses play.
+- **Facilitator:** in-headset panel, pauses play. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
 
 ## Not verified on a headset yet
 

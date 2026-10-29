@@ -54,3 +54,30 @@ func test_progress_is_saved_and_wiped() -> void:
 	Profile.wipe()
 	expect(not DirAccess.dir_exists_absolute(Profile.path()), "folder gone")
 	expect_eq(Profile.level(SKILL), Profile.START_LEVEL, "levels forgotten")
+
+
+func test_each_save_keeps_its_own_progress_and_switching_starts_a_fresh_game() -> void:
+	await boot()
+	var first := Profile.id
+	App.world.done = {&"find_toys": [0]}
+	Profile.adapt(SKILL, false, 2, 0.1)
+	var second := Profile.new_save("Ben")
+	expect_eq(Profile.saves(), [first, second], "listed, oldest first")
+	expect_eq([Profile.label(second), Profile.label(Profile.new_save())], ["Ben", "Save 2"], "named, else numbered")
+	var world := App.world
+	Profile.switch(second)
+	await frames(2)
+	expect_eq(Profile.id, second, "playing the new save")
+	expect(App.world != world and is_instance_valid(App.world), "a fresh world")
+	expect_eq([App.world.done, Profile.level(SKILL)], [{}, Profile.START_LEVEL], "starts from nothing")
+	App.world.done = {&"break_wall": [1]}
+	Profile.switch(first)
+	await frames(2)
+	expect_eq([App.world.done, Profile.level(SKILL)], [{&"find_toys": [0]}, 0.2], "the first save as it was left")
+	var copied := Profile.copy("Checkpoint")
+	expect(FileAccess.file_exists("%s%s/save.json" % [Profile.ROOT, copied]), "a copy of what is on disk")
+	Profile.switch(second)
+	await frames(2)
+	expect_eq(App.world.done, {&"break_wall": [1]}, "the second save was written when it was left")
+	Profile.switch(first)
+	await frames(2)

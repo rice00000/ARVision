@@ -11,10 +11,10 @@
   "limits": {"fov_h": 100, "fov_v": 90, "view_margin": 4, "hand_radius": 0.04, "torso_radius": 0.11, "path_step": 0.02},
   "perceptions": [
     {"name": "strong", "acuity": 0.8, "accuracy": 0.99, "clutter_cost": 0.002, "motion_threshold": 0.12, "motion_slope": 0.03, "depth_cost": 0.02,
-     "aim_error": 0.8, "asks_help_after": 2, "freeze": 0.0, "touch": 0.3, "search": 0.15, "fumble": 0.0},
+     "aim_error": 0.8, "asks_help_after": 2, "freeze": 0.0, "touch": 0.3, "search": 0.15, "fumble": 0.0, "colour_gap": 0.015},
     {"name": "typical", "acuity": 1.5, "accuracy": 0.85, "clutter_cost": 0.025, "motion_threshold": 0.35, "motion_slope": 0.08, "depth_cost": 0.08,
-     "aim_error": 1.5, "asks_help_after": 2, "freeze": 0.03, "touch": 0.3, "search": 0.3, "fumble": 0.05},
+     "aim_error": 1.5, "asks_help_after": 2, "freeze": 0.03, "touch": 0.3, "search": 0.3, "fumble": 0.05, "colour_gap": 0.035},
     {"name": "weak", "acuity": 3.0, "accuracy": 0.25, "clutter_cost": 0.08, "motion_threshold": 0.95, "motion_slope": 0.05, "depth_cost": 0.1,
-     "aim_error": 2.5, "asks_help_after": 0, "freeze": 0.0, "touch": 0.0, "search": 0.5, "fumble": 0.0}
+     "aim_error": 2.5, "asks_help_after": 0, "freeze": 0.0, "touch": 0.0, "search": 0.5, "fumble": 0.0, "colour_gap": 0.09}
   ]
 }

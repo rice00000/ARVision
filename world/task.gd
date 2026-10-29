@@ -1,15 +1,15 @@
 class_name Task
 extends Resource
-## Something the child can choose at a [Place]: a [SessionPlan] played at one
-## of [member levels]. Lives in content/tasks/; the file name is its id.
+## Something the child can choose at a [Place]: one [SessionPlan] per level.
+## Lives in content/tasks/; the file name is its id.
 ##
 ## Locked until every task in [member requires] is done at some level. Level 1
 ## is open once the task is; each next level opens when the one before is done.
 
 @export var title := ""
-@export var plan: SessionPlan
-## The difficulty (0-1) each level runs every round at, easiest first.
-@export var levels: PackedFloat32Array = [0.1, 0.5]
+## Easiest first. Each block sets its own [member Block.difficulty] and
+## [member Block.pins], so a level can change more than how hard it is.
+@export var levels: Array[SessionPlan] = []
 @export var requires: Array[Task] = []
 
 ## Steps of colour given back the first time the task is done.

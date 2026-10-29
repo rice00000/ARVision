@@ -54,6 +54,12 @@ func work_surface() -> Surface:
 	for table in surfaces(&"table"):
 		if table.transform.origin.distance_to(eye.origin) < TABLE_REACH:
 			return table
+	return patch()
+
+
+## A virtual patch [constant REACH] in front of the eyes and [constant BELOW_EYE] below them.
+func patch() -> Surface:
+	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	var centre := eye.origin + forward * REACH + Vector3.DOWN * BELOW_EYE
 	return Surface.new(&"table", Transform3D(Basis.looking_at(forward), centre), Vector2(0.8, 0.5))
