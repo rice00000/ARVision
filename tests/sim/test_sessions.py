@@ -24,7 +24,7 @@ class ShippedPlans(SimCase):
         self.assertEqual(views, ["Normal"] * 8 + ["High contrast"] * 3 + ["Spotlight"] * 3 + ["Normal"] * 7)
         said = [e["text"] for e in sim.events("said")]
         self.assertEqual(said[0], "Hi! Let's play a seeing game.")
-        self.assertEqual(said[-1], "All done. Great work today!")
+        self.assertEqual(said[-2:], ["All done. Great work today!", "To play again, touch the yellow ball."])
         lines = self.assert_log_ok(sim)
         self.assertEqual(lines[-1]["type"], "session_end")
         self.assertEqual(sum(1 for line in lines if line["type"] == "trial_end"), 21)

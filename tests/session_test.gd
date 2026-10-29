@@ -160,3 +160,25 @@ func test_no_help_by_itself_when_hint_after_is_zero() -> void:
 	expect(App.session.trial.is_running(), "and no time limit either")
 	await raise_hand(&"left")
 	expect_eq(hints.size(), 1, "a raised hand still asks")
+
+
+# -- the end ------------------------------------------------------------------
+
+func test_the_play_again_ball_runs_the_plan_again() -> void:
+	var plan := plan_of(FIND, 1)
+	plan.blocks.clear()
+	await boot(plan)
+	var finished := record(Events.session_finished)
+	var said := record(Events.said)
+	App.session.run()
+	expect(await until(func() -> bool: return finished.size() == 1), "the session ends")
+	await frames(1)
+	var buttons := App.stage.find_children("*", "ReplayButton", true, false)
+	expect_eq(buttons.size(), 1, "a play-again ball")
+	expect(said.back()[0].contains("play again"), "and the guide says so: %s" % said.back()[0])
+	var ball: Node3D = buttons[0]
+	expect(ball.global_position.distance_to(App.head().global_position) < 0.5, "within reach")
+	await select(ball.global_position)
+	expect(await until(func() -> bool: return finished.size() == 2), "played again")
+	await frames(1)
+	expect_eq(App.stage.find_children("*", "ReplayButton", true, false).size(), 1, "the old ball is gone, a new one waits")

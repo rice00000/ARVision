@@ -39,6 +39,8 @@ func _ready() -> void:
 func run() -> void:
 	running = true
 	await _announce(plan.greeting)
+	if not App.reality.is_settled:
+		await App.reality.settled # toys placed before the table is known land on the lap
 	for index in plan.blocks.size():
 		block_index = index
 		block = plan.blocks[index]
@@ -47,6 +49,21 @@ func run() -> void:
 	running = false
 	await _announce(plan.farewell)
 	Events.session_finished.emit()
+	_offer_replay()
+
+
+## A "Play again" ball in reach in front of the child; pressed, the plan runs again.
+func _offer_replay() -> void:
+	var button := ReplayButton.new()
+	App.stage.add_child(button)
+	var eye := App.head().global_transform
+	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	button.global_position = eye.origin + forward * 0.4 + Vector3.DOWN * 0.15
+	Events.say("To play again, touch the yellow ball.")
+	await button.pressed
+	button.queue_free()
+	Events.report(&"replay")
+	run()
 
 
 ## The level the next round runs at.

@@ -35,6 +35,7 @@ func kind() -> String:
 
 
 func _ready() -> void:
+	is_settled = false
 	get_viewport().transparent_bg = true
 	var environment := get_world_3d().environment
 	environment.background_mode = Environment.BG_COLOR
@@ -82,6 +83,9 @@ const HAND_TABLE_SECONDS := 1.0
 const HAND_TABLE_SIZE := Vector2(1.0, 0.6)
 ## Seconds after "room_ready" without a table before the child is asked for the hands.
 const ASK_HANDS_AFTER := 6.0
+## Seconds after asking for the hands before play starts on the virtual patch;
+## a table found later still takes the toys from the next round.
+const GIVE_UP_AFTER := 10.0
 ## The depth looks this far around the hands for the table top, metres.
 const HAND_TABLE_RADIUS := 0.35
 ## Points on the table top around the hands it must see, when it sees the place at all.
@@ -167,18 +171,22 @@ func _set_table(at: Vector3, size: Vector2, how: StringName) -> void:
 	add_surface(Surface.new(&"table", Transform3D(Basis.looking_at(forward), at), size, _depth))
 	Events.say("Got it. That's your table.")
 	note(how, {centre = at, size = size})
+	_settle()
 
 
 func _room_ready() -> void:
 	var surface := work_surface()
 	_depth.start()
-	if not surface in _surfaces:
+	if surface in _surfaces:
+		_settle()
+	else:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
 		_depth.refreshed.connect(_look_for_table)
 		get_tree().create_timer(ASK_HANDS_AFTER).timeout.connect(func() -> void:
 			if not _found_table:
 				_hands_asked = true
 				Events.say("Put both hands flat on the table for a moment."))
+		get_tree().create_timer(ASK_HANDS_AFTER + GIVE_UP_AFTER).timeout.connect(_settle)
 	note(&"room_ready", {head = App.head().global_position, surfaces = _surfaces.size(),
 		camera = {feeds = CameraServer.get_feed_count(), frame = camera_frame() != null},
 		work_surface = {kind = surface.kind, scanned = surface in _surfaces, centre = surface.transform.origin,

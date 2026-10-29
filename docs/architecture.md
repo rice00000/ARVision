@@ -20,7 +20,7 @@ Input works the same way: on a Quest the headset moves the `Rig`; without one, `
 ## A session
 
 ```text
-Session ─ Block ─▶ apply View ─▶ instance trial scene ─▶ per round:
+Session ─ waits for App.reality.settled (the table is known, or the search gave up) ─ Block ─▶ apply View ─▶ instance trial scene ─▶ per round:
    TrialDef.condition(level) ─▶ Trial.begin ─▶ child input (Events) ─▶ Trial.finish
    ─▶ Events.trial_ended ─▶ Log line, Profile.adapt (2-up / 1-down)
 ```

@@ -19,8 +19,13 @@ const TABLE_REACH := 1.2
 ## [method hit] looks this far along a ray, metres.
 const HIT_RANGE := 6.0
 
+## The work surface is decided: a real table was found, or the search gave up.
+signal settled
+
 ## How the real world is shown now. Change it with [method apply_view].
 var view := View.new()
+## Until true, [method work_surface] may still change; the session waits for [signal settled].
+var is_settled := true
 
 var _surfaces: Array[Surface] = []
 var _focus := Vector3.ZERO
@@ -76,6 +81,13 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 func add_surface(surface: Surface) -> void:
 	_surfaces.append(surface)
+
+
+func _settle() -> void:
+	if is_settled:
+		return
+	is_settled = true
+	settled.emit()
 
 
 ## Shows the real world through [param new_view] from now on.
