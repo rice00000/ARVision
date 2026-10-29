@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Place" format=3]
+
+[ext_resource type="Script" path="res://world/place.gd" id="1_place"]
+[ext_resource type="Resource" path="res://content/tasks/find_toys.tres" id="2_find_toys"]
+[ext_resource type="Resource" path="res://content/tasks/break_wall.tres" id="3_break_wall"]
+[ext_resource type="Script" path="res://world/task.gd" id="4_task"]
+
+[resource]
+script = ExtResource("1_place")
+title = "Table"
+turn_to = "This way! Turn to the table."
+arrive = "Here is the table. Touch a number to pick a game."
+tasks = Array[ExtResource("4_task")]([ExtResource("2_find_toys"), ExtResource("3_break_wall")])

@@ -8,7 +8,8 @@
 [ext_resource type="Script" path="res://modules/cv/detector.gd" id="6_detector"]
 [ext_resource type="Script" path="res://modules/facilitator/facilitator.gd" id="7_facilitator"]
 [ext_resource type="Script" path="res://trials/session.gd" id="8_session"]
-[ext_resource type="Resource" path="res://content/sessions/tech_demo.tres" id="9_plan"]
+[ext_resource type="Script" path="res://world/world.gd" id="9_world"]
+[ext_resource type="Resource" path="res://content/adventure.tres" id="18_adventure"]
 [ext_resource type="Resource" path="res://content/views/normal.tres" id="10_normal"]
 [ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="11_contrast"]
 [ext_resource type="Resource" path="res://content/views/greyscale.tres" id="12_grey"]
@@ -58,4 +59,7 @@ views = Array[ExtResource("17_view")]([ExtResource("10_normal"), ExtResource("11
 
 [node name="Session" type="Node" parent="."]
 script = ExtResource("8_session")
-plan = ExtResource("9_plan")
+
+[node name="World" type="Node" parent="."]
+script = ExtResource("9_world")
+adventure = ExtResource("18_adventure")

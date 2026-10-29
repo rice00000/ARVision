@@ -25,6 +25,7 @@ static func everything(clock: float, seq: int) -> Dictionary:
 		real_objects = real_objects(),
 		detections = detector.detections.map(func(found: Detection) -> Dictionary: return found.to_log()) if detector else [],
 		facilitator = panel(facilitator) if facilitator else null,
+		world = world(),
 		subtitle = subtitle(),
 	})
 
@@ -57,7 +58,8 @@ static func surface(found: Surface) -> Dictionary:
 
 static func session() -> Dictionary:
 	var running := App.session
-	var result := {running = running.running, block_index = running.block_index, blocks = running.plan.blocks.size(),
+	var result := {running = running.running, block_index = running.block_index,
+		blocks = running.plan.blocks.size() if running.plan else 0,
 		pinned = null if is_nan(running.pinned) else running.pinned, block = null, level = null, trial = null}
 	if running.block:
 		var block := running.block
@@ -74,11 +76,35 @@ static func session() -> Dictionary:
 	return result
 
 
-## Staircase level of every skill the plan trains.
+## Staircase level of every skill the plan (or the adventure's tasks) trains.
 static func levels() -> Dictionary:
+	var plans: Array[SessionPlan] = []
+	if App.session.plan:
+		plans.append(App.session.plan)
+	else:
+		for place in App.world.adventure.places:
+			plans.append_array(place.tasks.map(func(task: Task) -> SessionPlan: return task.plan))
 	var result := {}
-	for block in App.session.plan.blocks:
-		result[block.trial.skill] = Profile.level(block.trial.skill)
+	for plan in plans:
+		for block in plan.blocks:
+			result[block.trial.skill] = Profile.level(block.trial.skill)
+	return result
+
+
+## The adventure: progress, the guide and the open task menu with its buttons.
+static func world() -> Dictionary:
+	var world := App.world
+	var guide: Node3D = world.get("_guide")
+	var result := {done = world.done, colour = world.colour, stones = world.stones,
+		place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
+		menu = null}
+	if world.menu and world.menu.is_inside_tree():
+		var buttons := []
+		for button: Target in world.menu.find_children("task_*", "Target", false, false):
+			var entry: Array = world.menu.get("_buttons")[button]
+			buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
+				open = world.can_play(entry[0], entry[1]), done = world.is_done(entry[0], entry[1])})
+		result.menu = {open = world.menu.get("_open"), buttons = buttons}
 	return result
 
 

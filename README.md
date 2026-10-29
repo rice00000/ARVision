@@ -11,7 +11,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<child>`, `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Tech demo** (the default session, `content/sessions/tech_demo.tres`, about 2 min): find toys under four views, then sweep with the dots to break the wall. For the training session, set `Session.plan` in `main.tscn` back to `demo.tres`.
+**The adventure** (default, `content/adventure.tres`; [world](docs/world.md)): the room starts black and white. A yellow orb points the way to the table; turn to face it and its menu unfolds. Touch a number (or point and pinch) to play a game at that level. Each game done brings colour back and earns magic stones; the next level and the next game unlock as you go. Progress is saved per child. A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` (find toys under four views, then break the wall) or `demo.tres` (training).
 
 **Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, touch the yellow ball to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
 
@@ -26,12 +26,13 @@ Runs every suite headlessly on `test` profiles: GDScript unit tests and whole se
 ## Where things are
 
 ```text
-core/      Events (signal bus), App, Profile, Log, Module
+core/      Events (signal bus), App, Profile, Save, Log, Module
 rig/       head and hands, Pointer, Target, SimInput, DesktopDriver
 reality/   Reality API: PassthroughReality (Quest), SimReality + rooms/ (no headset), View, Surface
 modules/   voice, feedback, cv (Detector), facilitator: each one unpluggable
 trials/    Trial, TrialDef, Session; one folder per trial
-content/   views/ and sessions/ presets
+world/     World, Guide, TaskMenu; Adventure, Place, Task
+content/   adventure.tres, places/, tasks/, views/, sessions/
 tests/     unit tests, sim/ scenarios      tools/  test runner, sim/ simulated child, CV server
 ```
 
@@ -42,6 +43,8 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Trial:** `trials/<kind>/` with a scene whose root extends `Trial` and a `TrialDef` `.tres`; add a `Block` to a session plan.
 - **View preset:** a `View` `.tres` in `content/views/`.
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
+- **Task:** a `Task` `.tres` in `content/tasks/` (a plan, levels, what it needs, rewards); add it to a `Place` in `content/places/`.
+- **Saved state:** `save_state()` / `load_state()` on a node ([Save](core/save.gd), as in XRVision).
 - **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.

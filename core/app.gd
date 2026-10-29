@@ -12,6 +12,7 @@ var rig: Rig
 var reality: Reality
 var stage: Node3D
 var session: Session
+var world: World
 ## Synthetic hands when there is no headset (desktop and tests). Null in XR.
 var sim_input: SimInput
 

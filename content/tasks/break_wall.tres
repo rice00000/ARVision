@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="Task" format=3]
+
+[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" path="res://trials/motion/motion_demo.tres" id="4_motion"]
+[ext_resource type="Resource" path="res://content/tasks/find_toys.tres" id="5_find_toys"]
+
+[sub_resource type="Resource" id="wall"]
+script = ExtResource("3_block")
+trial = ExtResource("4_motion")
+ray = false
+rounds = 3
+intro = "Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"
+pause_between = 3.0
+
+[sub_resource type="Resource" id="plan"]
+script = ExtResource("2_plan")
+title = "Break the wall"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("wall")])
+
+[resource]
+script = ExtResource("1_task")
+title = "Break the wall"
+plan = SubResource("plan")
+levels = PackedFloat32Array(0.0, 0.3, 0.6)
+requires = Array[ExtResource("1_task")]([ExtResource("5_find_toys")])
+colour = 1

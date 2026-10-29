@@ -65,9 +65,6 @@ class ResearchLog(SimCase):
 
 
 class Profiles(SimCase):
-    def progress(self, sim):
-        return json.loads((Path(sim.profile_dir) / "progress.json").read_text(encoding="utf-8"))
-
     def test_levels_persist_across_a_relaunch(self):
         spec = plan(block("find", rounds=2))
         first = self.launch(spec, profile="test_sim_persist")
@@ -76,10 +73,10 @@ class Profiles(SimCase):
         first_log = first.observe()["log_path"]
         first.close(keep_profile=True)
         again = self.launch(spec, profile="test_sim_persist", keep_profile=True)
-        self.assertAlmostEqual(again.observe()["levels"]["objects_in_clutter"], 0.4, msg="read back from progress.json")
+        self.assertAlmostEqual(again.observe()["levels"]["objects_in_clutter"], 0.4, msg="read back from save.json")
         Child(again, seed=2).play(scripts={("find", 0): ["right"], ("find", 1): ["wrong", "right"]})
         self.assertEqual([round(e["data"]["level"], 6) for e in self.round_ends(again)], [0.4, 0.4])
-        self.assertAlmostEqual(self.progress(again)["levels"]["objects_in_clutter"], 0.3)
+        self.assertAlmostEqual(again.observe()["levels"]["objects_in_clutter"], 0.3)
         logs = sorted((Path(again.profile_dir) / "logs").glob("*.jsonl"))
         sessions = [line for path in logs for line in research_log.read(path) if line["type"] == "session"]
         self.assertEqual(len(sessions), 2, "both runs are in the profile's logs")
@@ -91,8 +88,8 @@ class Profiles(SimCase):
         Child(asha, seed=1).play(scripts={"find": ["right"]})
         ravi = self.launch(spec, profile="test_sim_ravi")
         Child(ravi, seed=2).play(scripts={"find": ["wrong", "right"]})
-        self.assertAlmostEqual(self.progress(asha)["levels"]["objects_in_clutter"], 0.4)
-        self.assertAlmostEqual(self.progress(ravi)["levels"]["objects_in_clutter"], 0.1)
+        self.assertAlmostEqual(asha.observe()["levels"]["objects_in_clutter"], 0.4)
+        self.assertAlmostEqual(ravi.observe()["levels"]["objects_in_clutter"], 0.1)
         self.assertNotEqual(asha.profile_dir, ravi.profile_dir)
         for sim in (asha, ravi):
             lines = self.assert_log_ok(sim)

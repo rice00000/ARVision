@@ -15,7 +15,7 @@ Input works the same way: on a Quest the headset moves the `Rig`; without one, `
 
 ## Layers
 
-`core` ← `rig`, `reality` ← `modules`, `trials` ← `content`. Modules and trials never call each other; they talk through `Events`. `App.module(name)` returns an optional module or null.
+`core` ← `rig`, `reality` ← `modules`, `trials` ← `world` ← `content`. Modules and trials never call each other; they talk through `Events`. `App.module(name)` returns an optional module or null.
 
 ## A session
 
@@ -30,6 +30,9 @@ Session ─ waits for App.reality.settled (the table is known, or the search gav
 - **Probe blocks** are unaided and do not move the level: no-help check-ins.
 - **Help** escalates by itself (`hint_after`, later each round) or when the child raises a hand; every hint is logged.
 - **Log:** `user://profiles/<id>/logs/*.jsonl`, every round with its full condition and view.
+- **Save:** `user://profiles/<id>/save.json` (staircase levels, the adventure's progress), written through a temporary file.
+
+Without a plan the [World](world.md) chooses: it plays one `Task` at a time with `Session.play(plan, level)`.
 
 ## Modules
 

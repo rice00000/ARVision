@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="Task" format=3]
+
+[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" path="res://trials/find/find.tres" id="4_find"]
+
+[sub_resource type="Resource" id="find"]
+script = ExtResource("3_block")
+trial = ExtResource("4_find")
+ray = false
+rounds = 3
+intro = "Find the toy I name. Reach out and grab it. Raise your hand if you need help."
+pause_between = 1.0
+
+[sub_resource type="Resource" id="plan"]
+script = ExtResource("2_plan")
+title = "Find the toys"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("find")])
+
+[resource]
+script = ExtResource("1_task")
+title = "Find the toys"
+plan = SubResource("plan")
+levels = PackedFloat32Array(0.1, 0.4, 0.7)
+colour = 1

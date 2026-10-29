@@ -9,18 +9,25 @@ extends Node
 ## solved round alone says little. Each block shows the real world through its
 ## [View]. The facilitator steers it through the public methods.
 ##
+## With a plan (main.tscn's, or from the command line) it runs that plan and
+## offers to play it again. Without one, the World chooses tasks and plays each
+## with [method play].
+##
 ##   godot --path . -- --plan=res://content/sessions/demo.tres
 
 @export var plan: SessionPlan
-## Start once the app is up. Tests switch it off and call [method run].
+## Start once the app is up, when there is a plan. Tests switch it off and call [method run].
 @export var autostart := true
+## How the real world looks in blocks without their own [member Block.view].
+var base_view := View.new()
 
 var block_index := -1
 ## The block in progress, or null.
 var block: Block
 ## Its trial scene, or null between blocks.
 var trial: Trial
-## Level pinned by the facilitator for the rest of the session; NAN = not pinned.
+## Level pinned for the rest of this play, by the level the child chose or by
+## the facilitator; NAN = not pinned (the staircase moves).
 var pinned := NAN
 var running := false
 
@@ -32,11 +39,21 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--plan="):
 			plan = load(arg.trim_prefix("--plan="))
-	if autostart:
+	if autostart and plan:
 		run.call_deferred()
 
 
+## Plays [member plan], then offers to play it again.
 func run() -> void:
+	await play(plan)
+	_offer_replay()
+
+
+## Plays [param session_plan] once, every round at [param at_level] when given
+## (a level the child chose), else as [method level] says.
+func play(session_plan: SessionPlan, at_level := NAN) -> void:
+	plan = session_plan
+	pinned = at_level
 	running = true
 	await _announce(plan.greeting)
 	if not App.reality.is_settled:
@@ -49,7 +66,6 @@ func run() -> void:
 	running = false
 	await _announce(plan.farewell)
 	Events.session_finished.emit()
-	_offer_replay()
 
 
 ## A "Play again" ball in reach in front of the child; pressed, the plan runs again.
@@ -100,7 +116,7 @@ func _run_block() -> void:
 	if not missing.is_empty():
 		Events.report(&"block_skipped", {trial = def.id, missing = missing})
 		return
-	App.reality.apply_view(block.view if block.view else View.new())
+	App.reality.apply_view(block.view if block.view else base_view)
 	Events.block_started.emit(block_index, {trial = def.id, rounds = block.rounds, probe = block.probe})
 	trial = def.scene.instantiate()
 	trial.def = def

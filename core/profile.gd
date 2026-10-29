@@ -3,14 +3,16 @@ extends Node
 ##
 ##   godot --path . -- --profile=asha
 ##
-## Everything lives in user://profiles/<id>/: progress.json (one difficulty
-## level per skill) and logs/ (see Log). Tests use ids starting with "test".
+## Everything lives in user://profiles/<id>/: save.json (see Save; this node
+## keeps one difficulty level per skill there) and logs/ (see Log). Tests use
+## ids starting with "test".
 
 const DEFAULT_ID := &"dev"
 ## Level a skill starts at, 0 = easiest, 1 = hardest.
 const START_LEVEL := 0.3
 
 var id: StringName = DEFAULT_ID
+var save_key := "levels"
 
 var _levels: Dictionary[StringName, float] = {}
 var _streaks: Dictionary[StringName, int] = {}
@@ -20,11 +22,15 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--profile="):
 			id = StringName(arg.trim_prefix("--profile="))
-	var file := FileAccess.open(path("progress.json"), FileAccess.READ)
-	if file:
-		var data: Dictionary = JSON.parse_string(file.get_as_text())
-		_levels.assign(data.levels)
-		_streaks.assign(data.streaks)
+
+
+func save_state() -> Dictionary:
+	return {levels = _levels, streaks = _streaks}
+
+
+func load_state(data: Dictionary) -> void:
+	_levels.assign(data.get("levels", {}))
+	_streaks.assign(data.get("streaks", {}))
 
 
 ## Absolute path of [param file] inside this profile's folder.
@@ -50,23 +56,16 @@ func adapt(skill: StringName, success: bool, up_after: int, step: float) -> floa
 		next -= step
 		_streaks[skill] = 0
 	_levels[skill] = clampf(next, 0.0, 1.0)
-	_save()
+	Save.request()
 	return _levels[skill]
 
 
-## Deletes this profile's files and levels. Tests start from here.
+## Deletes this profile's files; everything saved starts fresh. Tests start from here.
 func wipe() -> void:
-	_levels.clear()
-	_streaks.clear()
 	Log.close()
 	if DirAccess.dir_exists_absolute(path()):
 		_remove(ProjectSettings.globalize_path(path()))
-
-
-func _save() -> void:
-	DirAccess.make_dir_recursive_absolute(path())
-	var file := FileAccess.open(path("progress.json"), FileAccess.WRITE)
-	file.store_string(JSON.stringify({levels = _levels, streaks = _streaks}, "\t"))
+	Save.reload()
 
 
 func _remove(folder: String) -> void:

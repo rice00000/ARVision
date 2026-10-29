@@ -3,9 +3,9 @@
     "win32": {"name": "Microsoft David Desktop", "rate": -1},
     "darwin": {"name": "Samantha", "rate": 175}
   },
-  "lines": [],
-  "say_sources": ["core", "reality", "modules", "trials"],
-  "resource_roots": ["content/sessions"],
+  "lines": ["1", "2", "3"],
+  "say_sources": ["core", "reality", "modules", "trials", "world"],
+  "resource_roots": ["content"],
   "word_lists": ["trials/find/find_trial.gd:SHAPES", "trials/point_real/point_real_trial.gd:labels"],
   "names": [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",

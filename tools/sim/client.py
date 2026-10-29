@@ -49,7 +49,8 @@ class SimError(RuntimeError):
 
 
 class Sim:
-    """One running app. `plan` is a plan name ("demo", "motion") or a plan spec dict."""
+    """One running app. `plan` is a plan name ("demo", "motion"), a plan spec dict, or None: the
+    World's adventure (places, task menus)."""
 
     def __init__(self, plan="demo", profile="test_sim", unplug=(), seat=None, eye=None, rendered=False,
                  keep_profile=False, out=None, cv_server=None):
@@ -69,7 +70,7 @@ class Sim:
             spec = self.out / "plan.json"
             spec.write_text(json.dumps(plan, indent=1), encoding="utf-8")
             args.append(f"--plan-spec={spec.as_posix()}")
-        else:
+        elif plan:
             args.append(f"--plan={PLANS[plan]}")
         if unplug:
             args.append("--unplug=" + ",".join(unplug))
