@@ -24,5 +24,5 @@ blocks = Array[ExtResource("3_block")]([SubResource("find")])
 script = ExtResource("1_task")
 title = "Find the toys"
 plan = SubResource("plan")
-levels = PackedFloat32Array(0.1, 0.4, 0.7)
+levels = PackedFloat32Array(0.1, 0.5)
 colour = 1

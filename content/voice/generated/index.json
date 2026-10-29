@@ -1,5 +1,5 @@
 {
-  "fingerprint": "5be8cb44f8928c86fc5f354d979a322179391ccf9e24039f70cd2b8a4f567dca",
+  "fingerprint": "9af3e4f14fa27b4609942528c67fdb99877f0865b650edc3074af45560b4610d",
   "clips": {
     "1": "res://content/voice/generated/d21947acd5d6b2ca25830ae4.ogg",
     "2": "res://content/voice/generated/9f8d4810ad1c015832841c6e.ogg",
@@ -16,6 +16,7 @@
     "baseball glove": "res://content/voice/generated/083f318d1485f5917795fa0a.ogg",
     "bear": "res://content/voice/generated/98a96559f232e0906322967b.ogg",
     "bed": "res://content/voice/generated/f3eeaacb48925eebf9874a7f.ogg",
+    "behind you": "res://content/voice/generated/ea0f5298b8051a10ee15afa2.ogg",
     "bench": "res://content/voice/generated/7c0287df88b865c989845e3a.ogg",
     "bicycle": "res://content/voice/generated/89b7f957938d7fb1026997d8.ogg",
     "bird": "res://content/voice/generated/6834ff6b71b091cc7fb0bd55.ogg",
@@ -61,7 +62,8 @@
     "greyscale": "res://content/voice/generated/d9d1e8b63f0d385f5ef33d75.ogg",
     "hair drier": "res://content/voice/generated/5ec939868bdea8bf3f5e72f1.ogg",
     "handbag": "res://content/voice/generated/6b7861cf9ee369ab9f069985.ogg",
-    "here is the table touch a number to pick a game": "res://content/voice/generated/149eef8d1ddce6c7dfa76f52.ogg",
+    "here is the table touch a number to pick a level": "res://content/voice/generated/1594e514624fdffd8ed3c0e8.ogg",
+    "here is the wall touch a number to pick a level": "res://content/voice/generated/3dc07bc408752ac449a911d2.ogg",
     "hi let's play a seeing game": "res://content/voice/generated/bf053f6a6c00eb35cea2e264.ogg",
     "high contrast": "res://content/voice/generated/0c15af6e99957c1204cd00ac.ogg",
     "horse": "res://content/voice/generated/ccfb1b672ed3a63b693cdc37.ogg",
@@ -112,6 +114,7 @@
     "skateboard": "res://content/voice/generated/cb3473e5ef86df9fc33e1e56.ogg",
     "skis": "res://content/voice/generated/ab9b89d69f9fe084096e3fb2.ogg",
     "snowboard": "res://content/voice/generated/60e9d8042572f4fd045debb3.ogg",
+    "something new is behind you turn around": "res://content/voice/generated/9b1acb828a1452810af796e1.ogg",
     "spoon": "res://content/voice/generated/680046c3cff941b0b880856e.ogg",
     "sports ball": "res://content/voice/generated/247dbb15c83dfedd528bd794.ogg",
     "spotlight": "res://content/voice/generated/2a4f679864bf72d36c3ad527.ogg",
@@ -146,7 +149,6 @@
     "wine glass": "res://content/voice/generated/367dfca240146b40902ff2be.ogg",
     "yes now they all go together": "res://content/voice/generated/825e4f609565e6152d55ab43.ogg",
     "yes that's the": "res://content/voice/generated/2c804d419c07ada7e750bccd.ogg",
-    "you earned a magic stone": "res://content/voice/generated/2b7241541c87c1c32d2e7136.ogg",
     "your room has all its colours back": "res://content/voice/generated/cb21c3402e4da1ae18a6225f.ogg",
     "zebra": "res://content/voice/generated/dfe5a0d860f823357f6389e1.ogg"
   }

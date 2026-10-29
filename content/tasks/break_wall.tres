@@ -25,6 +25,6 @@ blocks = Array[ExtResource("3_block")]([SubResource("wall")])
 script = ExtResource("1_task")
 title = "Break the wall"
 plan = SubResource("plan")
-levels = PackedFloat32Array(0.0, 0.3, 0.6)
+levels = PackedFloat32Array(0.0, 0.4)
 requires = Array[ExtResource("1_task")]([ExtResource("5_find_toys")])
 colour = 1

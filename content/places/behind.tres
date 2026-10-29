@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="Place" format=3]
+
+[ext_resource type="Script" path="res://world/place.gd" id="1_place"]
+[ext_resource type="Resource" path="res://content/tasks/break_wall.tres" id="2_break_wall"]
+[ext_resource type="Script" path="res://world/task.gd" id="3_task"]
+
+[resource]
+script = ExtResource("1_place")
+title = "Behind you"
+where = "behind"
+turn_to = "Something new is behind you! Turn around."
+arrive = "Here is the wall. Touch a number to pick a level."
+tasks = Array[ExtResource("3_task")]([ExtResource("2_break_wall")])

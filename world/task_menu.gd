@@ -18,7 +18,7 @@ const BELOW_EYES := 0.12
 ## Degrees the top leans away from the child.
 const TILT := 30.0
 const BUTTON := 0.06
-const GAP := 0.075
+const GAP := 0.09
 const ROW := 0.085
 const TITLE_WIDTH := 0.2
 
@@ -77,17 +77,18 @@ func _press(target: Target) -> void:
 
 func _build() -> void:
 	var rows := _place.tasks.size()
-	var width := TITLE_WIDTH + GAP * 3 + 0.02
+	var width := TITLE_WIDTH + GAP * 2 + 0.02
 	var height := ROW * (rows + 1)
-	var back := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2(width, height)
-	quad.material = _flat(Color(0.08, 0.09, 0.12), 0)
-	back.mesh = quad
-	back.position = Vector3(0.0, 0.0, -0.02)
-	add_child(back)
+	for layer in [[0.012, Color(0.85, 0.85, 0.8), -1], [0.0, Color(0.08, 0.09, 0.12), 0]]: # a light rim, dark or light behind
+		var back := MeshInstance3D.new()
+		var quad := QuadMesh.new()
+		quad.size = Vector2(width, height) + Vector2.ONE * layer[0] * 2.0
+		quad.material = _flat(layer[1], layer[2])
+		back.mesh = quad
+		back.position = Vector3(0.0, 0.0, -0.02)
+		add_child(back)
 	var top := height * 0.5 - ROW * 0.5
-	var header := _label("%s    Magic stones: %d" % [_place.title, _world.stones], 40)
+	var header := _label(_place.title, 44)
 	header.position = Vector3(0.0, top, 0.0)
 	add_child(header)
 	for row in rows:

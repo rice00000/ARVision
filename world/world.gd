@@ -1,18 +1,22 @@
 class_name World
 extends Node
 ## Plays the [Adventure] when the Session has no plan. The room starts in black
-## and white. The guide points the way to a [Place] ("this way"); once the child
-## turns to face it, its [TaskMenu] unfolds there. The chosen task plays at the
-## chosen level; doing it gives back colour and magic stones, then the menu of
-## the same place comes back without turning again. Only the body's turn counts
-## for now, so it can be tested seated.
+## and white. Each [Place] has its own list of tasks. The guide points the way to
+## the first place ("this way"); once the child turns to face it, its
+## [TaskMenu] unfolds there. The chosen task plays at the chosen level, and the
+## first time a task is done colour comes back. Then the menu of the same place
+## comes back; if a level opened somewhere else that the child has not seen on a
+## menu yet, the guide points there too. Turning to face another place folds this menu and opens that one. Only
+## the body's turn counts for now, so it can be tested seated.
 ##
-## Saved as "world" (see Save): the levels done of each task, colour, stones.
+## Saved as "world" (see Save): the levels done of each task, the levels seen open, the colour.
 
 ## Degrees within which the head faces a place (left-right only).
 const FACING := 25.0
-## Seconds the child keeps facing it before the menu unfolds.
+## Seconds the child keeps facing a place before its menu unfolds.
 const FACING_SECONDS := 0.5
+## How far behind the child a place "behind" is, metres.
+const BEHIND := 1.5
 
 @export var adventure: Adventure
 ## Start once the app is up, when the Session has no plan. Tests switch it off and call [method run].
@@ -23,17 +27,20 @@ var save_key := "world"
 var done: Dictionary = {}
 ## Index into [member Adventure.colours].
 var colour := 0
-var stones := 0
+## "<task id>:<level>" of every level shown open on a menu.
+var seen: Array = []
 ## The open menu, or null.
 var menu: TaskMenu
-## The place being pointed at or visited, or null before the first.
+## The place the child is at, or null before the first.
 var place: Place
 
 var _guide := Guide.new()
-var _faced_for := 0.0
-var _awaiting_face := false
+## While true, facing a place other than [member place] for long enough sends [signal _picked].
+var _watching := false
+var _faced_for: Dictionary[Place, float] = {}
 
-signal _faced
+## [Task, level] chosen on the menu, or [Place] turned to.
+signal _picked(result: Array)
 
 
 func _ready() -> void:
@@ -44,13 +51,13 @@ func _ready() -> void:
 
 
 func save_state() -> Dictionary:
-	return {done = done, colour = colour, stones = stones}
+	return {done = done, colour = colour, seen = seen}
 
 
 func load_state(data: Dictionary) -> void:
 	done = data.get("done", {})
 	colour = data.get("colour", 0)
-	stones = data.get("stones", 0)
+	seen = data.get("seen", [])
 
 
 func run() -> void:
@@ -58,13 +65,22 @@ func run() -> void:
 	await say(adventure.greeting)
 	if not App.reality.is_settled:
 		await App.reality.settled
+	var first := _new_elsewhere()
+	if first == null: # everything open was seen in an earlier run
+		first = adventure.places[0]
+	if _facing(first):
+		_enter(first)
+	else:
+		_guide.point_to(position_of(first))
+		Events.say(first.turn_to)
+		_enter((await _watch())[0])
 	while true:
-		var next := _next_place()
-		if next != place:
-			await _go_to(next)
-		var choice: Array = await _choose()
-		var task: Task = choice[0]
-		var level: int = choice[1]
+		var picked: Array = await _choose()
+		if picked.size() == 1:
+			_enter(picked[0])
+			continue
+		var task: Task = picked[0]
+		var level: int = picked[1]
 		await App.session.play(task.plan, task.levels[level])
 		await _complete(task, level)
 
@@ -84,87 +100,117 @@ func can_play(task: Task, level: int) -> bool:
 	return is_unlocked(task) and (level == 0 or is_done(task, level - 1))
 
 
-## Where [param _where] is in the room: the table, for now.
-func position_of(_where: Place) -> Vector3:
-	return App.reality.work_surface().transform.origin
+## A level at [param where] can be chosen and has not been seen on a menu yet.
+func has_new(where: Place) -> bool:
+	for task in where.tasks:
+		for level in task.levels.size():
+			if can_play(task, level) and not _key(task, level) in seen:
+				return true
+	return false
 
 
-## The first place with a level open and not done yet, else the first place.
-func _next_place() -> Place:
+static func _key(task: Task, level: int) -> String:
+	return "%s:%d" % [task.id, level]
+
+
+## Where [param where] is in the room: the table, or [constant BEHIND] metres
+## the other way from the eyes, at eye height.
+func position_of(where: Place) -> Vector3:
+	var table := App.reality.work_surface().transform.origin
+	if where.where == "table":
+		return table
+	var eye := App.head().global_position
+	return eye + Vector3(eye.x - table.x, 0.0, eye.z - table.z).normalized() * BEHIND
+
+
+## The first place other than [member place] with something new, else null
+## (before the first place: the first with something new).
+func _new_elsewhere() -> Place:
 	for candidate in adventure.places:
-		for task in candidate.tasks:
-			for level in task.levels.size():
-				if can_play(task, level) and not is_done(task, level):
-					return candidate
-	return adventure.places[0]
+		if candidate != place and has_new(candidate):
+			return candidate
+	return null
 
 
-## Points the way to [param where] until the child faces it.
-func _go_to(where: Place) -> void:
+func _enter(where: Place) -> void:
 	place = where
-	if not _facing():
-		_guide.point_to(position_of(where))
-		Events.say(where.turn_to)
-		_faced_for = 0.0
-		_awaiting_face = true
-		await _faced
-		_guide.stop()
+	_guide.stop()
 	Events.report(&"place_entered", {place = where.title})
 
 
+## Waits until the child has faced a place other than [member place]: [Place].
+func _watch() -> Array:
+	_faced_for.clear()
+	_watching = true
+	var result: Array = await _picked
+	_watching = false
+	return result
+
+
 func _process(delta: float) -> void:
-	if not _awaiting_face:
+	if not _watching:
 		return
-	_faced_for = _faced_for + delta if _facing() else 0.0
-	if _faced_for >= FACING_SECONDS:
-		_awaiting_face = false
-		_faced.emit()
+	for candidate in adventure.places:
+		if candidate == place:
+			continue
+		_faced_for[candidate] = _faced_for.get(candidate, 0.0) + delta if _facing(candidate) else 0.0
+		if _faced_for[candidate] >= FACING_SECONDS:
+			_picked.emit([candidate])
+			return
 
 
-## The head is turned toward [member place], left-right within [constant FACING] degrees.
-func _facing() -> bool:
+## The head is turned toward [param where], left-right within [constant FACING] degrees.
+func _facing(where: Place) -> bool:
 	var eye := App.head().global_transform
 	var gaze := Vector2(-eye.basis.z.x, -eye.basis.z.z)
-	var to_place := position_of(place) - eye.origin
+	var to_place := position_of(where) - eye.origin
 	return rad_to_deg(absf(gaze.angle_to(Vector2(to_place.x, to_place.z)))) <= FACING
 
 
-## Unfolds [member place]'s menu and waits for a task and level: [Task, int].
+## Unfolds [member place]'s menu, the guide pointing to anything new elsewhere,
+## and waits for a task and level ([Task, int]) or a turn to another place ([Place]).
 func _choose() -> Array:
 	menu = TaskMenu.new(place, self)
 	App.stage.add_child(menu)
 	var eye := App.head().global_position
 	var to_place := position_of(place) - eye
-	var ahead := Vector3(to_place.x, 0.0, to_place.z).normalized()
-	menu.place_at(eye, ahead)
-	Events.say(place.arrive)
-	var choice: Array = await menu.chosen
-	Events.report(&"task_chosen", {task = choice[0].id, level = choice[1] + 1})
+	menu.place_at(eye, Vector3(to_place.x, 0.0, to_place.z).normalized())
+	menu.chosen.connect(_picked.emit)
+	for task in place.tasks:
+		for level in task.levels.size():
+			if can_play(task, level) and not _key(task, level) in seen:
+				seen.append(_key(task, level))
+	Save.request()
+	var elsewhere := _new_elsewhere()
+	if elsewhere:
+		_guide.point_to(position_of(elsewhere))
+		Events.say(elsewhere.turn_to)
+	else:
+		Events.say(place.arrive)
+	var picked: Array = await _watch()
+	_guide.stop()
 	menu.fold()
-	await say("%s, level %d!" % [choice[0].title, choice[1] + 1])
 	menu = null
-	return choice
+	if picked.size() == 2:
+		Events.report(&"task_chosen", {task = picked[0].id, level = picked[1] + 1})
+		await say("%s, level %d!" % [picked[0].title, picked[1] + 1])
+	return picked
 
 
-## Gives the rewards for the first time [param task] is done at [param level] and saves.
+## The first time [param task] is done brings colour back; saves.
 func _complete(task: Task, level: int) -> void:
-	var first_time := not is_done(task)
-	var new_level := not is_done(task, level)
-	if new_level:
+	var more_colour := not is_done(task) and task.colour > 0 and colour < adventure.colours.size() - 1
+	if not is_done(task, level):
 		var levels: Array = done.get(task.id, [])
 		levels.append(level)
 		done[task.id] = levels
-		stones += task.stones
-	var more_colour := first_time and task.colour > 0 and colour < adventure.colours.size() - 1
 	if more_colour:
 		colour = mini(colour + task.colour, adventure.colours.size() - 1)
 		_show_colour()
-	Events.report(&"task_done", {task = task.id, level = level + 1, stones = stones, colour = colour})
+	Events.report(&"task_done", {task = task.id, level = level + 1, colour = colour})
 	Save.write()
-	if new_level and task.stones > 0:
-		Events.feedback.emit(&"good", App.head().global_position + App.head().global_basis * Vector3(0.0, -0.1, -0.5))
-		await say("You earned a magic stone!")
 	if more_colour:
+		Events.feedback.emit(&"good", App.head().global_position + App.head().global_basis * Vector3(0.0, -0.1, -0.5))
 		await say("Look! Colour is coming back to your room." if colour < adventure.colours.size() - 1
 			else "Your room has all its colours back!")
 

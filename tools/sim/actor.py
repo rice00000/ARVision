@@ -16,6 +16,12 @@ CREEP_SPEED = 0.15  # m/s, under rig/pointer.gd's sweep_speed: a hand moved this
 REAIM = [(0, 0.08, 0), (0, 0.16, 0), (-0.08, 0.1, 0), (0.08, 0.1, 0), (0, 0.16, 0.08)]
 
 
+def rotated(vector, turn):
+    """`vector` turned `turn` radians to the left (about +Y, seen from above)."""
+    x, y, z = vector
+    return (x * math.cos(turn) + z * math.sin(turn), y, -x * math.sin(turn) + z * math.cos(turn))
+
+
 class Actor:
     def __init__(self, sim, body="medium"):
         bodies, limits, _ = load()
@@ -52,6 +58,30 @@ class Actor:
         forward = unit(sub(at, eye))
         self.body.check_head(eye, forward)
         self.sim.head(position=eye, at=at, seconds=max(distance(head["position"], eye) / 0.3, 0.1))
+
+    def swivel(self, degrees, seconds=1.5):
+        """Turns the chair `degrees` to the left about the seat: eyes and hands go round with the
+        body (in steps, so a hand never jumps), and the body's frame turns too. A seated child can
+        face anywhere this way; the head limits stay relative to the body."""
+        steps = max(int(abs(degrees) / 15), 1)
+        for _ in range(steps):
+            turn = math.radians(degrees / steps)
+            observation = self.observe()
+            for side in ("left", "right"):
+                hand = observation["hands"][side]
+                end = self.around(hand["position"], turn)
+                self.sim.hand(side, end, at=add(end, rotated(hand["forward"], turn)), seconds=0.0)
+            head = observation["head"]
+            eye = self.around(head["position"], turn)
+            self.sim.head(position=eye, at=add(eye, rotated(head["forward"], turn)), seconds=seconds / steps)
+            b = self.body
+            self.body = Body(b.profile, b.limits, {"position": b.origin, "x": rotated(b.axes[0], turn),
+                                                    "y": b.axes[1], "z": rotated(b.axes[2], turn)})
+        self.observe()
+
+    def around(self, point, turn):
+        """`point` turned `turn` radians to the left about the seat's vertical axis."""
+        return add(self.body.origin, rotated(sub(tuple(point), self.body.origin), turn))
 
     # -- hands --------------------------------------------------------------
 
