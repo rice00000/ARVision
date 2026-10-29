@@ -3,8 +3,9 @@ extends Node3D
 ## One tracked hand's pointing ray and fingertip, turned into [Events]: every
 ## button, [signal Events.selected] on a pinch (the OpenXR action
 ## trigger_click), [signal Events.touched] when the moving fingertip enters a
-## [Target], [signal Events.help_requested] when the hand is raised, and
-## tracking changes. A resting hand touches nothing: a toy that appears under
+## [Target], [signal Events.sweeping] and [signal Events.swept] as it sweeps,
+## [signal Events.help_requested] when the hand is raised, and tracking
+## changes. A resting hand touches nothing: a toy that appears under
 ## it, or hops into it, was not reached for. In blocks without the ray
 ## ([member Block.ray]) a pinch or a closed hand on a Target takes it, like a touch.
 ##
@@ -14,6 +15,8 @@ extends Node3D
 const TARGET_LAYER := 1
 ## How close the fingertip must be to a Target to grab it, metres.
 const GRAB_RADIUS := 0.07
+## A hand rising or falling more steeply than this (the sine of 50 degrees) is not sweeping.
+const VERTICAL := 0.77
 
 @export var length := 4.0
 ## How far in front of the hand's aim point the fingertip sits.
@@ -27,21 +30,21 @@ const GRAB_RADIUS := 0.07
 ## again only after coming down. Raised in front, it stays in the cameras' view.
 @export var raise_height := 0.1
 @export var raise_seconds := 0.4
-## A sweep: one move of the hand, from leaving rest (faster than
-## [member sweep_speed]) to resting again (slower than [member sweep_stop_speed]
-## for [member sweep_stop_seconds]), or [member sweep_max_seconds] of moving.
-## The move is cut into legs where the hand turns back ([member sweep_return]
-## metres from a leg's farthest point) and the longest leg is the sweep: the
-## wind-up before it and the way back after it are not, unless one of them is
-## [member sweep_longer] times longer. No pinch is involved: hand tracking drops
-## a pinch as the hand moves. A step too long for a hand in one tick is tracking
-## finding the hand again, never a sweep, and a pause drops one in progress.
+## A sweep: the hand going faster than [member sweep_speed] at least
+## [member sweep_distance] sideways, toward or away. It sets off where the hand
+## was last slower, or moving mostly up or down (a hand raised for help sweeps
+## nothing; one lifted on its way sweeps from where it levels out), or where it
+## turned back [member sweep_return] metres from its farthest point. Every tick it goes on, [signal Events.sweeping] says how far
+## it has got, so a trial can answer the moment the hand goes the right way.
+## Once the hand has been slower again for [member sweep_stop_seconds] (a turn
+## is quicker), [signal Events.swept] says it is done. No pinch is involved: hand
+## tracking drops a pinch as the hand moves. A step too long for a hand in one
+## tick is tracking finding the hand again, never a sweep, and a pause drops one
+## in progress.
 @export var sweep_speed := 0.3
-@export var sweep_stop_speed := 0.12
-@export var sweep_stop_seconds := 0.12
-@export var sweep_max_seconds := 2.0
+@export var sweep_distance := 0.12
 @export var sweep_return := 0.06
-@export var sweep_longer := 1.25
+@export var sweep_stop_seconds := 0.4
 @export var sweep_jump := 0.08
 ## Seconds the speed is smoothed over.
 @export var sweep_smoothing := 0.05
@@ -61,20 +64,15 @@ var _raised_for := 0.0
 var _asked := false
 var _last_position := Vector3.INF
 var _velocity := Vector3.ZERO
-## Where the hand last moved slower than [member sweep_speed]: a move starts there.
-var _slow_at := Vector3.ZERO
 ## Seconds of this hand's clock (pauses do not count).
 var _clock := 0.0
-## The move in progress: when it began, the leg being made (where it began and
-## when, its farthest point and when), the longest leg so far, and how long the
-## hand has been slow.
-var _moving := false
-var _move_began := 0.0
-var _leg_from := Vector3.ZERO
-var _leg_began := 0.0
-var _leg_far := Vector3.ZERO
-var _leg_far_at := 0.0
-var _best: Dictionary = {}
+## The sweep in progress: where it set off and when, its farthest point and when.
+var _from := Vector3.ZERO
+var _from_at := 0.0
+var _far := Vector3.ZERO
+var _far_at := 0.0
+## The hand has swept and not stopped since; how long it has been slow.
+var _swept := false
 var _slow_for := 0.0
 
 
@@ -121,48 +119,39 @@ func _track_sweep(delta: float) -> void:
 	var step := here - _last_position
 	_last_position = here
 	if get_tree().paused or not _controller.get_has_tracking_data() or step.length() > sweep_jump:
-		_moving = false
 		_velocity = Vector3.ZERO
-		_slow_at = here
+		_set_off(here, _clock)
 		return
 	_clock += delta
 	_velocity = _velocity.lerp(step / delta, minf(1.0, delta / sweep_smoothing))
-	var speed := _velocity.length()
-	if not _moving:
-		if step.length() / delta < sweep_speed:
-			_slow_at = here
-		if speed >= sweep_speed:
-			_moving = true
-			_move_began = _clock
-			_best = {}
-			_slow_for = 0.0
-			_start_leg(_slow_at, _clock)
+	if _velocity.length() < sweep_speed:
+		_set_off(here, _clock)
+		_slow_for += delta
+		if _swept and _slow_for >= sweep_stop_seconds:
+			_swept = false
+			Events.swept.emit(side)
 		return
-	if here.distance_to(_leg_from) > _leg_far.distance_to(_leg_from):
-		_leg_far = here
-		_leg_far_at = _clock
-	elif here.distance_to(_leg_far) > sweep_return:
-		_end_leg()
-		_start_leg(_leg_far, _leg_far_at)
-	_slow_for = _slow_for + delta if speed < sweep_stop_speed else 0.0
-	if _slow_for >= sweep_stop_seconds or _clock - _move_began >= sweep_max_seconds:
-		_end_leg()
-		_moving = false
-		Events.swept.emit(side, _best.from, _best.to, _best.seconds)
+	_slow_for = 0.0
+	if absf(_velocity.y) > _velocity.length() * VERTICAL:
+		_set_off(here, _clock)
+		return
+	if here.distance_to(_from) > _far.distance_to(_from):
+		_far = here
+		_far_at = _clock
+	elif here.distance_to(_far) > sweep_return:
+		_set_off(_far, _far_at)
+	var way := here - _from
+	if Vector2(way.x, way.z).length() >= sweep_distance:
+		_swept = true
+		Events.sweeping.emit(side, _from, here, _clock - _from_at)
 
 
-func _start_leg(from: Vector3, at: float) -> void:
-	_leg_from = from
-	_leg_began = at
-	_leg_far = from
-	_leg_far_at = at
-
-
-## Keeps the leg just made if it is the longest of this move so far.
-func _end_leg() -> void:
-	var length := _leg_far.distance_to(_leg_from)
-	if _best.is_empty() or length > _best.length * sweep_longer:
-		_best = {from = _leg_from, to = _leg_far, seconds = _leg_far_at - _leg_began, length = length}
+## A sweep sets off from [param at], at [param time] of this hand's clock.
+func _set_off(at: Vector3, time: float) -> void:
+	_from = at
+	_from_at = time
+	_far = at
+	_far_at = time
 
 
 ## The fingertip has not moved for [member rest_seconds].

@@ -112,7 +112,8 @@ class Actor:
 
     def sweep(self, side, direction, length=0.25, seconds=0.35):
         """Sweeps the hand `length` metres along `direction` (world) in `seconds`, then holds
-        still and waits to be judged. The hand first creeps to the start (slower than a sweep)."""
+        still: the right way is judged as the hand goes, a wrong way once it has stopped. The hand
+        first creeps to the start (slower than a sweep)."""
         ready = self.body.ready(side)
         start = sub(ready, mul(direction, length / 2))
         end = add(ready, mul(direction, length / 2))
@@ -121,7 +122,7 @@ class Actor:
         aim = self.body.direction((0, -0.3, -1))
         self.creep(side, start, at=add(start, aim))
         self.move_hand(side, end, at=add(end, aim), seconds=seconds)
-        self.wait(0.4)  # the rig reports a sweep once the hand has held still 0.12 s (Pointer.sweep_stop_seconds)
+        self.wait(0.55)  # a sweep is done once the hand has been slow 0.4 s (Pointer.sweep_stop_seconds)
 
     def creep(self, side, end, at):
         """Moves a hand slower than a sweep (CREEP_SPEED), then rests it a moment."""

@@ -50,6 +50,7 @@ pause_between = 1.0
 [sub_resource type="Resource" id="wall"]
 script = ExtResource("2_block")
 trial = ExtResource("4_motion")
+ray = false
 rounds = 3
 difficulty = 0.0
 intro = "Last one. Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"

@@ -132,56 +132,60 @@ func test_pinches_raised_hands_the_menu_pinch_and_tracking_become_events() -> vo
 	expect_eq(tracking.filter(func(args: Array) -> bool: return args[0] == &"right"), [[&"right", false], [&"right", true]], "lost, found")
 
 
-func test_a_brisk_hand_move_is_a_sweep_a_jump_or_a_creep_is_not() -> void:
+func test_a_sweep_is_sent_as_it_goes_and_done_once_the_hand_stops() -> void:
 	await boot(plan_of(FIND, 1))
+	var sweeping := record(Events.sweeping)
 	var swept := record(Events.swept)
 	var pointer := App.rig.pointer(&"right")
 	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	var right := start + Vector3.RIGHT * 0.3
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
-	expect(swept.is_empty(), "a jump (tracking finding the hand) is no sweep")
-	await _glide(&"right", start, start + Vector3.RIGHT * 0.3, 0.3)
+	expect(sweeping.is_empty(), "a jump (tracking finding the hand) is no sweep")
+	await _glide(&"right", start, right, 0.3)
+	expect(not sweeping.is_empty() and swept.is_empty(), "sweeping while it moves, not done yet")
+	var first: Array = sweeping[0]
+	expect_eq(first[0], &"right", "by the right hand")
+	expect(first[1].is_equal_approx(start), "from where it set off: %s" % first[1])
+	expect(first[2].distance_to(start) < pointer.sweep_distance + 0.02, "sent as soon as it is long enough: %s" % first[2])
+	expect(sweeping.back()[2].is_equal_approx(right), "then every tick, to where it has got: %s" % sweeping.back()[2])
+	expect(absf(sweeping.back()[3] - 0.3) < 0.05, "taking about 0.3 s: %s" % sweeping.back()[3])
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 1, "one sweep once the hand holds still")
-	expect_eq(swept[0][0], &"right", "by the right hand")
-	expect(swept[0][1].is_equal_approx(start), "from where it left rest: %s" % swept[0][1])
-	expect(swept[0][2].is_equal_approx(start + Vector3.RIGHT * 0.3), "to where it stopped: %s" % swept[0][2])
-	expect(absf(swept[0][3] - 0.3) < 0.05, "taking about 0.3 s: %s" % swept[0][3])
-	await _glide(&"right", start + Vector3.RIGHT * 0.3, start, 2.0) # 0.15 m/s: a creep
+	expect_eq(swept, [[&"right"]], "done once the hand has stopped")
+	sweeping.clear()
+	await _glide(&"right", right, start, 2.0) # 0.15 m/s: a creep
+	await _glide(&"right", start, start + Vector3.RIGHT * 0.08, 0.08) # brisk, but short
+	await _glide(&"right", start + Vector3.RIGHT * 0.08, start + Vector3(0.08, 0.3, 0.0), 0.3) # up: a hand raised
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 1, "a slow move is no sweep")
-	# Out and straight back without a stop: the way out is the sweep, the way back is not.
-	await _glide(&"right", start, start + Vector3.RIGHT * 0.3, 0.3)
-	await _glide(&"right", start + Vector3.RIGHT * 0.3, start, 0.3)
+	expect(sweeping.is_empty() and swept.size() == 1, "a slow, short or vertical move is no sweep")
+	# Lifted on its way: the sweep sets off where the hand levels out.
+	var lifted := start + Vector3(0.08, 0.3, 0.0)
+	await _glide(&"right", lifted, lifted + Vector3(0.05, -0.3, 0.0), 0.3)
+	await _glide(&"right", lifted + Vector3(0.05, -0.3, 0.0), lifted + Vector3(0.25, -0.3, 0.0), 0.2)
+	expect(not sweeping.is_empty() and sweeping[0][1].distance_to(lifted + Vector3(0.05, -0.3, 0.0)) < 0.03,
+		"a hand coming down then going sideways sweeps from where it turned: %s" % [sweeping.slice(0, 1)])
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 2, "one sweep for the whole wave")
-	expect(swept[1][1].is_equal_approx(start) and swept[1][2].is_equal_approx(start + Vector3.RIGHT * 0.3),
-		"the way out, to its farthest point: %s" % [swept[1]])
-	# A wind-up: a short pull back, then the sweep the other way without a stop.
-	await _glide(&"right", start, start + Vector3.LEFT * 0.12, 0.12)
-	await _glide(&"right", start + Vector3.LEFT * 0.12, start + Vector3.RIGHT * 0.3, 0.4)
-	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 3, "one sweep")
-	expect(swept[2][1].is_equal_approx(start + Vector3.LEFT * 0.12) and swept[2][2].is_equal_approx(start + Vector3.RIGHT * 0.3),
-		"the longer leg, from the end of the wind-up: %s" % [swept[2]])
-	expect(absf(swept[2][3] - 0.4) < 0.05, "taking the leg's own time: %s" % swept[2][3])
+	# Out and straight back without a stop: two sweeps, the second from the turn; done once.
+	sweeping.clear()
+	swept.clear()
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
-	# A hand that keeps going after a stop starts another sweep.
-	await _glide(&"right", start, start + Vector3.FORWARD * 0.2, 0.2)
+	await _glide(&"right", start, right, 0.3)
+	await _glide(&"right", right, start, 0.3)
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	await _glide(&"right", start + Vector3.FORWARD * 0.2, start + Vector3.FORWARD * 0.4, 0.2)
-	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 5, "two sweeps with a stop between")
+	var froms: Array = sweeping.map(func(args: Array) -> Vector3: return args[1])
+	expect(froms.front().is_equal_approx(start), "out from the start")
+	expect(froms.back().distance_to(right) < 0.05, "back from the turn: %s" % froms.back())
+	expect_eq(swept.size(), 1, "one stop")
+	# A sweep cut by a tracking loss is dropped: the part after it starts again.
+	sweeping.clear()
+	await _glide(&"right", start, start + Vector3.RIGHT * 0.08, 0.08)
 	input.track(&"right", false)
 	await frames(2)
 	input.track(&"right", true)
-	await _glide(&"right", start + Vector3.FORWARD * 0.4, start + Vector3.FORWARD * 0.4 + Vector3.RIGHT * 0.15, 0.15)
-	input.track(&"right", false)
-	await frames(2)
-	input.track(&"right", true)
+	await _glide(&"right", start + Vector3.RIGHT * 0.08, start + Vector3.RIGHT * 0.16, 0.08)
 	await wait(pointer.sweep_stop_seconds + 0.1)
-	expect_eq(swept.size(), 5, "a sweep cut by a tracking loss is dropped")
+	expect(sweeping.is_empty(), "neither part is long enough on its own")
 
 
 ## Moves a hand from [param from] to [param to] over [param seconds], a step per physics tick.

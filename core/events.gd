@@ -16,10 +16,13 @@ signal button(hand: StringName, action: StringName, pressed: bool)
 signal selected(hand: StringName, target: Target, origin: Vector3, direction: Vector3)
 ## A fingertip entered a Target.
 signal touched(hand: StringName, target: Target)
-## A hand swept: one brisk move from [param from] to [param to] that took
-## [param seconds], the longest leg of a move from rest to rest. No pinch
-## needed; a wind-up before it or the way back after it is not one.
-signal swept(hand: StringName, from: Vector3, to: Vector3, seconds: float)
+## A hand is sweeping: in [param seconds] it has gone from [param from] to
+## [param to] without slowing down or turning back, at least
+## Pointer.sweep_distance sideways, toward or away. Sent every tick the sweep
+## goes on, so it can be answered at once. No pinch needed.
+signal sweeping(hand: StringName, from: Vector3, to: Vector3, seconds: float)
+## A hand that swept has slowed down and stayed slow: its sweeping is done.
+signal swept(hand: StringName)
 ## The child asked for help (raised a hand).
 signal help_requested
 ## A hand lost or regained tracking.

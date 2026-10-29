@@ -1,4 +1,5 @@
-"""Read the flow, swept by a seated body: directions, hands, invalid sweeps, pauses, tracking loss."""
+"""Read the flow, swept by a seated body: directions, hands, wind-ups, moves that are no sweeps, pauses,
+tracking loss."""
 
 import unittest
 
@@ -27,31 +28,47 @@ class Motion(SimCase):
             for end in ends:
                 self.assertTrue(end["success"] and end["data"]["first_attempt_correct"] and end["data"]["first_try"])
                 self.assertLess(end["data"]["angle_degrees"], 1.0)
-                self.assertGreaterEqual(end["data"]["attempts"][0]["distance_metres"], 0.24)
+                distance = end["data"]["attempts"][0]["distance_metres"]
+                self.assertTrue(0.12 <= distance < 0.16, f"judged as soon as the hand has gone 0.12 m: {distance}")
             self.assert_log_ok(sim)
 
-    def test_invalid_sweeps_count_no_try(self):
+    def test_small_or_vertical_moves_are_no_sweeps(self):
         sim = self.launch(plan(block("motion", pins={"direction": 1})), body="large")
         child = Child(sim, body="large", seed=2)
         sim.run_until("trial_started")
         actor = child.actor
         right = self.cloud_direction(sim, "right")
-        actor.sweep("right", right, length=0.05, seconds=0.08)  # brisk but too small
+        said = len(sim.events("said"))
+        actor.sweep("right", right, length=0.08, seconds=0.1)  # brisk but short
         actor.sweep("left", (0, 1, 0), length=0.2)  # up: a hand raised, not an answer
-        invalid = self.reports(sim, "motion_invalid")
-        self.assertEqual([r["reason"] for r in invalid], ["too_small", "vertical"])
-        self.assertEqual([r["hand"] for r in invalid], ["right", "left"])
-        self.assertEqual(sim.events("feedback"), [], "no right or wrong for an unusable sweep")
-        said = [e["text"] for e in sim.events("said")]
-        self.assertEqual(said[-1], "Sweep your hand a little farther.")
-        self.assertEqual(said.count("Sweep your hand a little farther."), 1, "nothing said of a vertical move")
+        self.assertEqual(self.motion_reports(sim), [], "not judged")
+        self.assertEqual(sim.events("feedback"), [], "no right or wrong")
+        self.assertEqual(len(sim.events("said")), said, "nothing said")
         trial = sim.observe()["session"]["trial"]
         self.assertTrue(trial["running"])
         self.assertEqual(trial["tries"], 0)
         actor.sweep("right", right)
         end = self.round_ends(sim)[0]
-        self.assertEqual(end["data"]["invalid_gestures"], 2)
         self.assertTrue(end["data"]["first_attempt_correct"] and end["data"]["first_try"])
+
+    def test_a_wind_up_the_other_way_counts_no_try(self):
+        sim = self.launch(plan(block("motion", pins={"direction": 2}, pause_between=2.0)))
+        child = Child(sim, seed=7)
+        sim.run_until("trial_started")
+        sim.wait(1.0)
+        actor = child.actor
+        left = self.cloud_direction(sim, "left")
+        ready = actor.body.ready("right")
+        aim = actor.body.direction((0, -0.3, -1))
+        start, back = add(ready, mul(left, 0.15)), add(ready, mul(left, -0.15))
+        actor.creep("right", start, at=add(start, aim))
+        actor.move_hand("right", back, at=add(back, aim), seconds=0.4)  # pulled back the wrong way
+        actor.move_hand("right", start, at=add(start, aim), seconds=0.4)  # and straight on the right way
+        end = self.round_ends(sim)[0]
+        self.assertTrue(end["success"] and end["data"]["first_try"], "the wind-up is no try")
+        self.assertEqual(end["data"]["windups"], 1)
+        self.assertEqual([f["kind"] for f in sim.events("feedback")], ["good"])
+        self.assertEqual(len(self.reports(sim, "motion_windup")), 1)
 
     def test_a_wave_back_is_part_of_no_sweep(self):
         sim = self.launch(plan(block("motion", pins={"direction": 1}, pause_between=2.0)))
@@ -75,6 +92,7 @@ class Motion(SimCase):
         sim = self.launch(plan(block("motion", pins={"direction": 3}, pause_between=2.0)))
         child = Child(sim, seed=3)
         started = sim.run_until("trial_started")
+        sim.wait(1.0)  # watch the dots: sweeps setting off sooner are hands settling
         child.actor.sweep("right", self.cloud_direction(sim, "away"))
         child.actor.sweep("left", self.cloud_direction(sim, "right"))
         trial = sim.observe()["session"]["trial"]
@@ -89,12 +107,13 @@ class Motion(SimCase):
         self.assertEqual(sim.observe()["stimuli"]["cloud"]["alignment"], 1.0, "success: the dots align into streaks")
 
     def half_sweep(self, actor, side, direction):
-        """A hand halfway through a sweep, still moving. Returns the end point and where to aim."""
+        """A hand partway into a sweep, still moving, not far enough to count yet. Returns the end
+        point and where to aim."""
         ready = actor.body.ready(side)
         start, end = add(ready, mul(direction, -0.125)), add(ready, mul(direction, 0.125))
         aim = add(start, actor.body.direction((0, -0.3, -1)))
         actor.creep(side, start, at=aim)
-        actor.move_hand(side, ready, at=aim, seconds=0.2)
+        actor.move_hand(side, add(start, mul(direction, 0.08)), at=aim, seconds=0.1)
         return end, aim
 
     def test_a_pause_cancels_an_unfinished_sweep(self):

@@ -61,17 +61,12 @@ script = ExtResource("2_axis")
 name = &"tolerance"
 easy = 40.0
 
-[sub_resource type="Resource" id="min_sweep"]
-script = ExtResource("2_axis")
-name = &"min_sweep"
-easy = 0.12
-
 [resource]
 script = ExtResource("1_def")
 title = "Read the flow"
 scene = ExtResource("3_scene")
 skill = &"global_motion"
-axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("competing"), SubResource("direction"), SubResource("dots"), SubResource("speed"), SubResource("dot_lifetime"), SubResource("half_width"), SubResource("half_height"), SubResource("half_depth"), SubResource("distance"), SubResource("tolerance"), SubResource("min_sweep")])
+axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("competing"), SubResource("direction"), SubResource("dots"), SubResource("speed"), SubResource("dot_lifetime"), SubResource("half_width"), SubResource("half_height"), SubResource("half_depth"), SubResource("distance"), SubResource("tolerance")])
 notes = "Coherence is the driven axis; everything else is fixed so a failure points at coherence. Noise dots move in random directions. Retries are unlimited; the staircase moves on first-try, unaided sweeps, and the log carries every attempt. Help only when asked. A round with no right sweep ends after 30 s, so a child who does not respond never stalls the session."
 hint_after = 0.0
 max_hint = 1

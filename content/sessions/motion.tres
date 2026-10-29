@@ -8,6 +8,7 @@
 [sub_resource type="Resource" id="random"]
 script = ExtResource("2_block")
 trial = ExtResource("3_motion")
+ray = false
 rounds = 6
 intro = "Watch the dots. Sweep your hand the way most of them go."
 pause_between = 2.0
@@ -15,6 +16,7 @@ pause_between = 2.0
 [sub_resource type="Resource" id="competing"]
 script = ExtResource("2_block")
 trial = ExtResource("4_competing")
+ray = false
 rounds = 6
 intro = "Now some dots go the other way. Sweep with the bigger group."
 pause_between = 2.0

@@ -8,13 +8,15 @@ extends Trial
 ## random directions), direction (0 random, 1-4 right, left, toward, away, 5
 ## random lateral),
 ## dots, speed, dot_lifetime, half_width / half_height / half_depth (cloud, m),
-## distance (m), tolerance (degrees), min_sweep (m).
-## Sweeps come from the rig ([signal Events.swept]): one brisk move of a hand,
-## no pinch. A sweep that is too small, or mostly up or down (a hand raised for
-## help, or put down), is invalid: it is not a perceptual error and counts no
-## try. So is one in the first [constant ARM_SECONDS] of a round: hands still
-## settling from the last round, before the dots could be read. A wrong valid
-## sweep counts a try; the flow stays the same until the child finds it.
+## distance (m), tolerance (degrees).
+## Sweeps come from the rig, no pinch ([signal Events.sweeping]). The moment a
+## hand has gone the right way, the round is won. A sweep the wrong way counts a
+## try once that hand stops ([signal Events.swept]); one that turns straight into
+## the right way was a wind-up and counts nothing. Sweeps that set off in the
+## first [constant ARM_SECONDS] of a round are hands settling from the last
+## round, before the dots could be read: ignored. The flow stays the same until
+## the child finds it. While a judged sweep goes on, a white streak and a whoosh
+## show the hand was seen ([SweepTrail]), right or wrong alike.
 ## Hint 1 (only when asked): every dot follows the flow.
 ## With [member break_wall] (the tech demo), a right sweep also breaks the wall ahead.
 
@@ -24,13 +26,7 @@ const FLOWS: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector
 ## The cloud's near face stays at least this far from the eyes, metres.
 const NEAR := 0.6
 const ALIGN_SECONDS := 0.6
-## A sweep whose direction rises or falls more than this (the sine of 50
-## degrees) is not an answer: the flow never goes up or down.
-const VERTICAL := 0.77
 const ARM_SECONDS := 0.8
-const INVALID_SAY := {
-	too_small = "Sweep your hand a little farther.",
-}
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
@@ -43,34 +39,30 @@ var _flow := Vector3.RIGHT
 var _dots := 0
 ## Dots following the flow now (all of them once help is on).
 var _signal_dots := 0
-var _min_sweep := 0.0
 var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
-var _invalid := 0
+## Per hand, its latest wrong-way sweep, waiting for the hand to stop.
+var _wrong: Dictionary[StringName, Dictionary] = {}
 var _align: Tween
 
 @onready var _cloud: GPUParticles3D = $Cloud
+@onready var _trails: Dictionary[StringName, SweepTrail] = {&"left": $LeftTrail, &"right": $RightTrail}
 @onready var _material := _cloud.process_material as ShaderMaterial
 
 
-## Judges one sweep: [param displacement] in the cloud's frame.
-static func classify(displacement: Vector3, expected: Vector3, min_sweep: float, tolerance: float) -> Dictionary:
-	var distance := displacement.length()
-	if distance < min_sweep:
-		return {valid = false, reason = &"too_small", distance_metres = distance}
-	var direction := displacement / distance
-	if absf(direction.y) > VERTICAL:
-		return {valid = false, reason = &"vertical", distance_metres = distance, direction = direction}
-	var angle := rad_to_deg(direction.angle_to(expected.normalized()))
-	return {valid = true, correct = angle <= tolerance, angle_degrees = angle, direction = direction,
-		distance_metres = distance}
+## Judges one sweep: [param displacement] in the cloud's frame. Only its level
+## part counts: the flow never rises or falls.
+static func classify(displacement: Vector3, expected: Vector3, tolerance: float) -> Dictionary:
+	var angle := rad_to_deg(Vector3(displacement.x, 0.0, displacement.z).angle_to(expected))
+	return {correct = angle <= tolerance, angle_degrees = angle, direction = displacement.normalized(),
+		distance_metres = displacement.length()}
 
 
 func _setup(round_condition: TrialCondition) -> void:
 	if _align:
 		_align.kill()
 	_attempts.clear()
-	_invalid = 0
+	_wrong.clear()
 	_rng.randomize()
 	var pinned := int(round_condition.value(&"direction"))
 	var heading := pinned - 1
@@ -80,7 +72,6 @@ func _setup(round_condition: TrialCondition) -> void:
 	_dots = int(round_condition.value(&"dots"))
 	var coherence: float = round_condition.value(&"coherence")
 	var signal_dots := roundi(coherence * _dots)
-	_min_sweep = round_condition.value(&"min_sweep")
 	_tolerance = round_condition.value(&"tolerance")
 	var half := Vector3(round_condition.value(&"half_width"), round_condition.value(&"half_height"),
 		round_condition.value(&"half_depth"))
@@ -111,26 +102,25 @@ func focus_point() -> Vector3:
 	return _cloud.global_position
 
 
-func _on_swept(hand: StringName, from: Vector3, to: Vector3, duration: float) -> void:
-	var result := classify(_frame.basis.inverse() * (to - from), _flow, _min_sweep, _tolerance)
-	if seconds() < ARM_SECONDS:
-		result.merge({valid = false, reason = &"early"}, true)
-	result.merge({trial = condition.trial, round = condition.round_index, hand = hand,
-		onset_seconds = seconds() - duration, duration_seconds = duration,
-		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
-	if not result.valid:
-		_invalid += 1
-		Events.report(&"motion_invalid", result)
-		if INVALID_SAY.has(result.reason):
-			say(INVALID_SAY[result.reason])
+func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float) -> void:
+	var onset := seconds() - duration
+	if onset < ARM_SECONDS:
 		return
+	_trails[hand].show_sweep(from, to)
+	var result := classify(_frame.basis.inverse() * (to - from), _flow, _tolerance)
+	result.merge({trial = condition.trial, round = condition.round_index, hand = hand, from = from,
+		onset_seconds = onset, duration_seconds = duration,
+		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
+	if not result.correct:
+		_wrong[hand] = result
+		return
+	# A wrong sweep that set off elsewhere was a wind-up; this sweep's own start bending in is not.
+	var windups := _wrong.values().filter(func(wrong: Dictionary) -> bool: return wrong.from != from)
+	for windup: Dictionary in windups:
+		Events.report(&"motion_windup", windup)
+	_wrong.clear()
 	_attempts.append(result)
 	Events.report(&"motion_attempt", result)
-	if not result.correct:
-		judge(&"bad", _cloud.global_position)
-		count_try()
-		say("Not that way. Watch the dots and try again.")
-		return
 	judge(&"good", _cloud.global_position)
 	say("Yes! Now they all go together.")
 	if break_wall:
@@ -138,10 +128,28 @@ func _on_swept(hand: StringName, from: Vector3, to: Vector3, duration: float) ->
 		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow, wall_style)
 	_align = create_tween()
 	_align.tween_method(_set_alignment, 0.0, 1.0, ALIGN_SECONDS)
-	finish(true, {attempts = _attempts.duplicate(), invalid_gestures = _invalid,
+	finish(true, {attempts = _attempts.duplicate(), windups = windups.size(),
 		first_attempt_correct = _attempts[0].correct, first_onset_seconds = _attempts[0].onset_seconds,
 		response_onset_seconds = result.onset_seconds, gesture_seconds = result.duration_seconds,
 		angle_degrees = result.angle_degrees})
+
+
+## The hand stopped after going the wrong way: that was its answer.
+func _on_swept(hand: StringName) -> void:
+	if not _wrong.has(hand):
+		return
+	var result: Dictionary = _wrong[hand]
+	_wrong.erase(hand)
+	_attempts.append(result)
+	Events.report(&"motion_attempt", result)
+	judge(&"bad", _cloud.global_position)
+	count_try()
+	say("Not that way. Watch the dots and try again.")
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED:
+		_wrong.clear()
 
 
 ## Help: every dot follows the flow.

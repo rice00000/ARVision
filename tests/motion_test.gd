@@ -8,28 +8,21 @@ const RANDOM := preload("res://trials/motion/motion.tres")
 const COMPETING := preload("res://trials/motion/motion_competing.tres")
 const HEADINGS := [&"right", &"left", &"toward", &"away"]
 const SIDES := [&"right", &"left"]
-## A sweep is reported once the hand has held still this long.
-const SETTLE := 0.3
+## A wrong sweep counts once its hand has stopped this long (Pointer.sweep_stop_seconds and a margin).
+const SETTLE := 0.55
 
 # -- the classifier -----------------------------------------------------------
 
-func test_classifier_judges_valid_sweeps() -> void:
+func test_classifier_judges_the_level_direction() -> void:
 	for flow: Vector3 in MotionTrial.FLOWS:
 		var result := _classify(flow * 0.2, flow)
-		expect(result.valid and result.correct, "a sweep along %s is right" % flow)
+		expect(result.correct, "a sweep along %s is right" % flow)
 		expect(is_zero_approx(result.angle_degrees), "no angle error along %s" % flow)
 		expect(not _classify(-flow * 0.2, flow).correct, "the opposite sweep is wrong")
-	expect(_classify(Vector3(0.2, 0.15, 0.0), Vector3.RIGHT).correct, "a 37 degree drift is within tolerance")
-	expect(not _classify(Vector3(0.2, 0.18, 0.0), Vector3.RIGHT).correct, "a 42 degree drift is not")
+	expect(_classify(Vector3(0.2, 0.0, 0.15), Vector3.RIGHT).correct, "a 37 degree drift is within tolerance")
+	expect(not _classify(Vector3(0.2, 0.0, 0.18), Vector3.RIGHT).correct, "a 42 degree drift is not")
 	expect(not _classify(Vector3(0.0, 0.0, 0.2), Vector3.RIGHT).correct, "a sweep at right angles is wrong")
-
-
-func test_classifier_calls_unusable_sweeps_invalid_not_wrong() -> void:
-	expect_eq(_classify(Vector3.RIGHT * 0.05, Vector3.RIGHT).get("reason"), &"too_small", "a small sweep")
-	expect_eq(_classify(Vector3.LEFT * 0.05, Vector3.RIGHT).get("reason"), &"too_small", "a small wrong-way sweep is still just small")
-	expect_eq(_classify(Vector3.UP * 0.3, Vector3.RIGHT).get("reason"), &"vertical", "a hand raised")
-	expect_eq(_classify(Vector3(0.1, -0.3, 0.0), Vector3.RIGHT).get("reason"), &"vertical", "a hand put down")
-	expect(not _classify(Vector3.UP * 0.3, Vector3.RIGHT).has("correct"), "an invalid sweep is not judged")
+	expect(is_zero_approx(_classify(Vector3(0.2, 0.15, 0.0), Vector3.RIGHT).angle_degrees), "rising on the way does not count")
 
 
 # -- the task definitions -----------------------------------------------------
@@ -101,7 +94,7 @@ func test_direction_is_random_across_rounds_when_not_pinned() -> void:
 		condition.set_value(&"direction", 5.0)
 		App.session.trial.begin(condition)
 		seen[condition.value(&"heading")] = true
-	expect_eq(seen.keys(), [&"right", &"left"] as Array, "5 draws only lateral headings: %s" % [seen.keys()])
+	expect(seen.size() == 2 and seen.has(&"right") and seen.has(&"left"), "5 draws only lateral headings: %s" % [seen.keys()])
 	expect_eq(load("res://trials/motion/motion_demo.tres").condition(0.0, 0, false).value(&"direction"), 5.0, "the tech demo is lateral")
 
 
@@ -117,11 +110,11 @@ func test_sweeps_as_the_round_starts_are_not_answers() -> void:
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
 	await _glide(&"right", start, start + frame.basis.x * 0.25, 0.3) # a hand settling, 0.3 s into the round
+	await _glide(&"right", start + frame.basis.x * 0.25, start, 0.3) # and back
 	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "not judged, right as it was")
-	expect_eq(trial.tries, 0, "no try")
-	var early := reports.filter(func(args: Array) -> bool: return args[0] == &"motion_invalid")
-	expect(early.size() == 1 and early[0][1].reason == &"early", "logged as early: %s" % [early])
+	expect_eq(trial.tries, 0, "no try, wrong as the way back was")
+	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "nothing logged")
 	await _sweep(&"right", Vector3.RIGHT)
 	expect_eq(ended.size(), 1, "the same sweep once the round is under way")
 
@@ -148,13 +141,85 @@ func test_wrong_sweeps_count_tries_and_the_flow_stays() -> void:
 	expect_eq(feedback.back()[0], &"good", "good feedback")
 	expect_eq(data.tries, 2, "two tries")
 	expect_eq(data.first_attempt_correct, false, "the first attempt was wrong")
-	expect_eq(data.attempts.map(func(attempt: Dictionary) -> bool: return attempt.correct), [false, false, true] as Array, "every valid attempt is kept")
-	expect_eq(data.invalid_gestures, 0, "none invalid")
+	expect_eq(data.attempts.map(func(attempt: Dictionary) -> bool: return attempt.correct), [false, false, true] as Array, "every attempt is kept")
 	expect(data.first_onset_seconds < data.response_onset_seconds, "onset of the first attempt differs from the last")
-	expect(data.gesture_seconds > 0.2 and data.gesture_seconds < 0.5, "the sweep's own duration is logged: %s" % data.gesture_seconds)
+	expect(data.gesture_seconds > 0.1 and data.gesture_seconds < 0.25, "judged a moment into the sweep: %s s" % data.gesture_seconds)
 
 
-func test_unusable_sweeps_are_invalid_not_tries() -> void:
+func test_the_right_way_wins_at_once() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var ended := record(Events.trial_ended)
+	App.session.run()
+	await until(_round_is.bind(0))
+	await wait(MotionTrial.ARM_SECONDS)
+	var frame: Transform3D = App.session.trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	await _glide(&"right", start, start + frame.basis.x * 0.15, 0.15)
+	expect_eq(ended.size(), 1, "won while the hand is still moving")
+	var streak: MeshInstance3D = App.session.trial.get_node(^"RightTrail").get_child(0)
+	expect(streak.visible, "a streak shows the sweep")
+	expect(ended[0][2].attempts[0].distance_metres < 0.15, "after %s m" % ended[0][2].attempts[0].distance_metres)
+
+
+func test_a_wrong_sweep_counts_once_the_hand_stops() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var feedback := record(Events.feedback)
+	App.session.run()
+	await until(_round_is.bind(0))
+	var trial := App.session.trial
+	await wait(MotionTrial.ARM_SECONDS)
+	var frame: Transform3D = trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	await _glide(&"right", start, start - frame.basis.x * 0.3, 0.3)
+	expect(trial.tries == 0 and feedback.is_empty(), "nothing while the hand moves")
+	await wait(SETTLE)
+	expect_eq(trial.tries, 1, "a try once it has stopped")
+	expect_eq(feedback.back()[0], &"bad", "bad feedback")
+
+
+func test_a_wind_up_the_other_way_counts_nothing() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var ended := record(Events.trial_ended)
+	var reports := record(Events.reported)
+	App.session.run()
+	await until(_round_is.bind(0))
+	await wait(MotionTrial.ARM_SECONDS)
+	var frame: Transform3D = App.session.trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	var back := start - frame.basis.x * 0.4
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	await _glide(&"right", start, back, 0.4) # far back the wrong way, then straight on the right way
+	await _glide(&"right", back, start, 0.4)
+	expect_eq(ended.size(), 1, "the sweep the right way wins")
+	var data: Dictionary = ended[0][2]
+	expect(data.first_try and data.tries == 0, "the wind-up is no try")
+	expect_eq(data.windups, 1, "but it is counted")
+	expect_eq(reports.filter(func(args: Array) -> bool: return args[0] == &"motion_windup").size(), 1, "and logged")
+
+
+func test_a_sweep_bending_into_the_right_way_is_no_wind_up() -> void:
+	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
+	var ended := record(Events.trial_ended)
+	App.session.run()
+	await until(_round_is.bind(0))
+	await wait(MotionTrial.ARM_SECONDS)
+	var frame: Transform3D = App.session.trial.get("_frame")
+	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
+	var bend := start + frame.basis * Vector3(cos(deg_to_rad(50.0)), 0.0, -sin(deg_to_rad(50.0))) * 0.13
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(2)
+	await _glide(&"right", start, bend, 0.16) # an arm's arc: 50 degrees off at first
+	await _glide(&"right", bend, bend + frame.basis.x * 0.2, 0.25)
+	expect_eq(ended.size(), 1, "won once the sweep so far goes the right way")
+	expect_eq(ended[0][2].windups, 0, "one sweep, no wind-up")
+
+
+func test_small_or_vertical_moves_are_no_sweeps() -> void:
 	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
 	var ended := record(Events.trial_ended)
 	var feedback := record(Events.feedback)
@@ -163,19 +228,15 @@ func test_unusable_sweeps_are_invalid_not_tries() -> void:
 	App.session.run()
 	await until(_round_is.bind(0))
 	var trial := App.session.trial
-	await _sweep(&"right", Vector3.RIGHT, 0.05)
+	var spoken := said.size()
+	await _sweep(&"right", Vector3.RIGHT, 0.08)
 	await _sweep(&"right", Vector3.UP, 0.3)
-	await _sweep(&"left", Vector3.LEFT, 0.05)
-	expect(trial.is_running(), "invalid sweeps leave the round going")
-	expect_eq(trial.tries, 0, "no tries")
-	expect(feedback.is_empty(), "no good or bad feedback")
-	var invalid := reports.filter(func(args: Array) -> bool: return args[0] == &"motion_invalid")
-	expect_eq(invalid.map(func(args: Array) -> StringName: return args[1].reason), [&"too_small", &"vertical", &"too_small"] as Array, "reasons")
-	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == "Sweep your hand a little farther.").size(), 2, "small sweeps are answered, a raised hand is not")
-	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"motion_attempt"), "no valid attempt yet")
+	await _sweep(&"left", Vector3.LEFT, 0.08)
+	expect(trial.is_running() and trial.tries == 0, "the round goes on, no tries")
+	expect(feedback.is_empty() and said.size() == spoken, "nothing judged, nothing said")
+	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "nothing logged")
 	await _sweep(&"right", Vector3.RIGHT)
-	expect_eq(ended[0][2].invalid_gestures, 3, "invalid sweeps are totalled")
-	expect_eq(ended[0][2].first_attempt_correct, true, "invalid sweeps do not spoil the first attempt")
+	expect_eq(ended[0][2].first_attempt_correct, true, "the first sweep wins")
 
 
 func test_help_makes_every_dot_coherent_and_is_logged() -> void:
@@ -216,27 +277,35 @@ func test_probe_rounds_get_no_help() -> void:
 	expect(not reports.any(func(args: Array) -> bool: return args[0] == &"hint"), "no hint logged")
 
 
-func test_pause_cancels_an_unfinished_sweep() -> void:
+func test_a_pause_drops_unfinished_sweeps() -> void:
 	await boot(plan_of(RANDOM, 1, false, 0.0, null, {&"direction": 1.0}))
 	var ended := record(Events.trial_ended)
 	var reports := record(Events.reported)
 	App.session.run()
 	await until(_round_is.bind(0))
 	var trial := App.session.trial
+	await wait(MotionTrial.ARM_SECONDS)
 	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
-	var end: Vector3 = start + (trial.get("_frame") as Transform3D).basis.x * 0.25
+	var right: Vector3 = (trial.get("_frame") as Transform3D).basis.x
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
-	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
+	await _glide(&"right", start, start + right * 0.08, 0.1) # not long enough yet
 	input.menu()
 	expect(get_tree().paused, "the panel pauses play")
-	await _glide(&"right", start.lerp(end, 0.5), end, 0.15) # finished while paused
+	await _glide(&"right", start + right * 0.08, start + right * 0.25, 0.2) # finished while paused
 	await wait(SETTLE)
 	input.menu()
 	expect(not get_tree().paused, "closed again")
 	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "the sweep through the pause scored nothing")
-	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "and was not judged as invalid either")
+	# A wrong sweep the hand has not stopped after yet.
+	await _glide(&"right", start + right * 0.25, start - right * 0.1, 0.35)
+	input.menu()
+	await wait(SETTLE)
+	input.menu()
+	await wait(SETTLE)
+	expect_eq(trial.tries, 0, "the wrong sweep through the pause counts no try")
+	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "neither was judged")
 	await _sweep(&"left", Vector3.RIGHT)
 	expect_eq(ended.size(), 1, "the next sweep still works")
 
@@ -248,25 +317,25 @@ func test_tracking_loss_cancels_an_unfinished_sweep() -> void:
 	App.session.run()
 	await until(_round_is.bind(0))
 	var trial := App.session.trial
+	await wait(MotionTrial.ARM_SECONDS)
 	var start := App.head().global_position + Vector3(0.2, -0.4, -0.4)
-	var end: Vector3 = start + (trial.get("_frame") as Transform3D).basis.x * 0.25
+	var right: Vector3 = (trial.get("_frame") as Transform3D).basis.x
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
-	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
+	await _glide(&"right", start, start + right * 0.08, 0.1)
 	input.track(&"right", false)
 	await frames(2)
 	input.track(&"right", true)
-	await _glide(&"right", start.lerp(end, 0.5), end, 1.0) # the hand creeps on to where it was going
+	await _glide(&"right", start + right * 0.08, start + right * 0.16, 0.1) # on to where it was going
 	await wait(SETTLE)
 	expect(trial.is_running() and ended.is_empty(), "a sweep through a tracking loss scores nothing")
 	expect(not reports.any(func(args: Array) -> bool: return String(args[0]).begins_with("motion_")), "and is not judged")
 	# The other hand losing tracking does not matter.
 	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
 	await frames(2)
-	await _glide(&"right", start, start.lerp(end, 0.5), 0.15)
+	await _glide(&"right", start, start + right * 0.08, 0.1)
 	input.track(&"left", false)
-	await _glide(&"right", start.lerp(end, 0.5), end, 0.15)
-	await wait(SETTLE)
+	await _glide(&"right", start + right * 0.08, start + right * 0.25, 0.2)
 	expect_eq(ended.size(), 1, "the other hand's tracking loss changes nothing")
 
 
@@ -359,7 +428,7 @@ func test_round_data_is_valid_json() -> void:
 # -- helpers ------------------------------------------------------------------
 
 func _classify(displacement: Vector3, expected: Vector3) -> Dictionary:
-	return MotionTrial.classify(displacement, expected, 0.12, 40.0)
+	return MotionTrial.classify(displacement, expected, 40.0)
 
 
 func _round_is(index: int) -> bool:
@@ -371,7 +440,7 @@ func _material() -> ShaderMaterial:
 
 
 ## Sweeps [param side]'s hand [param length] metres along [param flow] (in the
-## cloud's frame) at 0.8 m/s, then holds it still until judged.
+## cloud's frame) at 0.8 m/s, then holds it still long enough for a wrong sweep to count.
 func _sweep(side: StringName, flow: Vector3, length := 0.25) -> void:
 	var seconds := length / 0.8
 	var trial := App.session.trial

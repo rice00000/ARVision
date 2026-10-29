@@ -43,6 +43,7 @@ intro = "Now look at the real room."
 [sub_resource type="Resource" id="motion"]
 script = ExtResource("2_block")
 trial = ExtResource("7_motion")
+ray = false
 rounds = 4
 intro = "Now watch the dots. Sweep your hand the way most of them go."
 pause_between = 2.0
