@@ -2,6 +2,8 @@
 play it, follow the guide round to the wall behind, play there, get colour back, and find it all
 again after a relaunch."""
 
+import csv
+from pathlib import Path
 import unittest
 
 from support import Actor, Child, SimCase
@@ -36,10 +38,10 @@ class Adventure(SimCase):
                 break
             sim.wait(0.5)
         self.assertTrue(sim.observe()["world"]["guide"]["visible"], "seated 40 degrees away: the guide shows the way")
-        self.assertIn("Turn to the table", self.last_said(sim))
+        self.assertIn("Turn to your alchemy table", self.last_said(sim))
 
         actor.swivel(-40)  # turns the chair to the table
-        world = self.menu_at(sim, "Table", timeout=5)
+        world = self.menu_at(sim, "Alchemy table", timeout=5)
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
                          [(f"task_find_toys_{n}", n == 1) for n in range(1, 6)], "the table's own list")
@@ -53,16 +55,21 @@ class Adventure(SimCase):
         self.assertEqual(len(ends), 3)
         self.assertTrue(all(e["data"]["view"]["title"] == "Black and white" for e in ends), "played without colour")
         self.assertTrue(all(abs(e["data"]["level"] - 0.1) < 1e-6 for e in ends), "at level 1's difficulty")
+        with open(Path(sim.observe()["profile_dir"]) / "picks.csv", encoding="utf-8") as file:
+            picks = list(csv.DictReader(file))
+        self.assertEqual({row["game"] for row in picks}, {"Find the toys, level 1"}, "every pick in the CSV")
+        self.assertEqual(sum(row["correct"] == "1" for row in picks), sum(e["success"] for e in ends), "a right pick per solved round")
 
-        world = self.menu_at(sim, "Table")
+        world = self.menu_at(sim, "Alchemy table")
         self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (1, "A little colour"))
         self.assertTrue(world["guide"]["visible"], "the wall opened: the guide points behind")
         self.assertIn("behind you", self.last_said(sim))
         self.assertEqual([b["open"] for b in world["menu"]["buttons"]], [True, True, False, False, False],
                          "level 2 opened here too")
 
+        actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
         actor.swivel(180)
-        world = self.menu_at(sim, "Behind you", timeout=5)
+        world = self.menu_at(sim, "Spell wall", timeout=5)
         self.assertFalse(world["guide"]["visible"], "nothing new left elsewhere: the guide rests")
         self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
                          [("task_break_wall_1", True), ("task_break_wall_2", False)], "the wall's own list")
@@ -72,14 +79,14 @@ class Adventure(SimCase):
         ends = [e for e in self.round_ends(sim) if e["skill"] != "objects_in_clutter"]
         self.assertEqual(len(ends), 3, "three wall rounds")
         self.assertTrue(all(e["data"]["view"]["title"] == "A little colour" for e in ends))
-        world = self.menu_at(sim, "Behind you")
+        world = self.menu_at(sim, "Spell wall")
         self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (2, "Normal"), "all the colour is back")
         self.assertEqual(len(sim.events("reported", "place_entered")), 2, "the table once, the wall once")
         self.assert_log_ok(sim)
         sim.close(keep_profile=True)
 
         again = self.launch(None, profile="test_sim_world", keep_profile=True)
-        world = self.menu_at(again, "Table")
+        world = self.menu_at(again, "Alchemy table")
         self.assertEqual((world["done"], world["colour"]), ({"find_toys": [0], "break_wall": [0]}, 2), "saved")
         self.assertEqual(again.observe()["view"]["title"], "Normal", "the colour stays")
         self.assertFalse(world["guide"]["visible"], "everything open was seen before: no nagging")
@@ -89,7 +96,7 @@ class Adventure(SimCase):
             with self.subTest(body=body):
                 sim = self.launch(None, profile=f"test_sim_world_reach_{body}", body=body)
                 actor = Actor(sim, body)
-                for place, turn in (("Table", 0), ("Behind you", 180)):
+                for place, turn in (("Alchemy table", 0), ("Spell wall", 180)):
                     if turn:
                         actor.swivel(turn)
                     menu = self.menu_at(sim, place)["menu"]

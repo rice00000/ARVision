@@ -11,7 +11,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**The adventure** (default, `content/adventure.tres`; [world](docs/world.md)): the room starts black and white. A yellow orb points the way; turn to face a place and its menu unfolds: the table (find the toys, five levels) and behind you (break the wall, two). Touch a number (or point and pinch) to play. Each game done the first time brings colour back; the next level, and the wall, unlock as you go. Progress is saved per save; the facilitator panel's **Saves** tab makes, names, copies and switches saves (one per child, as in XRVision). A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` (find toys under four views, then break the wall) or `demo.tres` (training).
+**The adventure** (default, `content/adventure.tres`; [world](docs/world.md)): you are a young alchemist and a grey spell has taken the room's colours. A yellow orb points the way; turn to face a place and its menu unfolds: the alchemy table (potion ingredients: find the toys, five levels) and behind you (break the spell wall, two). Touch a number (or point and pinch) to play. Each level done brews a potion (sparkles, a flask); each game done the first time brings colour back; the next level, and the wall, unlock as you go. Progress is saved per save; the facilitator panel's **Saves** tab makes, names, copies and switches saves (one per child, as in XRVision). A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` (find toys under four views, then break the wall) or `demo.tres` (training).
 
 **Quest controls (hands, no controllers):** point and pinch to choose (a fingertip touch also works; a resting hand touches nothing). Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, touch the yellow ball to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
 
@@ -29,7 +29,7 @@ Runs every suite headlessly on `test` profiles: GDScript unit tests and whole se
 core/      Events (signal bus), App, Profile, Save, Log, Module
 rig/       head and hands, Pointer, Target, SimInput, DesktopDriver
 reality/   Reality API: PassthroughReality (Quest), SimReality + rooms/ (no headset), View, Surface
-modules/   voice, feedback, cv (Detector), facilitator: each one unpluggable
+modules/   voice, feedback, cv (Detector), facilitator, magic (effects), picks (CSV): each one unpluggable
 trials/    Trial, TrialDef, Session; one folder per trial
 world/     World, Guide, TaskMenu; Adventure, Place, Task
 content/   adventure.tres, places/, tasks/, views/, sessions/
@@ -49,4 +49,5 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
 - **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).
+- **Pick data:** every pick is a row in `<save>/picks.csv` (time, save, game, round, target, picked, correct, seconds, accuracy; see [Picks](modules/picks/picks.gd)). One file for all saves: `python tools/picks.py pull` (Quest) or `local` → `build/picks.csv`.
 - **CV on a Quest:** `pip install ultralytics`, `python tools/cv_server.py`, `adb reverse tcp:8765 tcp:8765`.

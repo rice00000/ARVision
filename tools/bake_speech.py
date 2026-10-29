@@ -18,7 +18,7 @@ INDEX = OUT / "index.json"
 STRING = r'"(?:\\.|[^"\\])*"'
 LITERAL = re.compile(r'#[^\n]*|' + STRING)
 SAY = re.compile(r'(?<!func )\bsay\(')
-FIELDS = re.compile(r'(?m)^\s*(?:@export\s+var\s+)?(intro|greeting|farewell|title|turn_to|arrive)\s*(?::=|=)\s*(' + STRING + ')')
+FIELDS = re.compile(r'(?m)^\s*(?:@export\s+var\s+)?(intro|greeting|level_done|farewell|title|turn_to|arrive)\s*(?::=|=)\s*(' + STRING + ')')
 
 
 def decode(token):

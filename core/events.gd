@@ -42,6 +42,10 @@ signal view_changed(view: Dictionary)
 
 ## A round starts. [param condition] is TrialCondition.to_log(): everything it runs at.
 signal trial_started(trial: StringName, condition: Dictionary)
+## The child picked something in a round: [param data] has trial, round,
+## target (what was asked for), picked, correct and seconds (since the round
+## started, paused time not counted).
+signal picked(data: Dictionary)
 ## A scored round is over. Abandoned rounds never send this.
 signal trial_ended(skill: StringName, success: bool, data: Dictionary)
 signal block_started(index: int, info: Dictionary)

@@ -109,6 +109,7 @@ func _pick(toy: Target) -> void:
 	if not _toys.has(toy):
 		return
 	_picks.append(ODD if _odd and toy == _target else String(_toys[toy]))
+	pick(ODD if _odd else String(_toys[_target]), _picks.back())
 	if toy == _target:
 		judge(&"good", toy.global_position)
 		say("Yes! That's the one." if _odd else "Yes! That's the %s." % _toys[toy])

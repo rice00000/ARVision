@@ -6,7 +6,7 @@
 
 [resource]
 script = ExtResource("1_place")
-title = "Table"
-turn_to = "This way! Turn to the table."
-arrive = "Here is the table. Touch a number to pick a level."
+title = "Alchemy table"
+turn_to = "This way! Turn to your alchemy table."
+arrive = "Your alchemy table! Touch a number to pick a potion."
 tasks = Array[ExtResource("3_task")]([ExtResource("2_find_toys")])

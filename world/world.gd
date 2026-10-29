@@ -209,6 +209,7 @@ func _complete(task: Task, level: int) -> void:
 		_show_colour()
 	Events.report(&"task_done", {task = task.id, level = level + 1, colour = colour})
 	Save.write()
+	await say(adventure.level_done)
 	if more_colour:
 		Events.feedback.emit(&"good", App.head().global_position + App.head().global_basis * Vector3(0.0, -0.1, -0.5))
 		await say("Look! Colour is coming back to your room." if colour < adventure.colours.size() - 1

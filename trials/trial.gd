@@ -135,6 +135,13 @@ func say(text: String) -> void:
 	Events.say(text)
 
 
+## The child picked [param what] when [param target] was asked for. Call before
+## [method finish], so the pick's time is the round's.
+func pick(target: String, what: String) -> void:
+	Events.picked.emit({trial = condition.trial, round = condition.round_index, target = target,
+		picked = what, correct = what == target, seconds = snappedf(_elapsed, 0.01)})
+
+
 ## Feedback at [param at]: &"good", &"bad" or &"hint".
 func judge(kind: StringName, at: Vector3) -> void:
 	Events.feedback.emit(kind, at)

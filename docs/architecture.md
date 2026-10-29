@@ -41,6 +41,8 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
 - **Feedback:** sound, shape mark and vibration for good / bad / hint.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; remote backend posts frames to `tools/cv_server.py` (YOLO). Labels are COCO names in both.
+- **Magic:** the alchemist story's effects: gold sparkles on a right pick, a potion brewed below the eyes when a level is done. Nothing flashes.
+- **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
 - **Facilitator:** in-headset panel, pauses play. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
 
 ## Not verified on a headset yet

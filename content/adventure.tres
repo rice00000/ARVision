@@ -11,6 +11,7 @@
 
 [resource]
 script = ExtResource("1_adventure")
-greeting = "Welcome to AR Vision! Your room has lost its colours. Play games to bring them back."
+greeting = "Welcome, young alchemist! A grey spell has taken the colours from your workshop. Brew potions to bring them back."
+level_done = "Well done, alchemist! Your potion is ready."
 places = Array[ExtResource("2_place")]([ExtResource("3_table"), ExtResource("8_behind")])
 colours = Array[ExtResource("4_view")]([ExtResource("5_bw"), ExtResource("6_muted"), ExtResource("7_normal")])

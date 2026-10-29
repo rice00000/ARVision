@@ -71,7 +71,7 @@ func test_turning_to_the_table_unfolds_its_menu() -> void:
 	App.world.run()
 	var guide: Node3D = App.world.get("_guide")
 	expect(await until(func() -> bool: return guide.visible, 15.0), "the guide shows the way")
-	expect(said.back()[0].contains("Turn to the table"), "and says it: %s" % said.back()[0])
+	expect(said.back()[0].contains("Turn to your alchemy table"), "and says it: %s" % said.back()[0])
 	var to_table := App.reality.work_surface().transform.origin - App.head().global_position
 	var to_guide := guide.global_position - App.head().global_position
 	expect(Vector2(to_guide.x, to_guide.z).angle_to(Vector2(to_table.x, to_table.z)) < Vector2(-App.head().global_basis.z.x,
@@ -113,7 +113,7 @@ func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	var said := record(Events.said)
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "the table's menu")
-	expect_eq(App.world.place.title, "Table", "at the table")
+	expect_eq(App.world.place.title, "Alchemy table", "at the table")
 	var guide: Node3D = App.world.get("_guide")
 	expect(guide.visible, "the guide points to the new thing")
 	expect(said.back()[0].contains("behind you"), "and says so: %s" % said.back()[0])
@@ -124,7 +124,7 @@ func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	expect(rad_to_deg(Vector2(to_table.x, to_table.z).angle_to(Vector2(to_behind.x, to_behind.z))) > 179.0, "the other way")
 	await _turn_from_table(100.0)
 	await wait(1.0)
-	expect_eq(App.world.place.title, "Table", "half way round is nowhere new")
+	expect_eq(App.world.place.title, "Alchemy table", "half way round is nowhere new")
 	await _turn_from_table(180.0)
 	var at_wall := func() -> bool: return App.world.place == behind and App.world.menu != null and App.world.menu.get("_open")
 	expect(await until(at_wall, 5.0), "turned around: the wall's menu")

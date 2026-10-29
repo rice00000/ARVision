@@ -26,8 +26,19 @@ func _ready() -> void:
 			App.reality.apply_view(load(VIEWS + file))
 			await _save(out.path_join(file.get_basename() + ".png"))
 	App.reality.apply_view(View.new())
+	var magic := App.module(&"Magic")
+	magic.sparkle((App.session.trial.get("_target") as Node3D).global_position, magic.GOLD, 24)
+	await get_tree().create_timer(0.3).timeout
+	await _save(out.path_join("sparkles.png"))
+	Events.report(&"task_done", {task = &"find_toys", level = 1, colour = 1})
+	await get_tree().create_timer(1.3).timeout
+	await _save(out.path_join("potion.png"))
+	await get_tree().create_timer(2.5).timeout
 	App.sim_input.menu()
 	await _save(out.path_join("facilitator.png"))
+	App.module(&"Facilitator").call(&"_show", &"Saves")
+	App.module(&"Facilitator").call(&"_refresh")
+	await _save(out.path_join("facilitator_saves.png"))
 	print("CAPTURED ", out)
 	get_tree().quit()
 

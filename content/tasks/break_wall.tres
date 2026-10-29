@@ -11,7 +11,7 @@ script = ExtResource("3_block")
 trial = ExtResource("4_motion")
 rounds = 3
 difficulty = 0.0
-intro = "Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"
+intro = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
 ray = false
 pause_between = 3.0
 
@@ -27,7 +27,7 @@ script = ExtResource("3_block")
 trial = ExtResource("4_motion")
 rounds = 3
 difficulty = 0.4
-intro = "Watch the dots. Sweep your hand the way they flow, then hold still. Get it right and you break the wall!"
+intro = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
 ray = false
 pause_between = 3.0
 
@@ -40,7 +40,7 @@ blocks = Array[ExtResource("3_block")]([SubResource("wall_2")])
 
 [resource]
 script = ExtResource("1_task")
-title = "Break the wall"
+title = "Break the spell wall"
 levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2")])
 requires = Array[ExtResource("1_task")]([ExtResource("5_find_toys")])
 colour = 1

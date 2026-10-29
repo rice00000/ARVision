@@ -28,6 +28,13 @@ def ok_hue(colour):
     return math.atan2(b, a) / (2 * math.pi) % 1.0
 
 
+def segment_gap(point, start, end):
+    """Metres from `point` to the straight line from `start` to `end`."""
+    line = [e - s for s, e in zip(start, end)]
+    t = max(0.0, min(1.0, sum((p - s) * l for p, s, l in zip(point, start, line)) / sum(l * l for l in line)))
+    return math.dist(point, [s + t * l for s, l in zip(start, line)])
+
+
 def footprint_gap(point, thing):
     """Metres from `point` to the edge of `thing`'s footprint on the table (negative inside)."""
     dx, dz = (abs(point[i] - thing["centre"][i]) for i in (0, 2))
@@ -107,9 +114,12 @@ class FindIt(SimCase):
             started = sim.run_until("trial_started", "session_finished")
             if started["event"] == "session_finished":
                 break
-            target, _ = child.toys(started, sim.observe())
+            target, others = child.toys(started, sim.observe())
             try:
                 child.actor.body.check_reach("right", tuple(target["centre"]), comfortable=True)
+                ready = child.actor.body.ready("right")
+                if any(segment_gap(o["centre"], ready, target["centre"]) < o["radius"] + 0.04 for o in others):
+                    raise ConstraintError("path_blocked")  # a child reaches round; this one points instead
                 child.play_round(started, ["touch"])
                 self.assertEqual(sim.events("touched")[-1]["target"], target["id"])
                 touched += 1

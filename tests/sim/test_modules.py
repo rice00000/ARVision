@@ -49,7 +49,7 @@ class Unplugged(SimCase):
         self.assertEqual(sim.events("facilitator_toggled"), [])
 
     def test_everything_optional_unplugged(self):
-        sim = self.launch("demo", unplug=["Voice", "Feedback", "Detector", "Facilitator"])
+        sim = self.launch("demo", unplug=["Voice", "Feedback", "Detector", "Facilitator", "Magic", "Picks"])
         self.assertEqual(sim.observe()["modules"], [])
         Child(sim, perception="strong", seed=4).play()
         self.assertEqual(len(self.round_ends(sim)), 18)

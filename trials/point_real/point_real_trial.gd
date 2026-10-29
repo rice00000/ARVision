@@ -77,6 +77,7 @@ func _on_selected(_hand: StringName, _target: Target, origin: Vector3, direction
 			angle = off
 	_attempts.append({object = picked.label, angle = snappedf(angle, 0.1)})
 	var close: bool = angle <= condition.value(&"tolerance", 10.0)
+	pick(_label, picked.label if close else "nothing")
 	if picked == _named and close:
 		judge(&"good", _named.position)
 		say("Yes! That's the %s." % _label)
