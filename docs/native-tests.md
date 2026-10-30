@@ -13,7 +13,7 @@ Get ARVision building and running on the headset. Later sessions: camera frames 
 | N0 | Does the Mac see the headset, and what is its factory camera calibration? | Done Oct 29 |
 | N1 | Does ARVision run on the Quest (passthrough, hands, tables)? | Pass Oct 29 (table not checked) |
 | N2 | Do passthrough camera frames reach Godot? | Pass Oct 30 (CV Lab v1) |
-| N3 | Detections per second on the headset vs the browser (11–12/s); A/B: interval 0, 320 px input, more threads | — |
+| N3 | Detections per second on the headset vs the browser (11–12/s); A/B: interval 0, 320 px input, more threads | Baseline Oct 30: 3.0/s |
 | N4 | Do labels land on real objects? Compare with browser test 4.3 (2–3 cm); use this headset's own focal length | — |
 
 ## Setup (Mac)
@@ -66,6 +66,16 @@ Get ARVision building and running on the headset. Later sessions: camera frames 
 - **Conclusion:** PASS. Frames reach our code in the right format; Wei's "Quest camera unverified" can be marked verified on this headset.
 - **Next:** N3, YOLO on these frames with a detections-per-second readout. Saved frames can show people: keep them out of the repo.
 
+## N3 · How fast is YOLO on the headset? Baseline (Oct 30)
+
+- **Goal:** know the real detection speed before changing anything, and where the time goes.
+- **Question:** detections per second, and model time vs total time, for Wei's YOLO11n (640 px, ONNX Runtime on the CPU, XNNPACK, 2 threads)?
+- **How:** CV Lab v2: send the next frame as soon as the last answer arrives (no timer), readout once a second: rate, plugin `ms`, total ms from grab to answer, top labels ≥ 0.4.
+- **Result:** 3.0 detections/s; model ≈ 285 ms; total ≈ 300+ ms (to confirm). Detected laptop, person, book (library desk).
+- **Conclusion:** BASELINE. The model step is almost all of the time; copying and JPEG add little. About 4× slower than the browser (11–12/s, COCO-SSD at ~300 px on the GPU). Wei's game timer (0.5 s) already caps it at 2/s.
+- **Next:** one change at a time: (a) 4 threads instead of 2; (b) YOLO11n exported at 320 px; (c) a GPU/NPU execution provider (NNAPI).
+- **Debugging on the way:** the scene's root node was hidden (`visible = false` from the eye icon), which hid the panel and label (children of the hidden node). Found by print checkpoints (YOLO answered) plus a YOLO-off switch (still nothing), which pointed away from the code.
+
 ## Decisions
 
 | Date | Decision | Why |
@@ -76,3 +86,31 @@ Get ARVision building and running on the headset. Later sessions: camera frames 
 ## To review later
 
 - `rig/rig.tscn` and `rig/rig.gd`, `rig/pointer.gd`: how the Rig tracks the head and hands, and how pointing and pinching become choices.
+
+## Next session (from Oct 30)
+
+1. Confirm N3 total ms (Output prints `CVLAB readout:` once a second).
+2. Commit and push: keep `tools/cv_lab/`, `docs/native-tests.md`, `export_presets.cfg`, `project.godot`; discard Godot's rewrites of Wei's `.tres` files and `main.tscn`.
+3. Game-tied N4: run Wei's `point_real` trial on the headset (`demo` session) — does the marker land on the real object; what happens on misses.
+4. Speed experiments (threads, 320 px) only if `point_real` feels slow.
+5. If USB stops being detected: restart the headset, replug while wearing it.
+
+## M1 · Global motion on the headset (from Oct 30)
+
+- **Goal:** find what is wrong with the global-motion trial on a real Quest before anyone changes code; agree fixes with Wei.
+- **Question:** which items on Wei's "Still to check on a headset" list (docs/global-motion.md) pass, and what looks wrong?
+- **How:** app "ARVision Motion" (preset "Meta Quest 3 Motion", package `edu.mit.arvision.motion`, starts `content/sessions/motion.tres`). Hands only.
+
+| Check | What to do | Observed | OK? |
+|---|---|---|---|
+| Four directions, both hands | Sweep right, left, toward, away; once with each hand | | |
+| Dots visible over passthrough at 2.2 m | Can you see the cloud clearly in your room? | | |
+| Radial "gathering" motion | Does toward/away look right, or wrong / too hard? | | |
+| Frame rate | Smooth, or stutters? | | |
+| Help vs probe | Raise a hand: do all dots follow the flow? (not in probes) | | |
+| Tracking loss | Hide a hand, bring it back | | |
+| System-menu pause | Open the Quest menu mid-round, come back | | |
+| Reach comfort | Sweeps comfortable seated? | | |
+| Sweep thresholds | Do gentle sweeps count? (child-speed later) | | |
+
+- **Result / Conclusion / Next:** after the run.
