@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="Task" format=3]
+[gd_resource type="Resource" script_class="Task" format=3 uid="uid://i7vh6colt4u1"]
 
-[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
-[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
-[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
-[ext_resource type="Resource" path="res://trials/find/find.tres" id="4_find"]
+[ext_resource type="Script" uid="uid://btq5nanphne2n" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" uid="uid://c2uh7fjvtafom" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" uid="uid://b0nl06crubwd" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" uid="uid://c13q0mme27u20" path="res://trials/find/find.tres" id="4_find"]
 
 [sub_resource type="Resource" id="find_1"]
 script = ExtResource("3_block")
@@ -42,7 +42,10 @@ script = ExtResource("3_block")
 trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.6
-pins = Dictionary[StringName, float]({&"same_colour": 1.0, &"spacing": 1.4})
+pins = Dictionary[StringName, float]({
+&"same_colour": 1.0,
+&"spacing": 1.4
+})
 intro = "These treasures all share one colour. Look at the shapes!"
 ray = false
 pause_between = 1.0
@@ -59,7 +62,10 @@ script = ExtResource("3_block")
 trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.3
-pins = Dictionary[StringName, float]({&"same_shape": 1.0, &"colour_gap": 0.08})
+pins = Dictionary[StringName, float]({
+&"colour_gap": 0.08,
+&"same_shape": 1.0
+})
 intro = "Treasures that look alike! One has a different colour. Find it and grab it!"
 ray = false
 pause_between = 1.0
@@ -76,7 +82,10 @@ script = ExtResource("3_block")
 trial = ExtResource("4_find")
 rounds = 3
 difficulty = 0.45
-pins = Dictionary[StringName, float]({&"same_shape": 1.0, &"colour_gap": 0.04})
+pins = Dictionary[StringName, float]({
+&"colour_gap": 0.04,
+&"same_shape": 1.0
+})
 intro = "A tricky one: one treasure's colour is only a little different. Look closely!"
 ray = false
 pause_between = 1.0
