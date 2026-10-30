@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="Place" format=3]
 
 [ext_resource type="Script" path="res://world/place.gd" id="1_place"]
-[ext_resource type="Resource" path="res://content/tasks/find_toys.tres" id="2_find_toys"]
+[ext_resource type="Resource" path="res://content/tasks/tidy_shelf.tres" id="2_tidy_shelf"]
 [ext_resource type="Script" path="res://world/task.gd" id="3_task"]
 
 [resource]
@@ -9,4 +9,4 @@ script = ExtResource("1_place")
 title = "Alchemy table"
 turn_to = "This way! Turn to your alchemy table."
 arrive = "Your alchemy table! Touch a number to pick a level."
-tasks = Array[ExtResource("3_task")]([ExtResource("2_find_toys")])
+tasks = Array[ExtResource("3_task")]([ExtResource("2_tidy_shelf")])

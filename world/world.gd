@@ -9,9 +9,7 @@ extends Node
 ## menu yet, the guide points there too. Turning to face another place folds this menu and opens that one. Only
 ## the body's turn counts for now, so it can be tested seated.
 ##
-## Each level done the first time puts a treasure in the [Cabinet].
-##
-## Saved as "world" (see Save): the levels done of each task, the levels seen open, the colour, the treasures.
+## Saved as "world" (see Save): the levels done of each task, the levels seen open, the colour.
 
 ## Degrees within which the head faces a place (left-right only).
 const FACING := 25.0
@@ -31,18 +29,12 @@ var done: Dictionary = {}
 var colour := 0
 ## "<task id>:<level>" of every level shown open on a menu.
 var seen: Array = []
-## "<task id>:<level>" -> the treasure that level put in the cabinet: {shape, colour (html)}.
-var treasures: Dictionary = {}
 ## The open menu, or null.
 var menu: TaskMenu
 ## The place the child is at, or null before the first.
 var place: Place
 
 var _guide := Guide.new()
-## Built the first time it is needed, once the save is loaded.
-var _cabinet: Cabinet
-## What the child found in the last solved round of the level being played: {shape, colour}, or {}.
-var _found: Dictionary = {}
 ## While true, facing a place other than [member place] for long enough sends [signal _picked].
 var _watching := false
 var _faced_for: Dictionary[Place, float] = {}
@@ -52,9 +44,6 @@ signal _picked(result: Array)
 
 
 func _ready() -> void:
-	Events.trial_ended.connect(func(_skill: StringName, success: bool, data: Dictionary) -> void:
-		if success and data.has("found"):
-			_found = data.found)
 	App.world = self
 	add_child(_guide)
 	if autostart and App.session.plan == null:
@@ -62,14 +51,13 @@ func _ready() -> void:
 
 
 func save_state() -> Dictionary:
-	return {done = done, colour = colour, seen = seen, treasures = treasures}
+	return {done = done, colour = colour, seen = seen}
 
 
 func load_state(data: Dictionary) -> void:
 	done = data.get("done", {})
 	colour = data.get("colour", 0)
 	seen = data.get("seen", [])
-	treasures = data.get("treasures", {})
 
 
 func run() -> void:
@@ -93,7 +81,6 @@ func run() -> void:
 			continue
 		var task: Task = picked[0]
 		var level: int = picked[1]
-		_found = {}
 		await App.session.play(task.levels[level])
 		await _complete(task, level)
 
@@ -149,9 +136,6 @@ func _new_elsewhere() -> Place:
 func _enter(where: Place) -> void:
 	place = where
 	_guide.stop()
-	var eye := App.head().global_position
-	var to_place := position_of(where) - eye
-	cabinet().place_beside(eye, Vector3(to_place.x, 0.0, to_place.z).normalized())
 	Events.report(&"place_entered", {place = where.title})
 
 
@@ -214,16 +198,7 @@ func _choose() -> Array:
 	return picked
 
 
-## The treasure cabinet, built on first use.
-func cabinet() -> Cabinet:
-	if _cabinet == null:
-		_cabinet = Cabinet.new(self)
-		add_child(_cabinet)
-	return _cabinet
-
-
-## A level done the first time gives a treasure, a task done the first time
-## brings colour back; saves.
+## A task done the first time brings colour back; saves.
 func _complete(task: Task, level: int) -> void:
 	var more_colour := not is_done(task) and task.colour > 0 and colour < adventure.colours.size() - 1
 	var report := {task = task.id, level = level + 1}
@@ -231,19 +206,13 @@ func _complete(task: Task, level: int) -> void:
 		var levels: Array = done.get(task.id, [])
 		levels.append(level)
 		done[task.id] = levels
-		var treasure := _found if not _found.is_empty() else \
-			{shape = "gem", colour = Color.from_ok_hsl(fposmod(0.55 + 0.18 * level, 1.0), 0.75, 0.65).to_html(false)}
-		treasures[key(task, level)] = treasure
-		report.merge({treasure = treasure, slot = cabinet().slot_position(task, level), size = Cabinet.TREASURE,
-			arrive = Cabinet.ARRIVE})
-		cabinet().receive(task, level, treasure)
 	if more_colour:
 		colour = mini(colour + task.colour, adventure.colours.size() - 1)
 		_show_colour()
 	report.colour = colour
 	Events.report(&"task_done", report)
 	Save.write()
-	await say(adventure.new_treasure if report.has("treasure") else adventure.level_done)
+	await say(adventure.level_done)
 	if more_colour:
 		Events.feedback.emit(&"good", App.head().global_position + App.head().global_basis * Vector3(0.0, -0.1, -0.5))
 		await say("Look! Colour is coming back to your room." if colour < adventure.colours.size() - 1

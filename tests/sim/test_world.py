@@ -3,7 +3,6 @@ play it, follow the guide round to the wall behind, play there, get colour back,
 again after a relaunch."""
 
 import csv
-import math
 from pathlib import Path
 import unittest
 
@@ -45,29 +44,22 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Alchemy table", timeout=5)
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
-                         [(f"task_find_toys_{n}", n == 1) for n in range(1, 6)], "the table's own list")
-        self.press(sim, actor, "task_find_toys_2")
+                         [(f"task_tidy_shelf_{n}", n == 1) for n in range(1, 6)], "the table's own list")
+        self.press(sim, actor, "task_tidy_shelf_2")
         self.assertIn("still locked", self.last_said(sim))
-        self.press(sim, actor, "task_find_toys_1")
-        self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "find_toys", "level": 1})
+        self.press(sim, actor, "task_tidy_shelf_1")
+        self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1})
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         ends = self.round_ends(sim)
-        self.assertEqual(len(ends), 3)
+        self.assertEqual(len(ends), 2)
         self.assertTrue(all(e["data"]["view"]["title"] == "Black and white" for e in ends), "played without colour")
-        self.assertTrue(all(abs(e["data"]["level"] - 0.1) < 1e-6 for e in ends), "at level 1's difficulty")
+        self.assertTrue(all(e["data"]["level"] == 0.0 and e["data"]["values"]["things"] == 3 for e in ends), "level 1: three things")
         with open(Path(sim.observe()["profile_dir"]) / "picks.csv", encoding="utf-8") as file:
             picks = list(csv.DictReader(file))
-        self.assertEqual({row["game"] for row in picks}, {"Find the toys, level 1"}, "every pick in the CSV")
-        self.assertEqual(sum(row["correct"] == "1" for row in picks), sum(e["success"] for e in ends), "a right pick per solved round")
-        found = [e["data"]["found"] for e in ends if e["success"]][-1]
-        world = sim.observe()["world"]
-        self.assertEqual(world["treasures"], {"find_toys:0": found}, "the last thing found goes in the cabinet")
-        head = sim.observe()["head"]["position"]
-        table = sim.observe()["work_surface"]["position"]
-        cabinet = world["cabinet"]["position"]
-        angle = math.degrees(math.atan2(*[t - h for t, h in zip(table, head)][::-2]) - math.atan2(*[c - h for c, h in zip(cabinet, head)][::-2]))
-        self.assertTrue(world["cabinet"]["visible"] and 40 < abs(angle) % 360 < 50, f"beside the table, not on it: {angle}")
+        self.assertEqual({row["game"] for row in picks}, {"Tidy the shelf, level 1"}, "every put in the CSV")
+        puts = self.reports(sim, "put")
+        self.assertEqual([row["correct"] == "1" for row in picks], [put["correct"] for put in puts], "a row per put")
 
         world = self.menu_at(sim, "Alchemy table")
         self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (1, "A little colour"))
@@ -85,7 +77,7 @@ class Adventure(SimCase):
         self.press(sim, actor, "task_break_wall_1")
         Child(sim, seed=4).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=15))
-        ends = [e for e in self.round_ends(sim) if e["skill"] != "objects_in_clutter"]
+        ends = [e for e in self.round_ends(sim) if e["skill"] != "visual_matching"]
         self.assertEqual(len(ends), 3, "three wall rounds")
         self.assertTrue(all(e["data"]["view"]["title"] == "A little colour" for e in ends))
         world = self.menu_at(sim, "Spell wall")
@@ -96,7 +88,7 @@ class Adventure(SimCase):
 
         again = self.launch(None, profile="test_sim_world", keep_profile=True)
         world = self.menu_at(again, "Alchemy table")
-        self.assertEqual((world["done"], world["colour"]), ({"find_toys": [0], "break_wall": [0]}, 2), "saved")
+        self.assertEqual((world["done"], world["colour"]), ({"tidy_shelf": [0], "break_wall": [0]}, 2), "saved")
         self.assertEqual(again.observe()["view"]["title"], "Normal", "the colour stays")
         self.assertFalse(world["guide"]["visible"], "everything open was seen before: no nagging")
 

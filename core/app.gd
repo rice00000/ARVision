@@ -33,8 +33,8 @@ func _ready() -> void:
 	xr.session_visible.connect(hold_pause.bind(&"headset", true)) # system menu on top
 	xr.session_focussed.connect(hold_pause.bind(&"headset", false))
 	# Never center_on_hmd: the Stage space stays on the room, and recentring the
-	# world (Quest asks on every headset off and on) left the menus and the treasure
-	# cabinet behind while the table moved.
+	# world (Quest asks on every headset off and on) left the menus behind while
+	# the table moved.
 
 
 ## True when the headset can show the real world behind the app.

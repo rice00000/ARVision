@@ -11,6 +11,7 @@ from body import Body, ConstraintError, add, distance, load, mul, require, sub, 
 
 TIP_REACH = 0.05  # rig/pointer.gd: the fingertip is this far ahead of the hand's aim point
 RAISE = (0.14, 0.4)  # rig/pointer.gd: raise_height (+ a margin) and raise_seconds
+REST = 0.3  # rig/pointer.gd: rest_seconds, before a still fingertip counts as resting
 CREEP_SPEED = 0.15  # m/s, under rig/pointer.gd's sweep_speed: a hand moved this slowly never sweeps
 # Where a child moves the hand (body frame, from the ready pose) when the ray lands on the wrong thing.
 REAIM = [(0, 0.08, 0), (0, 0.16, 0), (-0.08, 0.1, 0), (0.08, 0.1, 0), (0, 0.16, 0.08)]
@@ -139,6 +140,32 @@ class Actor:
         self.move_hand(side, hand, at=point)
         self.wait(0.15)
         self.move_hand(side, ready, at=point)
+
+    def carry(self, side, point, radius, to, hold):
+        """Tidy up: comes down onto the thing at `point` from above (passing over the others), so it
+        sticks to the fingertip, takes it to `to` (where it hangs on a sticker) and holds still there
+        for `hold` seconds and until the hand counts as resting, then lifts the hand clear."""
+        above = add(point, (0.0, radius + 0.06, 0.0))
+        self.face(point)
+        self.body.check_view(self.observe()["head"], point)
+        self.move_hand(side, self.lifted(side), at=point)
+        self.move_hand(side, add(above, (0.0, TIP_REACH, 0.0)), at=point)
+        self.move_hand(side, add(point, (0.0, TIP_REACH, 0.0)), at=add(point, (0.0, -1.0, 0.0)))
+        self.put(side, to, hold)
+
+    def put(self, side, to, hold):
+        """Brings the fingertip (and what is on it) to `to`, holds still, then lifts the hand clear."""
+        lifted = self.lifted(side)
+        self.face(to)
+        self.body.check_view(self.observe()["head"], to)
+        along = unit(sub(to, lifted))
+        self.move_hand(side, sub(to, mul(along, TIP_REACH)), at=add(to, along))
+        self.wait(hold + REST + 0.1)
+        self.move_hand(side, lifted, at=to)
+
+    def lifted(self, side):
+        """The ready pose raised clear of things on a bench as high as a tall table."""
+        return add(self.body.ready(side), (0.0, 0.12, 0.0))
 
     def sweep(self, side, direction, length=0.25, seconds=0.35):
         """Sweeps the hand `length` metres along `direction` (world) in `seconds`, then holds

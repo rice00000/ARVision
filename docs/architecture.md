@@ -41,7 +41,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
 - **Feedback:** sound, shape mark and vibration for good / bad / hint.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
-- **Magic:** the story's effects: gold sparkles on a right pick; a new treasure shows below the eyes, turns and glides into its cabinet slot. Nothing flashes.
+- **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
 - **Facilitator:** in-headset panel, pauses play. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
 
@@ -51,4 +51,4 @@ On a Quest 3 so far: the passthrough camera gives frames (left camera, feed `50`
 
 ## The room frame
 
-Everything lives in OpenXR's Stage space, which stays on the room. The app never recentres (`center_on_hmd`): Quest asks on every headset off and on, and recentring left menus and the treasure cabinet behind while the table moved. A Quest that is off still reports the head as tracked, from a placeholder pose; a table found then is dropped once worn looks contradict it (`TableFinder`).
+Everything lives in OpenXR's Stage space, which stays on the room. The app never recentres (`center_on_hmd`): Quest asks on every headset off and on, and recentring left menus behind while the table moved. A Quest that is off still reports the head as tracked, from a placeholder pose; a table found then is dropped once worn looks contradict it (`TableFinder`).

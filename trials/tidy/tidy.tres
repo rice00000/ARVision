@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="PackedScene" path="res://trials/tidy/tidy.tscn" id="3_scene"]
+
+[sub_resource type="Resource" id="things"]
+script = ExtResource("2_axis")
+name = &"things"
+easy = 3.0
+hard = 6.0
+driven = true
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2_axis")
+name = &"size"
+easy = 0.06
+
+[sub_resource type="Resource" id="match"]
+script = ExtResource("2_axis")
+name = &"match"
+easy = 0.0
+
+[sub_resource type="Resource" id="outline"]
+script = ExtResource("2_axis")
+name = &"outline"
+easy = 0.0
+
+[resource]
+script = ExtResource("1_def")
+title = "Tidy up"
+scene = ExtResource("3_scene")
+skill = &"visual_matching"
+axes = Array[ExtResource("2_axis")]([SubResource("things"), SubResource("size"), SubResource("match"), SubResource("outline")])
+notes = "Things is the driven axis: more stickers to choose between, and at six the look-alikes (egg, drum). Task levels pin match (0 shape, 1 size, 2 colour) and outline (edges only). Each put is a pick: target = the sticker, picked = the thing. The bench stands in front of the child; no table needed."
+hint_after = 10.0
+hint_fade = 1.0
+max_hint = 2
+time_limit = 120.0

@@ -59,7 +59,7 @@ func test_progress_is_saved_and_wiped() -> void:
 func test_each_save_keeps_its_own_progress_and_switching_starts_a_fresh_game() -> void:
 	await boot()
 	var first := Profile.id
-	App.world.done = {&"find_toys": [0]}
+	App.world.done = {&"tidy_shelf": [0]}
 	Profile.adapt(SKILL, false, 2, 0.1)
 	var second := Profile.new_save("Ben")
 	expect_eq(Profile.saves(), [first, second], "listed, oldest first")
@@ -73,7 +73,7 @@ func test_each_save_keeps_its_own_progress_and_switching_starts_a_fresh_game() -
 	App.world.done = {&"break_wall": [1]}
 	Profile.switch(first)
 	await frames(2)
-	expect_eq([App.world.done, Profile.level(SKILL)], [{&"find_toys": [0]}, 0.2], "the first save as it was left")
+	expect_eq([App.world.done, Profile.level(SKILL)], [{&"tidy_shelf": [0]}, 0.2], "the first save as it was left")
 	var copied := Profile.copy("Checkpoint")
 	expect(FileAccess.file_exists("%s%s/save.json" % [Profile.ROOT, copied]), "a copy of what is on disk")
 	Profile.switch(second)

@@ -4,9 +4,7 @@ extends Resource
 ## and how colour comes back. content/adventure.tres.
 
 @export var greeting := ""
-## Said when a level done the first time puts a treasure in the cabinet.
-@export var new_treasure := ""
-## Said when a level is done again.
+## Said when a level is done.
 @export var level_done := ""
 @export var places: Array[Place] = []
 ## How the room looks as colour comes back, from the start (black and white)
