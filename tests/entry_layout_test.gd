@@ -77,6 +77,44 @@ func test_the_checker_catches_onion_on_the_hands_path() -> void:
 	expect(not layout.overlaps().filter(func(o: Dictionary) -> bool: return o.b == &"onion_aside" or o.a == &"onion_aside").is_empty(), "and Onion on the gear's landing spot")
 
 
+func test_the_panel_stays_put_where_the_table_allows_and_glides_where_it_does_not() -> void:
+	var roomy := _layout(Vector2(1.2, 0.7), 0.3, 0.45, 0.72)   # a long reach: a fixed spot exists (the shelf turns 30 degrees)
+	expect(roomy.panel_fixed, "on a long reach the panel has a fixed spot")
+	expect(not roomy.mechanism_moves() and not roomy.cauldron_moves(), "so neither the panel nor the cauldron moves at the reveal")
+	expect(roomy.onion_lifted.distance_to(roomy.onion_lifted_after) < 0.001, "and Onion has nothing to follow")
+	var tight := _layout(Vector2(1.2, 0.7), 0.3, 0.45, 0.6)   # Wei's bench leaves no room: the panel glides
+	expect(not tight.panel_fixed and tight.mechanism_moves(), "on a usual reach it still glides aside at the reveal (the layout says so)")
+	expect(tight.report() == "", "and is clean both ways: %s" % tight.report())
+
+
+func test_the_zones_are_real_volumes_not_footprints() -> void:
+	var layout := EntryLayout.usual().plan()
+	var onion := layout.zone(&"onion_aside")
+	var landing := layout.zone(&"gear_landing")
+	onion.centre = Vector3(landing.centre.x, landing.centre.y + 0.25, landing.centre.z)   # Onion hovering a hand's height above the gear
+	expect(layout.overlaps().filter(func(o: Dictionary) -> bool: return o.a == &"onion_aside" or o.b == &"onion_aside").is_empty(),
+			"Onion high above the landing spot is not an overlap (the volumes are apart)")
+	expect(not layout.overlaps_flat().filter(func(o: Dictionary) -> bool: return o.a == &"onion_aside" or o.b == &"onion_aside").is_empty(),
+			"but the flat fallback, which ignores heights, reports it")
+	onion.centre.y = landing.centre.y
+	expect(not layout.overlaps().filter(func(o: Dictionary) -> bool: return o.a == &"onion_aside" or o.b == &"onion_aside").is_empty(), "down at the gear's height it is")
+	var arc := layout.zone(&"gear_arc")
+	expect(arc != null and arc.shape == &"path" and arc.path.size() >= 10, "the gear's flight is a swept volume")
+	expect(arc.path[0].y > layout.cauldron.y + layout.rim, "that starts over the rim")
+	var panel := layout.zone(&"panel")
+	arc.path[5] = Vector3(panel.centre.x, panel.centre.y + 0.03, panel.centre.z)   # a gear dropped through the panel
+	expect(not layout.overlaps().filter(func(o: Dictionary) -> bool: return o.a == &"gear_arc" or o.b == &"gear_arc").is_empty(), "the flight through the panel is found")
+
+
+func test_onion_stands_beside_the_socket_for_the_set_in() -> void:
+	var layout := EntryLayout.usual().plan()
+	var near := Vector2(layout.onion_socket.x - layout.socket.x, layout.onion_socket.z - layout.socket.z).length()
+	expect(near >= 0.11 and near <= 0.28, "Onion is %d cm from the socket (beside it, not across the table)" % roundi(near * 100.0))
+	expect(layout.onion_socket.y > layout.table_y() + 0.09, "floating a little above the table")
+	expect(layout.zone(&"onion_socket") != null and layout.report() == "", "and clear of everything: %s" % layout.report())
+	expect(layout.onion_lifted.distance_to(layout.onion_socket) > 0.09, "then it rises from there")
+
+
 func test_a_table_out_of_reach_is_reported() -> void:
 	var layout := _layout(Vector2(1.2, 0.7), 0.4, 0.5, 0.5)
 	expect(not layout.out_of_reach().is_empty(), "a table starting 40 cm out for a 50 cm reach: the socket is out of reach, and it says so")
@@ -117,7 +155,8 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.poke_in_sim = true
 	entry.run()
-	expect(await until(func() -> bool: return entry.find_child("entry_part_place", true, false) != null, 20.0), "the dev jumps are there")
+	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
+	expect(entry.find_child("entry_part_place", true, false) != null, "the dev jumps are there")
 	# Every dev button: in reach of a seated grown-up, none on top of another.
 	var buttons: Array = entry.find_children("*", "EntryButton", true, false)
 	var eye := App.head().global_position
@@ -140,8 +179,45 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	expect(flat.call(plate.global_position).distance_to(flat.call(layout.mechanism)) < 0.01, "and the panel")
 	expect(layout.zone(&"gear_landing") != null and flat.call(entry.get("_gear_rest")).distance_to(flat.call(layout.gear_rest)) < 0.01, "the gear lands where the map says")
 	entry._on_target(entry.find_child("entry_part_reveal", true, false) as Target)
-	expect(await until(func() -> bool: return entry.get("_made_way"), 30.0), "the reveal makes way")
-	await wait(1.5)
-	expect(flat.call(box.global_position).distance_to(flat.call(layout.cauldron_after)) < 0.01, "the cauldron is at its spot for the revealed room")
-	expect(flat.call(plate.global_position).distance_to(flat.call(layout.mechanism_after)) < 0.01, "and the panel")
+	await wait(2.5)
+	# Where the panel is fixed it never moves; where it glides, it ends at the map's spot for the revealed room.
+	var want_box := layout.cauldron_after if entry.get("_made_way") else layout.cauldron
+	var want_plate := layout.mechanism_after if entry.get("_made_way") else layout.mechanism
+	expect(flat.call(box.global_position).distance_to(flat.call(want_box)) < 0.01, "the cauldron is where the map says after the reveal starts")
+	expect(flat.call(plate.global_position).distance_to(flat.call(want_plate)) < 0.01, "and the panel")
+	if layout.panel_fixed:
+		expect(flat.call(plate.global_position).distance_to(flat.call(layout.mechanism)) < 0.001, "a fixed panel did not move")
+	Engine.time_scale = 1.0
+
+
+func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_same_ones() -> void:
+	Engine.time_scale = 1.0
+	load("res://trials/tidy/tidy_trial.gd").push = 0.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = true
+	entry.run()
+	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
+	var copy: Variant = entry.get("_shelf")
+	expect(copy != null and copy.things().size() >= 3, "the opening has made the first round's things (%s)" % [copy.things().size() if copy != null else 0])
+	var before := {}
+	for thing: Node3D in copy.things():
+		before[thing.name] = thing.global_position
+		expect(not thing.visible, "%s is hidden until the ripple reaches it" % thing.name)
+	entry._on_target(entry.find_child("entry_part_shelf", true, false) as Target)
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "the first visit loads")
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.get("_things") != null and not (App.session.trial.get("_things") as Array).is_empty(), 30.0), "and its trial makes things")
+	var made: Array = App.session.trial.get("_things")
+	expect_eq(made.size(), before.size(), "the same number of things")
+	for thing: Node3D in made:
+		expect(before.has(thing.name), "%s is one of the things the opening showed (same shape, same colour, same seed)" % thing.name)
+		if before.has(thing.name):
+			expect(thing.global_position.distance_to(before[thing.name]) < 0.001, "%s is in the same place (no swap, no drop-in)" % thing.name)
+	await App.main.change_scene(&"global_motion")   # leave the first visit: it gives the shelf's static settings back
+	var tidy = load("res://trials/tidy/tidy_trial.gd")
+	tidy.push = 0.0
+	tidy.seed_next = 0
+	tidy.things_arrive = true
+	tidy.onion_voice = false
 	Engine.time_scale = 1.0

@@ -19,12 +19,20 @@ func _ready() -> void:
 	await get_tree().process_frame
 	(App.rig.head as Camera3D).fov = 80.0
 	_entry = app.get_node(^"Intro/Entry")
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--reach="):   # a measured reach (setup step 3 is skipped): the layout and the shelf's push follow it
+			var reach := float(arg.trim_prefix("--reach="))
+			_entry.set("_reach_measured", reach)
+			_entry.set("shelf_push", EntryLayout.shelf_push(reach))
+			_entry.set("_cauldron_distance", EntryLayout.cauldron_out(reach))
 	_entry.run()
 	app.autostart = true
-	await _until(func() -> bool: return _entry.find_child("entry_part_touch", true, false) != null)
+	await _until(func() -> bool: return _entry.find_child("entry_part_all", true, false) != null)   # the layout is planned
 	await _pause(0.5)
 	var args := OS.get_cmdline_user_args()
-	if "--part=visit" in args:
+	if "--part=r5" in args:
+		await _round5()
+	elif "--part=visit" in args:
 		await _visit()
 	else:
 		await _hands("--zones" in args)
@@ -32,6 +40,29 @@ func _ready() -> void:
 
 
 ## Onion beside the hand: each gesture, a few frames across its loop.
+## Round 5: the opening with the 3D zone map on (the wireframes), the reveal with the first things arriving
+## with the shelf, and Onion beside the socket for the set-in.
+func _round5() -> void:
+	var layout: EntryLayout = _entry.get("_layout")
+	print("R5 layout ", layout.summary(), " fixed ", layout.panel_fixed, " make_way ", layout.make_way)
+	print("R5 report ", layout.report().replace("\n", "; ") if layout.report() != "" else "no problems")
+	_press(&"entry_part_place")
+	await _pause(1.6)
+	var socket: Vector3 = _entry.get("_socket_at")
+	_look_at(socket + Vector3(0, 0, -0.05))
+	await _save("r5_set_in_onion_beside_socket")
+	_entry._toggle_zones()
+	await _pause(0.3)
+	_look_at(socket + Vector3(0, 0, -0.1))
+	await _save("r5_zones_3d_set_in")
+	_entry._toggle_zones()
+	_press(&"entry_part_reveal")
+	for k in 6:
+		await _pause(1.1)
+		_look_at(socket + Vector3(0.1, 0, -0.2))
+		await _save("r5_reveal_%d" % k)
+
+
 func _hands(zones: bool) -> void:
 	var layout: EntryLayout = _entry.get("_layout")
 	print("R4 layout ", layout.summary())

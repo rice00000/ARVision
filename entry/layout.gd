@@ -93,12 +93,20 @@ const OPENING := 2
 const REVEAL := 4
 const SHELF := 8
 const ALWAYS := 15
+## The gear's hop (entry.gd _emerge_gear): its middle rises 6 cm over the straight line from just over the
+## rim (5 cm above it) to where it lands; a ball this big holds the gear (0.6 scale: 10.5 cm wide, 4.7 tall).
+const ARC_HEIGHT := 0.06
+const ARC_RADIUS := 0.058
+const ARC_OVER_RIM := 0.05
+const GEAR_MIDDLE := 0.0235
 ## Parts of the opening where one teaching-hand gesture shows (with Onion at a known spot):
 ## the tap (Tap), the pinch (Pick up), the lowering over the socket (Set in).
 const TAP := 16
 const PICKUP := 32
 const SETIN := 64
-const GESTURES := TAP | PICKUP | SETIN
+## The gear's flight out of the cauldron (the Gear part).
+const ARC := 128
+const GESTURES := TAP | PICKUP | SETIN | ARC
 
 ## The teaching hand's reach (entry/demo_hand.gd), MEASURED in the scene at DemoHand.HAND_SCALE 0.6 from
 ## the skeleton's bones over a whole loop, relative to the point it works on (the rim point, the gear's
@@ -128,7 +136,11 @@ enum Kind { THING, PANEL, AREA, HAND }
 class Zone:
 	var name: StringName
 	var kind := Kind.THING
-	## &"circle", &"rect" (turned by [member yaw]) or &"ring" (a slice of a ring around [member centre]).
+	## The volume: &"circle" (a cylinder), &"rect" (a box, turned by [member yaw]) and &"ring" (a slice
+	## of a ring round [member centre], the hands' room) are prisms: a footprint from [member centre].y
+	## up [member height]. &"capsule" is a vertical capsule ([member radius] round a vertical line, [member
+	## height] in all: Onion's body). &"path" is a swept sphere ([member radius] along [member path]: the
+	## gear's flight). All are real 3D volumes: [method EntryLayout.volume_gap].
 	var shape := &"circle"
 	var centre := Vector3.ZERO       # middle of its footprint; y is its bottom
 	var radius := 0.0                # circle; ring: outer
@@ -137,21 +149,47 @@ class Zone:
 	var yaw := 0.0                   # rect: turn about up, radians; ring: the middle direction
 	var spread := 0.0                # ring: half its angle, radians
 	var height := 0.0                # top above [member centre].y
+	var path := PackedVector3Array()   # path: the middle line of the swept sphere (world points)
 	var phases := ALWAYS
 	var user := ""                   # who uses it, in words
 	## The least gap it keeps from other things on the table, metres.
 	var keeps := GAP
+	## Room added all round for THING pairs only (Onion's halo beyond its body), metres.
+	var space := 0.0
 	## Zones this one may overlap on purpose (things on the bench, the gear in its socket).
 	var may_overlap: Array[StringName] = []
 
 	func top() -> float:
 		return centre.y + height
 
+	## A prism: a footprint extruded up (circle, rect, ring), not a capsule or a swept path.
+	func is_prism() -> bool:
+		return shape == &"circle" or shape == &"rect" or shape == &"ring"
+
+	## The middle line(s) of a capsule or path as [[from, to], ...]: one vertical segment for a capsule,
+	## a point (a zero-length segment) every few cm along a path.
+	func segments() -> Array:
+		var all := []
+		if shape == &"capsule":
+			all.append([Vector3(centre.x, centre.y + radius, centre.z), Vector3(centre.x, centre.y + maxf(height - radius, radius), centre.z)])
+		elif shape == &"path":
+			for i in path.size() - 1:
+				var steps := maxi(1, ceili(path[i].distance_to(path[i + 1]) / 0.02))
+				for k in steps + 1:
+					var at := path[i].lerp(path[i + 1], k / float(steps))
+					all.append([at, at])
+		return all
+
 	## The footprint seen from above, (x, z) points, counter-clockwise or not.
 	func outline() -> PackedVector2Array:
 		var points := PackedVector2Array()
 		match shape:
-			&"circle":
+			&"path":
+				for at in path:
+					for i in 8:
+						var a := i * TAU / 8.0
+						points.append(Vector2(at.x + cos(a) * radius, at.z + sin(a) * radius))
+			&"circle", &"capsule":
 				for i in 24:
 					var a := i * TAU / 24.0
 					points.append(Vector2(centre.x + cos(a) * radius, centre.z + sin(a) * radius))
@@ -171,9 +209,16 @@ class Zone:
 					points.append(Vector2(centre.x, centre.z) + _dir(a) * inner)
 		return points
 
-	## Its corners in 3D: the footprint at its bottom and at its top.
+	## Its corners in 3D: the footprint at its bottom and at its top (a path: round every point).
 	func corners() -> Array[Vector3]:
 		var all: Array[Vector3] = []
+		if shape == &"path":
+			for at in path:
+				for i in 8:
+					var a := i * TAU / 8.0
+					all.append(at + Vector3(cos(a) * radius, radius, sin(a) * radius))
+					all.append(at + Vector3(cos(a) * radius, -radius, sin(a) * radius))
+			return all
 		for p in outline():
 			all.append(Vector3(p.x, centre.y, p.y))
 			all.append(Vector3(p.x, top(), p.y))
@@ -245,10 +290,10 @@ var reach := 0.0
 
 # --- Results (after [method plan]) ---------------------------------------------
 
-## The cauldron and the panel make way when the room is revealed: the bench takes the middle of
-## the table, and whatever stands where it will be glides to a clear spot farther back (still in
-## view). Off: they stay where they were in the opening, overlapping the bench on most tables.
-const MAKE_WAY := true
+## Off (Megan, round 5): the panel and the gear NEVER move at the reveal. The layout finds a spot for the
+## panel (and the cauldron, which is gone after the ripple) that is clear of the bench, the shelf and the
+## things from the start. On: the old way, they glide to a clear spot at the reveal (Entry._make_way).
+const MAKE_WAY := false   # legacy name: the default is now chosen by plan() (see [member panel_fixed])
 
 var push := SHELF_PUSH
 var cauldron_distance := CAULDRON_DISTANCE
@@ -277,6 +322,10 @@ var onion_mouth_offset := Vector3.ZERO
 var onion_mouth := Vector3.ZERO
 var onion_lifted := Vector3.ZERO
 var onion_lifted_after := Vector3.ZERO
+## Where Onion stands while the child sets the gear in: BESIDE the socket (and the same beside the moved
+## panel, when the panel glides at the reveal), and the lifted spots above it.
+var onion_socket := Vector3.ZERO
+var onion_socket_after := Vector3.ZERO
 ## Onion in the shelf scene, beyond the shelf's end on the cauldron's side.
 var onion_rest := Vector3.ZERO
 var zones: Array[Zone] = []
@@ -317,36 +366,95 @@ func mechanism_moves() -> bool:
 	return not mechanism_after.is_equal_approx(mechanism)
 
 
-## Works out every spot and every zone. Call again after changing an input.
-## 1. The shelf scene first: the angle that keeps Wei's things and shelf in view (his bench is
-##    wide and close), nearest straight ahead. 2. The opening: the cauldron left, the panel where
-##    the child can reach and see it, clear of the cauldron (and of the bench, when it can be), the
-##    gear's landing spot beside the cauldron, Onion on the far side. 3. From the reveal on: what
-##    stands where the bench goes moves to a clear spot.
+## Works out every spot and every zone. Call again after changing an input. The panel (with the gear's
+## landing spot) and the cauldron are placed TOGETHER with the shelf. First the FIXED plan (Megan: the panel
+## and the gear never move at the reveal): for each shelf angle (straight ahead to the right) and each
+## cauldron place the panel goes where it is clear of the bench, shelf, things, cauldron and landing spot and
+## its socket is in reach, scored by overlaps, things out of reach or view, and how far the shelf turns. If
+## that cannot be clean on this table (it often cannot: see DEV_NOTES), the same search is run with the panel
+## allowed to glide aside at the reveal ([member make_way]) and kept only if it is clean and the fixed one is
+## not ([member panel_fixed] tells which).
 func plan() -> EntryLayout:
 	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
 	push = shelf_push(reach)
 	cauldron_distance = cauldron_out(reach)
-	# Two tries for the cauldron: three quarters of the reach out, or just beyond it (its near rim
-	# still in reach for the tap) so the gear can land in front of it on a shallow strip of table.
+	var fixed := _plan(false)
+	panel_fixed = true
+	if fixed < -0.001:
+		var kept := {cauldron = cauldron, angle = shelf_angle, mechanism = mechanism}
+		var glide := _plan(true)
+		if glide > fixed + 0.5:
+			panel_fixed = false
+		else:   # the fixed plan stays: put it back
+			make_way = false
+			cauldron = kept.cauldron
+			shelf_angle = kept.angle
+			bench = bench_frame(shelf_angle)
+			mechanism = kept.mechanism
+			_finish()
+	return self
+
+
+## One search, the panel fixed ([param way] false) or gliding ([param way] true). Returns its score
+## (0: clean). Leaves the best plan in place.
+func _plan(way: bool) -> float:
+	make_way = way
+	var angles: Array = [0.0] if not real_table else SHELF_ANGLES
+	var candidates := []
+	for out: float in [cauldron_distance, reach_used() + 0.09]:
+		if not candidates.is_empty() and _best_quick(candidates) > -3.0:
+			break   # the nearer cauldron already works: no need to try the farther one
+		for bearing_left: float in CAULDRON_BEARINGS:
+			cauldron = _cauldron_spot(out, -bearing_left)
+			for angle: float in angles:
+				shelf_angle = angle
+				bench = bench_frame(angle)
+				_place_mechanism()
+				var cauldron_view := absf(bearing_left) + rad_to_deg(atan2(CAULDRON_WIDTH * 0.5, out)) - VIEW_WIDE * 0.5
+				var quick := _mech_score - maxf(cauldron_view, 0.0) * 0.3 - angle * 0.02 - absf(bearing_left - CAULDRON_ANGLE) * 0.01
+				candidates.append({q = quick, cauldron = cauldron, angle = angle, mechanism = mechanism})
+	candidates.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.q > y.q)
 	var best := {}
 	var best_score := -INF
-	for out: float in [cauldron_distance, reach_used() + 0.09]:
-		cauldron = _cauldron_spot(out)
-		shelf_angle = _shelf_angle()
+	for c in candidates.slice(0, 4):   # only the best few get the full (slow) check
+		cauldron = c.cauldron
+		shelf_angle = c.angle
 		bench = bench_frame(shelf_angle)
-		_place_mechanism()
+		mechanism = c.mechanism
 		_finish()
 		var score := _problems()
-		if score > best_score + 0.5:
-			best_score = score
-			best = {cauldron = cauldron, angle = shelf_angle, mechanism = mechanism}
+		if score - shelf_angle * 0.02 > best_score:
+			best_score = score - shelf_angle * 0.02
+			best = c
 	cauldron = best.cauldron
 	shelf_angle = best.angle
 	bench = bench_frame(shelf_angle)
 	mechanism = best.mechanism
 	_finish()
-	return self
+	return _problems()
+
+
+func _best_quick(candidates: Array) -> float:
+	var best := -INF
+	for c: Dictionary in candidates:
+		best = maxf(best, c.q)
+	return best
+
+
+## The panel stays where it is through the reveal and the first visit (the plan found a clear spot for it);
+## false: this table has no such spot, the panel glides aside at the reveal (Entry._make_way).
+var panel_fixed := true
+## While planning: let the panel glide aside at the reveal (false: it must be clear of the bench from the start).
+var make_way := false
+var _mech_score := 0.0
+
+
+## The shelf may turn this many degrees to the right of straight ahead (Wei's table point moves there), and
+## the cauldron may stand this many degrees to the left (the usual CAULDRON_ANGLE first).
+## How much farther than the easy reach the socket may be (a stretch, once, to set the gear in).
+static var socket_stretch := 0.0
+const SHELF_ANGLES := [0.0, 10.0, 20.0, 30.0]
+const CAULDRON_BEARINGS := [30.0, 0.0, -20.0, 50.0]
 
 
 ## Minus how bad the plan is: overlaps, things out of view or out of reach (0: none).
@@ -381,7 +489,7 @@ func _finish() -> void:
 	onion_aside = _onion_aside(cauldron, mechanism)
 	cauldron_after = cauldron
 	mechanism_after = mechanism
-	if MAKE_WAY:
+	if make_way:
 		if not _clear_of_bench(_circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, rim), LOOKED_GAP):
 			cauldron_after = _clear_spot(cauldron, _circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, rim), [])
 		var plate := _rect(&"probe", mechanism, _panel_half(), mechanism_yaw, HAND_ROOM)
@@ -393,8 +501,10 @@ func _finish() -> void:
 	mechanism_yaw_after = _facing(mechanism_after)
 	socket_after = _socket_of(mechanism_after, mechanism_yaw_after)
 	onion_aside_after = _onion_aside(cauldron_after, mechanism_after)
-	onion_lifted = onion_aside + Vector3.UP * LIFT_UP
-	onion_lifted_after = onion_aside_after + Vector3.UP * LIFT_UP
+	onion_socket = _onion_beside_socket(mechanism, mechanism_yaw, socket)
+	onion_socket_after = _onion_beside_socket(mechanism_after, mechanism_yaw_after, socket_after)
+	onion_lifted = onion_socket + Vector3.UP * LIFT_UP
+	onion_lifted_after = onion_socket_after + Vector3.UP * LIFT_UP
 	onion_mouth_offset = _onion_mouth_offset()
 	onion_mouth = _mouth_point() + Vector3.UP * PEEK_UP + onion_mouth_offset
 	onion_rest = _onion_rest()
@@ -470,8 +580,8 @@ func _on_the_table(z: Zone) -> bool:
 
 ## The cauldron: CAULDRON_ANGLE left, [member cauldron_distance] out, on the table and
 ## [constant TABLE_MARGIN] in from its edges (the pretend table too).
-func _cauldron_spot(out := cauldron_distance) -> Vector3:
-	var spot := _on_table(eye + toward(-CAULDRON_ANGLE) * out, TABLE_MARGIN)
+func _cauldron_spot(out := cauldron_distance, bearing_deg := -CAULDRON_ANGLE) -> Vector3:
+	var spot := _on_table(eye + toward(bearing_deg) * out, TABLE_MARGIN)
 	spot.y = table_y()
 	return spot
 
@@ -492,7 +602,7 @@ func _shelf_angle() -> float:
 			var box := in_view(z)
 			view += maxf(maxf(-VIEW_WIDE * 0.5 - box.position.x, box.end.x - VIEW_WIDE * 0.5), 0.0)
 		var clash := maxf(-gap(_bench_zone(), pot), 0.0) + maxf(-gap(_things_zone(), pot), 0.0)
-		var score := -view * 2.0 - (2.0 if view > 0.0 else 0.0) - clash * (5.0 if MAKE_WAY else 50.0) - absf(angle) * 0.02
+		var score := -view * 2.0 - (2.0 if view > 0.0 else 0.0) - clash * (5.0 if make_way else 50.0) - absf(angle) * 0.02
 		if score > best_score:
 			best_score = score
 			best = angle
@@ -531,37 +641,72 @@ func _clear_of_bench(z: Zone, keep := GAP) -> bool:
 ## near the middle and near the cauldron (a short carry). A spot that is also clear of the bench
 ## wins if there is one (then nothing has to move at the reveal).
 func _place_mechanism() -> void:
-	var hands := reach_used()
-	var pot := _circle(&"pot", cauldron, CAULDRON_WIDTH * 0.5, 0.0)
-	var best_score := -INF
-	for angle in range(-50, 55, 5):
-		for distance: float in [0.32, 0.37, 0.42, 0.47, 0.52, 0.57, 0.62, 0.67, 0.72, 0.77, 0.82]:
-			var p := eye + toward(angle) * distance
-			p.y = table_y()
-			var plate := _rect(&"plate", p, _panel_half(), _facing(p), 0.0)
-			if not _on_the_table(plate):
-				continue   # it lies on the table, not hanging off its edge
-			var view := absf(angle) + rad_to_deg(atan2(PANEL.x * 0.5, distance)) - VIEW_WIDE * 0.5
-			var clear := gap(plate, pot)
-			var arc := 0.0
-			if clear >= GAP:   # and the gear can land clear of both, on the cauldron's side
-				var spot := _gear_rest_for(p)
-				var landing := _circle(&"landing", spot, GEAR_RADIUS + FINGERS, 0.0)
-				clear = minf(clear, minf(gap(landing, plate), gap(landing, pot)))
-				arc = _arc_cost(spot, plate)
-				if away(spot) - GEAR_RADIUS - FINGERS > hands + 0.02:   # the gear's near side must be in reach
-					arc += 15.0 + (away(spot) - hands) * 20.0
-			var score := (0.0 if clear >= GAP else -30.0 + clear) - maxf(view, 0.0) * 0.2 - arc
-			score += 0.5 if MAKE_WAY and _clear_of_bench(plate) else 0.0
-			score -= absf(angle) * 0.004 + absf(distance - 0.42) * 0.5 + p.distance_to(cauldron) * 0.5
-			if distance - SOCKET_Z > hands + 0.02:   # the socket must be in easy reach
-				score -= 15.0 + (distance - SOCKET_Z - hands) * 20.0
-			if score > best_score:
-				best_score = score
-				mechanism = p
-	if best_score == -INF:   # a very small table: the middle of it
+	var ctx := {
+		hands = reach_used(),
+		pot = _circle(&"pot", cauldron, CAULDRON_WIDTH * 0.5, 0.0),
+		bench_zones = [_bench_zone(), _shelf_zone(), _things_zone()],
+		beside = _circle(&"beside", cauldron + _onion_mouth_offset(), ONION * 0.5, 0.0),   # where Onion waits for the tap
+		best_score = -INF, best_at = Vector3.ZERO, best_angle = 0, best_distance = 0.0,
+	}
+	for angle in range(-60, 65, 10):   # coarse first, then a closer look round the best
+		for distance: float in [0.32, 0.42, 0.52, 0.62, 0.72, 0.82]:
+			_try_panel(angle, distance, ctx)
+	if ctx.best_score > -INF:
+		var angle0: int = ctx.best_angle
+		var distance0: float = ctx.best_distance
+		for da in [-10, -5, 0, 5, 10]:
+			for dd: float in [-0.1, -0.05, 0.0, 0.05, 0.1]:
+				if da != 0 or dd != 0.0:
+					_try_panel(angle0 + da, distance0 + dd, ctx)
+	if ctx.best_score == -INF:   # a very small table: the middle of it
 		mechanism = _on_table(eye + ahead * 0.42, 0.0)
+		ctx.best_score = -100.0
+	else:
+		mechanism = ctx.best_at
+	_mech_score = ctx.best_score
 	mechanism.y = cauldron.y
+
+
+## Scores a panel at [param angle] degrees, [param distance] m out (higher is better) and keeps it in [param ctx]
+## if it is the best so far: on the table, the socket in reach, in view, clear of the cauldron, Onion's tap
+## spot, the bench (when fixed) and with room for the gear to land.
+func _try_panel(angle: int, distance: float, ctx: Dictionary) -> void:
+	var hands: float = ctx.hands
+	if distance - SOCKET_Z > hands + 0.12 + socket_stretch:
+		return   # far out of reach: never worth the time
+	var p := eye + toward(angle) * distance
+	p.y = table_y()
+	var plate := _rect(&"plate", p, _panel_half(), _facing(p), 0.0)
+	if not _on_the_table(plate):
+		return   # it lies on the table, not hanging off its edge
+	var view := absf(angle) + rad_to_deg(atan2(PANEL.x * 0.5, distance)) - VIEW_WIDE * 0.5
+	var score := -maxf(view, 0.0) * 0.2
+	var clear := minf(gap(plate, ctx.pot), gap(plate, ctx.beside))
+	var bench_clear := INF
+	for z: Zone in ctx.bench_zones:
+		bench_clear = minf(bench_clear, gap(plate, z))
+	if not make_way:   # it stays through the reveal and the first visit: clear of the bench too
+		clear = minf(clear, bench_clear)
+	if distance - SOCKET_Z > hands + 0.02 + socket_stretch:   # the socket must be in easy reach
+		score -= 15.0 + (distance - SOCKET_Z - hands) * 20.0
+	score += 0.5 if make_way and bench_clear >= LOOKED_GAP else 0.0
+	score -= absf(angle) * 0.004 + absf(distance - 0.42) * 0.5 + p.distance_to(cauldron) * 0.5
+	score += 0.0 if clear >= GAP else -30.0 + clear
+	if clear >= GAP and score > ctx.best_score:   # only now the gear's landing spot (the slow part)
+		var spot := _gear_rest_for(p)
+		var landing := _circle(&"landing", spot, GEAR_RADIUS + FINGERS, 0.0)
+		var room := minf(minf(gap(landing, plate), gap(landing, ctx.pot)), gap(landing, ctx.beside))
+		if not make_way:
+			room = minf(room, minf(gap(landing, ctx.bench_zones[0]), gap(landing, ctx.bench_zones[2])))
+		score -= _arc_cost(spot, plate)
+		if away(spot) - GEAR_RADIUS - FINGERS > hands + 0.02:   # the gear's near side must be in reach
+			score -= 15.0 + (away(spot) - hands) * 20.0
+		score += 0.0 if room >= GAP else -30.0 + room
+	if score > ctx.best_score:
+		ctx.best_score = score
+		ctx.best_at = p
+		ctx.best_angle = angle
+		ctx.best_distance = distance
 
 
 ## A clear spot for [param z] (a zone standing at [param from]) from the reveal on: on the table,
@@ -642,7 +787,14 @@ func _arc_cost(spot: Vector3, plate: Zone) -> float:
 	for i in outline.size():
 		if Geometry2D.segment_intersects_segment(from, to, outline[i], outline[(i + 1) % outline.size()]) != null:
 			return cost + HOP_OVER_PANEL
-	return cost
+	# It does not cross the panel; the ball (the gear, 5.8 cm) must also keep clear of its edge.
+	var point := Zone.new()
+	var near := INF
+	for k in 6:
+		var at := from.lerp(to, k / 5.0)
+		point.centre = Vector3(at.x, 0.0, at.y)
+		near = minf(near, gap(point, plate))
+	return cost + maxf(ARC_RADIUS + GAP - near, 0.0) * 30.0
 
 
 ## Onion while the gear comes out: beside [param pot], above the rim, in view, clear of [param panel]
@@ -719,13 +871,51 @@ func _onion_mouth_offset() -> Vector3:
 	return best
 
 
+## Onion BESIDE the socket of the panel at [param plate] (turned [param yaw], socket at [param at]): the
+## nearest spot to the socket, 11 to 26 cm out, that is clear of the panel's plate, the gear's landing
+## spot, the cauldron, the teaching hand's lowering (the hand's body lies to the child's right, so Onion
+## ends on the left or behind), the bench, shelf and things, and in view; a little toward the child
+## preferred; at about 9 cm above the table.
+func _onion_beside_socket(plate: Vector3, yaw: float, at: Vector3) -> Vector3:
+	var plate_zone := _rect(&"plate", plate, _panel_half(), yaw, HAND_ROOM)
+	var landing := _circle(&"landing", gear_rest, GEAR_RADIUS + FINGERS, HAND_ROOM)
+	var pot := _circle(&"pot", cauldron, CAULDRON_WIDTH * 0.5, rim)
+	var hand := hand_zone(&"place", at + Vector3.UP * 0.014)
+	var zones_near: Array[Zone] = [_bench_zone(), _shelf_zone(), _things_zone()]
+	var y := table_y() + 0.09 + ONION_HEIGHT * 0.5
+	var best := at + Vector3.UP * 0.12
+	var best_score := -INF
+	for step in 24:
+		for r: float in [0.11, 0.14, 0.17, 0.20, 0.23, 0.26]:
+			var dir := Vector3(sin(step * TAU / 24.0), 0.0, cos(step * TAU / 24.0))
+			var spot := Vector3(at.x, y, at.z) + dir * r
+			var me := _circle(&"me", Vector3(spot.x, 0.0, spot.z), ONION * 0.5, 0.0)
+			var clear := minf(gap(me, plate_zone), minf(gap(me, landing), gap(me, pot)))
+			for z in zones_near:
+				clear = minf(clear, gap(me, z))
+			var body := Zone.new()
+			body.shape = &"capsule"
+			body.centre = spot - Vector3.UP * ONION_HEIGHT * 0.5
+			body.radius = ONION_BODY
+			body.height = ONION_HEIGHT
+			var hand_clear := volume_gap(body, hand) - HAND_CLEAR
+			var box := in_view(_circle(&"me", Vector3(spot.x, table_y(), spot.z), ONION * 0.5, ONION_HEIGHT + 0.09))
+			var outside := maxf(maxf(-VIEW_WIDE * 0.5 - box.position.x, box.end.x - VIEW_WIDE * 0.5), 0.0)
+			var score := (0.0 if clear >= GAP else -10.0 + clear) + (0.0 if hand_clear >= 0.0 else -10.0 + hand_clear) - outside * 0.5 - r * 4.0
+			score -= absf(spot.y - y) * 0.0 + (dir.dot(Vector3(eye.x - at.x, 0.0, eye.z - at.z).normalized()) * -0.1)   # toward the child a touch
+			if score > best_score:
+				best_score = score
+				best = spot
+	return best
+
+
 ## Onion in the shelf scene: just beyond the shelf's end on the cauldron's side, high up beside the
 ## shelf, as far back as the shelf: never over a cubby, the things or the panel. If that is taken,
 ## up over the cauldron.
 func _onion_rest() -> Vector3:
 	var side := -1.0 if on_bench(cauldron_after).x < 0.0 else 1.0
-	var x := side * (SHELF_HALF + ONION * 0.5 + GAP + 0.01)
-	var spot := bench * Vector3(x, -bench_below + SHELF_HIGH * 0.8, -(SHELF_NEAR + SHELF_FAR) * 0.5)
+	var x := side * (SHELF_HALF + ONION * 0.5 + GAP + 0.04)
+	var spot := bench * Vector3(x, -bench_below + SHELF_HIGH * 0.85, -(SHELF_NEAR + SHELF_FAR) * 0.5)
 	var me := _circle(&"me", spot, ONION * 0.5, 0.0)
 	var pot := _circle(&"pot", cauldron_after, CAULDRON_WIDTH * 0.5, 0.0)
 	var plate := _rect(&"plate", mechanism_after, _panel_half(), mechanism_yaw_after, 0.0)
@@ -745,10 +935,13 @@ static func _yaw_of(frame: Transform3D) -> float:
 func _zones() -> Array[Zone]:
 	var all: Array[Zone] = []
 	var after := REVEAL | SHELF
-	var c_phases := OPENING if cauldron_moves() else OPENING | after
+	# The cauldron is there for the opening only; it sinks away right after the ripple. While the ripple
+	# passes (REVEAL) it may still stand where the bench grows in: see [method ripple_overlaps], which
+	# lists that (information, not an error: a second or two, then it is gone).
+	var c_phases := OPENING
 	all.append(_circle(&"cauldron", cauldron, CAULDRON_WIDTH * 0.5, rim + 0.09, c_phases, "Onion peeks out, the child taps it"))
 	if cauldron_moves():
-		var moved := _circle(&"cauldron_after", cauldron_after, CAULDRON_WIDTH * 0.5, rim + 0.09, after, "the cauldron, moved aside for the bench")
+		var moved := _circle(&"cauldron_after", cauldron_after, CAULDRON_WIDTH * 0.5, rim + 0.09, REVEAL, "the cauldron, moved aside for the bench (gone after the ripple)")
 		moved.keeps = LOOKED_GAP
 		all.append(moved)
 	var m_phases := OPENING if mechanism_moves() else OPENING | after
@@ -766,24 +959,20 @@ func _zones() -> Array[Zone]:
 		ring_after.may_overlap = [&"panel_after"]
 		ring_after.keeps = LOOKED_GAP
 		all.append(ring_after)
-	var moves := not onion_aside_after.is_equal_approx(onion_aside)
-	var a_phases := (OPENING | PICKUP | SETIN) if moves else (OPENING | PICKUP | SETIN | REVEAL)
-	all.append(_circle(&"onion_aside", onion_aside - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, a_phases, "Onion waits while the gear comes out, and while the child picks it up and sets it in"))
-	var lifted := _circle(&"onion_lifted", onion_lifted - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, OPENING, "Onion rises after the seating")
-	lifted.may_overlap = [&"onion_aside"]
-	all.append(lifted)
-	if moves:
-		all.append(_circle(&"onion_aside_after", onion_aside_after - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, REVEAL, "Onion while the room is revealed"))
-	var lifted_after := _circle(&"onion_lifted_after", onion_lifted_after - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, REVEAL, "Onion lifted, turned to the revealed room")
-	lifted_after.may_overlap = [&"onion_aside_after", &"onion_aside"]
-	all.append(lifted_after)
-	var beside := _circle(&"onion_mouth", onion_mouth - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, OPENING | TAP, "Onion beside the mouth while the tap is shown")
+	all.append(_onion(&"onion_aside", onion_aside, OPENING | PICKUP | ARC, "Onion waits while the gear comes out and while the child picks it up"))
+	all.append(_onion(&"onion_socket", onion_socket, OPENING | SETIN, "Onion beside the socket while the child sets the gear in"))
+	all.append(_onion(&"onion_lifted", onion_lifted, OPENING, "Onion rises after the seating"))
+	all.append(_onion(&"onion_lifted_after", onion_lifted_after, REVEAL, "Onion lifted, turned to the revealed room"))
+	var beside := _onion(&"onion_mouth", onion_mouth, OPENING | TAP, "Onion beside the mouth while the tap is shown")
 	beside.may_overlap = [&"cauldron"]
 	all.append(beside)
+	var arc := gear_arc_zone()
+	arc.may_overlap = [&"cauldron", &"gear_landing", &"cauldron_after"]
+	all.append(arc)
 	all.append(hand_zone(&"tap", rim_point()))
 	all.append(hand_zone(&"pinch", gear_rest + Vector3.UP * 0.0235))
 	all.append(hand_zone(&"place", socket + Vector3.UP * 0.014))
-	all.append(_circle(&"onion_rest", onion_rest - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, SHELF, "Onion waits in the shelf scene"))
+	all.append(_onion(&"onion_rest", onion_rest, SHELF, "Onion waits in the shelf scene"))
 	all.append(_bench_zone())
 	all.append(_shelf_zone())
 	all.append(_things_zone())
@@ -889,6 +1078,39 @@ func _panel_zone(name: StringName, offset: Vector3, size: Vector2, middle_y: flo
 	return zone
 
 
+## Onion's body as a vertical capsule centred on [param at] (where its holder floats), with its halo as
+## room all round (the table things keep their distance from the halo, the hand only from the body).
+func _onion(name: StringName, at: Vector3, phases: int, user: String) -> Zone:
+	var z := Zone.new()
+	z.name = name
+	z.shape = &"capsule"
+	z.centre = at - Vector3.UP * ONION_HEIGHT * 0.5
+	z.radius = ONION_BODY
+	z.height = ONION_HEIGHT
+	z.space = ONION * 0.5 - ONION_BODY
+	z.phases = phases
+	z.user = user
+	return z
+
+
+## The gear's flight out of the cauldron: a ball (the gear) swept from just over the rim along its hop to
+## where it lands (entry.gd _emerge_gear / _gear_arc), as a volume.
+func gear_arc_zone() -> Zone:
+	var z := Zone.new()
+	z.name = &"gear_arc"
+	z.shape = &"path"
+	z.radius = ARC_RADIUS
+	var mouth := _mouth_point()
+	var start := Vector3(mouth.x, cauldron.y + rim + ARC_OVER_RIM, mouth.z)
+	var landing := Vector3(gear_rest.x, cauldron.y, gear_rest.z)
+	for i in 11:
+		var k := i / 10.0
+		z.path.append(start.lerp(landing, k) + Vector3.UP * (ARC_HEIGHT * 4.0 * k * (1.0 - k) + GEAR_MIDDLE))
+	z.phases = OPENING | ARC
+	z.user = "the gear's hop out of the cauldron"
+	return z
+
+
 func _circle(name: StringName, at: Vector3, r: float, height: float, phases := ALWAYS, user := "") -> Zone:
 	var zone := Zone.new()
 	zone.name = name
@@ -926,6 +1148,20 @@ func zone(name: StringName) -> Zone:
 ## The gap between two footprints seen from above, metres; negative: they overlap by that much
 ## (the narrower side of the shared part). Heights are not looked at here.
 static func gap(a: Zone, b: Zone) -> float:
+	if a.shape == &"capsule" or b.shape == &"capsule":   # seen from above a capsule is a circle
+		var flat_a := a
+		var flat_b := b
+		if a.shape == &"capsule":
+			flat_a = Zone.new()
+			flat_a.centre = a.centre
+			flat_a.radius = a.radius
+		if b.shape == &"capsule":
+			flat_b = Zone.new()
+			flat_b.centre = b.centre
+			flat_b.radius = b.radius
+		return gap(flat_a, flat_b)
+	if a.shape == &"rect" and b.shape == &"rect":
+		return _rect_rect(a, b)
 	if a.shape == &"circle" and b.shape == &"circle":
 		return Vector2(a.centre.x - b.centre.x, a.centre.z - b.centre.z).length() - a.radius - b.radius
 	if a.shape == &"circle" and b.shape == &"rect":
@@ -959,6 +1195,23 @@ static func gap(a: Zone, b: Zone) -> float:
 	return nearest
 
 
+## Two turned rectangles: the largest separation along their four axes (separating axes), or minus the
+## shallowest overlap. Exact for overlaps and side-to-side gaps; at a corner-to-corner gap it is a little
+## less than the true distance (so a touch stricter, never looser).
+static func _rect_rect(a: Zone, b: Zone) -> float:
+	var ua := Vector2(cos(a.yaw), -sin(a.yaw))
+	var va := Vector2(sin(a.yaw), cos(a.yaw))
+	var ub := Vector2(cos(b.yaw), -sin(b.yaw))
+	var vb := Vector2(sin(b.yaw), cos(b.yaw))
+	var d := Vector2(b.centre.x - a.centre.x, b.centre.z - a.centre.z)
+	var best := -INF
+	for axis: Vector2 in [ua, va, ub, vb]:
+		var ra := a.half.x * absf(ua.dot(axis)) + a.half.y * absf(va.dot(axis))
+		var rb := b.half.x * absf(ub.dot(axis)) + b.half.y * absf(vb.dot(axis))
+		best = maxf(best, absf(d.dot(axis)) - ra - rb)
+	return best
+
+
 ## Circle [param c] and turned rectangle [param r]: their gap, or minus how deep they overlap.
 static func _circle_rect(c: Zone, r: Zone) -> float:
 	var d := Vector2(c.centre.x - r.centre.x, c.centre.z - r.centre.z)
@@ -967,6 +1220,46 @@ static func _circle_rect(c: Zone, r: Zone) -> float:
 	if out.x > 0.0 or out.y > 0.0:
 		return out.max(Vector2.ZERO).length() - c.radius
 	return maxf(out.x, out.y) - c.radius   # the middle is inside: how far in, plus the radius
+
+
+## How far apart two zones are as REAL 3D volumes, metres; negative: they intersect, by how deep (the
+## least way out). Prisms (cylinders, boxes) and capsules and swept paths are all handled exactly (a
+## path as many small spheres). This is what [method overlaps] uses.
+static func volume_gap(a: Zone, b: Zone) -> float:
+	if a.is_prism() and b.is_prism():
+		return _combine(gap(a, b), _y_gap(a.centre.y, a.top(), b.centre.y, b.top()))
+	if a.is_prism():
+		return volume_gap(b, a)
+	var best := INF
+	for seg: Array in a.segments():
+		var lo := minf((seg[0] as Vector3).y, (seg[1] as Vector3).y)
+		var hi := maxf((seg[0] as Vector3).y, (seg[1] as Vector3).y)
+		var at := Vector2((seg[0] as Vector3).x, (seg[0] as Vector3).z)
+		if b.is_prism():
+			var point := Zone.new()
+			point.centre = Vector3(at.x, 0.0, at.y)
+			var h := gap(point, b)
+			best = minf(best, _combine(h, _y_gap(lo, hi, b.centre.y, b.top())) - a.radius)
+		else:
+			for other: Array in b.segments():
+				var o_lo := minf((other[0] as Vector3).y, (other[1] as Vector3).y)
+				var o_hi := maxf((other[0] as Vector3).y, (other[1] as Vector3).y)
+				var h := at.distance_to(Vector2((other[0] as Vector3).x, (other[0] as Vector3).z))
+				best = minf(best, _combine(h, _y_gap(lo, hi, o_lo, o_hi)) - a.radius - b.radius)
+	return best
+
+
+## The gap between two vertical intervals, negative: how deep they overlap.
+static func _y_gap(a0: float, a1: float, b0: float, b1: float) -> float:
+	return maxf(a0, b0) - minf(a1, b1)
+
+
+## Two separations at right angles (across and up): both positive, the straight distance; one positive,
+## that one; both negative, the shallower overlap.
+static func _combine(h: float, v: float) -> float:
+	if h > 0.0 or v > 0.0:
+		return sqrt(maxf(h, 0.0) * maxf(h, 0.0) + maxf(v, 0.0) * maxf(v, 0.0))
+	return maxf(h, v)
 
 
 ## Seen from [param from], the box of directions [param zone] covers: Rect2(degrees right, degrees up).
@@ -986,9 +1279,20 @@ func in_view(zone: Zone, from := eye) -> Rect2:
 	return box
 
 
-## Every pair of zones that overlap when both are there: [{a, b, how, amount}], amount in metres
-## (on the table) or degrees (in view). Empty: all clear.
+## Every pair of zones that overlap when both are there, as 3D VOLUMES: [{a, b, how, amount}], amount in
+## metres (the table things, Onion's body, the teaching hand's sweep, the gear's flight: how much too
+## close, or how deep inside) or degrees (a panel in view). Empty: all clear. [method overlaps_flat] is the
+## same on the footprints only (heights ignored).
 func overlaps() -> Array[Dictionary]:
+	return _overlaps(true)
+
+
+## The same seen from above only: heights are ignored (a quicker, stricter fallback).
+func overlaps_flat() -> Array[Dictionary]:
+	return _overlaps(false)
+
+
+func _overlaps(volumes: bool) -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	for i in zones.size():
 		for j in range(i + 1, zones.size()):
@@ -996,6 +1300,8 @@ func overlaps() -> Array[Dictionary]:
 			var b := zones[j]
 			if a.phases & b.phases == 0 or b.name in a.may_overlap or a.name in b.may_overlap:
 				continue
+			if a.phases & GESTURES != 0 and b.phases & GESTURES != 0 and a.phases & b.phases & GESTURES == 0:
+				continue   # Onion's tap spot and the gear's flight never happen at the same time
 			if String(a.name).begins_with("onion") and String(b.name).begins_with("onion"):
 				continue   # Onion stands in one place at a time
 			if a.kind == Kind.HAND or b.kind == Kind.HAND:
@@ -1003,10 +1309,7 @@ func overlaps() -> Array[Dictionary]:
 				var o := b if a.kind == Kind.HAND else a
 				if h.phases & o.phases & GESTURES == 0 or not String(o.name).begins_with("onion"):
 					continue   # the hand meets only Onion, and only while that gesture shows
-				if minf(h.top(), o.centre.y + ONION) <= maxf(h.centre.y, o.centre.y):
-					continue   # Onion's body passes over or under it
-				var body := _circle(o.name, o.centre, ONION_BODY, ONION)
-				var clear := gap(body, h)
+				var clear := _gap_of(o, h, volumes)
 				if clear < HAND_CLEAR:
 					found.append({a = h.name, b = o.name, how = "on the table", amount = HAND_CLEAR - clear})
 				continue
@@ -1019,14 +1322,21 @@ func overlaps() -> Array[Dictionary]:
 				if view > 0.0:
 					found.append({a = a.name, b = b.name, how = "in view", amount = view})
 					continue
-			var heights := minf(a.top(), b.top()) - maxf(a.centre.y, b.centre.y)
-			if heights <= 0.0:
-				continue
-			var needed := minf(a.keeps, b.keeps) if a.kind == Kind.THING and b.kind == Kind.THING else 0.0
-			var between := gap(a, b)
+			if a.kind == Kind.PANEL or b.kind == Kind.PANEL:
+				if not volumes:
+					continue
+			var needed := minf(a.keeps, b.keeps) + a.space + b.space if a.kind == Kind.THING and b.kind == Kind.THING else 0.0
+			var between := _gap_of(a, b, volumes)
 			if between < needed:
 				found.append({a = a.name, b = b.name, how = "on the table", amount = needed - between})
 	return found
+
+
+## The gap between [param a] and [param b]: as 3D volumes, or (flat) on their footprints.
+func _gap_of(a: Zone, b: Zone, volumes: bool) -> float:
+	if volumes:
+		return volume_gap(a, b)
+	return gap(a, b)
 
 
 ## How many degrees two zones overlap in view (the smaller of across and up), 0 if they don't.
@@ -1036,11 +1346,14 @@ func _view_overlap(a: Zone, b: Zone) -> float:
 
 
 ## Things the child needs that fall outside a seated view looking [constant LOOK_DOWN] down toward
-## the middle of the play: [{name, how}].
+## the middle of the play: [{name, how}]. The shelf, its bench and things, and Onion beside it are not
+## counted when the shelf stands to the side (Onion leads the child there and the child turns to it, as in
+## Wei's World: "turn to face a place"): they only have to be in view when the child faces them, which is
+## always so; how far the shelf had to turn is a cost of the plan instead.
 func out_of_view() -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	for z in zones:
-		if z.kind != Kind.THING:
+		if z.kind != Kind.THING or z.name in [&"bench", &"shelf", &"things", &"onion_rest"]:
 			continue
 		var box := in_view(z)
 		if box.position.x < -VIEW_WIDE * 0.5 or box.end.x > VIEW_WIDE * 0.5:
@@ -1062,7 +1375,7 @@ func out_of_reach() -> Array[Dictionary]:
 			nearest = minf(nearest, Vector2(p.x - eye.x, p.y - eye.z).length())
 		if name == &"panel":
 			nearest = away(socket)   # the gear goes into the socket: that is what must be in reach
-		if nearest > reach_used() + 0.02:
+		if nearest > reach_used() + 0.02 + (socket_stretch if name == &"panel" else 0.0):
 			found.append({name = name, how = "%d cm out, reach %d cm" % [roundi(nearest * 100.0), roundi(reach_used() * 100.0)],
 					metres = nearest - reach_used() - 0.02})
 	return found
@@ -1096,6 +1409,22 @@ func subtitle_covers(above_gaze := 25.0) -> Array[Dictionary]:
 	return found
 
 
+## What the cauldron still touches while the ripple grows the bench, shelf and things in (it sinks away
+## right after): [{b, amount}] in metres. Information only: [method overlaps] does not count it.
+func ripple_overlaps() -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	var pot := Zone.new()
+	pot.shape = &"circle"
+	pot.centre = cauldron_after   # where it stands when the ripple starts (glided aside, or not moved)
+	pot.radius = CAULDRON_WIDTH * 0.5
+	pot.height = rim
+	for other: Zone in [_bench_zone(), _shelf_zone(), _things_zone()]:
+		var between := volume_gap(pot, other)
+		if between < GAP:
+			found.append({b = other.name, amount = GAP - between})
+	return found
+
+
 ## One line per overlap, for Output and the tests.
 func report() -> String:
 	var lines: Array[String] = []
@@ -1117,4 +1446,5 @@ func summary() -> String:
 		roundi(reach_used() * 100), roundi(push * 100), roundi(shelf_angle),
 		where.call(cauldron), (" then " + where.call(cauldron_after)) if cauldron_moves() else "",
 		where.call(mechanism), (" then " + where.call(mechanism_after)) if mechanism_moves() else "", where.call(gear_rest)] \
-		+ (" (it hops over the panel: little table in reach)" if hops_over_panel() else "")
+		+ (" (it hops over the panel: little table in reach)" if hops_over_panel() else "") \
+		+ (" [panel stays put]" if panel_fixed else " [panel glides at the reveal: no clear fixed spot on this table]")
