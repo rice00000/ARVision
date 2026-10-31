@@ -57,6 +57,13 @@ const SHOW_RAYS := true
 ## TESTING: before the opening, show where the table was found and ask to confirm it
 ## (or point at the real table and pinch).
 const CONFIRM_TABLE := true
+## TESTING: a rough line outline of each tracked hand (headset only).
+const SHOW_HANDS := true
+## TESTING: in setup, beside Start, buttons that play one part on its own (set up
+## as that part needs it), then come back. Start plays everything, into Wei's World.
+const JUMP_PANEL := true
+## The parts, in order: button id suffix -> label.
+const PARTS := {hello = "Hello", touch = "Touch", emerge = "Emerge", ripple = "Ripple", shelf = "Shelf"}
 
 var _table: Surface
 var _box := Node3D.new()            # the cauldron on the table
@@ -91,6 +98,8 @@ var _guiding := false               # the guide was showing the way last frame
 signal _cauldron_touched
 ## TESTING: a confirm button: its id.
 signal _confirm_pressed(id: StringName)
+## TESTING: a Start or jump button: which part (&"all" for Start).
+signal _part_pressed(part: StringName)
 ## DEBUG: Onion's soft halo.
 var _halo: StandardMaterial3D
 
@@ -130,6 +139,9 @@ func run() -> void:
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(target))
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
+	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
+	if &"announce_table" in App.reality:
+		App.reality.announce_table = false
 	if not App.reality.is_settled:
 		await App.reality.settled
 	if DEBUG:
@@ -139,14 +151,40 @@ func run() -> void:
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
 	_on_table = _cauldron_on_table()
 	_shelf_to_the_side()
-	Engine.time_scale = TEST_SPEED
 	_table = App.reality.work_surface()
+	# One cauldron, one Onion, one shelf, one workshop for every part.
 	_build_shelf()
 	_build_cauldron(await _cauldron_spot())
 	_build_onion()
-	_start_music()
+	_build_workshop()
 
-	# 1. Arrival: Onion peeks over the rim and says hello.
+	# Nothing plays until the adult presses Start (or a part to jump to).
+	while true:
+		var part := await _choose_part()
+		if not _music.playing:
+			_start_music()
+		Engine.time_scale = TEST_SPEED
+		_set_up_for(&"hello" if part == &"all" else part)
+		if part == &"all":
+			await _hello()
+			await _touch()
+			await _out()
+			await _reveal()
+		elif part != &"shelf":
+			match part:
+				&"hello": await _hello()
+				&"touch": await _touch()
+				&"emerge": await _out()
+				&"ripple": await _reveal()
+			Engine.time_scale = 1.0
+			print("ENTRY jump: ", part, " done")
+			continue
+		await _to_shelf()
+		return
+
+
+## 1. Arrival: Onion peeks over the rim and says hello.
+func _hello() -> void:
 	_beat("1: hello")
 	await _wait(2.0)   # nothing rushes the child
 	await _peek()
@@ -156,25 +194,33 @@ func run() -> void:
 	await _peek()
 	await say("I'm Onion, by the way.")
 
-	# 2. PLACEHOLDER activation: touch the cauldron. The interaction is not chosen yet,
-	# so there is no spoken instruction: the cauldron glows slowly until touched.
+
+## 2. PLACEHOLDER activation: touch the cauldron. The interaction is not chosen yet,
+## so there is no spoken instruction: the cauldron glows slowly until touched.
+func _touch() -> void:
 	_beat("2: PLACEHOLDER touch the cauldron")
 	_cue = true
 	await _cauldron_touched
 	_cue = false
 
-	# 3. Onion moves aside; things come up through the opening, clear the rim, then out.
+
+## 3. Onion moves aside; things come up through the opening, clear the rim, then out.
+func _out() -> void:
 	_beat("3: out of the cauldron")
 	await _onion_aside()
 	await _emerge()
 
-	# 4. The reveal: a gentle ripple spreads through the nearby room.
+
+## 4. The reveal: a gentle ripple spreads through the nearby room.
+func _reveal() -> void:
 	_beat("4: the ripple")
 	await _ripple()
 	await say("Welcome.")
 	await _wait(3.0)   # time to look around
 
-	# 5. Into the shelf activity, inside the revealed workshop. Onion stays.
+
+## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
+func _to_shelf() -> void:
 	_beat("5: to the shelf")
 	await _tidy_away()   # clears the table for the shelf
 	_orb_to(_beside_shelf())
@@ -183,6 +229,77 @@ func run() -> void:
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_beat("done: Wei's World")
 	App.world.run()
+
+
+# --- TESTING: Start, and jumping to one part ----------------------------------
+
+## Shows Start (green) and, with JUMP_PANEL, one button per part; waits for one.
+## Returns the part, or &"all" for Start.
+func _choose_part() -> StringName:
+	_beat("setup: press Start" + (" or jump to a part" if JUMP_PANEL else ""))
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	var side := ahead.rotated(Vector3.UP, -PI * 0.5)   # to the right
+	var middle := eye.origin + ahead * 0.5 + Vector3.UP * 0.08
+	var buttons: Array[Node3D] = [_button("Start", middle, &"entry_part_all", Color(0.25, 0.65, 0.35))]
+	if JUMP_PANEL:
+		var words := Label3D.new()
+		words.text = "or jump to:"
+		words.font_size = 24
+		words.pixel_size = 0.0006
+		words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		add_child(words)
+		words.global_position = middle + Vector3.DOWN * 0.065
+		buttons.append(words)
+		# Two rows (3 + 2) under Start, 13 cm apart, so each is easy to hit on its own.
+		var names: Array = PARTS.keys()
+		for i in names.size():
+			var row := i / 3
+			var count := 3 if row == 0 else names.size() - 3
+			var across := ((i % 3) - (count - 1) * 0.5) * 0.13
+			var at := middle + side * across + Vector3.DOWN * (0.13 + row * 0.1)
+			buttons.append(_button(PARTS[names[i]], at, StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.045))
+	var part: StringName = await _part_pressed
+	for button in buttons:
+		button.queue_free()
+	print("ENTRY setup: ", "Start" if part == &"all" else "jump to " + part)
+	return part
+
+
+## Puts everything as [param part] finds it, at once: Onion's place, the things on
+## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
+func _set_up_for(part: StringName) -> void:
+	_cue = false
+	for piece in _pieces:
+		piece.queue_free()
+	_pieces.clear()
+	_surface_points.clear()
+	for detail in _details:
+		if is_instance_valid(detail):
+			_show_detail(detail, false)
+	match part:
+		&"hello":
+			_orb.global_position = _inside()
+		&"touch", &"emerge":
+			_orb.global_position = _peek_spot()
+		&"ripple", &"shelf":
+			_orb.global_position = _aside_spot()
+			for i in 3:
+				var piece := _new_piece(i)
+				piece.global_position = _land_spot(i)
+				piece.rotation.y += PI * 0.5
+	if part == &"shelf":
+		for detail in _details:
+			if is_instance_valid(detail):
+				_show_detail(detail, true)
+	print("ENTRY jump: set up for ", part)
+
+
+## Shows (at full size) or hides one part of the workshop, at once.
+func _show_detail(detail: Node3D, shown: bool) -> void:
+	detail.set_meta(&"shown", shown)
+	detail.visible = shown
+	detail.scale = detail.get_meta(&"size", Vector3.ONE) if shown else Vector3.ONE * 0.001
 
 
 ## Onion becomes the body of Wei's "this way" guide: one guide all the way through.
@@ -215,6 +332,10 @@ func _on_target(target: Target) -> void:
 	if target != null and target.id == &"entry_debug_exit":
 		print("ENTRY DEBUG: exit")
 		get_tree().quit()
+		return
+	if target != null and String(target.id).begins_with("entry_part_"):
+		Events.feedback.emit(&"hint", target.global_position)
+		_part_pressed.emit(StringName(String(target.id).trim_prefix("entry_part_")))
 		return
 	if target != null and String(target.id).begins_with("entry_confirm"):
 		Events.feedback.emit(&"hint", target.global_position)
@@ -303,19 +424,81 @@ func _new_ray() -> Array:
 	return [beam, dot, light]
 
 
+# --- TESTING: the hands' outlines --------------------------------------------
+
+## Wrist to each fingertip, through the knuckles (Godot's OpenXR hand joints).
+const FINGERS := [[1, 2, 3, 4, 5], [1, 6, 7, 8, 9, 10], [1, 11, 12, 13, 14, 15], [1, 16, 17, 18, 19, 20], [1, 21, 22, 23, 24, 25]]
+var _hand_lines: Dictionary = {}   # side -> [MeshInstance3D of lines, ImmediateMesh, joint dots]
+
+## A rough outline of each tracked hand: a line along each finger and a small dot on
+## each joint (lines alone are 1 pixel wide). Headset only: the desktop has no joints.
+func _draw_hands() -> void:
+	if App.rig == null or App.xr == null:
+		return
+	for side: StringName in [&"left", &"right"]:
+		if not _hand_lines.has(side):
+			_hand_lines[side] = _new_hand()
+		var outline: MeshInstance3D = _hand_lines[side][0]
+		var lines: ImmediateMesh = _hand_lines[side][1]
+		var dots: MultiMeshInstance3D = _hand_lines[side][2]
+		var hand := App.rig.tracked_hand(side)
+		var on := hand.has_joints()
+		outline.visible = on
+		dots.visible = on
+		if not on:
+			continue
+		var joints := hand.joints()
+		var to_world := App.rig.global_transform
+		lines.clear_surfaces()
+		lines.surface_begin(Mesh.PRIMITIVE_LINES)
+		for finger: Array in FINGERS:
+			for k in finger.size() - 1:
+				lines.surface_add_vertex(to_world * joints.get_hand_joint_transform(finger[k]).origin)
+				lines.surface_add_vertex(to_world * joints.get_hand_joint_transform(finger[k + 1]).origin)
+		lines.surface_end()
+		for joint in 25:
+			dots.multimesh.set_instance_transform(joint, Transform3D(Basis.IDENTITY, to_world * joints.get_hand_joint_transform(joint + 1).origin))
+
+
+func _new_hand() -> Array:
+	var lines := ImmediateMesh.new()
+	var outline := MeshInstance3D.new()
+	outline.mesh = lines
+	outline.material_override = _material(Color(0.8, 0.95, 1.0, 0.7), true)
+	outline.top_level = true
+	add_child(outline)
+	var ball := SphereMesh.new()
+	ball.radius = 0.004
+	ball.height = 0.008
+	ball.radial_segments = 6
+	ball.rings = 3
+	ball.material = _material(Color(0.8, 0.95, 1.0, 0.7), true)
+	var many := MultiMesh.new()
+	many.transform_format = MultiMesh.TRANSFORM_3D
+	many.mesh = ball
+	many.instance_count = 25
+	var dots := MultiMeshInstance3D.new()
+	dots.multimesh = many
+	dots.top_level = true
+	add_child(dots)
+	return [outline, lines, dots]
+
+
 # --- DEBUG: restart and exit -------------------------------------------------
 
-## Two small buttons low on the left, out of the way, for the whole run (Wei's World
+## Two small buttons up on the right, out of the way, for the whole run (Wei's World
 ## too): "Restart" plays the opening again from the start, "Exit app" closes the app.
+## 15 cm apart, so each is easy to hit on its own.
 func _debug_buttons() -> void:
 	var eye := App.head().global_transform
 	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var left := ahead.rotated(Vector3.UP, deg_to_rad(38.0))
-	var at := eye.origin + left * 0.5 + Vector3.DOWN * 0.12
-	var down := Vector3.DOWN * 0.045
+	var right := ahead.rotated(Vector3.UP, -deg_to_rad(38.0))
+	var at := eye.origin + right * 0.5 + Vector3.UP * 0.1
+	var down := Vector3.DOWN * 0.075
 	var restart := _button("Restart", at - down, &"entry_debug_restart", Color(0.35, 0.35, 0.4))
 	var leave := _button("Exit app", at + down, &"entry_debug_exit", Color(0.55, 0.25, 0.25))
-	print("ENTRY DEBUG: Restart / Exit buttons ", _away(restart.global_position), " m away, low on the left")
+	print("ENTRY DEBUG: Restart / Exit buttons ", _away(restart.global_position), " m away, up on the right, ",
+			snappedf(restart.global_position.distance_to(leave.global_position), 0.01), " m apart")
 	for button in [restart, leave]:
 		button.set_meta(&"debug", true)
 
@@ -518,23 +701,24 @@ func _outline(table: Surface, real: bool) -> Node3D:
 
 
 ## A floating button with [param text]: touch it, or point at it and pinch.
-func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.45, 0.85)) -> Node3D:
+func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.45, 0.85),
+		wide := 0.22, reach := 0.05) -> Node3D:
 	var button := Node3D.new()
 	add_child(button)
 	button.global_position = at
 	var face := MeshInstance3D.new()
 	var plate := BoxMesh.new()
-	plate.size = Vector3(0.22, 0.06, 0.01)
+	plate.size = Vector3(wide, 0.06 if wide > 0.15 else 0.05, 0.01)
 	plate.material = _material(colour)
 	face.mesh = plate
 	button.add_child(face)
 	var words := Label3D.new()
 	words.text = text
-	words.font_size = 28
+	words.font_size = 28 if wide > 0.15 else 24
 	words.pixel_size = 0.0006
 	words.position = Vector3(0, 0, 0.007)
 	button.add_child(words)
-	button.add_child(Target.sphere(id, 0.05))
+	button.add_child(Target.sphere(id, reach))
 	button.look_at(App.head().global_position, Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)   # its face to the child
 	return button
@@ -726,17 +910,49 @@ func _build_onion() -> void:
 	_glow.omni_range = 0.6
 	_glow.light_energy = 0.6
 	_orb.add_child(_glow)
-	# A very faint halo around Onion: a soft disc of light that always faces the child.
+	# A small, soft halo around Onion in its own body colour, always facing the child.
 	var halo := MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * ONION_HEIGHT * 1.8
+	quad.size = Vector2.ONE * ONION_HEIGHT * 1.5
 	# Normal (mixed) blending: over passthrough, an added glow can vanish.
-	_halo = _material(Color(1.0, 0.88, 0.55, 0.22), true)
+	var tint := _body_colour()
+	tint.a = 0.22
+	_halo = _material(tint, true)
 	_halo.albedo_texture = _soft_dot()
 	_halo.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	quad.material = _halo
 	halo.mesh = quad
 	_orb.add_child(halo)
+
+
+## Onion's body colour: the average of its texture where the body's UVs fall
+## (light blue). If the texture can't be read on this device, the value measured on the desktop.
+func _body_colour() -> Color:
+	var measured := Color(0.57, 0.84, 0.91)
+	for mesh: MeshInstance3D in _onion.find_children("*", "MeshInstance3D", true, false):
+		if mesh.name.contains("Eye"):
+			continue
+		var material := mesh.mesh.surface_get_material(0) as BaseMaterial3D
+		if material == null or material.albedo_texture == null:
+			continue
+		var image := material.albedo_texture.get_image()
+		if image == null:
+			break
+		if image.is_compressed() and image.decompress() != OK:
+			break
+		var uvs: PackedVector2Array = mesh.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		var sum := Color(0, 0, 0, 0)
+		var count := 0
+		for i in range(0, uvs.size(), 7):
+			var x := clampi(int(fposmod(uvs[i].x, 1.0) * image.get_width()), 0, image.get_width() - 1)
+			var y := clampi(int(fposmod(uvs[i].y, 1.0) * image.get_height()), 0, image.get_height() - 1)
+			sum += image.get_pixel(x, y)
+			count += 1
+		if count > 0:
+			print("ENTRY Onion's colour: ", sum / count)
+			return Color(sum.r / count, sum.g / count, sum.b / count)
+	print("ENTRY Onion's colour: measured value (texture not readable here)")
+	return measured
 
 
 ## Where Onion hides: under the brew, out of sight.
@@ -750,6 +966,8 @@ func _process(delta: float) -> void:
 	_clock += delta
 	if SHOW_RAYS:
 		_draw_rays()
+	if SHOW_HANDS:
+		_draw_hands()
 	if _aiming:
 		_aim()
 	for i in _motes.size():
@@ -782,7 +1000,11 @@ func _process(delta: float) -> void:
 
 ## Onion rises just over the rim.
 func _peek() -> void:
-	await _move(_orb, _mouth + Vector3.UP * 0.035, 0.6)
+	await _move(_orb, _peek_spot(), 0.6)
+
+
+func _peek_spot() -> Vector3:
+	return _mouth + Vector3.UP * 0.035
 
 
 ## Onion ducks back under the brew.
@@ -794,7 +1016,12 @@ func _duck() -> void:
 ## (seen by the child), away from where the things will land.
 func _onion_aside() -> void:
 	await _move(_orb, _mouth + Vector3.UP * (ONION_HEIGHT * 0.5 + 0.05), 0.7)
-	await _move(_orb, _mouth + Vector3.UP * (ONION_HEIGHT * 0.5 + 0.04) - _left * (CAULDRON_WIDTH * 0.5 + 0.08) + _toward_child() * 0.04, 0.8)
+	await _move(_orb, _aside_spot(), 0.8)
+
+
+## Where Onion waits while the things come out: right of the cauldron, a little toward the child.
+func _aside_spot() -> Vector3:
+	return _mouth + Vector3.UP * (ONION_HEIGHT * 0.5 + 0.04) - _left * (CAULDRON_WIDTH * 0.5 + 0.08) + _toward_child() * 0.04
 
 
 ## Moves Onion smoothly to [param where].
@@ -812,32 +1039,15 @@ func _beside_shelf() -> Vector3:
 ## Three small things come up through the opening one after another: straight up
 ## until they clear the rim, then out in an arc to the table beside the cauldron.
 func _emerge() -> void:
-	var shapes: Array[Mesh] = [SphereMesh.new(), CylinderMesh.new(), PrismMesh.new()]
-	var colours := [Color(0.35, 0.65, 0.85), Color(0.85, 0.55, 0.25), Color(0.5, 0.75, 0.4)]
-	# On the child's left of the cauldron and toward the child: [toward, left] metres.
-	var spots: Array[Vector2] = [Vector2(0.16, 0.0), Vector2(0.13, 0.10), Vector2(0.04, 0.16)]
-	var toward := -_ahead   # toward the child's seat
 	var rim_y := _box.global_position.y + _rim
 	var last: Tween
-	for i in shapes.size():
-		var piece := MeshInstance3D.new()
-		var mesh := shapes[i]
-		mesh.set("radius", PIECE * 0.5)
-		mesh.set("height", PIECE)
-		mesh.set("top_radius", PIECE * 0.4)
-		mesh.set("bottom_radius", PIECE * 0.4)
-		mesh.set("size", Vector3.ONE * PIECE)
-		var material := StandardMaterial3D.new()
-		material.albedo_color = colours[i]
-		mesh.material = material
-		piece.mesh = mesh
-		add_child(piece)
-		_pieces.append(piece)
+	for i in 3:
+		var piece := _new_piece(i)
 		# Through the opening: start under the brew, a little off centre, inside the opening.
 		var across := _left.rotated(Vector3.UP, i * TAU / 3.0) * (_mouth_radius - PIECE * 0.6) * 0.5
 		var start := _mouth + across + Vector3.DOWN * (PIECE + 0.01)
 		var clear := Vector3(_mouth.x + across.x, rim_y + PIECE * 0.5 + 0.05, _mouth.z + across.z)
-		var land := _box.global_position + toward * spots[i].x + _left * spots[i].y + Vector3.UP * PIECE * 0.5
+		var land := _land_spot(i)
 		piece.global_position = start
 		last = create_tween()
 		last.tween_property(piece, "global_position", clear, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -848,6 +1058,32 @@ func _emerge() -> void:
 					snappedf(clear.y - rim_y, 0.001), " m over it, lands ", snappedf(land.distance_to(_box.global_position), 0.01), " m out")
 		await _wait(0.6)
 	await last.finished
+
+
+## Placeholder thing number [param i] (0..2): a sphere, a cylinder or a prism.
+func _new_piece(i: int) -> MeshInstance3D:
+	var shapes: Array[Mesh] = [SphereMesh.new(), CylinderMesh.new(), PrismMesh.new()]
+	var colours := [Color(0.35, 0.65, 0.85), Color(0.85, 0.55, 0.25), Color(0.5, 0.75, 0.4)]
+	var piece := MeshInstance3D.new()
+	var mesh := shapes[i]
+	mesh.set("radius", PIECE * 0.5)
+	mesh.set("height", PIECE)
+	mesh.set("top_radius", PIECE * 0.4)
+	mesh.set("bottom_radius", PIECE * 0.4)
+	mesh.set("size", Vector3.ONE * PIECE)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colours[i]
+	mesh.material = material
+	piece.mesh = mesh
+	add_child(piece)
+	_pieces.append(piece)
+	return piece
+
+
+## Where thing [param i] lands: on the child's left of the cauldron, toward the child.
+func _land_spot(i: int) -> Vector3:
+	var spots: Array[Vector2] = [Vector2(0.16, 0.0), Vector2(0.13, 0.10), Vector2(0.04, 0.16)]   # [toward, left] metres
+	return _box.global_position - _ahead * spots[i].x + _left * spots[i].y + Vector3.UP * PIECE * 0.5
 
 
 ## One step of a hop from [param from] to [param to], [param height] high in the middle.
@@ -877,7 +1113,7 @@ func _tidy_away() -> void:
 ## surface (depth) a faint glint shows on it: the ripple travels over the real room.
 ## No flash, no camera movement.
 func _ripple() -> void:
-	_build_workshop()
+	_surface_points.clear()
 	_sample_room()
 	var reach := PLAY_RADIUS * 1.6 + _away(_box.global_position)
 	for wave in 3:   # three rings, a second apart, each fainter
@@ -913,7 +1149,7 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 			point.shown = true
 			_glint(point.position, point.normal)
 	for detail in _details:
-		if not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_box.global_position) <= radius:
+		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_box.global_position) <= radius:
 			detail.set_meta(&"shown", true)
 			detail.visible = true
 			create_tween().tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
