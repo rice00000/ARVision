@@ -61,7 +61,7 @@ func stop() -> void
 ```
 Change this API only by telling the other chats: add a line to "API changes" below.
 
-API changes: (none yet)
+API changes: Carry gained (nothing removed): `configure(floor_y, eyes, reach, yaw, keep_clear_at, keep_clear_radius)` (Entry calls it from `_configure_interaction()`), `has_been_picked_up()`, `has_docked()`, static `Carry.middle_of(gear)`. `begin()` resets the memory, so a jump button can replay the part. DemoHand calls return at once (nothing to await); the hand shows until `stop()`. After `docked` the gear stays in the socket (Carry no longer picks it up); `released(false)` is emitted at the moment of release, `released(true)` together with `docked`.
 
 ## Decisions from the story chat's final UPDATE (BUILD_CHAT_UPDATE_2026-10-31.md, last section; it supersedes earlier lines)
 

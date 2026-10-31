@@ -1765,6 +1765,7 @@ func _build_gear() -> void:
 	_demo = DemoHand.new()
 	_demo.name = "DemoHand"
 	add_child(_demo)
+	_configure_interaction()
 	print("ENTRY gear: ", snappedf(box.size.x, 0.001), " m wide, ", snappedf(_gear_height, 0.001), " m high at full size, ", "real" if player != null else "stand-in")
 
 
@@ -2263,3 +2264,12 @@ func _start_music() -> void:
 	_music.play()
 	print("ENTRY music playing: ", _music.playing)
 	create_tween().tween_property(_music, "volume_db", MUSIC_DB, 4.0)
+
+
+# --- Interaction -------------------------------------------------------------
+# What Carry needs to know about the room (the interaction chat's; Carry and DemoHand do the rest).
+
+## Tells Carry where the table is, how far the child reaches, how the panel faces, and what to keep clear.
+func _configure_interaction() -> void:
+	_carry.configure(_gear_rest.y, App.head().global_position, maxf(_cauldron_distance, 0.45) + 0.15,
+		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
