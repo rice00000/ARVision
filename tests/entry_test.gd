@@ -112,7 +112,7 @@ func test_setup_is_quiet_and_waits_for_start() -> void:
 	expect(a.distance_to(b) > 0.14, "Restart and Exit are well apart")
 	await wait(6.0)
 	expect(said.is_empty(), "nothing is said before Start (no 'Got it' line either): %s" % [said])
-	expect(not (entry.get("_music") as AudioStreamPlayer).playing, "and no music yet")
+	expect((entry.get("_music") as AudioStreamPlayer).playing, "the piano is already playing (it starts with the scene)")
 
 
 func test_start_plays_everything_into_the_world() -> void:

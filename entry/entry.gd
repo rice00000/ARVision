@@ -221,6 +221,7 @@ func _exit_tree() -> void:
 func run() -> void:
 	_runner = PartRunner.new()
 	add_child(_runner)
+	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
@@ -2514,6 +2515,8 @@ func _move(thing: Node3D, where: Vector3, seconds: float) -> void:
 
 ## Quiet piano, fading in, looping.
 func _start_music() -> void:
+	if _music.is_inside_tree():
+		return
 	var stream: AudioStreamMP3 = MUSIC.duplicate()
 	stream.loop = true
 	_music.stream = stream
