@@ -43,6 +43,13 @@ const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 static var push := 0.0
 ## While Onion leads the first visit it speaks for the shelf: the instruction, the first "fits" and the end.
 static var onion_voice := false
+## Layout chat (round 5): the opening already showed the first round's things with the shelf. If non-zero,
+## the NEXT round's random numbers start from this seed (so it makes the same things in the same places), and
+## the flag clears itself. 0: random, as always.
+static var seed_next := 0
+## The NEXT round's things are simply there at their places (they were already shown), not dropping in; clears
+## itself after one round. True: they drop in with a bounce, as always.
+static var things_arrive := true
 
 ## The bench, metres from the eyes: the shelf's front; the bench top below the
 ## eyes, the work surface's height kept within this range.
@@ -126,7 +133,14 @@ var _junk: Array[Node3D] = []
 func _setup(round_condition: TrialCondition) -> void:
 	_clear()
 	_rng.randomize()
+	var seeded := seed_next != 0
+	if seeded:
+		_rng.seed = seed_next
+		seed(seed_next)   # the shuffles below use the global generator
+		seed_next = 0
 	round_condition.set_value(&"seed", _rng.seed)
+	var arrive := things_arrive
+	things_arrive = true
 	if _shelf == null:
 		_build_shelf()
 	_match = int(round_condition.value(&"match", SHAPE))
@@ -147,8 +161,13 @@ func _setup(round_condition: TrialCondition) -> void:
 		var thing := _make_thing(looks[i], "thing_%d_%s" % [i, looks[i].key])
 		add_child(thing)
 		_home[thing] = spots[i] + _frame.basis.y * _extent(looks[i].shape, looks[i].size).y * 0.5
-		thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
-		_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
+		if arrive:
+			thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
+			_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
+		else:
+			thing.global_transform = Transform3D(_frame.basis, _home[thing])
+	if seeded:
+		randomize()   # back to chance for everything else
 	round_condition.set_value(&"stickers", ",".join(_cell_key))
 	if not onion_voice:
 		match _match:

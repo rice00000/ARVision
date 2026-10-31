@@ -4,8 +4,14 @@ For Megan, in the Quest 3, seated at a real table, the way a child would sit. On
 what you should **see** and **hear** (the lines are the story's own words, as the build speaks them now), what to
 **judge or measure**, and a box to tick. Mark anything odd in "Notes"; a phone photo of the room helps.
 
-**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 4), with `entry-layout-4` on top if it is merged.
+**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 5), with `entry-layout-5` on top if it is merged.
 **Not built yet** is marked ⚠ so you don't test what isn't there.
+
+What changed in round 5: the PANEL and the GEAR do not move at the reveal where the table allows it (long reach: the
+shelf then stands up to 30 degrees to the side and the cauldron on a far side; the Output line says `[panel stays put]` or
+`[panel glides at the reveal...]`); the cauldron may sink as the ripple STARTS; the first round's THINGS arrive with the
+shelf (they grow in and settle onto the bench as the ring passes), and the shelf level starts with the same things, already
+in place; Onion now stands BESIDE the socket for the set-in; the "Zones" button draws 3D wireframes.
 
 What changed since the first sheet (round 3): Onion now moves for each beat (beside the mouth for the tap, aside for the
 gear, lifted for the reveal); the teaching hand is the real hand (translucent, scale 0.6); the story's lines and staging
@@ -154,9 +160,9 @@ Notes:
 
 ## 6. Set in (DEV "Set in")
 
-**See:** Onion leans a little and looks down at the socket (it stands at its spot LEFT of the cauldron, about 45 cm from the
-socket: the sheet and the notes ask whether it should stand closer). The teaching hand lowers over the socket and opens its
-fingers, looping (it fades out and in between rounds). Bring the
+**See:** Onion moves beside the socket (about 20-25 cm from it, just over the panel's edge, never in the hand's way),
+leans a little and looks down at it. The teaching hand lowers over the socket and opens its fingers, looping (it fades
+out and in between rounds); its body lies to your right, Onion is on the left or behind. Bring the
 gear over the socket and let go: it aligns itself, clicks, and the gears and the panel's little cog start turning.
 Onion rises slightly (about 2 cm and then up to the lifted spot), looks at the mechanism, and turns to the room. Let go anywhere else: the gear floats down onto the table within reach, no fuss.
 **Hear:** "Set it in here, then open your fingers." / a click, once / "Ah. There we go."
@@ -169,7 +175,8 @@ Judge:
 - [ ] It seated at the first try. Tries: ______. Did it ever seat when you did not mean it to? yes / no
 - [ ] The click is a gentle click (not a crack); heard once.
 - [ ] The turning gears are visible from your seat.
-- [ ] Onion is clear of the socket, the panel's edge and the teaching hand while you set the gear in.
+- [ ] Onion is clear of the socket, the panel's edge and the teaching hand while you set the gear in, and still reads as
+      "beside the socket": yes / too far / in the way.
 
 Notes:
 
@@ -177,10 +184,14 @@ Notes:
 
 ## 7. Reveal (DEV "Reveal")
 
-**See:** the cauldron and the panel (still turning) glide aside, about a second, to make room, and Onion (lifted) glides
-along with the cauldron. Onion straightens and turns to look at the shelf as it grows in. A soft ring of light
+**See:** if the Output line said `[panel stays put]`, NOTHING moves (panel, gear, turning cog stay where they are); if it
+said `[panel glides at the reveal...]` the cauldron and the panel (still turning) glide aside, about a second, and Onion
+(lifted) glides along. If the cauldron would stand in the shelf's way it sinks as the ripple STARTS; otherwise right after
+it. Onion straightens and turns to look at the shelf as it grows in. A soft ring of light
 spreads from the socket across the table and the room; faint glints on real surfaces; a wooden bench and a shelf with
-six cubbies grow in, in front of you a little to the right, and a soft doorway of light further off. Onion looks around,
+six cubbies grow in, in front of you a little to the right (up to 30 degrees on a long reach), **together with Wei's first
+round of things**, which grow in and settle the last few cm onto the bench as the ring reaches each one, and a soft doorway
+of light further off. Onion looks around,
 then at things scattered by the shelf, leans in and hops.
 **Hear:** a soft magical pad (fades after about 3 s); "I've been looking forward to showing you this." (Onion turns back
 to you and holds a welcoming pose) / a pause of about 3 s / Onion looks down at the things and leans in /
@@ -188,7 +199,10 @@ to you and holds a welcoming pose) / a pause of about 3 s / Onion looks down at 
 ⚠ The workshop is placeholders (the shelf is Wei's; the doorway of light is a stand-in). No reveal music yet.
 
 Judge:
-- [ ] The glide aside reads as "making room", not as a glitch. Keep it / prefer they stay (they then overlap the shelf).
+- [ ] The glide aside (if it happens) reads as "making room", not as a glitch. If the panel stayed put: nothing looked
+      odd about the shelf standing off to the side (you turned your head to it: ______ degrees).
+- [ ] The cauldron and the shelf never visibly overlap while the ripple passes.
+- [ ] The things arrive WITH the shelf, softly (no pop, no drop with a bounce).
 - [ ] After the reveal: the shelf's nearest edge is within reach: ______ cm. Its top cubbies are within reach: yes / no.
 - [ ] The bench's top is AT your table's height, not floating above it. Floating by about ______ cm.
       (Wei's bench keeps 28-42 cm below the eyes: if you sit high, it floats; that is a known issue for Wei.)
@@ -205,7 +219,7 @@ Notes:
 ## 8. First visit (DEV "Shelf", or after the reveal)
 
 **See:** the scene switches (Onion and the panel stay; **the cauldron is hidden**, so the bench has the middle of the table).
-Wei's things lie on the bench in front of the shelf;
+The things you saw arrive with the shelf are still exactly where they were (nothing is replaced or drops in again);
 cards in the cubbies show their shapes. Onion waits beside the shelf's end, up high. Put a thing into the cubby with its
 shape: it clicks in; a wrong one goes back. At the end Onion looks across the shelf, speaks, and does a little cheer;
 then quiet.
@@ -214,6 +228,7 @@ right one only: "It fits. Let's find places for the others." / at the end: "Ther
 "Thank you for helping."
 
 Judge:
+- [ ] The things on the bench are the SAME ones (same shapes, colours, places) as at the reveal; no flicker at the switch.
 - [ ] Every thing on the bench is reachable seated. The farthest: ______ cm.
 - [ ] Every cubby is reachable seated (the top row too).
 - [ ] **Subtitles:** while you look at the things, does the line cover the shelf? none / top row / more. While you look

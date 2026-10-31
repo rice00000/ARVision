@@ -78,6 +78,11 @@ const POP_AUDITION := false
 ## The build chat's first guess at Onion's waiting behaviour in the Tap beat (gaze to the rim and
 ## back). Megan did not like it; off until the story chat decides the staging.
 const TAP_STAGING := false
+## The first round's things appear WITH the shelf at the ripple (made now by Wei's own code, hidden), rise this
+## far as they arrive (metres), and the first visit makes the same things from the same seed. False: as before
+## (only the shelf appears; Wei's things drop in when the first visit starts).
+const FIRST_THINGS := true
+const FIRST_THINGS_RISE := 0.04
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
@@ -177,6 +182,8 @@ var _reach_measured := 0.0          # the reach the layout uses: _reach_seen whe
 var _layout: EntryLayout            # WHERE everything stands (entry/layout.gd), worked out once after setup
 var _zones: EntryZoneOverlay        # DEV: the zone map drawn on the table (the "Zones" button)
 var _made_way := false              # the cauldron and the panel stand at their spots for the revealed room
+var _cauldron_gone := false         # the cauldron has sunk away (or is sinking)
+var _first_seed := 0                # the seed the first round's things were made from (the first visit makes the same)
 var _runner: PartRunner             # what the playing part waits on; freed to cancel it
 var _part_running := false          # a part is playing (a jump button cuts in on it)
 var _pending: StringName = &""      # the part a jump button asked for while another was playing
@@ -203,6 +210,17 @@ class ShelfCopy extends "res://trials/tidy/tidy_trial.gd":
 
 	func shelf() -> Node3D:
 		return _shelf
+
+	## The things of the round built by [method make_things] (Wei's own, as his trial makes them).
+	func things() -> Array[Target]:
+		return _things
+
+	## Builds the round's things and stickers as Wei's trial does, silently (no spoken instruction).
+	func make_things(condition: TrialCondition) -> void:
+		var spoke := onion_voice
+		onion_voice = true
+		_setup(condition)
+		onion_voice = spoke
 
 
 func _exit_tree() -> void:
@@ -241,7 +259,7 @@ func run() -> void:
 	await _setup()
 	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
-	_on_table = _cauldron_on_table()
+	_on_table = await _cauldron_on_table()
 	_shelf_to_the_side()
 	_table = App.reality.work_surface()
 	# One cauldron, one Onion, one shelf, one workshop for every part.
@@ -471,8 +489,11 @@ func _pickup() -> void:
 	_attend(null)
 
 
-## The cauldron shrinks away into the table over about a second, then hides.
+## The cauldron shrinks away into the table over about a second, then hides (once).
 func _cauldron_away() -> void:
+	if _cauldron_gone:
+		return
+	_cauldron_gone = true
 	var tween := _runner.create_tween()
 	tween.tween_property(_box, "scale", Vector3(0.02, 0.02, 0.02), CAULDRON_SINK).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_callback(func() -> void: _box.visible = false)
@@ -499,7 +520,7 @@ func _place() -> void:
 	if USE_REAL_CARRY and not _carry.enabled:
 		_carry.begin(_gear, _socket_at)   # a jump straight here: the child may act during the instruction
 	_actions.lean_to(_runner, 0.3, 0.8)   # moves beside the socket (0.8 s), looks down and holds
-	_move(_orb, _aside_spot(), 0.8)
+	_move(_orb, _beside_socket(), 0.8)   # genuinely beside the socket (EntryLayout.onion_socket), clear of the hand
 	_attend(_socket_at)
 	if not (USE_REAL_CARRY and _carry.has_docked()):   # a child who set it in while Onion talked is not asked to
 		_demo.lower_release(_socket_at)
@@ -524,11 +545,16 @@ func _reveal(fast := false) -> void:
 	await _make_way()   # layout chat: what stands where the bench goes glides aside first
 	_actions.lean_to(_runner, 0.0, 0.5)
 	_attend(_shelf)   # as the ripple spreads Onion straightens and turns to one revealed feature (the shelf)
-	# The cauldron's job is done: it has sunk away by the time the first ring reaches it (Megan).
-	var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
-	var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)   # as _ripple works it out
-	var hits := RIPPLE_SECONDS * asin(clampf(to_pot / reach, 0.0, 1.0)) * 2.0 / PI   # the ring's ease is a sine
-	_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
+	# The cauldron's job is done (Megan). Where it stands in the bench's way it sinks as the ripple
+	# starts (layout chat: EntryLayout.ripple_overlaps); otherwise it has sunk away by the time the
+	# first ring reaches it.
+	if _layout != null and not _layout.ripple_overlaps().is_empty():
+		_cauldron_away()
+	else:
+		var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
+		var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)   # as _ripple works it out
+		var hits := RIPPLE_SECONDS * asin(clampf(to_pot / reach, 0.0, 1.0)) * 2.0 / PI   # the ring's ease is a sine
+		_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
 	await _ripple()
 	_attend(null)   # turns toward the child
 	await say("I've been looking forward to showing you this.")
@@ -545,6 +571,9 @@ func _reveal(fast := false) -> void:
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
 func _to_shelf(fast := false) -> void:
 	_beat("5: to the shelf")
+	if FIRST_THINGS and _first_seed != 0:   # the real trial makes the same things, already in place
+		ShelfCopy.seed_next = _first_seed
+		ShelfCopy.things_arrive = false
 	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
@@ -736,6 +765,11 @@ func _choose_part() -> StringName:
 		_early_part = &""
 		print("ENTRY setup: jumped to ", early, " from an earlier step")
 		return early
+	var queued := _take_part()   # a jump button pressed while the layout was being planned (on a worker thread)
+	if queued != &"":
+		print("ENTRY setup: jump to ", queued, " (pressed while the layout was planned)")
+		_panel.hide_all()
+		return queued
 	_beat("setup done: press Start" + (" or jump to a part" if JUMP_PANEL else ""))
 	_panel.show_step(SETUP_STEPS, SETUP_STEPS, "All set", "Hand the headset to the child. Press Start when they are ready.",
 			[], [["Start", &"entry_part_all", SetupPanel.GREEN]])
@@ -789,6 +823,7 @@ func _set_up_for(part: StringName) -> void:
 	_surface_points.clear()
 	_box.visible = part != &"shelf"   # back for every part but the shelf (it went after the ripple)
 	_box.scale = Vector3.ONE
+	_cauldron_gone = part == &"shelf"
 	_gear.visible = false
 	_gear_spin.running = false
 	_mech_spin.running = false
@@ -1336,12 +1371,22 @@ func _shelf_to_the_side() -> void:
 
 ## Works out the layout (EntryLayout) from the confirmed table, the head and the reach, and
 ## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
-## finds the height by depth).
+## finds the height by depth). A coroutine: the search runs on a worker thread.
 func _cauldron_on_table() -> Variant:
 	var table := App.reality.work_surface()
 	var real := App.reality.surfaces(&"table").has(table)
 	_layout = _new_layout(table, real, _reach_measured)
-	_layout.plan()
+	# The plan is a search that takes a second or more on the headset: off the main thread, the scene
+	# keeps drawing meanwhile (the layout holds numbers only, no nodes).
+	var started := Time.get_ticks_msec()
+	if DisplayServer.get_name() == "headless":
+		_layout.plan()   # tests wait in game time (fixed frame rate), a thread would run in real time: plan at once
+	else:
+		var task := WorkerThreadPool.add_task(_layout.plan)
+		while not WorkerThreadPool.is_task_completed(task):
+			await get_tree().process_frame
+		WorkerThreadPool.wait_for_task_completion(task)
+	print("ENTRY layout: planned in ", Time.get_ticks_msec() - started, " ms, panel fixed: ", _layout.panel_fixed, ", make_way: ", _layout.make_way)
 	print("ENTRY layout: ", _layout.summary())
 	var problems := _layout.report()
 	if problems != "":
@@ -1455,6 +1500,8 @@ func _table_panel(table: Surface, real: bool) -> void:
 	var crowded := layout.overlaps().filter(func(o: Dictionary) -> bool: return o.how == "on the table").size()
 	var far := layout.out_of_reach().size()
 	var big := crowded == 0 and far == 0
+	if not big:
+		print("ENTRY table step: ", layout.summary(), " | ", layout.report().replace("\n", "; "))
 	_panel.show_step(2, SETUP_STEPS, "Find the table", "Is the outline on your table?",
 			[["Found by the headset" if real else "No table found: a pretend one", &"good" if real else &"warn"],
 			["Comfortable height (%d cm down)" % roundi(drop * 100.0) if comfy else "Looks odd: %d cm below the eyes" % roundi(drop * 100.0), &"good" if comfy else &"warn"],
@@ -1629,8 +1676,29 @@ func _build_shelf() -> void:
 	pivot.global_transform = frame.translated_local(Vector3(0.0, -_shelf.top_below(), -0.26))
 	_shelf.shelf().reparent(pivot)
 	_detail(pivot, pivot.global_position)
+	_build_first_things()
 	get_tree().node_added.connect(_on_node_added)
 	print("ENTRY shelf: bench top ", snappedf(_shelf.top_below(), 0.01), " m below the eyes")
+
+
+## The first round's things, made now by Wei's own code with a fixed seed (the first visit's trial then makes
+## the SAME ones from the same seed: [method _to_shelf]), hidden like the shelf until the ripple reaches each.
+## So the ripple reveals the shelf and its things together and nothing is swapped when the shelf level starts.
+func _build_first_things() -> void:
+	var plan := load("res://entry/first_visit_plan.tres") as SessionPlan
+	if plan == null or plan.blocks.is_empty() or not FIRST_THINGS:
+		return
+	var block: Block = plan.blocks[0]
+	var condition := block.trial.condition(block.difficulty, 0, block.probe, block.pins)
+	_first_seed = (randi() % 2147483646) + 1
+	ShelfCopy.seed_next = _first_seed
+	ShelfCopy.things_arrive = false
+	_shelf.make_things(condition)
+	for thing in _shelf.things():
+		var home := thing.global_position
+		_detail(thing, home)
+		thing.set_meta(&"rise", FIRST_THINGS_RISE)
+	print("ENTRY shelf: ", _shelf.things().size(), " things ready for the ripple (seed ", _first_seed, ")")
 
 
 ## Wei's trial built its own shelf: the copy goes (they stand in the same place).
@@ -1861,7 +1929,13 @@ func _aside_spot() -> Vector3:
 	return _layout.onion_aside_after if _made_way else _layout.onion_aside
 
 
-## Where Onion rises to after the seating, and waits for the reveal: above the aside spot (EntryLayout).
+## Where Onion stands while the child sets the gear in: beside the socket (EntryLayout.onion_socket; beside
+## the moved panel if the panel has glided).
+func _beside_socket() -> Vector3:
+	return _layout.onion_socket_after if _made_way else _layout.onion_socket
+
+
+## Where Onion rises to after the seating, and waits for the reveal: above the spot beside the socket (EntryLayout).
 func _lifted_spot() -> Vector3:
 	return _layout.onion_lifted_after if _made_way else _layout.onion_lifted
 
@@ -2390,7 +2464,12 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_ripple_origin) <= radius:
 			detail.set_meta(&"shown", true)
 			detail.visible = true
-			_runner.create_tween().tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			var arrival := _runner.create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			arrival.tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2)
+			if detail.has_meta(&"rise"):   # a thing: it settles the last few cm onto the bench, softly
+				var home := detail.global_position
+				detail.global_position = home + Vector3.UP * float(detail.get_meta(&"rise"))
+				arrival.tween_property(detail, "global_position", home, 1.2)
 
 
 ## PLACEHOLDER for a depth ripple (later: drawn on the depth image itself, every pixel).

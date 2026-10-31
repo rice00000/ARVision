@@ -142,7 +142,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	await _press(&"entry_part_reveal")
 	await frames(2)
 	expect(_docked(), "ripple: the gear is already in its socket")
-	expect(orb.global_position.distance_to(entry.call("_aside_spot")) < 0.15, "ripple: Onion is already aside")
+	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "ripple: Onion is already up beside the socket (the lifted spot)")
 	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "ripple: plays and says welcome")
 	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "ripple: the panel comes back")
@@ -454,7 +454,11 @@ func test_the_shelf_stands_back_along_the_table_not_in_front_of_the_player() -> 
 	var cauldron: Node3D = entry.get("_box")
 	var shelf_frame: Transform3D = bench
 	var local := shelf_frame.affine_inverse() * cauldron.global_position
-	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0, "the cauldron does not stand inside the shelf's footprint")
+	# Where the panel stays put the cauldron may stand in the bench's way (EntryLayout.ripple_overlaps); it then sinks
+	# as the ripple starts, before the bench grows in.
+	var layout: EntryLayout = entry.get("_layout")
+	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0 or not layout.ripple_overlaps().is_empty(),
+			"the cauldron does not stand inside the shelf's footprint, or it sinks as the ripple starts")
 
 
 func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:

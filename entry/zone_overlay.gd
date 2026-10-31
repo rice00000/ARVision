@@ -1,7 +1,8 @@
 class_name EntryZoneOverlay
 extends Node3D
-## DEV: the zone map (EntryLayout) drawn flat on the table, each zone a soft coloured footprint
-## with its name, so the layout can be seen in the headset or a picture. Red: overlapping another
+## DEV: the zone map (EntryLayout) drawn on the table as 3D wireframes (each zone a real volume: boxes,
+## cylinders, Onion's capsule, the gear's flight as a swept ball, the hand's sweep) over a faint flat
+## footprint, each with its name, so the layout can be seen in the headset or a picture. Red: overlapping another
 ## zone that is there at the same time. Toggled by the "Zones" dev button.
 ##
 ## Colours: Onion's spots cyan; the teaching hand's sweep orange; things the child uses sage-blue; things moved aside for the revealed room violet; the
@@ -34,7 +35,9 @@ func draw(layout: EntryLayout, phases: int) -> void:
 		if z.name in clashing:
 			colour = OVERLAP
 		lift += 0.0008   # each a hair above the last: no flicker where they overlap
-		add_child(_footprint(z.outline(), layout.table_y() + lift, colour, 5 if z.name in clashing else 2))
+		if z.kind != EntryLayout.Kind.PANEL and z.shape != &"path" and z.shape != &"capsule":
+			add_child(_footprint(z.outline(), layout.table_y() + lift, Color(colour.r, colour.g, colour.b, colour.a * 0.5), 5 if z.name in clashing else 2))
+		add_child(_wireframe(z, Color(colour.r, colour.g, colour.b, 0.95), 7 if z.name in clashing else 6))
 		var words := Label3D.new()
 		words.text = String(z.name).replace("_", " ")
 		words.font_size = 28
@@ -43,7 +46,7 @@ func draw(layout: EntryLayout, phases: int) -> void:
 		words.modulate = Color(1, 1, 1, 0.9)
 		words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		words.no_depth_test = true
-		words.render_priority = 6
+		words.render_priority = 8
 		var middle := Vector2.ZERO
 		for p in z.outline():
 			middle += p
@@ -51,7 +54,63 @@ func draw(layout: EntryLayout, phases: int) -> void:
 		if z.shape == &"ring":   # the hands' room: its name at the middle of its far edge
 			middle = Vector2(z.centre.x, z.centre.z) + Vector2(-sin(z.yaw), -cos(z.yaw)) * z.radius * 0.92
 		add_child(words)
-		words.global_position = Vector3(middle.x, layout.table_y() + 0.03, middle.y)
+		words.global_position = Vector3(middle.x, (z.top() + 0.03) if z.shape != &"path" else (z.path[z.path.size() / 2].y + 0.07), middle.y)
+
+
+## The zone as a 3D wireframe: a prism's bottom and top outlines with its edges; a capsule's rings and
+## sides; a swept path as a ring of its radius at every step, joined.
+func _wireframe(z: EntryLayout.Zone, colour: Color, priority: int) -> MeshInstance3D:
+	var mesh := ImmediateMesh.new()
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = colour
+	material.no_depth_test = true
+	material.render_priority = priority
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES, material)
+	match z.shape:
+		&"capsule":
+			var low := z.centre.y + z.radius
+			var high := z.centre.y + z.height - z.radius
+			for y: float in [z.centre.y, low, high, z.top()]:
+				var r := z.radius * (1.0 if y == low or y == high else 0.55)
+				_ring(mesh, Vector3(z.centre.x, y, z.centre.z), r)
+			for i in 4:
+				var a := i * TAU / 4.0
+				var off := Vector3(cos(a), 0.0, sin(a)) * z.radius
+				mesh.surface_add_vertex(Vector3(z.centre.x, low, z.centre.z) + off)
+				mesh.surface_add_vertex(Vector3(z.centre.x, high, z.centre.z) + off)
+		&"path":
+			for i in z.path.size():
+				_ring(mesh, z.path[i], z.radius)
+				if i > 0:
+					mesh.surface_add_vertex(z.path[i - 1])
+					mesh.surface_add_vertex(z.path[i])
+		_:
+			var outline := z.outline()
+			var n := outline.size()
+			var step := 1 if z.shape != &"circle" else 4   # a circle: fewer sides, fewer lines
+			for i in range(0, n, step):
+				var a := outline[i]
+				var b := outline[(i + step) % n]
+				for y: float in [z.centre.y, z.top()]:
+					mesh.surface_add_vertex(Vector3(a.x, y, a.y))
+					mesh.surface_add_vertex(Vector3(b.x, y, b.y))
+				mesh.surface_add_vertex(Vector3(a.x, z.centre.y, a.y))
+				mesh.surface_add_vertex(Vector3(a.x, z.top(), a.y))
+	mesh.surface_end()
+	var shape := MeshInstance3D.new()
+	shape.mesh = mesh
+	shape.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return shape
+
+
+func _ring(mesh: ImmediateMesh, at: Vector3, radius: float) -> void:
+	for i in 16:
+		var a := i * TAU / 16.0
+		var b := (i + 1) * TAU / 16.0
+		mesh.surface_add_vertex(at + Vector3(cos(a), 0.0, sin(a)) * radius)
+		mesh.surface_add_vertex(at + Vector3(cos(b), 0.0, sin(b)) * radius)
 
 
 func _footprint(outline: PackedVector2Array, y: float, colour: Color, priority: int) -> MeshInstance3D:

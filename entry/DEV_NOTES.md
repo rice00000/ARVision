@@ -404,3 +404,75 @@ the panel and the landing spot on 42 table/reach cases; the checker catches Onio
 **The real hand with Onion (`tools/hand_with_onion.gd`, numbers in `build/onion_hand/overlap.txt`):** *Tap:* Onion stands against the cauldron's left rim (-0.27, 0.89, -0.37) and at the press (0.8 s into the loop) the hand's joints are 1.1 cm INSIDE Onion's box (4 px inside its screen outline, seat view): in the pictures the bodies do not overlap but touch distance; **layout chat: move Onion's tap spot about 3 to 4 cm farther from the mouth, away from the hand** (`_beside_mouth()` uses 0.07 m sideways; about 0.11 m would clear it). *Pinch:* Onion at (-0.47, 0.94, -0.43), 42 cm from the hand: clear; but the gear's rest spot is low in the desktop seat view (the hand is near the bottom edge). *Set in:* the hand over the socket, Onion 43 cm away at the cauldron's left: clear (Onion is not "beside the socket" now but beside the cauldron).
 
 **Controls bug (Mac): clicking worked in the shelf but nothing could move or turn.** The keys that move and turn the head (W/A/S/D/Q/E, the arrows, R) were handled only by `Entry._move_head` in the opening's own per-frame code; when the opening handed over to the first visit that code was freed, so only right-drag was left, which is hard on a trackpad (on a Mac, Control + click-drag acts as a right-drag). New `entry/desktop_keys.gd` (`DesktopKeys`): the same keys, same speeds, a child of Main so it survives every scene change; it keeps out of the way while `current_scene == &"intro"` (Entry does it there, so nothing moves twice). Added from `_configure_interaction()` (my region), no Wei file touched. For the build chat: a session that starts straight in another scene (a plan, `find_object`) never runs the opening, so it never gets the node: one line next to `add_child(DesktopDriver.new())` in `main.gd` (`add_child(DesktopKeys.new())`, name it "DesktopKeys") would cover that; then Entry's copy can be deleted and the intro guard dropped.
+
+## Layout chat (C), round 5 (Oct 31): `entry-layout-5`
+
+**1. The panel and gear never move: only where the table has room (6 of 42 table cases).** The layout now plans the
+panel TOGETHER with the shelf and the cauldron: for each shelf angle (0-30 degrees right) and each cauldron place it looks for a
+panel spot clear of the bench, shelf, things, cauldron, the gear's landing spot and Onion's tap spot, with the socket in
+easy reach; then it scores overlaps, things out of reach or view, and how far the shelf had to turn. `EntryLayout.panel_fixed`
+says whether it found one. **On 36 of the 42 cases (every usual reach) it cannot, and the panel still glides at the reveal
+(`_make_way`, as before).** Why: Wei's bench with its things is 54 cm wide and starts 33 cm from the eyes; with the cauldron
+(22 cm) and the panel (27 cm) that is about 130 degrees of view at a 45-60 cm reach, in a 110-degree view. The fixed plan
+exists where the reach is long (72 cm on 1.2 x 0.7 and 1.6 x 0.9 m tables): shelf turned 30 degrees right, cauldron on the
+child's far left or right, panel 15-40 degrees left. Things that would make it work on usual reaches (decisions, not mine):
+a narrower bench or things zone (`THINGS_WIDE` 0.48 is Wei's), a smaller panel (0.26 x 0.22 m), the cauldron standing in the
+shelf's footprint for the ripple (see below), or letting the shelf stand 30-40 degrees to the side as the fixed plan does.
+The check, the 3D overlaps, the sim pictures and the headset sheet say which plan a table got (the Output line ends with
+`[panel stays put]` or `[panel glides at the reveal: no clear fixed spot on this table]`).
+* The cauldron may stand where the bench grows in (it is gone anyway). `EntryLayout.ripple_overlaps()` lists that. Where it
+  is not empty `_reveal()` now sinks the cauldron as the ripple STARTS (a second before the first ring reaches the bench),
+  otherwise right after the ripple as before (`_cauldron_gone` makes the second call a no-op).
+* The shelf may stand up to 30 degrees to the side. Bench, shelf, things and Onion's rest are no longer required to be in the
+  110-degree static view (the child turns to the shelf, as in Wei's World); the turn is a cost of the plan.
+* The search runs on a worker thread (`WorkerThreadPool`, `_cauldron_on_table()` is now a coroutine awaited in `run()`): about
+  0.4-1.5 s on the cloud, so a second or more on the Quest. `_make_way()` is a no-op when `panel_fixed` (nothing moves).
+  Onion's follow-fix stays for the glide case.
+
+**2. 3D zones.** Every zone is a real volume now: boxes (rect + height), cylinders (circle + height), the hands' room
+(a ring slice + height), Onion's body as a vertical CAPSULE (6.7 cm wide, 11 cm tall, with its halo as room), the teaching
+hand's sweep as a box (measured), and the gear's hop as a swept ball (`gear_arc`: 5.8 cm radius along the same parabola
+`_emerge_gear` flies, from just over the rim to the landing spot). `EntryLayout.volume_gap(a, b)` is the exact distance
+between any two (prism/prism, capsule/prism, capsule/capsule, path/anything; negative = how deep inside); `overlaps()` uses it;
+`overlaps_flat()` is the old footprint-only report as a quick fallback (stricter: it ignores heights). The overlay
+(`Zones` button) draws the wireframes: boxes and cylinders as edges, Onion as capsule rings, the gear's flight as rings along
+its path, the hand sweep orange, Onion cyan, overlaps red, over a faint flat footprint (`build/round4/r5_zones_3d_set_in.png`).
+New phase bit `ARC` (the Gear part) so the gear's flight is only checked against Onion where Onion is then.
+
+**3. First things WITH the shelf (cheap version BUILT; the proper one is a proposal).**
+* Built (`FIRST_THINGS := true` in `entry.gd`): when the opening builds its shelf it also has Wei's OWN code make the first
+  round's things (`ShelfCopy.make_things`, the first visit plan's first condition, a fixed seed), hidden like the shelf; the
+  ripple shows each as the ring reaches it: it grows in over 1.2 s and settles the last 4 cm onto the bench (`FIRST_THINGS_RISE`).
+  `_to_shelf()` hands the SAME seed to Wei's trial, so the first visit's trial makes the same things in the same places
+  with no drop-in. **Edits to Wei's `trials/tidy/tidy_trial.gd`: two single-use static flags like `push` / `onion_voice`:**
+  `seed_next` (non-zero: the next round's random numbers, also the global generator for its shuffles, start from it) and
+  `things_arrive` (false: the next round's things are simply there, no bounce); about 17 lines; defaults change nothing.
+  Test: `test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_same_ones` (same names, same positions, hidden
+  until the ripple). The "Oh!" lines the organizer moved into the first visit can return to the reveal now (the things are
+  there when Onion notices them): the story chat's call.
+* Still a swap in the engine's eyes: the opening's things belong to the Intro scene and are freed on the scene switch, the
+  trial's identical ones are made in the new scene. With no black fade (`Main.change_scene(id, false)`) the eye cannot see it
+  (same shapes, colours and places, one frame), but anything that moved a thing in between (a child touching one during the
+  reveal: things are inert in the opening) would reset.
+* PROPER version (proposal, about a day; edits Wei's trial more): the trial ADOPTS the opening's shelf and things instead of
+  rebuilding them: `Workshop` carries the shelf node and the things across the switch (it already carries Onion, the panel,
+  the gear), and `Trial.adopt(shelf, things, stickers)` fills `_things`, `_home`, `_key`, `_size`, `_cell_*` from them. No
+  second set, no seed, no flicker even for a touched thing; needs about 30 lines in `tidy_trial.gd` and its tests.
+
+**4. Onion beside the socket for the set-in.** `EntryLayout.onion_socket` (and `onion_socket_after`, beside the moved panel):
+the nearest spot to the socket (20-26 cm horizontally on every table tested, 9 cm up) that is clear of the plate's edge, the
+gear's landing spot, the cauldron, the bench and the teaching hand's lowering (its body lies to the child's right, so Onion
+ends on the left or behind); `Entry._place()` sends Onion there (`_beside_socket()`), then it rises 10 cm (`onion_lifted`) as
+before. In `build/round4/r5_set_in_onion_beside_socket.png` Onion hangs just over the panel's left edge.
+
+
+
+Pictures (`tools/round4_shots.gd -- --part=r5 [--reach=0.72]`, in `build/round4/`): `fixed_*` is a measured reach of 72 cm, the panel
+stays put (nothing moves at the reveal; the shelf is 30 degrees to the right, the cauldron stays clear of it; things arrive with the
+shelf); `r5_*` is the usual reach, where the panel glides; `*_zones_3d_set_in.png` is the wireframe overlay.
+
+Tests (round 5): all 211 pass on `entry-layout-5` (the base's 207 plus 4 new layout tests: fixed panel where the table allows,
+3D volumes, Onion beside the socket, the first things). Three existing tests needed a change from this round (the story chat's
+`entry_test.gd`: Onion is now up beside the socket, not at the aside spot, after a jump to the ripple; the cauldron may stand in
+the bench's way when the panel is fixed because it sinks as the ripple starts); my layout test waits for "All set" now that
+the plan takes a second. `trials/tidy/tidy_trial.gd`: the two single-use flags only (see 3).
