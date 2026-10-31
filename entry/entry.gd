@@ -2111,6 +2111,8 @@ func _stand_in_pickup(runner: PartRunner) -> void:
 ## Waits for the child to set the gear into the socket.
 func _child_sets_in() -> void:
 	var runner := _runner
+	if USE_REAL_CARRY and _carry.has_docked():
+		return   # the child already set it in, while Onion talked
 	if USE_REAL_CARRY:
 		if not _carry.held:   # a jump straight to Set in: the child has to pick it up as well
 			_carry.begin(_gear, _socket_at)
@@ -2346,7 +2348,8 @@ func _start_music() -> void:
 # --- Interaction -------------------------------------------------------------
 # What Carry needs to know about the room (the interaction chat's; Carry and DemoHand do the rest).
 
-## How long the gear waits untouched before the teaching hand shows how to pick it up, seconds.
+## THE delay: how long the gear waits in view, untouched, before the teaching hand shows how to pick it
+## up (seconds; 0 = never). Only the gesture shows, on the gear itself: never a place, never an answer.
 const PICKUP_REMINDER_SECONDS := 14.0
 ## DEBUG: this key puts the gear out on the table and turns Carry on, so a click-hold, a drag and
 ## a release (the mouse hand) try the whole pick-up and set-in without the story.
@@ -2358,6 +2361,7 @@ const TRY_CARRY_KEY := KEY_G
 func _configure_interaction() -> void:
 	_carry.configure(_gear_rest.y, App.head().global_position, maxf(_cauldron_distance, 0.45) + 0.15,
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
+	_carry.follow(_box, _mechanism)   # they move at the reveal
 	_carry.remind_after = PICKUP_REMINDER_SECONDS
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)

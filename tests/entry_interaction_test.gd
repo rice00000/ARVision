@@ -269,14 +269,15 @@ func test_the_socket_outline_shows_only_while_the_gear_is_held() -> void:
 	expect(not hint.visible, "gone after the release")
 
 
-func test_begin_starts_over_so_a_jump_can_replay_the_part() -> void:
+func test_reset_forgets_so_a_jump_can_replay_the_part() -> void:
 	await _scene()
 	await _carry_to(socket)
 	await _press(false)
 	expect(await until(func() -> bool: return carry.has_docked(), 2.0), "docked")
 	gear.global_position = Vector3(eye.x + 0.25, table_y, eye.z - 0.30)
+	carry.reset()
+	expect(not carry.has_docked() and not carry.has_been_picked_up() and not carry.enabled, "forgets")
 	carry.begin(gear, socket)
-	expect(not carry.has_docked() and not carry.has_been_picked_up(), "forgets")
 	await _pinch_at(Carry.middle_of(gear))
 	await _press(true)
 	expect(carry.held, "and can be picked up again")
@@ -324,6 +325,171 @@ func test_no_reminder_for_a_child_who_has_picked_it_up_or_when_it_is_not_in_view
 	expect(due.is_empty(), "a hidden gear is not waiting")
 
 
+# --- Robustness (no headset: the hands are simulated) -----------------------------------
+
+func _left_at(p: Vector3) -> void:
+	input.set_hand(&"left", Transform3D(Basis.IDENTITY, p + Vector3(0.0, 0.0, 0.05)))
+	await frames(2)
+
+
+func test_two_hands_pinching_the_first_one_holds_and_the_second_does_not_steal_it() -> void:
+	await _scene()
+	var picked := record(carry.picked_up)
+	var released := record(carry.released)
+	await _pinch_at(Carry.middle_of(gear))
+	await _press(true)                                   # the right hand takes it
+	await _left_at(Carry.middle_of(gear))
+	input.press(&"left", &"trigger_click", true)         # the left pinches it too
+	await frames(2)
+	expect_eq(picked.size(), 1, "picked up once")
+	await _pinch_at(Vector3(eye.x + 0.2, table_y + 0.1, eye.z - 0.25))
+	await wait(0.4)
+	expect(carry.held, "still in the right hand")
+	await _press(false)                                  # the right lets go
+	await wait(1.2)
+	expect_eq(released, [[false]], "let go once")
+	expect(not carry.held, "the left hand's closed pinch does not steal it")
+	input.press(&"left", &"trigger_click", false)
+	await _left_at(Carry.middle_of(gear))
+	input.press(&"left", &"trigger_click", true)         # a new pinch does take it
+	await frames(2)
+	expect(carry.held, "a fresh pinch by the left hand takes it")
+	input.press(&"left", &"trigger_click", false)
+
+
+func test_the_other_hand_losing_tracking_does_not_drop_the_gear() -> void:
+	await _scene()
+	await _carry_to(Vector3(eye.x + 0.1, table_y + 0.1, eye.z - 0.3))
+	input.track(&"left", false)
+	await wait(0.6)
+	expect(carry.held, "still held by the hand that has it")
+	input.track(&"left", true)
+
+
+func test_the_gear_settles_clear_of_the_cauldron_wherever_it_stands_now() -> void:
+	await _scene()
+	var pot := Node3D.new()
+	app.add_child(pot)
+	pot.global_position = Vector3(eye.x + 0.30, table_y, eye.z - 0.30)   # it moved since configure()
+	carry.follow(pot, null)
+	await _carry_to(pot.global_position + Vector3(0.01, 0.2, 0.0))   # let go right over its mouth
+	await _press(false)
+	await wait(1.4)
+	expect(_flat(gear.global_position, pot.global_position) >= 0.17 - 0.005, "beside the cauldron in its new place (%s m)" % _flat(gear.global_position, pot.global_position))
+	expect(absf(gear.global_position.y - table_y) < 0.003, "on the table")
+
+
+func test_the_docked_gear_faces_the_panel_as_it_stands_now() -> void:
+	await _scene()
+	var panel := Node3D.new()
+	app.add_child(panel)
+	panel.rotation.y = 1.1   # turned since configure() said 0.6
+	carry.follow(null, panel)
+	await _carry_to(socket + Vector3(0.0, 0.03, 0.0))
+	await _press(false)
+	expect(await until(func() -> bool: return carry.has_docked(), 2.0), "docked")
+	expect(absf(angle_difference(gear.global_basis.get_euler().y, 1.1)) < 0.01, "turned like the panel is now")
+
+
+func test_a_gear_carried_far_away_and_let_go_floats_back_within_reach() -> void:
+	await _scene()
+	var released := record(carry.released)
+	await _carry_to(Vector3(eye.x + 2.5, table_y + 1.0, eye.z - 2.5))   # thrown far
+	expect(carry.held and gear.global_position.is_finite(), "it went with the hand")
+	await _press(false)
+	await wait(2.0)
+	var out := _flat(gear.global_position, eye)
+	expect(out <= 0.62 + 0.005, "back within reach: %s m" % out)
+	expect(absf(gear.global_position.y - table_y) < 0.003 and gear.global_position.is_finite(), "on the table")
+	expect_eq(released, [[false]], "no docking, no failure")
+	await _press(false)
+	await _pinch_at(Carry.middle_of(gear))
+	await _press(true)
+	expect(carry.held, "and it can be picked up again")
+
+
+func test_a_tracking_glitch_with_a_nonsense_pose_changes_nothing() -> void:
+	await _scene()
+	await _carry_to(Vector3(eye.x + 0.1, table_y + 0.1, eye.z - 0.3))
+	var at := gear.global_position
+	carry._follow(Transform3D(Basis.IDENTITY, Vector3(NAN, 0.0, 0.0)), 0.016)
+	carry._follow(Transform3D(Basis.IDENTITY, Vector3(INF, 0.0, 0.0)), 0.016)
+	expect(gear.global_position == at and gear.global_position.is_finite(), "the gear stays put")
+
+
+func test_the_gear_going_away_while_held_does_not_break_carry() -> void:
+	await _scene()
+	await _carry_to(Vector3(eye.x + 0.1, table_y + 0.1, eye.z - 0.3))
+	gear.free()   # a scene change took it
+	await frames(3)
+	expect(not carry.held, "nothing left to hold")
+	await _press(false)
+	expect(true, "and no error")
+
+
+func test_a_jump_button_while_carrying_leaves_nothing_running() -> void:
+	await _scene()
+	var signals := record(carry.released)
+	var hints := record(Events.feedback)
+	var hint := carry.find_child("SocketHint", true, false) as MeshInstance3D
+	await _carry_to(Vector3(eye.x + 0.15, table_y + 0.12, eye.z - 0.3))
+	await wait(0.7)
+	expect(hint.visible, "the outline is up while held")
+	carry.reset()   # what the story's _set_up_for does
+	expect(not carry.held and not carry.enabled, "let go of, and off")
+	expect(not carry.has_been_picked_up(), "forgotten")
+	expect(signals.is_empty() and hints.is_empty(), "no signal, no click")
+	var at := gear.global_position
+	await wait(1.5)
+	expect(gear.global_position == at, "nothing keeps moving the gear (the story places it itself)")
+	expect(not hint.visible, "the outline is gone")
+	carry.begin(gear, socket)
+	await _press(false)
+	await _pinch_at(Carry.middle_of(gear))
+	await _press(true)
+	expect(carry.held, "the part can be played again")
+
+
+func test_a_jump_button_while_the_gear_slides_in_cancels_the_docking() -> void:
+	await _scene()
+	var docked := record(carry.docked)
+	var hints := record(Events.feedback)
+	await _carry_to(socket + Vector3(0.05, 0.03, 0.0))
+	await _press(false)
+	await wait(0.1)   # the align takes 0.25 s
+	carry.reset()
+	var at := gear.global_position
+	await wait(0.8)
+	expect(docked.is_empty() and hints.is_empty() and not carry.has_docked(), "never docked, no click")
+	expect(gear.global_position == at, "and it stopped where it was")
+
+
+func test_a_jump_button_while_the_gear_floats_down_stops_it() -> void:
+	await _scene()
+	await _carry_to(Vector3(eye.x + 0.2, table_y + 0.2, eye.z - 0.25))
+	await _press(false)
+	await wait(0.2)
+	carry.reset()
+	var at := gear.global_position
+	await wait(1.0)
+	expect(gear.global_position == at, "the settle was cancelled")
+
+
+func test_begin_again_while_the_child_has_it_or_has_set_it_in_forgets_nothing() -> void:
+	await _scene()
+	await _carry_to(Vector3(eye.x + 0.1, table_y + 0.1, eye.z - 0.3))
+	carry.begin(gear, socket)   # the story asks again
+	expect(carry.held and carry.has_been_picked_up(), "still held")
+	await _carry_to(socket + Vector3(0.0, 0.03, 0.0))
+	await _press(false)
+	expect(await until(func() -> bool: return carry.has_docked(), 2.0), "docked")
+	carry.begin(gear, socket)
+	expect(carry.has_docked() and carry.enabled, "still docked after being asked again")
+	await _pinch_at(Carry.middle_of(gear))
+	await _press(true)
+	expect(not carry.held, "a docked gear is not pulled out again")
+
+
 # --- The teaching hand ----------------------------------------------------------------
 
 func _demo() -> DemoHand:
@@ -349,6 +515,46 @@ func test_the_demo_hand_pinches_the_gear_without_moving_it() -> void:
 		low = minf(low, demo.global_position.y - middle.y)
 		await wait(0.15)
 	expect(low < 0.01, "and lowers again: it loops")
+
+
+func test_asking_for_the_gesture_already_showing_does_not_make_the_hand_blink() -> void:
+	await _scene()
+	var demo := _demo()
+	demo.pinch_lift(gear)
+	await wait(1.0)
+	expect(demo._fade > 0.99, "fully shown")
+	demo.pinch_lift(gear)   # the story's hand and the reminder both ask
+	expect(demo._fade > 0.99, "asking again changes nothing")
+	demo.pinch_lift(gear)
+	await wait(0.1)
+	expect(demo._fade > 0.99, "and it is not restarted")
+
+
+func test_the_pinch_lift_hand_stays_with_its_thing_and_never_points_at_a_place() -> void:
+	await _scene()
+	var demo := _demo()
+	var thing := Node3D.new()   # a shelf thing, far from the socket
+	var ball := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.03
+	sphere.height = 0.06
+	ball.mesh = sphere
+	thing.add_child(ball)
+	app.add_child(thing)
+	thing.global_position = Vector3(eye.x - 0.5, table_y + 0.03, eye.z - 0.15)
+	demo.pinch_lift(thing)
+	var middle := Carry.middle_of(thing)
+	var farthest := 0.0
+	var nearest_socket := INF
+	for i in 70:   # a full round (6.6 s) and a little more
+		await wait(0.1)
+		farthest = maxf(farthest, demo.global_position.distance_to(middle))
+		nearest_socket = minf(nearest_socket, demo.global_position.distance_to(socket))
+	expect(farthest < 0.13, "never more than 13 cm from the thing it pinches (%s)" % farthest)
+	expect(nearest_socket > 0.3, "and never anywhere near the socket (%s)" % nearest_socket)
+	thing.free()
+	await wait(0.3)
+	expect(not demo.visible or not demo.is_processing() or demo.global_position.is_finite(), "a thing that goes away does not leave the hand stuck")
 
 
 func test_the_demo_hand_shows_one_gesture_and_stop_takes_it_away() -> void:
@@ -506,3 +712,40 @@ func test_the_real_opening_can_be_tried_with_the_mouse_hand_and_reminds_a_waitin
 	await wait(0.2)
 	expect((entry.get("_gear_spin") as GearSpin).running, "and it turns")
 	expect(not before.is_equal_approx(real_gear.global_transform), "it did move")
+
+
+func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = true
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	input.click(&"right", &"trigger_click")
+	await frames(3)
+	await wait(0.7)
+	await _press_button(&"entry_step_next")
+	await _press_button(&"entry_confirm_yes")
+	await _press_button(&"entry_step_alt")
+	await _press_button(&"entry_step_next")
+	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
+	var real: Carry = entry.get("_carry")
+	var real_gear: Node3D = entry.get("_gear")
+	var real_socket: Vector3 = entry.get("_socket_at")
+	expect(real._cauldron_node == entry.get("_box") and real._panel_node == entry.get("_mechanism"), "Carry follows the cauldron and the panel")
+	entry._try_carry()
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, Carry.middle_of(real_gear) + Vector3(0.0, 0.0, 0.05)))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, real_socket + Vector3(0.0, 0.03, 0.0) + Vector3(0.0, 0.0, 0.05)))
+	await wait(0.5)
+	input.press(&"right", &"trigger_click", false)   # set in early, while the story is still talking
+	expect(await until(func() -> bool: return real.has_docked(), 3.0), "docked early")
+	var done := {finished = false}
+	var wait_for_it := func() -> void:
+		await entry._child_sets_in()
+		done.finished = true
+	wait_for_it.call()
+	expect(await until(func() -> bool: return done.finished, 1.5), "the story's wait for 'set it in' ends at once")

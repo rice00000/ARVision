@@ -3,7 +3,10 @@ extends Node3D
 ## A softly translucent teaching hand from primitives (a palm, curled fingers, a thumb and an
 ## index finger; no textures). It shows ONE gesture at a time and loops it until [method stop]:
 ## a tap on the cauldron, a pinch that lifts the gear, a lowering and opening over the socket.
-## It never moves the real gear, never flashes, and its calls return at once: everything it
+## It never moves the real gear and never points at an answer: [method pinch_lift] stays within a few
+## cm of the thing it pinches (it only shows HOW to pick up, for any thing, a shelf thing too), and only
+## [method lower_release] goes to a place, which is the story's own instruction (the socket), never a
+## shelf slot. It never flashes, and its calls return at once: everything it
 ## does runs from its own [method _process], so [method stop] (or freeing it) cancels it, and
 ## nothing waits on a timer or a tween that could outlive a part.
 ## Later the MRTK Hand Coach rigs may replace the stand-in (see hand-coach/README.md).
@@ -27,6 +30,7 @@ var _length := 0.0
 var _anchor := Callable()       # () -> Vector3: the spot the keys are measured from
 var _pitch := 0.0               # radians, negative: pointing down
 var _fade_loop := false         # fade out and in between rounds (when the end does not match the start)
+var _key: Variant = null        # what the gesture is about (the gear, a spot): asking again for it changes nothing
 var _material: StandardMaterial3D
 var _figure: Node3D
 var _index: Array[MeshInstance3D] = []
@@ -47,7 +51,7 @@ func tap(at: Vector3) -> void:
 		[1.2, 0.012, 0.0, 0.25],
 		[2.0, 0.13, 0.05, 0.25],
 		[3.0, 0.13, 0.05, 0.25],
-	], func() -> Vector3: return at, -0.55, false)
+	], func() -> Vector3: return at, -0.55, false, at)
 
 
 ## Pinches [param gear] and lifts it a little, looping until [method stop]. It only shows the
@@ -65,7 +69,7 @@ func pinch_lift(gear: Node3D) -> void:
 		[5.0, 0.0, 0.0, 1.0],
 		[6.0, 0.09, 0.07, 1.0],
 		[6.6, 0.09, 0.07, 1.0],
-	], func() -> Vector3: return Carry.middle_of(gear) if is_instance_valid(gear) else Vector3.ZERO, -0.2, false)
+	], func() -> Vector3: return Carry.middle_of(gear) if is_instance_valid(gear) else Vector3.INF, -0.2, false, gear)
 
 
 ## Lowers over [param socket_at] and opens its fingers, looping until [method stop].
@@ -78,18 +82,22 @@ func lower_release(socket_at: Vector3) -> void:
 		[2.4, 0.0, 0.0, 1.0],
 		[3.3, 0.1, 0.05, 1.0],
 		[3.8, 0.1, 0.05, 1.0],
-	], func() -> Vector3: return socket_at + Vector3.UP * 0.026, -0.3, true)
+	], func() -> Vector3: return socket_at + Vector3.UP * 0.026, -0.3, true, socket_at)
 
 
 ## Takes the hand away (soon, softly).
 func stop() -> void:
 	_mode = Mode.NONE
+	_key = null
 
 
-func _start(mode: Mode, keys: Array, anchor: Callable, pitch: float, fade_loop: bool) -> void:
+func _start(mode: Mode, keys: Array, anchor: Callable, pitch: float, fade_loop: bool, key: Variant) -> void:
 	_ensure_built()
+	if _mode == mode and is_same(_key, key):
+		return   # already showing exactly this: asking again must not make it blink
 	if _mode != Mode.NONE:
 		_fade = 0.0   # one gesture at a time: the old one is gone before the new one shows
+	_key = key
 	_mode = mode
 	_keys = keys
 	_length = keys[keys.size() - 1][0]
@@ -132,6 +140,9 @@ func _pose(seconds: float) -> void:
 			open = lerpf(a[3], b[3], k)
 			break
 	var anchor: Vector3 = _anchor.call()
+	if not anchor.is_finite():
+		stop()   # what it was showing is gone
+		return
 	var forward := Vector3.FORWARD   # away from the child
 	if App.head() != null:
 		var flat := anchor - App.head().global_position
