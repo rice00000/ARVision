@@ -23,21 +23,24 @@ installed mechanism persist across the scene switch (the `Workshop`); the gear i
 (the real 57k-triangle gear is optional and NOT CC0); the shelf stands back along the table (`push`,
 set by the child's measured reach); the child's reach is measured in setup step 3.
 
-## Two chats, one seam
+## Three chats, one seam
 
-* **Interaction chat** owns `carry.gd`, `demo_hand.gd` and their tests (`tests/entry_interaction_test.gd`).
-  It may touch `entry.gd` ONLY in `_build_gear()` (to configure `_carry`/`_demo`) and by adding a new
-  region `# --- Interaction`. It does not edit lines, Onion, the part functions, `_play`, `_set_up_for`.
-* **Story chat** owns the beats and everything about Onion: `_hello`, `_touch`, `_out`, `_reveal`,
-  `_play`, `_set_up_for`, `PARTS`, `say()` lines, Onion's actions (`entry/onion_actions.gd`, new),
-  `?`/`!` marks, the cauldron's rattle and Onion's pop, the ripple, sounds, and `tests/entry_story_test.gd`.
-  It calls the interaction chat's API; until that is real it uses the stubs.
-* Do not rewrite `tests/entry_test.gd`; fix it only where your change breaks it.
-* Each chat works on its own branch from the same base and **never touches Megan's working tree**:
-  deliver by fetching the bundle into a branch ref (below). Megan tests with `git checkout <branch>`;
-  one integrator merges.
+* **Interaction chat (A)** owns `carry.gd`, `demo_hand.gd` and `tests/entry_interaction_test.gd`. In `entry.gd` it may touch
+  ONLY `_build_gear()` (to configure `_carry` / `_demo`) and add a region `# --- Interaction`.
+* **Story chat (B)** owns the beats and Onion: `_hello`, `_touch`, `_out`, `_reveal`, `_play`, `_set_up_for`, `PARTS`, every
+  `say()` line, `entry/onion_actions.gd` (new), `entry/sounds.gd` (new), the ? and ! marks, the ripple's look and sound,
+  `tests/entry_story_test.gd`. It calls A's API (stubs until real).
+* **Layout and UI chat (C)** owns WHERE things stand and how the UI looks: a new `entry/layout.gd` (the zone map), the placement
+  code in `entry.gd` (constants `CAULDRON_*`, `SHELF_*`, `PANEL*`, `SOCKET_*`, `GEAR_*SCALE`, and `_cauldron_on_table`,
+  `_cauldron_spot`, `_shelf_to_the_side`, `_clearance`, `_mechanism_spot`, `_slot_clearance`, `_aside_spot`, `_beside_shelf`,
+  `_gear_rest`), the setup panel and dev buttons (`setup_panel.gd`, `entry_button.gd`, `_step_*`, `_debug_buttons`, `_dev_jumps`),
+  `tests/entry_layout_test.gd`. For Wei's World UI (the task menu, level announcements, guide, subtitles in `world/` and
+  `modules/`) C produces PROPOSALS with pictures first and edits only what Megan approves, on its own branch: Wei's files move.
+* Everyone: do not rewrite `tests/entry_test.gd`; fix it only where your change breaks it. Each chat works on its own branch from the
+  same base (`entry-interaction`, `entry-story`, `entry-layout`) and **never touches Megan's working tree**: deliver by fetching a
+  bundle into a branch ref (below). Megan tests with `git checkout <branch>`; one integrator merges.
 
-### The API the two chats agree on
+### The API the chats agree on
 
 ```gdscript
 # Carry (child of Entry as `_carry`)
@@ -50,15 +53,39 @@ func begin(gear: Node3D, socket_at: Vector3) -> void   # start watching
 func stop() -> void
 func simulate(after := 1.0) -> void                    # stub / tests: pretend the child did it
 
-# DemoHand (child of Entry as `_demo`)  each shows ONE gesture, looping, until stop()
+# DemoHand (child of Entry as `_demo`)  each shows ONE gesture, looping, until stop(); it never carries the gear
 func tap(at: Vector3) -> void
 func pinch_lift(gear: Node3D) -> void
 func lower_release(socket_at: Vector3) -> void
 func stop() -> void
 ```
-Change this API only by telling the other chat (add a line to this file's "API changes" below).
+Change this API only by telling the other chats: add a line to "API changes" below.
 
 API changes: (none yet)
+
+## Decisions from the story chat's final UPDATE (BUILD_CHAT_UPDATE_2026-10-31.md, last section; it supersedes earlier lines)
+
+* Lines changed: "Uh... nearly ready." (not "Nearly ready."); after seating "Ah. There we go." (do NOT say the room is waking up);
+  after the reveal "I've been looking forward to showing you this."; then, after a pause to enjoy the room: "Oh!" / "Things come
+  through, but they don't always land in the right place." / "Would you help me put them where they belong?"; the first shelf round:
+  "The shapes on the shelf show where things go." / "Can you find a place for one of these?"; the first placement only: "It fits.
+  Let's find places for the others." then quiet. The lead-in to placement ("Let's see if we can wake this place up") is NOT approved:
+  leave that beat unspoken. A tiny sheepish laugh is only an audition idea.
+* Picking the gear up IS the child accepting to help: no yes button, no speech recognition. A delayed grab-hand reminder is allowed
+  (configurable inactivity delay) but must never carry the object to the right answer; skip it if the child already holds one.
+* Sounds (SELECTED, not downloaded or edited yet; put the files in `entry/assets/audio/` with the original names and keep licence notes):
+  cauldron movement before Onion: "Dinner Plate Impact with Vibration" (OwlStorm, CC0); the gear's entrance: "Door Rattle" (SumiXIV, CC0);
+  seating click: "Ceramic Click" (Mafon2, CC0), once, after release and successful seating, never on hover; reveal: "Floating Pad Magic"
+  (humordome, Pixabay licence), gentle onset and fade. Onion's pop: keep BOTH for an in-scene A/B audition, no layering, same timing and
+  comparable loudness, played as Onion clears the rim and finished before the greeting: A "Gentle Air Bubble Burst" (humordome), C "Light
+  Bubble Pop" (Virtual_Vibes), both Pixabay licence. Do not reopen "Pop or Bloop". Keep the intro piano; no persistent loops under tasks.
+* Marks: bold solid ? and ! silhouettes, sage with a cream outline AND cream with a sage outline (choose by readability in the scene);
+  brief, no flashing or particles, never a target. ? when Onion asks for help at the cauldron, ! at the surprised hop as the gear pops out.
+  The final graphics are pending: use a bold Label3D stand-in with both colourings switchable.
+* The demonstration hand: the Hand Coach GLBs are rigged but NOT animated: until clips are authored, a primitive stand-in hand.
+* First-visit shelf flow (the World's second alchemist welcome, task menu, level announcement, long block intro) conflicts with a seamless
+  Onion-led visit. NOT to implement now: only proposals (chat C), never a silent global change to the menu behaviour. After the first shelf
+  level a new activity may be introduced by a cauldron/room event: not ready, do not build it.
 
 ## Setting up a cloud copy (each chat)
 
