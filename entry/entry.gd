@@ -488,6 +488,43 @@ func _new_ray() -> Array:
 	return [beam, dot, light]
 
 
+# --- DESKTOP: moving the head ------------------------------------------------
+
+## Metres a second the head moves with the keys (a seated child only leans a little).
+const HEAD_SPEED := 0.5
+var _head_start: Variant = null
+
+## Without a headset: W / S forward and back, A / D left and right, Q / E down and up, R back
+## where it started. Right-drag still looks around. Moves the hand with it, so the cursor stays on target.
+func _move_head(delta: float) -> void:
+	if App.xr != null or App.sim_input == null or App.rig == null:
+		return
+	var head := App.rig.head
+	if _head_start == null:
+		_head_start = head.global_position
+	if Input.is_physical_key_pressed(KEY_R):
+		head.global_position = _head_start
+		_hand_to_cursor()
+		return
+	var forward := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
+	var right := forward.cross(Vector3.UP)
+	var step := Vector3.ZERO
+	step += forward * (float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S)))
+	step += right * (float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)))
+	step += Vector3.UP * (float(Input.is_physical_key_pressed(KEY_E)) - float(Input.is_physical_key_pressed(KEY_Q)))
+	if step == Vector3.ZERO:
+		return
+	head.global_position += step.normalized() * HEAD_SPEED * delta / maxf(Engine.time_scale, 0.05)
+	_hand_to_cursor()
+
+
+## Puts the mouse hand back under the cursor (it stays where it was in the room when the head moves).
+func _hand_to_cursor() -> void:
+	for sibling in get_parent().get_children():
+		if sibling is DesktopDriver:
+			(sibling as DesktopDriver)._place_hand(get_viewport().get_mouse_position())
+
+
 # --- Pressing -----------------------------------------------------------------
 
 ## Remembers, for each hand, what its ray pointed at over the last 0.4 s.
@@ -1124,6 +1161,7 @@ func _inside() -> Vector3:
 func _process(delta: float) -> void:
 	_clock += delta
 	_real += delta / maxf(Engine.time_scale, 0.05)
+	_move_head(delta)
 	if _exit_button != null and is_instance_valid(_exit_button) and _real - _exit_armed > EXIT_WINDOW and _exit_button.text() != "Exit app":
 		_exit_button.set_text("Exit app")
 	if App.rig != null:

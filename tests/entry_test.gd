@@ -233,3 +233,36 @@ func test_on_desktop_only_a_click_presses_not_moving_over_a_button() -> void:
 	await select(start.global_position)
 	await frames(2)
 	expect_eq(pressed.size(), 1, "but a click does")
+
+
+func _key(code: Key, down: bool) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()   # a real window does this every frame; the headless loop doesn't
+
+
+func test_on_desktop_the_head_moves_with_the_keys() -> void:
+	await _boot_entry()
+	var head := App.rig.head
+	var start := head.global_position
+	var ahead := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
+	_key(KEY_W, true)
+	await frames(60)
+	_key(KEY_W, false)
+	var moved := head.global_position - start
+	expect(moved.length() > 0.3 and moved.length() < 0.7, "W moves the head about half a metre in a second, got %s" % moved.length())
+	expect(moved.normalized().dot(ahead) > 0.95, "and forward")
+	var there := head.global_position
+	await frames(10)
+	expect(head.global_position.distance_to(there) < 0.001, "it stops when the key is let go")
+	_key(KEY_E, true)
+	await frames(30)
+	_key(KEY_E, false)
+	expect(head.global_position.y > there.y + 0.1, "E raises it")
+	_key(KEY_R, true)
+	await frames(3)
+	_key(KEY_R, false)
+	expect(head.global_position.distance_to(start) < 0.01, "R puts it back")
