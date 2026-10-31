@@ -320,14 +320,23 @@ func _hello(fast := false) -> void:
 	_rattle(0.006)   # fainter, until the child taps the cauldron
 	_tap_open = true   # a tap counts from here on, even before it is asked for
 	await say("Oh! Hello there.")
-	_attend(_mouth)   # a glance inside
-	await _wait(0.4)
+	# Approved staging (story chat): Onion is fetching the gear to wake the table and wants to look
+	# prepared. It leans over the opening and searches a little; the knock (the gear shifting) gives
+	# it away; a startled hop and an angled peek; "nearly ready" is a sheepish correction to the
+	# child, said while still half over the cauldron; then it straightens up and faces the child.
+	_attend(_peer_point())
+	_actions.lean_in(_runner, true)
+	_search()   # one or two small searching movements, while it speaks
 	await say("I was getting things ready.")
-	await _knock()   # a metallic knock from inside
+	await _knock()   # the gear shifts against the cauldron's inside
+	_actions.hop(_runner)   # a small startled hop
+	await _wait(0.5)   # then an angled peek into the opening
+	_attend(null)   # a glance back at the child, still leaning over the cauldron
 	await say("Uh... nearly ready.")
-	_attend(null)
+	_actions.lean_in(_runner, false)   # straightens up
+	await _wait(0.4)
 	await say("I'm Onion, by the way.")
-	_attend(_mouth)   # turns to the cauldron, glances back
+	_attend(_peer_point())   # turns to the cauldron, glances back
 	await _wait(0.5)
 	_attend(null)
 	_actions.mark(_runner, "?", 2.4)
@@ -2050,6 +2059,23 @@ func _gear_to_rest() -> void:
 ## The front of the cauldron's rim: where a tap goes.
 func _rim_point() -> Vector3:
 	return _box.global_position + Vector3.UP * _rim + _toward_child() * (CAULDRON_WIDTH * 0.35)
+
+
+## Where Onion looks to peek into the opening from its spot at the rim: a point down in the
+## cauldron, off to one side and away from the child, so it turns three-quarters (not straight down).
+func _peer_point() -> Vector3:
+	var away := -_toward_child()
+	var side := away.cross(Vector3.UP).normalized()
+	return _mouth + Vector3.DOWN * 0.04 + away * 0.05 + side * 0.04
+
+
+## Onion shifts a little from side to side over the opening, twice: searching.
+func _search() -> void:
+	var rim := _peek_spot()
+	var side := _toward_child().cross(Vector3.UP).normalized()
+	await _move(_orb, rim + side * 0.015, 0.45)
+	await _move(_orb, rim - side * 0.012, 0.6)
+	await _move(_orb, rim, 0.4)
 
 
 ## Onion looks at [param what] (a Node3D or a position), or at the child when null.

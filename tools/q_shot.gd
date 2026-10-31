@@ -18,13 +18,16 @@ func _ready() -> void:
 		n += 1
 	await get_tree().create_timer(0.5).timeout
 	entry._on_target(entry.find_child("entry_part_hello", true, false) as Target)
+	var wanted := ["I was getting things ready.", "Uh... nearly ready.", "I'm Onion, by the way."]
+	var shots := 0
 	n = 0
-	while _said != "Could you help me with something?" and n < 3000:
+	while shots < wanted.size() and n < 6000:
 		await get_tree().process_frame
 		n += 1
-	for i in 4:
-		await get_tree().create_timer(0.25).timeout
-		await RenderingServer.frame_post_draw
-		get_viewport().get_texture().get_image().save_png(_out.path_join("q_%d.png" % i))
-	print("SHOT done ", _said)
+		if _said == wanted[shots]:
+			await get_tree().create_timer(1.1 if shots == 0 else 0.5).timeout
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png(_out.path_join("hello_%d.png" % shots))
+			print("SHOT hello_", shots, " ", _said)
+			shots += 1
 	get_tree().quit()
