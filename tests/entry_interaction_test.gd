@@ -721,6 +721,7 @@ func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)

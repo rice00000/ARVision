@@ -32,7 +32,7 @@ const ONION_HEIGHT := 0.11
 ## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md).
 const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
 ## Music volume, decibels: well under the voice.
-const MUSIC_DB := -12.0
+const MUSIC_DB := -15.0
 
 ## DEMO: the child stays seated. Everything to reach or look at closely sits inside
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.
