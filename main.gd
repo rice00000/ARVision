@@ -54,12 +54,13 @@ func _ready() -> void:
 
 ## Switch after the input event has reached all listeners. Interrupted rounds
 ## are abandoned, never scored. The brief fade also works inside the headset.
-func change_scene(id: StringName) -> void:
+func change_scene(id: StringName, fade := true) -> void:
 	if switching or id == current_scene:
 		return
 	switching = true
 	App.hold_pause(&"scene", true)
-	await _fade_to(1.0, 0.18)
+	if fade:   # the opening hands over to its first visit without a black blink (Megan's scene one)
+		await _fade_to(1.0, 0.18)
 	Save.write()
 	var previous := current_scene
 	_clear_scene()
@@ -67,7 +68,8 @@ func change_scene(id: StringName) -> void:
 	App.reality.apply_view(View.new())
 	_load_scene(id)
 	Events.report(&"scene_changed", {from = previous, to = id})
-	await _fade_to(0.0, 0.22)
+	if fade:
+		await _fade_to(0.0, 0.22)
 	App.hold_pause(&"scene", false)
 	switching = false
 

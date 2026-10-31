@@ -516,14 +516,8 @@ func _reveal(fast := false) -> void:
 	await say("I've been looking forward to showing you this.")
 	if not fast:
 		await _wait(3.0)   # time to enjoy the room first: quiet floating, no scanning
-	_attend(_shelf.global_position + Vector3.DOWN * 0.25)   # then it notices the scattered things:
-	_actions.lean_to(_runner, 0.3, 0.8)   # turns downward over 0.8 s
-	await _wait(1.2)   # a brief pause
-	await say("Oh!")
-	await say("Things come through, but they don't always land in the right place.")
-	await say("Would you help me put them where they belong?")
-	_actions.lean_to(_runner, 0.0, 0.5)
-	_attend(null)
+	# Then the first things drop in (Wei's shelf level, in the first visit) and Onion notices them
+	# there: "Oh!" ... is the first visit's (entry/first_visit.gd), so it never points at nothing.
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
@@ -533,7 +527,7 @@ func _to_shelf(fast := false) -> void:
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
 	_beat("done: Wei's World")
-	App.main.change_scene.call_deferred(&"first_visit")   # Onion leads the first shelf level
+	App.main.change_scene.call_deferred(&"first_visit", false)   # no black blink: the room just goes on   # Onion leads the first shelf level
 
 
 ## The global motion task (Wei's dots scene) in the same passthrough room. Onion and the

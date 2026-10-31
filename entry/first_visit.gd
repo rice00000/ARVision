@@ -40,6 +40,20 @@ func run() -> void:
 		if App.session.trial is Node3D:
 			_shelf_spot = (App.session.trial as Node3D).global_position
 			break
+	# The first things have just dropped in beside the shelf: Onion notices them (the reveal's
+	# last beat, moved here so they are really there). A short wait lets them land first.
+	await get_tree().create_timer(0.9, false).timeout
+	if _onion != null and _shelf_spot != Vector3.INF:
+		_onion.attend(_shelf_spot + Vector3.DOWN * 0.25)   # turns down toward them
+	await get_tree().create_timer(0.8, false).timeout
+	if not _fits_said:
+		await say("Oh!")
+	if _onion != null:
+		_onion.attend(null)
+	if not _fits_said:
+		await say("Things come through, but they don't always land in the right place.")
+	if not _fits_said:
+		await say("Would you help me put them where they belong?")
 	# The child may place a thing while Onion is still explaining: the action counts, and an
 	# instruction it has made obsolete is skipped.
 	if not _fits_said:
