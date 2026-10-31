@@ -1185,3 +1185,58 @@ func test_in_the_shelf_both_hands_each_carry_one_thing_and_losing_one_hand_retur
 	input.track(&"left", true)
 	input.press(&"left", &"trigger_click", false)
 	input.press(&"right", &"trigger_click", false)
+
+
+# --- Desktop keys after the opening (a Mac could click in the shelf but neither move nor turn) ------------------
+
+func _key(code: Key, down: bool) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()   # a real window does this every frame; the headless loop doesn't
+
+
+func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_follows() -> void:
+	var entry := await _opening_at_start()
+	var keys := App.main.get_node_or_null(^"DesktopKeys")
+	expect(keys != null, "the key node is there, under Main (it outlives the opening)")
+	var head := App.rig.head
+	var start := head.global_position
+	_key(KEY_W, true)
+	await frames(60)
+	_key(KEY_W, false)
+	var in_opening := head.global_position.distance_to(start)
+	expect(in_opening > 0.3 and in_opening < 0.7, "in the opening W moves about half a metre a second, once (not twice): %s" % in_opening)
+	_key(KEY_R, true)
+	await frames(3)
+	_key(KEY_R, false)
+	App.main.change_scene(&"first_visit")   # the opening hands over to the shelf
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not is_instance_valid(entry), 10.0), "now in the shelf scene")
+	await wait(1.5)
+	expect(App.main.get_node_or_null(^"DesktopKeys") == keys, "the same key node, still there")
+	var before := head.global_position
+	var ahead := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
+	_key(KEY_W, true)
+	await frames(60)
+	_key(KEY_W, false)
+	var moved := head.global_position - before
+	expect(moved.length() > 0.3 and moved.length() < 0.7, "in the shelf W moves the head about half a metre a second: %s" % moved.length())
+	expect(moved.normalized().dot(ahead) > 0.95, "and forward")
+	_key(KEY_LEFT, true)
+	await frames(30)
+	_key(KEY_LEFT, false)
+	expect(head.rotation.y > 0.3, "the left arrow turns the head: %s" % head.rotation.y)
+	_key(KEY_UP, true)
+	await frames(30)
+	_key(KEY_UP, false)
+	expect(head.rotation.x > 0.3, "the up arrow tilts it: %s" % head.rotation.x)
+	_key(KEY_E, true)
+	await frames(30)
+	_key(KEY_E, false)
+	expect(head.global_position.y > before.y + 0.1, "E raises it")
+	_key(KEY_R, true)
+	await frames(3)
+	_key(KEY_R, false)
+	expect(head.global_position.distance_to(start) < 0.01 and absf(head.rotation.y) < 0.001 and absf(head.rotation.x) < 0.001, "R puts it back, looking straight ahead")

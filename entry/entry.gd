@@ -2529,6 +2529,10 @@ func _configure_interaction() -> void:
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
 	_carry.follow(_box, _mechanism)   # they move at the reveal
 	Events.selected.connect(_on_desktop_click)
+	if App.xr == null and App.main.get_node_or_null(^"DesktopKeys") == null:   # the head keys must outlive the opening
+		var keys := DesktopKeys.new()
+		keys.name = "DesktopKeys"
+		App.main.add_child(keys)
 	_carry.remind_after = PICKUP_REMINDER_SECONDS
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)
