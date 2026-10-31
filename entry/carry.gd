@@ -22,6 +22,9 @@ signal picked_up
 signal released(docked: bool)
 ## The gear is in the socket (after the auto-align and the click).
 signal docked
+## [method reset] was called (a jump button, the story starting a part over): whatever was showing the
+## child how to carry (a highlight, the teaching hand) should go. No other signal comes with it.
+signal was_reset
 ## The gear has been in view for [member remind_after] seconds and the child has not touched it.
 ## Once per [method begin]. The listener may show the teaching hand (it must never carry the gear).
 signal reminder_due
@@ -174,6 +177,7 @@ func reset() -> void:
 	if _hint != null:
 		_hint_level = 0.0
 		_hint.visible = false
+	was_reset.emit()
 
 
 ## True once the child has picked the gear up (since [method begin]).

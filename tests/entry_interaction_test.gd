@@ -640,6 +640,41 @@ func test_a_tap_points_with_the_index_fingertip_on_the_rim() -> void:
 	expect(demo._figure.position == Vector3.ZERO, "the hand is back at its own origin")
 
 
+func test_the_tap_presses_harder_than_the_clip_and_rings_the_rim_once_a_loop() -> void:
+	await _scene()
+	var demo := _demo()
+	var rim := cauldron + Vector3.UP * 0.12
+	demo.tap(rim)
+	await _frozen(demo, 0.3)
+	var ring := demo._ring
+	expect(ring != null and not ring.visible, "no ring before the fingertip lands")
+	var index_bone := demo._skeleton.find_bone(DemoHand.INDEX_TIP_BONE)
+	var parent := demo._skeleton.get_bone_parent(index_bone)
+	var rest := demo._skeleton.get_bone_pose_rotation(parent)   # the finger as the tap starts (frozen at 0.3 s)
+	await _frozen(demo, (DemoHand.TAP_DOWN + DemoHand.TAP_UP) * 0.5)
+	var pressed := demo._skeleton.get_bone_pose_rotation(parent)
+	var clip_pressed: Quaternion = demo._index_pressed[parent]
+	var clip_rest: Quaternion = demo._index_rest[parent]
+	var asked := clip_rest.angle_to(clip_pressed)
+	var made := clip_rest.angle_to(pressed)
+	expect(made > asked * 1.5, "the index bends at least 1.5 times as far as the clip alone (%s vs %s rad)" % [made, asked])
+	expect(ring.visible, "the ring shows as it lands")
+	expect(ring.global_position.distance_to(rim) < 0.001, "on the rim point")
+	var width := ring.scale.x
+	await _frozen(demo, DemoHand.TAP_DOWN + DemoHand.RING_SECONDS * 0.8)
+	expect(ring.scale.x > width and demo._ring_material.albedo_color.a < DemoHand.RING_ALPHA, "it spreads and fades")
+	expect(demo._ring_material.albedo_color.a <= DemoHand.RING_ALPHA + 0.001, "softly")
+	await _frozen(demo, DemoHand.TAP_BACK + 0.2)
+	expect(not ring.visible, "gone once the hand lifts")
+	demo.pinch_lift(gear)   # another gesture has no ring
+	await _frozen(demo, 1.1)
+	expect(not ring.visible, "the pinch has no ring")
+	demo.set_process(true)   # (it was held still for the checks)
+	demo.stop()
+	await wait(0.7)
+	expect_eq(demo.get_child_count(), 0, "and nothing is left of it")
+
+
 func test_without_the_glb_the_primitive_hand_does_the_same_job() -> void:
 	await _scene()
 	var plain := _demo()
@@ -874,3 +909,49 @@ func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -
 		done.finished = true
 	wait_for_it.call()
 	expect(await until(func() -> bool: return done.finished, 1.5), "the story's wait for 'set it in' ends at once")
+
+
+# --- The desktop mouse and the cauldron ----------------------------------------------------
+
+## The real opening at its Start screen (setup skipped: the default), ready for a jump button.
+func _opening_at_start() -> Entry:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = false   # a desktop: only a click presses
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_part_touch") != null, 30.0)
+	return entry
+
+
+func test_a_click_on_the_cauldron_registers_every_time_a_click_beside_it_does_not() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_touch")
+	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	var driver: DesktopDriver = entry._desktop_driver()
+	var camera := App.rig.head
+	var target: Target = entry.get("_cauldron_target")
+	var taps := record(entry._runner.cauldron_touched)
+	var clicks := 0
+	for depth: float in [0.2, 0.3, 0.45, 0.6, 0.9]:   # the wheel moves the hand in and out
+		driver.depth = depth
+		for offset: Vector3 in [Vector3.ZERO, Vector3(0.07, 0.0, 0.0), Vector3(-0.07, 0.0, 0.0), Vector3(0.0, 0.1, 0.0), Vector3(0.0, -0.05, 0.0)]:
+			driver._place_hand(camera.unproject_position(target.global_position + offset))
+			await frames(2)
+			input.press(&"right", &"trigger_click", true)
+			await frames(2)
+			input.press(&"right", &"trigger_click", false)
+			await frames(2)
+			clicks += 1
+			expect_eq(taps.size(), clicks, "click %d (depth %s, offset %s) taps the cauldron" % [clicks, depth, offset])
+	# Beside the cauldron (well outside its tap sphere) nothing happens.
+	driver.depth = 0.9
+	var before := taps.size()
+	driver._place_hand(camera.unproject_position(target.global_position + camera.global_basis.x * 0.5))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	expect_eq(taps.size(), before, "a click well beside the cauldron does nothing")

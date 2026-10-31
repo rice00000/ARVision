@@ -444,6 +444,8 @@ func _out() -> void:
 ## 4. Asks the child to pick the gear up, with a hand that shows the pinch; ends when it is held.
 func _pickup() -> void:
 	_beat("4: pick it up")
+	if USE_REAL_CARRY and not _carry.enabled:
+		_carry.begin(_gear, _socket_at)   # a jump straight here: the child may grab during the ask, as in the full flow
 	var already := USE_REAL_CARRY and _carry.has_been_picked_up()   # the child did it before being asked
 	if not already:
 		_attend(_gear)   # looks at the gear with a small curious lean; the gear stays still
@@ -483,12 +485,15 @@ func _glow_gear(on: bool) -> void:
 func _place() -> void:
 	_beat("5: set it in")
 	_glow_gear(false)
+	if USE_REAL_CARRY and not _carry.enabled:
+		_carry.begin(_gear, _socket_at)   # a jump straight here: the child may act during the instruction
 	_actions.lean_to(_runner, 0.3, 0.8)   # moves beside the socket (0.8 s), looks down and holds
 	_move(_orb, _aside_spot(), 0.8)
 	_attend(_socket_at)
-	_demo.lower_release(_socket_at)
-	await say("Set it in here, then open your fingers.")
-	await _child_sets_in()
+	if not (USE_REAL_CARRY and _carry.has_docked()):   # a child who set it in while Onion talked is not asked to
+		_demo.lower_release(_socket_at)
+		await say("Set it in here, then open your fingers.")
+		await _child_sets_in()
 	_demo.stop()
 	_sounds.play(&"seat", _socket_at)   # once, on the completed seating
 	_dock_at_once()   # settled, upright, and now turning
@@ -2523,10 +2528,30 @@ func _configure_interaction() -> void:
 	_carry.configure(_gear_rest.y, App.head().global_position, maxf(_cauldron_distance, 0.45) + 0.15,
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
 	_carry.follow(_box, _mechanism)   # they move at the reveal
+	Events.selected.connect(_on_desktop_click)
 	_carry.remind_after = PICKUP_REMINDER_SECONDS
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)
 	_carry.docked.connect(_demo.stop)
+	# The pick-up highlight goes the moment the gear is grabbed (not when the story's line ends), and on
+	# every reset (a jump button), together with the teaching hand: neither may outlive its part.
+	_carry.picked_up.connect(_glow_gear.bind(false))
+	_carry.was_reset.connect(func() -> void:
+		_glow_gear(false)
+		_demo.stop())
+
+
+## DESKTOP: the mouse hand sits on the cursor's line at a depth the wheel (and the W/S keys) change, so its
+## own ray can start BEYOND the cauldron and point away from it: the click then reached nothing, which
+## looked like a click that "sometimes works". A click whose line passes through the cauldron's tap
+## sphere counts, whatever the hand's depth. (In a headset the hand's own ray and the fingertip decide.)
+func _on_desktop_click(_hand: StringName, target: Target, origin: Vector3, direction: Vector3) -> void:
+	if App.xr != null or target != null or _cauldron_target == null or not is_instance_valid(_cauldron_target):
+		return   # a headset, or the ray hit something else, or there is no cauldron to tap
+	var line := direction.normalized()
+	var from_centre := _cauldron_target.global_position - origin
+	if from_centre.cross(line).length() <= CAULDRON_WIDTH * 0.6:   # how far the centre is from the line
+		_on_target(_cauldron_target)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
