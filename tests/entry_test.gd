@@ -150,3 +150,69 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	await _press(&"entry_part_shelf")
 	expect(await _until_said(said, App.world.adventure.greeting, 60.0), "shelf: Wei's World starts")
 	expect(entry.get("_guide") != null, "shelf: with Onion as its guide")
+
+
+## Puts the right fingertip at [param point] (button space), the hand behind it pointing into the plate.
+func _poke_at(button: EntryButton, local: Vector3) -> void:
+	var tip := button.to_global(local)
+	var back := button.global_basis.z.normalized()
+	input.point(&"right", tip + back * App.rig.pointer(&"right").tip_reach, tip)
+	await frames(3)
+
+
+func test_poking_anywhere_on_the_plate_presses_it() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var pressed := record(entry._part_pressed)
+	var start: EntryButton = _target(&"entry_part_all").get_parent()
+	await wait(1.0)   # a finger already there as a button appears doesn't count
+	# Near the far end of the plate, which the old round hit area missed.
+	await _poke_at(start, Vector3(start.plate.x * 0.5 - 0.01, 0.0, 0.15))
+	await _poke_at(start, Vector3(start.plate.x * 0.5 - 0.01, 0.0, -0.01))
+	expect_eq(pressed.size(), 1, "one press from one poke (pokes and pinches don't double)")
+	expect_eq(pressed[0][0] if not pressed.is_empty() else null, &"all", "and it was Start")
+
+
+func test_a_pinch_counts_what_was_aimed_at_before_the_fingers_closed() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var pressed := record(entry._part_pressed)
+	var start: EntryButton = _target(&"entry_part_all").get_parent()
+	var eye := App.head().global_position
+	var at := start.global_position
+	input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
+	await wait(0.5)
+	# The aim slips off the button as the fingers close, then the click lands.
+	var off := at + Vector3.UP * 0.6
+	input.point(&"right", eye + (off - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, off)
+	await wait(0.08)
+	input.click(&"right", &"trigger_click")
+	await frames(3)
+	expect_eq(pressed.size(), 1, "the pinch still presses the button that was aimed at")
+
+
+func test_buttons_light_up_under_a_ray() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var start: EntryButton = _target(&"entry_part_all").get_parent()
+	var eye := App.head().global_position
+	var at := start.global_position
+	input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
+	await wait(0.6)
+	expect(start.get("_hot"), "the button the ray is on is lit")
+	input.point(&"right", eye + Vector3.UP * 0.1, eye + Vector3.UP * 0.1 + Vector3.BACK * 2.0)
+	await wait(0.6)
+	expect(not start.get("_hot"), "and not once the ray leaves")
+
+
+func test_exit_needs_two_presses_so_a_stray_pinch_cannot_close_the_app() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var exit_button: EntryButton = _target(&"entry_debug_exit").get_parent()
+	expect_eq(exit_button.text(), "Exit app", "it starts as Exit app")
+	await select(_target(&"entry_debug_exit").global_position)
+	await frames(3)
+	expect(is_instance_valid(app), "one press does not quit")
+	expect_eq(exit_button.text(), "Press again to exit", "it asks for a second press")
+	await wait(3.5)
+	expect_eq(exit_button.text(), "Exit app", "and goes back if none comes")
