@@ -28,6 +28,9 @@ var _depth := DepthSensor.new()
 var _finder := TableFinder.new()
 ## The table found without the room scan (depth or hands); null while none.
 var _table: Surface
+## Say "Got it. That's your table." when depth finds the table. Off while something
+## else sets the table up quietly (the entry's own table check).
+var announce_table := true
 
 
 func kind() -> String:
@@ -144,7 +147,8 @@ func _set_table(how: StringName) -> void:
 	var found := _finder.table
 	_table = Surface.new(&"table", Transform3D(Basis.looking_at(found.forward), found.centre), found.size)
 	add_surface(_table)
-	Events.say("Got it. That's your table.")
+	if announce_table:
+		Events.say("Got it. That's your table.")
 	note(how, {centre = found.centre, size = found.size})
 	_settle()
 
