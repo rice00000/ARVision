@@ -273,13 +273,13 @@ func _choose_part() -> StringName:
 		add_child(words)
 		words.global_position = middle + Vector3.DOWN * 0.065
 		buttons.append(words)
-		# Two rows (3 + 2) under Start, 13 cm apart, so each is easy to hit on its own.
+		# Two rows (3 + 2) under Start, 13 cm across, 8.5 cm down (clear of the beat label below).
 		var names: Array = PARTS.keys()
 		for i in names.size():
 			var row := i / 3
 			var count := 3 if row == 0 else names.size() - 3
 			var across := ((i % 3) - (count - 1) * 0.5) * 0.13
-			var at := middle + side * across + Vector3.DOWN * (0.13 + row * 0.1)
+			var at := middle + side * across + Vector3.DOWN * (0.12 + row * 0.085)
 			buttons.append(_button(PARTS[names[i]], at, StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.01))
 	var part: StringName = await _part_pressed
 	for button in buttons:
