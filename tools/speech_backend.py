@@ -4,6 +4,8 @@ import sys
 
 
 def synthesizer(voices, platform=sys.platform):
+    if "kokoro" in voices:
+        return kokoro_synthesizer(voices["kokoro"])
     if platform not in ("darwin", "win32"):
         raise RuntimeError("Speech authoring supports Windows and macOS. Cached audio plays everywhere.")
     settings = voices[platform]
@@ -35,4 +37,26 @@ def synthesizer(voices, platform=sys.platform):
             voice.Speak(text, 16) # SVSFIsNotXML: authored text is always literal.
         finally:
             stream.Close()
+    return write
+
+
+def kokoro_synthesizer(settings):
+    """Kokoro-82M (open weights, Apache 2.0; https://huggingface.co/hexgrad/Kokoro-82M).
+    Same voice on every computer. Needs: python3 -m pip install kokoro soundfile, and espeak-ng.
+    settings: {"voice": "af_heart", "speed": 1.0}; the voice's first letter picks the accent
+    (a = American, b = British English)."""
+    try:
+        import numpy
+        import soundfile
+        from kokoro import KPipeline
+    except ImportError:
+        raise RuntimeError("Install Kokoro: python3 -m pip install kokoro soundfile (and brew install espeak-ng)") from None
+    voice = settings["voice"]
+    pipeline = KPipeline(lang_code=voice[0], repo_id="hexgrad/Kokoro-82M")
+
+    def write(text, path):
+        parts = [audio for _, _, audio in pipeline(text, voice=voice, speed=settings.get("speed", 1.0))]
+        if not parts:
+            raise RuntimeError("Kokoro made no audio for: " + text)
+        soundfile.write(str(path), numpy.concatenate([numpy.asarray(part) for part in parts]), 24000, format="WAV")
     return write

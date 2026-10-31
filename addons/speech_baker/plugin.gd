@@ -10,7 +10,16 @@ var _last_report := ""
 var _status: Label
 
 
+## The Python that bakes. Kokoro (content/voice/speech.tts) needs a Python with it
+## installed; the first that exists wins: $ARVISION_PYTHON, a tts-env next to the
+## project (python3 -m venv ../tts-env), a .venv inside it, else the system Python.
 func _python() -> String:
+	var project := ProjectSettings.globalize_path("res://")
+	var bin := "Scripts/python.exe" if OS.has_feature("windows") else "bin/python"
+	for candidate in [OS.get_environment("ARVISION_PYTHON"), project.path_join("../tts-env/" + bin).simplify_path(),
+			project.path_join(".venv/" + bin)]:
+		if not candidate.is_empty() and FileAccess.file_exists(candidate):
+			return candidate
 	return "python3" if OS.has_feature("macos") else "python"
 
 

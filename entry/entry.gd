@@ -16,7 +16,7 @@ const ONION_HEIGHT := 0.11
 ## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md).
 const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
 ## Music volume, decibels: well under the voice.
-const MUSIC_DB := -20.0
+const MUSIC_DB := -12.0
 
 var _table: Surface
 var _box := Node3D.new()            # the cauldron on the table (named _box from v0)
@@ -25,6 +25,10 @@ var _music := AudioStreamPlayer.new()
 var _orb := MeshInstance3D.new()    # the guide: holds Onion and its glow (named _orb from v0)
 var _onion: Node3D                  # the wisp model, turned to face the child
 var _face := Vector3.FORWARD        # which way Onion's eyes point, in its own space
+var _glow: OmniLight3D              # Onion's light; pulses while it talks
+var _talk_until := 0.0              # seconds (game time) until Onion stops "talking"
+var _clock := 0.0
+var _onion_rest_y := 0.0            # Onion's height in its holder when still
 var _found: Array[Node3D] = []      # the objects that tumble out
 var _cabinet := Node3D.new()        # stand-in for the cabinet beside the chair
 var _seal := MeshInstance3D.new()   # the sealed patch on the wall behind
@@ -50,6 +54,8 @@ func _ready() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_target(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(target))
 	Events.help_requested.connect(_on_help)
+	# Onion moves while a line plays: about as long as the subtitle stays.
+	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	_play.call_deferred()   # run the opening once everything is set up
 
 
@@ -59,7 +65,7 @@ func _play() -> void:
 		await App.reality.settled
 	_table = App.reality.work_surface()
 	print("ENTRY 2: table found: ", _table != null)
-	_build_box()
+	_build_box(await _table_spot())
 	_build_orb()
 	_start_music()
 	print("ENTRY 3: cauldron at ", _box.global_position, ", head at ", App.head().global_position)
@@ -142,6 +148,13 @@ func _on_target(target: Target) -> void:
 		return
 	if DEBUG:
 		print("ENTRY touched/picked: ", target.id)
+	# Touch feedback (tracked hands can't vibrate): Wei's Feedback module plays a
+	# sound and shows a mark where the touch landed.
+	if target.id == &"entry_cauldron" or target.id == &"entry_begin":
+		Events.feedback.emit(&"hint", target.global_position)
+	elif String(target.id).begins_with("entry_piece_") and _wanted >= 0:
+		var right := String(target.id) == "entry_piece_%d" % _wanted
+		Events.feedback.emit(&"good" if right else &"bad", target.global_position)
 	if target.id == &"entry_cauldron":
 		_lid_touched.emit()
 	elif target.id == &"entry_begin":
@@ -173,9 +186,9 @@ func _beat(text: String) -> void:
 	_beat_label.text = "beat " + text
 
 
-func _build_box() -> void:
+func _build_box(spot: Vector3) -> void:
 	add_child(_box)
-	_box.global_position = _table.point(0, 0)   # centre of the table, on its top
+	_box.global_position = spot   # on the real table, within seated reach
 	var cauldron: Node3D = CAULDRON.instantiate()
 	_box.add_child(cauldron)
 	# Scale it to CAULDRON_WIDTH and stand it on the table, whatever the model's own units.
@@ -190,6 +203,56 @@ func _build_box() -> void:
 	var target := Target.sphere(&"entry_cauldron", CAULDRON_WIDTH * 0.6)
 	target.position = Vector3.UP * _rim * 0.5
 	_box.add_child(target)
+
+
+## Where the cauldron goes: on the real table, within seated reach.
+## 1. A real table Wei's code found (room scan or depth), the point of it nearest the child.
+## 2. Else depth: a flat, level patch at table height 0.55-0.75 m ahead. The patch must be
+##    flat over 16 cm, so a lap or knees (curved, close) don't count.
+## 3. Else Wei's work surface (a virtual spot in front of the child).
+const REACH := 0.6
+func _table_spot() -> Vector3:
+	for attempt in 32:   # about 8 s
+		var eye := App.head().global_transform
+		var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+		for table: Surface in App.reality.surfaces(&"table"):
+			if table.transform.origin.distance_to(eye.origin) < 1.2:
+				var spot := _nearest_on(table, eye.origin, 0.12)
+				print("ENTRY spot: Wei's table, ", snappedf(Vector2(spot.x - eye.origin.x, spot.z - eye.origin.z).length(), 0.01), " m away")
+				return spot
+		for distance: float in [REACH, REACH - 0.05, REACH + 0.1, REACH + 0.15]:
+			var spot: Variant = _flat_at(eye.origin, eye.origin + ahead * distance)
+			if spot != null:
+				print("ENTRY spot: depth, ", distance, " m ahead, ", snappedf(eye.origin.y - (spot as Vector3).y, 0.01), " m below the eyes")
+				return spot
+		await get_tree().create_timer(0.25).timeout
+	print("ENTRY spot: fallback to the work surface")
+	return _table.point(0, 0)
+
+
+## The point of [param table] nearest [param eye] (seen from above), [param margin] in from its edges.
+func _nearest_on(table: Surface, eye: Vector3, margin: float) -> Vector3:
+	var local := table.transform.affine_inverse() * eye
+	var half := table.size * 0.5 - Vector2.ONE * margin
+	local.x = clampf(local.x, -half.x, half.x)
+	local.z = clampf(local.z, -half.y, half.y)
+	local.y = 0.0
+	return table.transform * local
+
+
+## The tabletop under [param above] if it is level and flat over 16 cm at table
+## height below [param eye]; else null.
+func _flat_at(eye: Vector3, above: Vector3) -> Variant:
+	var heights: Array[float] = []
+	for offset: Vector3 in [Vector3.ZERO, Vector3(0.08, 0, 0), Vector3(-0.08, 0, 0), Vector3(0, 0, 0.08), Vector3(0, 0, -0.08)]:
+		var found: Dictionary = App.reality.hit(above + offset, Vector3.DOWN)
+		if found.is_empty() or found.normal.y < 0.95:
+			return null
+		heights.append(found.position.y)
+	var drop := eye.y - heights[0]
+	if drop < 0.25 or drop > 0.8 or heights.max() - heights.min() > 0.015:
+		return null
+	return Vector3(above.x, heights[0], above.z)
 
 
 ## The box around every mesh under [param root], in world space.
@@ -213,23 +276,29 @@ func _build_orb() -> void:
 	_onion.scale *= ONION_HEIGHT / bounds.size.y
 	bounds = _bounds(_onion)
 	_onion.global_position -= bounds.get_center() - _orb.global_position
+	_onion_rest_y = _onion.position.y
 	# Which way the eyes look: from the body's centre to the eyes' centre.
 	for mesh: MeshInstance3D in _onion.find_children("*Eyes*", "MeshInstance3D", true, false):
 		var eyes := (mesh.global_transform * mesh.get_aabb()).get_center()
 		var towards := eyes - bounds.get_center()
 		_face = _orb.global_transform.basis.inverse() * Vector3(towards.x, 0, towards.z).normalized()
 	# A soft light around Onion, so it glows on the cauldron and table.
-	var light := OmniLight3D.new()
-	light.light_color = Color(1.0, 0.85, 0.2)
-	light.omni_range = 0.6
-	light.light_energy = 0.6
-	_orb.add_child(light)
+	_glow = OmniLight3D.new()
+	_glow.light_color = Color(1.0, 0.85, 0.2)
+	_glow.omni_range = 0.6
+	_glow.light_energy = 0.6
+	_orb.add_child(_glow)
 
 
-## Onion keeps its face turned to the child.
-func _process(_delta: float) -> void:
+## Onion keeps its face turned to the child, and bobs and glows while it talks.
+func _process(delta: float) -> void:
+	_clock += delta
 	if _onion == null or App.rig == null:
 		return
+	var talking := _clock < _talk_until
+	var bob := sin(_clock * 7.0) * 0.006 if talking else sin(_clock * 1.5) * 0.002   # idle: a slow float
+	_onion.position.y = lerpf(_onion.position.y, _onion_rest_y + bob, minf(1.0, delta * 10.0))
+	_glow.light_energy = 0.6 + (0.35 * (0.5 + 0.5 * sin(_clock * 9.0)) if talking else 0.0)
 	var to_child := App.head().global_position - _orb.global_position
 	to_child.y = 0
 	if to_child.length() < 0.01:
@@ -258,7 +327,7 @@ func _open_lid() -> void:
 		grey.albedo_color = Color(0.6, 0.6, 0.6)   # faded: the colour has drained away
 		mesh.material = grey
 		piece.mesh = mesh
-		piece.add_child(Target.sphere(StringName("entry_piece_%d" % i), 0.06))
+		piece.add_child(Target.sphere(StringName("entry_piece_%d" % i), 0.08))
 		add_child(piece)
 		piece.global_position = _box.global_position + Vector3.UP * (_rim + 0.05)
 		_found.append(piece)
@@ -343,11 +412,13 @@ func _orb_to(where: Vector3) -> void:
 ## The object opens up and shows a small coloured fragment with a mark. Returns it.
 func _unfold(piece: Node3D) -> Node3D:
 	for target in piece.find_children("*", "Target", false, false):
-		piece.remove_child(target)   # found: it can't be picked again (and physics shapes can't squash)
+		piece.remove_child(target)   # found: it can't be picked again
 		target.queue_free()
-	var grow := create_tween()
-	grow.tween_property(piece, "scale", Vector3(1.4, 0.2, 1.4), 0.5)
-	await grow.finished
+	# The object opens a little (a gentle wobble), and something rises out of it.
+	var wobble := create_tween()
+	wobble.tween_property(piece, "scale", Vector3(1.15, 1.15, 1.15), 0.25)
+	wobble.tween_property(piece, "scale", Vector3.ONE, 0.25)
+	await wobble.finished
 	var fragment := MeshInstance3D.new()
 	var gem := PrismMesh.new()
 	gem.size = Vector3(0.04, 0.05, 0.02)
@@ -358,7 +429,10 @@ func _unfold(piece: Node3D) -> Node3D:
 	gem.material = shine
 	fragment.mesh = gem
 	add_child(fragment)
-	fragment.global_position = piece.global_position + Vector3.UP * 0.08
+	fragment.global_position = piece.global_position
+	var rise := create_tween()
+	rise.tween_property(fragment, "global_position", piece.global_position + Vector3.UP * 0.12, 0.8).set_trans(Tween.TRANS_SINE)
+	await rise.finished
 	return fragment
 
 
@@ -443,4 +517,5 @@ func _start_music() -> void:
 	_music.volume_db = -60.0
 	add_child(_music)
 	_music.play()
+	print("ENTRY music playing: ", _music.playing)
 	create_tween().tween_property(_music, "volume_db", MUSIC_DB, 4.0)
