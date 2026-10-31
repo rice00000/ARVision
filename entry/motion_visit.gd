@@ -34,6 +34,7 @@ var _shelf_level := 1            # the next of Wei's shelf levels "more to sort"
 var _buttons: Array[EntryButton] = []
 var _coherence_level := NAN      # the level the DEV buttons pinned, NAN: Wei's own for the plan
 var _coherence_label: Label3D
+var _dev: EntryMotionDev
 
 
 func _ready() -> void:
@@ -78,7 +79,9 @@ func run_motion() -> void:
 	_rounds_ended = 0
 	_rounds_won = 0
 	if DEV_COHERENCE:
-		_coherence_panel()
+		_dev = EntryMotionDev.new()   # chat C: readout + buttons that pin the level (logged)
+		add_child(_dev)
+		_dev.set_scene(&"Motion")
 	_rounds_running = true
 	_play_rounds()   # not awaited here: the DEV coherence pin goes in right after play() clears it
 	if not is_nan(_coherence_level):
@@ -87,6 +90,9 @@ func run_motion() -> void:
 		await get_tree().process_frame
 	_in_motion = false
 	_clear_buttons()
+	if _dev != null:
+		_dev.queue_free()
+		_dev = null
 	await _ending()
 
 
@@ -95,19 +101,51 @@ func _play_rounds() -> void:
 	_rounds_running = false
 
 
-## The approved ending, whatever the success count: the last effect finishes, the dots are gone
-## (Wei's session frees its trial), Onion turns to the child, a pause, the line, quiet, then the
-## closing scene (not written yet: it stops here).
+## The approved ending and closing (story chat, whatever the success count): the last earned effect
+## finishes (a time-out gets none: Wei's trial only plays it on a right sweep), the dots are gone (Wei's
+## session frees its trial) and the teaching cues stop; Onion thanks the child; the gears slow and stop;
+## the gear goes home into the cauldron; Onion promises to be ready next time, a rattle gives it away;
+## a goodbye bob and Onion ducks inside. Then the end-session control; the workshop stays until it is
+## pressed.
 func _ending() -> void:
 	await get_tree().create_timer(SETTLE, false).timeout
 	if _onion != null:
 		_onion.attend(null)
 	await get_tree().create_timer(1.0, false).timeout
 	await say("Thank you for trying that with me.")
-	await get_tree().create_timer(QUIET_END, false).timeout
+	await get_tree().create_timer(1.2, false).timeout
+	await say("It's been lovely having you here.")
 	Motion.onion_voice = false
-	SceneMarker.show_text("Closing (not written yet)")
+	SceneMarker.show_text("Closing")
+	if _onion != null:
+		await _onion.slow_gears()
+		await _onion.cauldron_back()
+		_onion.attend(_onion.mouth())   # watches it land
+		await _onion.gear_home()
+		await get_tree().create_timer(0.5, false).timeout
+		_onion.attend(null)   # turns back
+	await say("I'll have everything ready for your next visit.")
+	if _onion != null:
+		_onion.attend(_onion.mouth())   # a glance toward the rattle
+		await _onion.rattle()
+		await get_tree().create_timer(0.3, false).timeout
+		_onion.attend(null)
+		_onion.tilt(true)   # back, with a sheepish tilt
+	await say("Well. I'll do my best.")
+	if _onion != null:
+		_onion.tilt(false)
+		await _onion.goodbye()
 	Events.report(&"motion_visit_done", {rounds = _rounds_ended, successes = _rounds_won})
+	await get_tree().create_timer(QUIET_END, false).timeout
+	_end_session_control()
+
+
+## "End session": stays until the grown-up presses it; the workshop stays visible meanwhile.
+func _end_session_control() -> void:
+	SceneMarker.show_text("End of session")
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	_add_button("End session", &"visit_end_session", eye.origin + ahead.rotated(Vector3.UP, deg_to_rad(-35.0)) * 0.45 + Vector3.DOWN * 0.05, Color(0.45, 0.3, 0.3))
 
 
 func _on_trial_ended(_skill: StringName, success: bool, _data: Dictionary) -> void:
@@ -130,10 +168,26 @@ func _entrance() -> void:
 	await get_tree().create_timer(1.0, false).timeout
 
 
-## The unscored demonstration (chat A): dots at full coherence, the teaching hand's sideways
-## sweep, Wei's effect once; nothing logged. Now: a short pause.
+## The unscored demonstration (chat A's MotionTutorial): dots at full coherence, the teaching hand's
+## sideways sweep, Wei's effect once; nothing logged, no round. Onion turns to follow it.
 func _tutorial() -> void:
-	await get_tree().create_timer(1.5, false).timeout
+	var tutorial := MotionTutorial.new()
+	add_child(tutorial)
+	tutorial.effect_started.connect(func() -> void:
+		if _onion != null:
+			_onion.attend(_dots_frame().origin))   # one smooth turn to the effect
+	tutorial.play(_dots_frame())
+	await tutorial.settled
+	tutorial.queue_free()
+	if _onion != null:
+		_onion.attend(null)
+
+
+## Where the dots stand: ahead at eye height, EntryMotionLayout.DOTS_DISTANCE away (like Wei's cloud).
+func _dots_frame() -> Transform3D:
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	return Transform3D(Basis.looking_at(ahead, Vector3.UP), eye.origin + ahead * EntryMotionLayout.DOTS_DISTANCE)
 
 
 ## Two plain buttons in front of the child (chat C lays out the real choice). A press, never a look.
@@ -143,11 +197,27 @@ func _choose() -> StringName:
 	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	var right := ahead.cross(Vector3.UP)
 	var at := eye.origin + ahead * 0.42 + Vector3.DOWN * 0.12
-	_add_button("More shapes", &"visit_more_shelf", at - right * 0.13, Color(0.55, 0.42, 0.28))
-	_add_button("The dots", &"visit_motion", at + right * 0.13, Color(0.3, 0.45, 0.65))
+	var spots := _motion_layout()
+	if spots != null:   # chat C: a row on the table straight ahead, inside the reach
+		at = spots.choice_spot(0, 2)
+	_add_button("More shapes", &"visit_more_shelf", at - right * 0.06 if spots == null else at, Color(0.55, 0.42, 0.28))
+	var disc := MotionChoice.new()   # chat A: a still disc of dots, pressed deliberately (never a look)
+	add_child(disc)
+	if spots != null:
+		disc.global_transform = _buttons[0].global_transform
+		disc.global_position = spots.choice_spot(1, 2)
+		var place: Dictionary = spots.onion_without_shelf(2)
+		if _onion != null:
+			_onion.float_to(place.at, 1.0)   # beside the row, out of the dots' view
+	else:
+		disc.place_beside(_buttons[0], 0.1)
+	disc.open()
+	disc.chosen.connect(func() -> void: _choice = &"motion")
 	_choice = &""
 	while _choice == &"":
 		await get_tree().process_frame
+	disc.close()
+	disc.queue_free()
 	_clear_buttons()
 	return _choice
 
@@ -193,6 +263,10 @@ func _on_press(target: Target) -> void:
 			_choice = &"shelf"
 		&"visit_motion":
 			_choice = &"motion"
+		&"visit_end_session":
+			Events.report(&"session_ended", {by = "end_session_button"})
+			_clear_buttons()
+			get_tree().quit.call_deferred()
 		_:
 			var id := String(target.id)
 			if id.begins_with("visit_coherence_"):
@@ -231,6 +305,13 @@ func _add_button(text: String, id: StringName, at: Vector3, colour: Color, size 
 	button.look_at(Vector3(head.x, at.y, head.z), Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)
 	_buttons.append(button)
+
+
+## Chat C's motion layout on the opening's zone map, or null (no map: the plain placement is used).
+func _motion_layout() -> EntryMotionLayout:
+	if _onion == null or _onion.layout == null:
+		return null
+	return EntryMotionLayout.new(_onion.layout)
 
 
 func _clear_buttons() -> void:

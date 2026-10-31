@@ -1714,3 +1714,332 @@ func test_the_invitation_in_the_first_visit_is_not_cut_until_the_child_has_taken
 	await wait(0.6)
 	if _voice().speaking() != "":
 		expect(skip.skip(), "after that a line can be cut")
+
+
+# --- The motion route: the sweep gesture and the unscored tutorial -------------------------------------------------
+
+func _ahead() -> Vector3:
+	var basis := App.head().global_basis
+	return Vector3(-basis.z.x, 0.0, -basis.z.z).normalized()
+
+
+func test_the_teaching_hand_sweeps_from_one_point_to_another_fingers_leading_and_loops_until_stopped() -> void:
+	await boot(null, &"intro")
+	var eye := App.head().global_position
+	var right := _ahead().cross(Vector3.UP)
+	var from := eye + _ahead() * 0.4 + Vector3.DOWN * 0.2 - right * 0.15
+	var to := from + right * 0.3
+	var demo := DemoHand.new()
+	app.add_child(demo)
+	demo.sweep(from, to)   # returns at once
+	expect(demo.visible, "shown at once")
+	var path: Array[Vector3] = []
+	var forward_dots: Array[float] = []
+	for i in 240:   # 4 s at 60 frames a second: a whole loop (3.2 s) and the start of the next
+		await frames(1)
+		path.append(demo.global_position)
+		forward_dots.append((-demo.global_basis.z).dot(right))
+	var at := func(seconds: float) -> int: return int(seconds * 60.0)
+	expect(path[at.call(0.25)].distance_to(from) < 0.02, "it waits at the start")
+	expect(path[at.call(DemoHand.SWEEP_END + 0.2)].distance_to(to) < 0.02, "and is across at the end")
+	var monotone := true
+	var level := 0.0
+	for i in range(at.call(DemoHand.SWEEP_START), at.call(DemoHand.SWEEP_END)):
+		monotone = monotone and (path[i + 1] - path[i]).dot(right) >= -0.0005
+		level = maxf(level, absf(path[i].y - from.y))
+	expect(monotone, "it only ever goes the way it was sent")
+	expect(level < 0.01, "level: a sweep never rises or falls")
+	var halfway: Vector3 = path[at.call((DemoHand.SWEEP_START + DemoHand.SWEEP_END) / 2.0)]
+	expect(halfway.distance_to(from.lerp(to, 0.5)) < 0.04, "and is in the middle half way (%s from it)" % halfway.distance_to(from.lerp(to, 0.5)))
+	expect(forward_dots.slice(at.call(DemoHand.SWEEP_START), at.call(DemoHand.SWEEP_END)).all(func(d: float) -> bool: return d > 0.97), "its fingers lead: they point the way it goes")
+	expect(path[at.call(DemoHand.SWEEP_LOOP + 0.2)].distance_to(from) < 0.03, "after the end it comes again from the start (the loop)")
+	demo.stop()
+	await wait(0.8)
+	expect(not demo.visible and demo.get_child_count() == 0, "stop takes it away and leaves nothing")
+	demo.sweep(from, from)   # no way to go: nothing to show
+	expect(not demo.visible, "a sweep with no distance shows nothing")
+
+
+func test_the_motion_tutorial_plays_the_example_with_nothing_judged_or_logged() -> void:
+	await boot(null, &"intro")
+	var events := record(Events.reported)
+	var started := record(Events.trial_started)
+	var ended := record(Events.trial_ended)
+	var eye := App.head().global_position
+	var tutorial := MotionTutorial.new()
+	app.add_child(tutorial)
+	var order: Array[String] = []
+	tutorial.sweep_started.connect(func() -> void: order.append("sweep"))
+	tutorial.effect_started.connect(func() -> void: order.append("effect"))
+	tutorial.settled.connect(func() -> void: order.append("settled"))
+	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
+	tutorial.play(frame)
+	await wait(0.4)
+	var cloud: GPUParticles3D = tutorial._cloud
+	var material := cloud.process_material as ShaderMaterial
+	expect(cloud != null and cloud.visible, "the dots are there")
+	expect_eq(int(material.get_shader_parameter(&"signal_count")), int(material.get_shader_parameter(&"dot_count")), "every dot follows the flow: full coherence")
+	expect_eq(material.get_shader_parameter(&"flow_direction"), Vector3.RIGHT, "a sideways flow")
+	expect_eq(material.get_shader_parameter(&"alignment"), 0.0, "not yet aligned")
+	expect(get_tree().root.find_children("*", "Trial", true, false).is_empty(), "no Trial exists: nothing is judged")
+	expect(await until(func() -> bool: return order.has("sweep"), 5.0), "the hand sweeps")
+	var flow := frame.basis * Vector3.RIGHT
+	var along := (tutorial.hand_to - tutorial.hand_from)
+	expect(along.normalized().dot(flow) > 0.99 and absf(along.length() - MotionTutorial.SWEEP_LENGTH) < 0.01, "the same way the dots go, 30 cm")
+	expect(tutorial.hand_from.y < eye.y - 0.1 and tutorial.hand_to.y < eye.y - 0.1, "below the eyes, in comfortable hand space")
+	expect(tutorial.hand_from.distance_to(cloud.global_position) > 0.6 and tutorial.hand_to.distance_to(cloud.global_position) > 0.6, "and not toward the cloud (%s m away)" % tutorial.hand_from.distance_to(cloud.global_position))
+	expect(await until(func() -> bool: return order.has("effect"), 5.0), "then the effect")
+	expect(not App.stage.find_children("*", "WallBreak", true, false).is_empty(), "Wei's wall effect is playing")
+	await wait(0.8)
+	expect_eq(material.get_shader_parameter(&"alignment"), 1.0, "and the dots all go together")
+	expect(await until(func() -> bool: return order.has("settled"), 12.0), "it settles")
+	expect_eq(order, ["sweep", "effect", "settled"], "in that order")
+	expect(tutorial._cloud == null, "the dots are gone")
+	expect(events.is_empty(), "nothing was reported to the research log (no wall_break, no motion_attempt): %s" % [events])
+	expect(started.is_empty() and ended.is_empty(), "no round started or ended")
+	expect(get_tree().root.find_children("*", "Trial", true, false).is_empty(), "and no Trial was ever there")
+
+
+func test_stopping_the_motion_tutorial_takes_the_dots_and_the_hand_and_nothing_follows() -> void:
+	await boot(null, &"intro")
+	var events := record(Events.reported)
+	var tutorial := MotionTutorial.new()
+	app.add_child(tutorial)
+	var order: Array[String] = []
+	tutorial.effect_started.connect(func() -> void: order.append("effect"))
+	tutorial.settled.connect(func() -> void: order.append("settled"))
+	tutorial.heading = &"left"
+	var eye := App.head().global_position
+	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
+	tutorial.play(frame)
+	await wait(0.4)
+	expect_eq((tutorial._cloud.process_material as ShaderMaterial).get_shader_parameter(&"flow_direction"), Vector3.LEFT, "a flow to the left")
+	expect((tutorial.hand_to - tutorial.hand_from).normalized().dot(frame.basis * Vector3.LEFT) > 0.99, "and the hand sweeps to the left")
+	await wait(1.6)
+	tutorial.stop()
+	await wait(7.0)
+	expect(order.is_empty(), "no effect and no end after it was stopped: %s" % [order])
+	expect(App.stage.find_children("*", "WallBreak", true, false).is_empty(), "no wall effect")
+	expect(tutorial._cloud == null and (tutorial._demo == null or not tutorial._demo.visible), "no dots, no hand")
+	expect(events.is_empty(), "and nothing logged")
+
+
+# --- The choice of motion --------------------------------------------------------------------------------------------
+
+func _choice() -> MotionChoice:
+	var eye := App.head().global_position
+	var choice := MotionChoice.new()
+	app.add_child(choice)
+	choice.global_transform = Transform3D(Basis.looking_at(-App.head().global_basis.z), eye + _ahead() * 0.4 + Vector3.DOWN * 0.12)
+	return choice
+
+
+func _until_open(choice: MotionChoice) -> void:
+	choice.open()
+	await until(func() -> bool: return choice.is_open(), 2.0)
+
+
+func test_the_motion_choice_is_chosen_by_a_pinch_aimed_at_it() -> void:
+	await boot(null, &"intro")
+	var choice := _choice()
+	var chosen := record(choice.chosen)
+	await _until_open(choice)
+	await select(choice.global_position)
+	await frames(2)
+	expect_eq(chosen.size(), 1, "a pinch aimed at it chooses it")
+	await select(choice.global_position)
+	await frames(2)
+	expect_eq(chosen.size(), 1, "and only once")
+
+
+func test_the_motion_choice_is_chosen_by_a_mouse_click_at_any_hand_depth() -> void:
+	await boot(null, &"intro")
+	var choice := _choice()
+	var chosen := record(choice.chosen)
+	await _until_open(choice)
+	var driver: DesktopDriver
+	for sibling in app.get_children():
+		if sibling is DesktopDriver:
+			driver = sibling
+	expect(driver != null, "the mouse driver is there")
+	for depth: float in [0.2, 0.45, 0.9]:
+		choice._open = true
+		driver.depth = depth
+		driver._place_hand(App.rig.head.unproject_position(choice.global_position))
+		await frames(2)
+		input.press(&"right", &"trigger_click", true)
+		await frames(2)
+		input.press(&"right", &"trigger_click", false)
+		await frames(2)
+	expect_eq(chosen.size(), 3, "a click chooses it at every hand depth")
+	choice._open = true
+	driver.depth = 0.9
+	driver._place_hand(App.rig.head.unproject_position(choice.global_position + App.head().global_basis.x * 0.3))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	expect_eq(chosen.size(), 3, "a click a hand's width beside it does not")
+
+
+func test_the_motion_choice_is_chosen_by_a_fingertip_touching_it() -> void:
+	await boot(null, &"intro")
+	var choice := _choice()
+	var chosen := record(choice.chosen)
+	await _until_open(choice)
+	var eye := App.head().global_position
+	var back := choice.global_position + Vector3(0.0, 0.0, 0.3)
+	var along := (choice.global_position - back).normalized()
+	input.point(&"right", back - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
+	await frames(3)
+	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position)   # the fingertip goes in
+	await frames(4)
+	expect_eq(chosen.size(), 1, "a fingertip going into it chooses it")
+
+
+func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it() -> void:
+	await boot(null, &"intro")
+	var choice := _choice()
+	var chosen := record(choice.chosen)
+	# A finger already resting on it when it appears has to leave and touch again: nothing commits by waiting.
+	var along := Vector3.FORWARD
+	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
+	await frames(3)
+	await _until_open(choice)
+	await wait(2.0)
+	expect(chosen.is_empty(), "a finger resting on it as it appears does not choose it")
+	input.point(&"right", choice.global_position + Vector3(0.0, 0.0, 0.05) - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
+	await wait(2.0)
+	expect(chosen.is_empty(), "nor does holding it still just in front of it for seconds")
+	input.look_at(choice.global_position)   # the head turned straight at it
+	await wait(6.0)   # far longer than any dwell
+	expect(chosen.is_empty(), "looking straight at it for a long time chooses nothing")
+	expect(choice.is_open(), "and it stays on offer")
+
+
+func test_a_press_on_it_before_it_is_offered_or_after_it_is_closed_does_nothing_and_a_fingertip_lifts_it() -> void:
+	await boot(null, &"intro")
+	var choice := _choice()
+	var chosen := record(choice.chosen)
+	await select(choice.global_position)   # not offered yet (and hidden)
+	expect(chosen.is_empty(), "not before it is offered")
+	await _until_open(choice)
+	var at := choice.global_position
+	var along := Vector3.FORWARD
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.06) - along * App.rig.pointer(&"right").tip_reach, at + Vector3(0.0, 0.0, -0.3))   # a fingertip close in front
+	await frames(3)
+	expect(choice._look.position.z > 0.005, "a fingertip close in front lifts it toward the hand")
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.5), at)
+	await frames(3)
+	expect(choice._look.position.z == 0.0, "and it settles when the hand goes")
+	choice.close()
+	await wait(0.4)
+	await select(at)
+	expect(chosen.is_empty(), "and not after it is closed")
+	expect(not choice.visible, "it is gone")
+
+
+# --- Does Wei's sweep detection see a seated child's real sweeps? (rig/pointer.gd, by simulation) -----------------
+
+## One hand sweep along +X through the real rig, shaped like a person's: smooth start and stop (a minimum-jerk
+## curve, peak speed 1.875 * length / seconds), optionally with a tremor, a rise and an arc (a wrist swinging).
+## Returns what the rig made of it.
+func _human_sweep(length: float, seconds: float, tremor := 0.0, rise := 0.0, arc := 0.0) -> Dictionary:
+	var sweeping := record(Events.sweeping)
+	var swept := record(Events.swept)
+	var start := App.head().global_position + Vector3(0.0, -0.35, -0.4)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + Vector3(-length * 0.5, 0.0, 0.0)))   # a jump: never taken for a sweep
+	await frames(3)
+	var steps := maxi(1, roundi(seconds * Engine.physics_ticks_per_second))
+	for i in steps:
+		var tau := float(i + 1) / steps
+		var s := 10.0 * pow(tau, 3.0) - 15.0 * pow(tau, 4.0) + 6.0 * pow(tau, 5.0)
+		var at := start + Vector3(length * (s - 0.5), rise * s, -arc * 4.0 * s * (1.0 - s))
+		at += Vector3(rng.randfn(0.0, tremor), rng.randfn(0.0, tremor), rng.randfn(0.0, tremor))
+		input.set_hand(&"right", Transform3D(Basis.IDENTITY, at))
+		await get_tree().physics_frame
+	await wait(0.6)   # long enough for a hand that has stopped to be seen to stop
+	var result := {detected = not sweeping.is_empty(), ended = not swept.is_empty(), peak_speed = 1.875 * length / seconds,
+		length = length, seconds = seconds}
+	if not sweeping.is_empty():
+		var last: Array = sweeping.back()
+		var way: Vector3 = last[2] - last[1]
+		result.merge({heard_distance = Vector2(way.x, way.z).length(), angle = rad_to_deg(Vector3(way.x, 0.0, way.z).angle_to(Vector3.RIGHT))}, true)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start + Vector3(0.4, 0.4, 0.4)))   # away, out of the next case's way
+	await frames(4)
+	return result
+
+
+func test_a_seated_childs_sweeps_slow_ones_too_are_seen_and_read_the_right_way_and_tiny_ones_are_not() -> void:
+	await boot(null, &"intro")
+	var cases := [   # [name, length m, seconds, tremor m, rise m, arc m]
+		["brisk, 30 cm in 0.5 s", 0.30, 0.5, 0.0, 0.0, 0.0],
+		["ordinary, 30 cm in 0.8 s", 0.30, 0.8, 0.0, 0.0, 0.0],
+		["unhurried, 30 cm in 1.2 s", 0.30, 1.2, 0.0, 0.0, 0.0],
+		["slow and careful, 30 cm in 1.6 s", 0.30, 1.6, 0.0, 0.0, 0.0],
+		["very slow, 30 cm in 2.2 s", 0.30, 2.2, 0.0, 0.0, 0.0],
+		["short, 20 cm in 0.6 s", 0.20, 0.6, 0.0, 0.0, 0.0],
+		["short, 15 cm in 0.5 s", 0.15, 0.5, 0.0, 0.0, 0.0],
+		["tiny, 10 cm in 0.4 s", 0.10, 0.4, 0.0, 0.0, 0.0],
+		["long, 45 cm in 1.0 s", 0.45, 1.0, 0.0, 0.0, 0.0],
+		["ordinary with 1.5 mm of tracking jitter", 0.30, 0.8, 0.0015, 0.0, 0.0],
+		["slow and careful with 1.5 mm of jitter", 0.30, 1.6, 0.0015, 0.0, 0.0],
+		["ordinary with 4 mm of jitter (poor tracking)", 0.30, 0.8, 0.004, 0.0, 0.0],
+		["slow and careful with 4 mm of jitter", 0.30, 1.6, 0.004, 0.0, 0.0],
+		["rising 15 cm on the way (27 degrees)", 0.30, 0.8, 0.0, 0.15, 0.0],
+		["rising 30 cm on the way (45 degrees)", 0.30, 0.8, 0.0, 0.30, 0.0],
+		["an arc, 8 cm out and back, like a swinging wrist", 0.30, 0.8, 0.0, 0.0, 0.08],
+	]
+	var table := {}
+	for case: Array in cases:
+		var result := await _human_sweep(case[1], case[2], case[3], case[4], case[5])
+		table[case[0]] = result
+		print("SWEEPTABLE %-52s peak %.2f m/s  detected %s  heard %s cm  angle %s deg" % [case[0], result.peak_speed, result.detected,
+			snappedf(result.get("heard_distance", 0.0) * 100.0, 0.1), snappedf(result.get("angle", -1.0), 0.1)])
+	for name: String in ["brisk, 30 cm in 0.5 s", "ordinary, 30 cm in 0.8 s", "unhurried, 30 cm in 1.2 s", "slow and careful, 30 cm in 1.6 s", "slow and careful with 1.5 mm of jitter", "very slow, 30 cm in 2.2 s", "long, 45 cm in 1.0 s", "ordinary with 1.5 mm of tracking jitter",
+			"short, 20 cm in 0.6 s", "rising 15 cm on the way (27 degrees)", "rising 30 cm on the way (45 degrees)", "an arc, 8 cm out and back, like a swinging wrist"]:
+		expect(table[name].detected and table[name].ended, "seen, and seen to stop: %s" % name)
+		expect(table[name].angle < 40.0, "and read the right way (within Wei's 40 degrees): %s, %s deg" % [name, table[name].get("angle")])
+	expect(not table["tiny, 10 cm in 0.4 s"].detected, "a 10 cm movement is not a sweep (Wei's minimum is 12 cm)")
+	expect(not table["slow and careful with 4 mm of jitter"].detected or table["slow and careful with 4 mm of jitter"].detected, "(a slow sweep with 4 mm of jitter: printed above, not judged)")
+
+
+## A hand that is not sweeping: resting with some tracking jitter, or drifting slowly. How many sweeps did the rig see?
+func _idle_hand_sweeps(seconds: float, jitter: float, drift_per_second := 0.0) -> int:
+	var sweeping := record(Events.sweeping)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var start := App.head().global_position + Vector3(0.0, -0.35, -0.4)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+	await frames(3)
+	for i in roundi(seconds * Engine.physics_ticks_per_second):
+		var at := start + Vector3(drift_per_second * i / Engine.physics_ticks_per_second, 0.0, 0.0)
+		at += Vector3(rng.randfn(0.0, jitter), rng.randfn(0.0, jitter), rng.randfn(0.0, jitter))
+		input.set_hand(&"right", Transform3D(Basis.IDENTITY, at))
+		await get_tree().physics_frame
+	return sweeping.size()
+
+
+func test_the_approved_sweep_speed_catches_a_slow_careful_sweep_and_the_old_one_did_not_and_a_resting_or_drifting_hand_never_sweeps() -> void:
+	await boot(null, &"intro")
+	var pointer := App.rig.pointer(&"right")
+	var default_speed := pointer.sweep_speed
+	var findings := {}
+	expect(is_equal_approx(default_speed, 0.2), "the rig's sweep speed is the approved 0.2 m/s (it was 0.3)")
+	for speed: float in [0.3, 0.2, 0.15]:
+		pointer.sweep_speed = speed
+		var slow_jitter := await _human_sweep(0.30, 1.6, 0.0015)
+		var very_slow := await _human_sweep(0.30, 2.2)
+		var rests := await _idle_hand_sweeps(4.0, 0.0015)
+		var rests_badly := await _idle_hand_sweeps(4.0, 0.004)
+		var drifts := await _idle_hand_sweeps(4.0, 0.0015, 0.04)
+		findings[speed] = {slow_jitter = slow_jitter.detected, very_slow = very_slow.detected, rests = rests, rests_badly = rests_badly, drifts = drifts}
+		print("SWEEPSPEED %.2f m/s: slow and careful with jitter %s, very slow %s; false sweeps: resting %d, resting with poor tracking %d, drifting 4 cm/s %d" % [
+			speed, slow_jitter.detected, very_slow.detected, rests, rests_badly, drifts])
+	pointer.sweep_speed = default_speed
+	expect(not findings[0.3].slow_jitter and not findings[0.3].very_slow, "at the old 0.3 m/s a slow sweep with a little jitter, and a very slow one, were missed")
+	expect(findings[0.2].slow_jitter and findings[0.2].very_slow, "at 0.2 m/s a slow, careful sweep with a little jitter, and a very slow one, are seen")
+	expect(findings[0.2].rests == 0 and findings[0.2].rests_badly == 0 and findings[0.2].drifts == 0, "and a resting or slowly drifting hand still makes no sweep: %s" % [findings[0.2]])

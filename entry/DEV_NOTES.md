@@ -511,3 +511,58 @@ frame; shader compile is not measurable headless. If the freeze persists on the 
 scene switch) is still available.
 
 Tests: 225 pass on `entry-layout-6` (the base's 222 plus mine; `entry_test` waits for the socket to settle after a jump to the ripple).
+
+## Interaction chat: motion route, round 1 (branch `entry-interaction-7`)
+**What is new (all additive; public names kept).** `DemoHand.sweep(from, to)`: a new gesture, an open hand sliding from one world point to the other, fingers leading the way it goes, waiting at each end (`SWEEP_START` 0.5 s, `SWEEP_END` 1.7 s, loop `SWEEP_LOOP` 3.2 s), looping until `stop()`, returns at once, one gesture at a time, nothing left after `stop()`; the way is read level. `MotionTutorial` (`entry/motion_tutorial.gd`), `MotionChoice` (`entry/motion_choice.gd`). One flag in Wei's file: `WallBreak.burst(eye, look, flow, style, log := true)` (`trials/motion/wall_break.gd`): `false` leaves out the research log's `wall_break` event (the log writes every `Events.report`); the default is unchanged, so his round does exactly what it did.
+**The unscored tutorial.** `var t := MotionTutorial.new(); add_child(t); t.heading = &"right"` (or `&"left"`), `t.style = WallBreak.Style.CRACK`; `t.play(frame)` returns at once. `frame` is the cloud's place like Wei's own (`Trial.in_front`: level, its -Z pointing away from the child; where it stands is the layout chat's). Signals `sweep_started`, `effect_started`, `settled` (the dots are gone), `stopped`; `stop()` cuts it short (dots and hand go at once, nothing after). The dots are a separate copy of Wei's cloud (his scene's `Cloud`, shader and dot look; never added to the tree with his trial code), at the easiest level's dots, speed and size, EVERY dot following the flow, flowing sideways; after 1.5 s the hand sweeps 30 cm the same way with the white streak a child's own sweep leaves (`SweepTrail`, same whoosh); when the hand is across the dots all go together (alignment 0 to 1 in Wei's 0.6 s) and `WallBreak.burst` plays once (3.2 s CRACK, 6 s SPACE); then the dots fade. There is no Trial and no Session, no response timer, nothing judged and nothing logged: a test checks that no `reported`, `trial_started` or `trial_ended` event and no `Trial` node ever appears. The hand's path (`hand_from`, `hand_to`, default 38 cm ahead of the eyes, 22 cm below them: comfortable hand space, 60 cm or more from the cloud) can be set before `play`.
+**The choice.** `MotionChoice` (`MotionChoice.new()`, `add_child`, `place_beside(menu, half_width)` to stand it to the right of the `TaskMenu`, `open()`, wait for `chosen`, `close()` when the child picks a shelf level instead, which `TaskMenu.chosen` says). A round disc with a still cluster of dots (nothing on it moves), bigger than a level's square button, a `Target` named `motion_choice`. Chosen only by a deliberate press: a pinch aimed at it, a fingertip touching its thin touch volume, or a click (desktop, at any hand depth, as for the cauldron). Never by looking, holding a hand near or resting a finger on it (no gaze and no dwell in it; a finger resting on it as it appears has to leave and come back); once per `open()`. A fingertip close in front lifts it a little, silently.
+**Wei's sweep detection with real hands, by simulation** (`rig/pointer.gd`: the hand's aim position, speed at least `sweep_speed` 0.3 m/s smoothed over 0.05 s, 12 cm of level travel; stopped for 0.4 s ends it). A seated child's sweeps are bell-shaped (slow at both ends); the table below is a smooth sweep through the real rig, peak speed in brackets:
+| sweep | seen? |
+|---|---|
+| 30 cm in 0.5 s (1.1 m/s), 0.8 s (0.7), 1.2 s (0.47); 45 cm in 1.0 s; 20 cm and 15 cm in 0.5 to 0.6 s | yes, and read the right way (0 to 3 degrees off) |
+| rising 15 cm or 30 cm on the way, an 8 cm arc like a swinging wrist, 4 mm of tracking jitter at an ordinary pace | yes |
+| 30 cm in 1.6 s (0.35 m/s, "slow and careful") | yes if the tracking is perfectly steady (but only 14 cm of the 30 are heard); **no with just 1.5 mm of jitter** |
+| 30 cm in 2.2 s (0.26 m/s) | **no** |
+| 10 cm movement | no (below Wei's 12 cm: right) |
+A slow, careful child (the way a child may well sweep, with the hand seen at 0.35 m/s) is missed because the peak of the sweep sits just above Wei's threshold and any jitter takes it under. **Recommendation (Wei's file, needs Megan's OK): `sweep_speed` 0.3 to 0.2** (an export on `Pointer`, so it can also be set on the rig's pointers by the motion route only, e.g. `App.rig.pointer(side).sweep_speed = 0.2` while its rounds run, and put back): with 0.2 the slow-with-jitter and the very slow sweeps are seen, and a hand resting with 1.5 mm or 4 mm of jitter for 4 s, or drifting at 4 cm a second, still makes NO sweep (0.15 m/s also holds, not tested lower). Rising help: a hand above the eyes (+10 cm) for 0.4 s asks for help, so the sweep must stay below eye level: the tutorial's hand does (22 cm below). In a headset a hand in the lap may not be tracked at all: the example's path is at chest height in front.
+## Motion route, round 1 (chat C): `entry/motion_layout.gd`, `entry/motion_dev.gd`
+
+Wei's cloud (not changed): a box of half sizes **0.8 wide x 0.5 high x 0.8 deep** (motion.tres; a test checks them) round a
+centre 2.2 m ahead at EYE height, so its near face is 1.4 m from the eyes (Wei's rule: at least 0.6) and it spans 60 degrees
+across and 39 degrees up and down, seen from the near face.
+
+1. **Where the dots appear and sit.** `EntryMotionLayout.entrance()`: the group (a ball of 18 cm) starts hidden 20 cm behind the
+   table's far edge and 30 cm under the table top, rises past the far edge and eases into the cloud's middle in `RISE_SECONDS`
+   (1.4 s), one soft swoosh (Wei's `SweepTrail` whoosh, quieter, until the swoosh is sourced). On all 42 test tables the far edge is at
+   most 1.2 m out, so the cloud never touches the table, and the entrance is at least 0.4 m clear of the bench, shelf and things.
+   Onion: the shelf scene's resting spot is INSIDE the dots' view (29 to 35 degrees left, the cloud reaches 30 degrees), so while
+   the dots play `EntryMotionLayout.onion_spot()` moves him to the nearest clear spot along the shelf's end that is 4+ degrees out
+   of the dots' view (about 40 degrees to the side, 10 to 20 degrees down, within 55 degrees: in view, not covering dots).
+   **Subtitles: the line at Voice's 20 degrees covers the dots, and the proposed 12 degrees would cover them more** (the proposal
+   was for the shelf; do not apply it to the motion part). To clear the dots the line has to be at 26 degrees or more
+   (`Voice.above_horizon`, set by the motion scene while it plays, back after; a setting, not a code change in Wei's file).
+2. **The choice panel** is not done: I need Wei's shelf-level choice targets (World's `task_menu`) to place the motion target
+   beside them; say if the organizer wants them side by side above the shelf and I will lay it out next.
+3. **Scene marker and coherence control (built, ready for the organizer's scene).** `EntryMotionDev`: add it as a child, call
+   `set_scene(&"Motion")` (also `Opening`, `Tutorial`, `Shelf`). Head-locked top-left marker (34 degrees left, 18 up, 75 cm,
+   outside the dots' 30 degrees and the subtitle). Under the DEV jump panel: a readout ("DEV · coherence 70 % (pinned, next
+   round)") and buttons 90 / 70 / 50 / 30 / 15 and -5 / +5. They pin like Wei's Easier/Harder: `Session.pinned` plus a
+   `level_pinned` event (with the percent and `source = dev_coherence`), so it is logged. Level 0 is 90 %, level 1 is 15 %
+   (`EntryMotionLayout.level_for` / `percent_for`). A pin applies from the NEXT round (the round in play has its condition).
+4. **The wall effect** (`build/round4/wall_*.png`, the simulated room, wall 3 m away, effect at eye height): the hole is
+   2.4 x 1.7 m up to 3 m, shrinking in metres beyond (so about 43 x 32 degrees of view at up to 3 m, 33 x 24 at 4 m). It fills a
+   third of the child's view width, and its lower part sits behind the shelf's top (the shelf reaches about 10 degrees under
+   the horizon). CRACK: the picture ripples and cracks, quiet colours, 3 s; SPACE: a glowing yellow rim round a purple hole,
+   6 s. **Proposal for "restrained" (Wei's constants, not changed): use CRACK, not SPACE; `HOLE_SIZE` 2.4 x 1.7 to 1.7 x 1.2
+   (about 31 x 22 degrees at 3 m), centre it a little above the eye line so the shelf does not cover it; keep `STAY_SECONDS` 3.**
+
+Tests: `entry_layout_test` has four new ones (the numbers against `motion.tres`; the dots on all 42 tables; the subtitle;
+the coherence mapping and the marker). The pinning buttons are not tested with hands (needs the headset).
+**Wei's sweep detection with real hands, by simulation, and the change Megan approved (Oct 31): `Pointer.sweep_speed` 0.3 to 0.2 m/s** (`rig/pointer.gd`, one number and a comment; sweeps are used only by the motion task). It judges the hand's aim position: speed of at least `sweep_speed` (smoothed over 0.05 s), 12 cm of level travel; stopped for 0.4 s ends it. A seated child's sweeps are bell-shaped (slow at both ends), so the test (`entry_interaction_test.gd`, `SWEEPTABLE` lines) sweeps smoothly through the real rig. At the OLD 0.3: 30 cm in 0.5 to 1.2 s (peak 1.1 to 0.47 m/s), 45 cm, 20 cm and 15 cm sweeps, rises of 27 and 45 degrees, an 8 cm arc and 4 mm of jitter at an ordinary pace were all seen and read the right way (0 to 3 degrees off); but 30 cm in 1.6 s (peak 0.35 m/s, "slow and careful") was seen only if the tracking was perfectly steady (14 cm of the 30 heard) and was MISSED with just 1.5 mm of jitter, and 30 cm in 2.2 s (peak 0.26) was missed. At **0.2** all of those are seen (heard 21 to 26 cm of 30 for the slow ones); a 10 cm movement still is not a sweep (Wei's 12 cm); and a hand resting with 1.5 mm or 4 mm of jitter for 4 s, or drifting at 4 cm a second, makes NO sweep (0.15 m/s held too, not tested lower; Wei's own 0.15 m/s "creep" test still passes). Rising help: a hand above the eyes (+10 cm) for 0.4 s asks for help, so the sweep must stay below eye level: the tutorial's hand does (22 cm below). In a headset a hand in the lap may not be tracked at all: the example's path is at chest height in front.
+
+**Choice panel (follow-up, shelf gone).** Megan: the shelf is gone at the choice. `EntryMotionLayout.choice_spot(i, n)`: a row of
+15 cm targets, 18 cm apart, centred straight ahead on the table, a little nearer than the reach (at most 55 cm), 3 cm above the
+table top, facing the child; beyond the table's far edge nothing is in the way, so the dots' entrance stays clear.
+`onion_without_shelf(n)`: Onion beside the row's left end, low (5 to 16 cm up), out of the dots' view by 4 degrees. Tested on
+short and long tables and three reaches. Wei's own shelf-level choice is not on the table in this route: the organizer's
+scene decides which targets (the shelf levels and "motion") fill the row.

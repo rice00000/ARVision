@@ -108,7 +108,8 @@ var _dust := CPUParticles3D.new()
 
 
 ## Breaks the wall in front of [param eye] along [param look]; pieces fly along [param flow] (world).
-static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRACK) -> void:
+## [param log] false: the research log is not told (the unscored tutorial's example, not a round).
+static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRACK, log := true) -> void:
 	var hit := App.reality.hit(eye, look)
 	var at: Vector3 = hit.position if hit else eye + look * 3.0
 	var normal: Vector3 = hit.normal if hit else -look
@@ -118,8 +119,9 @@ static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRA
 	effect.global_transform = Transform3D(Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.FORWARD),
 		at + normal * 0.02)
 	var hole := HOLE_SIZE * clampf(eye.distance_to(at) / FULL_SIZE_AT, 0.4, 1.0)
-	Events.report(&"wall_break", {found = not hit.is_empty(), at = at, normal = normal,
-		distance = eye.distance_to(at), hole = hole, style = Style.keys()[style].to_lower()})
+	if log:
+		Events.report(&"wall_break", {found = not hit.is_empty(), at = at, normal = normal,
+			distance = eye.distance_to(at), hole = hole, style = Style.keys()[style].to_lower()})
 	effect._build(hole, effect.global_basis.inverse() * flow, App.reality.camera_frame())
 
 
