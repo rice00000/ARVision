@@ -107,7 +107,7 @@ var _ahead := Vector3.FORWARD       # straight ahead from the seat, flat (at the
 var _on_table: Variant = null       # where the cauldron goes on the confirmed table, or null (no real table)
 
 ## Sent when the child touches (or points at and pinches) the cauldron.
-signal _cauldron_touched
+signal _part_over(how: StringName)   # a part &"finished", or a jump button &"interrupted" it
 ## TESTING: a confirm button: its id.
 signal _confirm_pressed(id: StringName)
 ## TESTING: a Start or jump button: which part (&"all" for Start).
@@ -147,6 +147,9 @@ var shelf_push := SHELF_PUSH
 var cauldron_angle := CAULDRON_ANGLE
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
+var _runner: PartRunner             # what the playing part waits on; freed to cancel it
+var _part_running := false          # a part is playing (a jump button cuts in on it)
+var _pending: StringName = &""      # the part a jump button asked for while another was playing
 var _exit_button: EntryButton
 var _exit_armed := -100.0           # _real when "Exit app" was first pressed; a second press within EXIT_WINDOW quits
 
@@ -185,6 +188,8 @@ func _exit_tree() -> void:
 
 ## Plays the arrival, then starts the World.
 func run() -> void:
+	_runner = PartRunner.new()
+	add_child(_runner)
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
@@ -210,35 +215,69 @@ func run() -> void:
 	_build_onion()
 	_build_workshop()
 
-	# Nothing plays until the adult presses Start (or a part to jump to).
+	# Nothing plays until the adult presses Start (or a part to jump to). A jump button also
+	# cuts in on a part that is still playing, and a jump skips the story's own pauses.
 	while true:
-		var part := await _choose_part()
+		var part := _pending
+		_pending = &""
+		if part == &"":
+			part = await _choose_part()
 		if not _music.playing:
 			_start_music()
 		Engine.time_scale = TEST_SPEED
+		var fast := part != &"all"
 		_set_up_for(&"hello" if part == &"all" else part)
+		if part == &"shelf":
+			await _to_shelf(true)
+			return
+		_part_running = true
+		_play(part, fast, _runner)   # not awaited: a jump button can cut in
+		var how: StringName = await _part_over
+		_part_running = false
+		if how == &"interrupted":
+			continue
+		Engine.time_scale = 1.0
 		if part == &"all":
-			await _hello()
+			await _to_shelf(false)
+			return
+		print("ENTRY jump: ", part, " done")
+
+
+## Plays [param part] on [param runner]; it never gets to the end if the runner is freed.
+func _play(part: StringName, fast: bool, runner: PartRunner) -> void:
+	await get_tree().process_frame   # the main loop is waiting for _part_over by now
+	match part:
+		&"all":
+			await _hello(false)
 			await _touch()
 			await _out()
-			await _reveal()
-		elif part != &"shelf":
-			match part:
-				&"hello": await _hello()
-				&"touch": await _touch()
-				&"emerge": await _out()
-				&"ripple": await _reveal()
-			Engine.time_scale = 1.0
-			print("ENTRY jump: ", part, " done")
-			continue
-		await _to_shelf()
-		return
+			await _reveal(false)
+		&"hello": await _hello(fast)
+		&"touch": await _touch()
+		&"emerge": await _out()
+		&"ripple": await _reveal(fast)
+	if runner == _runner and _part_running:
+		_part_over.emit(&"finished")
+
+
+## A jump button was pressed while a part was playing: cancel that part and play [param part].
+func _interrupt(part: StringName) -> void:
+	print("ENTRY jump: cutting in with ", part)
+	_pending = part
+	_runner.process_mode = Node.PROCESS_MODE_DISABLED   # nothing it holds resumes
+	_runner.queue_free()
+	_runner = PartRunner.new()
+	add_child(_runner)
+	get_tree().call_group(&"entry_transient", "queue_free")   # rings and glints left by the old part
+	_cue = false
+	_part_over.emit(&"interrupted")
 
 
 ## 1. Arrival: Onion peeks over the rim and says hello.
-func _hello() -> void:
+func _hello(fast := false) -> void:
 	_beat("1: hello")
-	await _wait(2.0)   # nothing rushes the child
+	if not fast:
+		await _wait(2.0)   # nothing rushes the child
 	await _peek()
 	await say("Hello.")
 	await _duck()
@@ -252,7 +291,7 @@ func _hello() -> void:
 func _touch() -> void:
 	_beat("2: PLACEHOLDER touch the cauldron")
 	_cue = true
-	await _cauldron_touched
+	await _runner.cauldron_touched
 	_cue = false
 
 
@@ -264,17 +303,19 @@ func _out() -> void:
 
 
 ## 4. The reveal: a gentle ripple spreads through the nearby room.
-func _reveal() -> void:
+func _reveal(fast := false) -> void:
 	_beat("4: the ripple")
 	await _ripple()
 	await say("Welcome.")
-	await _wait(3.0)   # time to look around
+	if not fast:
+		await _wait(3.0)   # time to look around
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
-func _to_shelf() -> void:
+func _to_shelf(fast := false) -> void:
 	_beat("5: to the shelf")
-	await _tidy_away()   # clears the table for the shelf
+	if not fast:
+		await _tidy_away()   # clears the table for the shelf
 	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
@@ -553,13 +594,13 @@ func say(text: String) -> void:
 	Events.say(text)
 	var limit := _real + maxf(6.0, text.length() * 0.2)   # never stuck on a line that cannot end
 	while not done.finished and _real < limit:
-		await get_tree().process_frame
+		await _runner.tick
 	voice.line_finished.disconnect(on_finished)
 	await _wait(BREATH)
 
 
 func _wait(seconds: float) -> void:
-	await get_tree().create_timer(seconds, false).timeout
+	await _runner.wait(seconds)
 
 
 func _on_target(target: Target) -> void:
@@ -590,7 +631,10 @@ func _on_target(target: Target) -> void:
 		return
 	if target != null and String(target.id).begins_with("entry_part_"):
 		Events.feedback.emit(&"hint", target.global_position)
-		_part_pressed.emit(StringName(String(target.id).trim_prefix("entry_part_")))
+		var chosen := StringName(String(target.id).trim_prefix("entry_part_"))
+		if _part_running:
+			_interrupt(chosen)
+		_part_pressed.emit(chosen)
 		return
 	if target != null and String(target.id).begins_with("entry_step"):
 		Events.feedback.emit(&"hint", target.global_position)
@@ -606,7 +650,7 @@ func _on_target(target: Target) -> void:
 	# Touch feedback (tracked hands can't vibrate): Wei's Feedback module plays a
 	# sound and shows a mark where the touch landed.
 	Events.feedback.emit(&"hint", target.global_position)
-	_cauldron_touched.emit()
+	_runner.cauldron_touched.emit()
 
 
 ## DEBUG: the beat name in Output and floating low in view.
@@ -1555,7 +1599,7 @@ func _emerge() -> void:
 		var clear := Vector3(_mouth.x + across.x, rim_y + PIECE * 0.5 + 0.05, _mouth.z + across.z)
 		var land := _land_spot(i)
 		piece.global_position = start
-		last = create_tween()
+		last = _runner.create_tween()
 		last.tween_property(piece, "global_position", clear, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		last.tween_method(_arc.bind(piece, clear, land, 0.06), 0.0, 1.0, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		last.tween_property(piece, "rotation:y", piece.rotation.y + PI * 0.5, 0.4)
@@ -1603,7 +1647,7 @@ func _tidy_away() -> void:
 	var last: Tween
 	for piece in _pieces:
 		var over := Vector3(_mouth.x, rim_y + PIECE * 0.5 + 0.05, _mouth.z)
-		last = create_tween()
+		last = _runner.create_tween()
 		last.tween_method(_arc.bind(piece, piece.global_position, over, 0.06), 0.0, 1.0, 0.7).set_trans(Tween.TRANS_SINE)
 		last.tween_property(piece, "global_position", _mouth + Vector3.DOWN * (PIECE + 0.01), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		last.tween_callback(piece.queue_free)
@@ -1635,8 +1679,9 @@ func _ripple() -> void:
 		torus.material = light
 		ring.mesh = torus
 		add_child(ring)
+		ring.add_to_group(&"entry_transient")
 		ring.global_position = _box.global_position + Vector3.UP * 0.004
-		var spread := create_tween()
+		var spread := _runner.create_tween()
 		spread.tween_method(_spread.bind(ring, light, reach, light.albedo_color.a, wave == 0), 0.0, 1.0, RIPPLE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		spread.tween_callback(ring.queue_free)
 		await _wait(1.0)
@@ -1658,7 +1703,7 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_box.global_position) <= radius:
 			detail.set_meta(&"shown", true)
 			detail.visible = true
-			create_tween().tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			_runner.create_tween().tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 ## PLACEHOLDER for a depth ripple (later: drawn on the depth image itself, every pixel).
@@ -1698,10 +1743,11 @@ func _glint(at: Vector3, normal: Vector3) -> void:
 	quad.material = light
 	disc.mesh = quad
 	add_child(disc)
+	disc.add_to_group(&"entry_transient")
 	var up := normal.normalized()
 	var side := up.cross(Vector3.FORWARD if absf(up.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
 	disc.global_transform = Transform3D(Basis(side, up.cross(side), up), at + up * 0.005)   # the quad's face along the normal
-	var fade := create_tween()
+	var fade := _runner.create_tween()
 	fade.tween_property(light, "albedo_color:a", 0.3, 0.5)
 	fade.tween_property(light, "albedo_color:a", 0.0, 1.5)
 	fade.tween_callback(disc.queue_free)
@@ -1798,9 +1844,7 @@ func _material(colour: Color, glows := false) -> StandardMaterial3D:
 
 ## Moves [param thing] smoothly to [param where] in [param seconds].
 func _move(thing: Node3D, where: Vector3, seconds: float) -> void:
-	var tween := create_tween()
-	tween.tween_property(thing, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
-	await tween.finished
+	await _runner.move(thing, where, seconds)
 
 
 ## Quiet piano, fading in, looping.

@@ -436,3 +436,22 @@ func test_the_shelf_stands_back_along_the_table_not_in_front_of_the_player() -> 
 	var shelf_frame: Transform3D = bench
 	var local := shelf_frame.affine_inverse() * cauldron.global_position
 	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0, "the cauldron does not stand inside the shelf's footprint")
+
+
+func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
+	await _boot_entry()
+	var said := record(Events.said)
+	await _to_setup_panel()
+	await _press(&"entry_part_touch")   # waits for a tap that never comes
+	await wait(1.0)
+	expect(entry.get("_cue"), "the touch part is waiting for the tap")
+	await _press(&"entry_part_ripple")   # cuts in
+	expect(await _until_said(said, "Welcome.", 30.0), "the ripple plays at once")
+	expect(not entry.get("_cue"), "and the touch part is gone")
+	expect(not _said_line(said, "Hello."), "without the earlier parts")
+	# Back at the panel, wait for a part again and cut straight into the shelf scene.
+	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "the panel comes back")
+	await _press(&"entry_part_touch")
+	await wait(0.5)
+	await _press(&"entry_part_shelf")
+	expect(await until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 30.0), "a jump to the shelf works mid-part too")
