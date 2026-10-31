@@ -63,6 +63,10 @@ var socket_yaw := 0.0
 ## A spot to keep clear of (the cauldron) and its radius; Vector3.INF = none.
 var avoid_at := Vector3.INF
 var avoid_radius := 0.0
+## Live things to keep clear of and to face, when [method follow] was given them (the cauldron and
+## the panel move at the reveal, so their copies above would go stale).
+var _cauldron_node: Node3D
+var _panel_node: Node3D
 
 enum State { IDLE, HELD, ALIGNING, SETTLING, DOCKED }
 var _state := State.IDLE
@@ -79,6 +83,7 @@ var _lost_for := 0.0
 var _picked := false
 var _docked := false
 var _tween: Tween
+var _token := 0                       # a finished tween only counts if no one cancelled it since
 var _hint: MeshInstance3D
 var _hint_material: StandardMaterial3D
 var _hint_level := 0.0
@@ -107,8 +112,21 @@ func configure(floor_y: float, eyes: Vector3, reach: float, yaw: float, keep_cle
 	avoid_radius = keep_clear_radius
 
 
+## Keeps the settle spot clear of [param cauldron] and the docked gear turned like [param panel],
+## wherever they stand now (they move at the reveal). Either may be null.
+func follow(cauldron: Node3D, panel: Node3D) -> void:
+	_cauldron_node = cauldron
+	_panel_node = panel
+
+
 ## Starts watching for [param gear] to be picked up and set into the socket at [param socket_at].
 func begin(gear: Node3D, socket_at: Vector3) -> void:
+	if gear == _gear and _gear_ok() and (held or _state == State.ALIGNING or _state == State.DOCKED):
+		# Called again while the child has it (or has already set it in): carry on, forget nothing.
+		# Only [method reset] forgets.
+		_socket_at = socket_at
+		enabled = true
+		return
 	_kill_tween()
 	_gear = gear
 	_socket_at = socket_at
@@ -138,11 +156,24 @@ func stop() -> void:
 		_let_go()
 
 
-## Forgets everything: not enabled, not picked up, not docked. (The story chat's jump buttons.)
+## Forgets everything at once and lets go of nothing: not enabled, not held, not picked up, not
+## docked, any align or settle in progress cancelled (the gear stays where it is, for the story to
+## place), no signal. (The jump buttons: the story moves the gear itself afterwards.)
 func reset() -> void:
-	stop()
+	enabled = false
+	held = false
+	_kill_tween()
+	_state = State.IDLE
 	_picked = false
 	_docked = false
+	_idle = 0.0
+	_reminded = false
+	_lost_for = 0.0
+	_pinching.clear()
+	_press_age.clear()
+	if _hint != null:
+		_hint_level = 0.0
+		_hint.visible = false
 
 
 ## True once the child has picked the gear up (since [method begin]).
@@ -219,7 +250,11 @@ func _process(delta: float) -> void:
 			_press_age.erase(side)
 		else:
 			_try_pick_up(side)
-	if not held or App.rig == null:
+	if not held:
+		return
+	if not _gear_ok() or App.rig == null:
+		held = false   # the gear went away (a scene change took it): nothing to hold
+		_state = State.IDLE
 		return
 	var pointer := App.rig.pointer(_side)
 	if not pointer.tracked():
@@ -233,7 +268,7 @@ func _process(delta: float) -> void:
 
 ## Counts the seconds the gear waits in view, untouched, and says so once.
 func _watch_for_idle(delta: float) -> void:
-	if remind_after <= 0.0 or _reminded or not enabled or _picked or _gear == null or not is_instance_valid(_gear) or not _gear.visible:
+	if remind_after <= 0.0 or _reminded or not enabled or _picked or not _gear_ok() or not _gear.visible:
 		return
 	_idle += delta
 	if _idle >= remind_after:
@@ -244,7 +279,7 @@ func _watch_for_idle(delta: float) -> void:
 # --- Picking up and carrying -------------------------------------------------------
 
 func _try_pick_up(side: StringName) -> void:
-	if not enabled or held or _gear == null or not is_instance_valid(_gear) or not _gear.visible or App.rig == null:
+	if not enabled or held or not _gear_ok() or not _gear.visible or App.rig == null:
 		return
 	if _state == State.ALIGNING or _state == State.DOCKED:
 		return
@@ -252,7 +287,7 @@ func _try_pick_up(side: StringName) -> void:
 	if not pointer.tracked():
 		return
 	var pinch := pointer.grip()
-	if pinch.origin.distance_to(middle_of(_gear)) > GRAB_RADIUS:
+	if not pinch.origin.is_finite() or pinch.origin.distance_to(middle_of(_gear)) > GRAB_RADIUS:
 		return
 	_kill_tween()   # a gear still floating down can be taken again
 	_side = side
@@ -270,7 +305,13 @@ func _try_pick_up(side: StringName) -> void:
 	picked_up.emit()
 
 
+func _gear_ok() -> bool:
+	return _gear != null and is_instance_valid(_gear)
+
+
 func _follow(pinch: Transform3D, delta: float) -> void:
+	if not pinch.origin.is_finite() or not pinch.basis.is_finite():
+		return   # a tracking glitch: stay where we are
 	var hand := Transform3D(pinch.basis.orthonormalized(), pinch.origin)
 	var want := hand * _offset
 	var keep := 1.0 - exp(-delta * 30.0)   # a little smoothing: tracking is jittery
@@ -314,21 +355,26 @@ func _dock() -> void:
 	held = false
 	var from := _gear.global_transform
 	var from_q := from.basis.orthonormalized().get_rotation_quaternion()
-	var to_q := Quaternion(Vector3.UP, socket_yaw)
+	var to_q := Quaternion(Vector3.UP, _facing())
 	var size := from.basis.get_scale()
 	var high := maxf(from.origin.y - _socket_at.y - 0.08, 0.0)
 	var seconds := clampf(ALIGN_SECONDS + high * 2.0, ALIGN_SECONDS, 0.7)
+	var socket := _socket_at
 	_tween = create_tween()
 	_tween.tween_method(func(k: float) -> void:
-		_gear.global_transform = Transform3D(Basis(from_q.slerp(to_q, k)) * Basis.from_scale(size),
-			from.origin.lerp(_socket_at, k)), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	await _tween.finished
-	if _state != State.ALIGNING:
-		return   # begin() or stop() cut in
-	_gear.global_transform = Transform3D(Basis(to_q) * Basis.from_scale(size), _socket_at)
+		if _gear_ok():
+			_gear.global_transform = Transform3D(Basis(from_q.slerp(to_q, k)) * Basis.from_scale(size),
+				from.origin.lerp(socket, k)), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tween.finished.connect(_finish_dock.bind(_token, to_q, size, socket), CONNECT_ONE_SHOT)
+
+
+func _finish_dock(token: int, to_q: Quaternion, size: Vector3, socket: Vector3) -> void:
+	if token != _token or _state != State.ALIGNING or not _gear_ok():
+		return   # reset(), begin() or the scene cut in
+	_gear.global_transform = Transform3D(Basis(to_q) * Basis.from_scale(size), socket)
 	_state = State.DOCKED
 	_docked = true
-	Events.feedback.emit(&"hint", _socket_at)
+	Events.feedback.emit(&"hint", socket)
 	released.emit(true)
 	docked.emit()
 
@@ -342,12 +388,17 @@ func _settle() -> void:
 	var from_q := from.basis.orthonormalized().get_rotation_quaternion()
 	var to_q := Quaternion(Vector3.UP, _yaw_of(from.basis))
 	var to := _settle_spot(from.origin)
+	var seconds := clampf(SETTLE_SECONDS + from.origin.distance_to(to) * 0.4, SETTLE_SECONDS, 1.6)   # a gear thrown far still floats
 	_tween = create_tween()
 	_tween.tween_method(func(k: float) -> void:
-		_gear.global_transform = Transform3D(Basis(from_q.slerp(to_q, k)) * Basis.from_scale(size),
-			from.origin.lerp(to, k)), 0.0, 1.0, SETTLE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	await _tween.finished
-	if _state == State.SETTLING:
+		if _gear_ok():
+			_gear.global_transform = Transform3D(Basis(from_q.slerp(to_q, k)) * Basis.from_scale(size),
+				from.origin.lerp(to, k)), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_tween.finished.connect(_finish_settle.bind(_token), CONNECT_ONE_SHOT)
+
+
+func _finish_settle(token: int) -> void:
+	if token == _token and _state == State.SETTLING:
 		_state = State.IDLE
 
 
@@ -380,7 +431,8 @@ func _settle_spot(p: Vector3) -> Vector3:
 func _spot_is_free(spot: Vector3) -> bool:
 	if reach_radius > 0.0 and Vector2(spot.x - reach_from.x, spot.z - reach_from.z).length() > reach_radius:
 		return false
-	if avoid_at != Vector3.INF and Vector2(spot.x - avoid_at.x, spot.z - avoid_at.z).length() < avoid_radius:
+	var avoid := _avoid_centre()
+	if avoid != Vector3.INF and Vector2(spot.x - avoid.x, spot.z - avoid.z).length() < avoid_radius:
 		return false
 	return Vector2(spot.x - _socket_at.x, spot.z - _socket_at.z).length() >= PANEL_CLEAR
 
@@ -395,9 +447,24 @@ func _yaw_of(basis: Basis) -> float:
 
 
 func _kill_tween() -> void:
+	_token += 1   # whatever was waiting on the old tween is void
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = null
+
+
+## The way the docked gear faces: like the panel, wherever it stands now.
+func _facing() -> float:
+	if _panel_node != null and is_instance_valid(_panel_node):
+		return _panel_node.global_rotation.y
+	return socket_yaw
+
+
+## The middle of what the gear must not settle on (the cauldron), or INF.
+func _avoid_centre() -> Vector3:
+	if _cauldron_node != null and is_instance_valid(_cauldron_node):
+		return _cauldron_node.global_position
+	return avoid_at
 
 
 # --- The socket hint -------------------------------------------------------------------
