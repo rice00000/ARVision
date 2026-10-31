@@ -51,6 +51,8 @@ const CAULDRON_DISTANCE := EntryLayout.CAULDRON_DISTANCE
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
 ## Seconds the ripple takes to spread across the play circle. Slow and soft: no flash.
 const RIPPLE_SECONDS := 5.0
+## Seconds the cauldron takes to sink away at the reveal (it is gone when the first ring reaches it).
+const CAULDRON_SINK := 0.6
 
 ## DEBUG: show the beat in the headset and in Output.
 const DEBUG := true
@@ -473,7 +475,7 @@ func _pickup() -> void:
 ## The cauldron shrinks away into the table over about a second, then hides.
 func _cauldron_away() -> void:
 	var tween := _runner.create_tween()
-	tween.tween_property(_box, "scale", Vector3(0.02, 0.02, 0.02), 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(_box, "scale", Vector3(0.02, 0.02, 0.02), CAULDRON_SINK).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_callback(func() -> void: _box.visible = false)
 
 
@@ -520,8 +522,12 @@ func _reveal(fast := false) -> void:
 	await _make_way()   # layout chat: what stands where the bench goes glides aside first
 	_actions.lean_to(_runner, 0.0, 0.5)
 	_attend(_shelf)   # as the ripple spreads Onion straightens and turns to one revealed feature (the shelf)
+	# The cauldron's job is done: it has sunk away by the time the first ring reaches it (Megan).
+	var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
+	var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)   # as _ripple works it out
+	var hits := RIPPLE_SECONDS * asin(clampf(to_pot / reach, 0.0, 1.0)) * 2.0 / PI   # the ring's ease is a sine
+	_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
 	await _ripple()
-	_cauldron_away()   # its job is done: the cauldron sinks away after the ripple (Megan)
 	_attend(null)   # "I've been looking forward..." turns back to the child and holds a welcoming pose
 	await say("I've been looking forward to showing you this.")
 	if not fast:
