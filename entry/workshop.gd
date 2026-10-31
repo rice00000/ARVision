@@ -26,6 +26,11 @@ var _switches := 0
 var _cauldron: Node3D
 var _attention: Variant = null   # a Node3D or a position to look at instead of the child
 var _cheer_until := 0.0
+var _gear: Node3D
+var _mechanism: Node3D
+var _mouth := Vector3.ZERO
+var _sounds: Sounds
+var _tilt := 0.0
 
 
 ## Takes over from the opening. [param parts]: onion (holder), model, face, rest_y, glow, halo,
@@ -46,6 +51,13 @@ func take(parts: Dictionary) -> void:
 		var part: Node3D = parts.get(key)
 		if part != null and is_instance_valid(part):
 			part.reparent(self)
+	_gear = parts.get("gear")
+	_mechanism = parts.get("mechanism")
+	_mouth = parts.get("mouth", _cauldron.global_position)
+	var sounds: Sounds = parts.get("sounds")
+	if sounds != null and is_instance_valid(sounds):
+		sounds.reparent(self)   # the closing's clunk and rattle
+		_sounds = sounds
 	var music: AudioStreamPlayer = parts.get("music")
 	if music != null and is_instance_valid(music):
 		music.reparent(self)
@@ -71,6 +83,80 @@ func float_to(where: Vector3, seconds := 1.0) -> void:
 ## Where Onion is now.
 func onion_position() -> Vector3:
 	return _onion.global_position
+
+
+# --- The closing (story chat: approved motion ending and closing) ------------------------
+
+## The gears slow to a stop over [param seconds].
+func slow_gears(seconds := 1.5) -> void:
+	var spins: Array = []
+	for part in [_gear, _mechanism]:
+		if part != null and is_instance_valid(part):
+			spins.append_array(part.find_children("*", "GearSpin", true, false))
+	var tween := create_tween().set_parallel(true)
+	for spin: GearSpin in spins:
+		tween.tween_property(spin, "rate", 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await tween.finished
+	for spin: GearSpin in spins:
+		spin.running = false
+
+
+## The cauldron (sunk away at the reveal) comes back up where it stood.
+func cauldron_back(seconds := 0.7) -> void:
+	_cauldron.visible = true
+	var tween := create_tween()
+	tween.tween_property(_cauldron, "scale", Vector3.ONE, seconds).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await tween.finished
+
+
+## The gear lifts out of its socket, floats over and drops into the cauldron, with a soft clunk.
+func gear_home() -> void:
+	if _gear == null or not is_instance_valid(_gear):
+		return
+	var start := _gear.global_position
+	var over := _mouth + Vector3.UP * 0.12
+	var tween := create_tween()
+	tween.tween_property(_gear, "global_position", start + Vector3.UP * 0.06, 0.5).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_gear, "global_position", over, 1.0).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_gear, "global_position", _mouth + Vector3.DOWN * 0.04, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void:
+		_gear.visible = false
+		if _sounds != null:
+			_sounds.play(&"knock", _mouth))   # the soft clunk as it lands
+	await tween.finished
+
+
+## A small rattle from the cauldron.
+func rattle() -> void:
+	if _sounds != null:
+		_sounds.play(&"rattle_soft", _cauldron.global_position)
+	var tween := create_tween()
+	for i in 6:
+		tween.tween_property(_cauldron, "rotation:z", 0.03 if i % 2 == 0 else -0.03, 0.06)
+	tween.tween_property(_cauldron, "rotation:z", 0.0, 0.08)
+	await tween.finished
+
+
+## A sheepish sideways tilt of Onion's body ([param on]), or straight again.
+func tilt(on: bool) -> void:
+	create_tween().tween_property(self, "_tilt", 0.28 if on else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+
+
+## A gentle goodbye bob, then Onion ducks into the cauldron and is gone.
+func goodbye() -> void:
+	cheer()
+	await get_tree().create_timer(1.2, false).timeout
+	attend(null)
+	var tween := create_tween()
+	tween.tween_property(_onion, "global_position", _mouth + Vector3.UP * 0.06, 0.8).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_onion, "global_position", _mouth + Vector3.DOWN * 0.12, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void: _onion.visible = false)
+	await tween.finished
+
+
+## Where the cauldron's mouth is.
+func mouth() -> Vector3:
+	return _mouth
 
 
 ## A small satisfied bob.
@@ -132,3 +218,4 @@ func _process(delta: float) -> void:
 	if to_child.length() < 0.01:
 		return
 	_onion.global_rotation.y = -(atan2(_face.x, _face.z) - atan2(to_child.x, to_child.z))
+	_model.rotation.z = lerpf(_model.rotation.z, _tilt, minf(1.0, delta * 8.0))   # the sheepish tilt

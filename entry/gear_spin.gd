@@ -6,6 +6,8 @@ extends Node
 ## turned directly: no seam, however long it runs.
 
 var running := false
+## 1 = full speed; the closing slows the gears to a stop by lowering it.
+var rate := 1.0
 
 var _nodes: Array[Node3D] = []
 var _start: Array[float] = []   # angle about Y at the start, radians
@@ -49,7 +51,7 @@ func add(node: Node3D, radians_a_second: float) -> void:
 func _process(delta: float) -> void:
 	if not running:
 		return
-	_clock += delta
+	_clock += delta * rate
 	for i in _nodes.size():
 		if is_instance_valid(_nodes[i]):
 			_nodes[i].quaternion = Quaternion(Vector3.UP, _start[i] + _speed[i] * _clock)

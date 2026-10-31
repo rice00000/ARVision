@@ -597,4 +597,11 @@ func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_
 	await visit._ending()
 	Engine.time_scale = 1.0
 	expect(_said_line(said, "Thank you for trying that with me."), "the approved ending")
+	for line: String in ["It's been lovely having you here.", "I'll have everything ready for your next visit.", "Well. I'll do my best."]:
+		expect(_said_line(said, line), "the closing says: " + line)
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	expect(not (workshop.get("_gear") as Node3D).visible, "the gear went home into the cauldron")
+	expect((workshop.get("_cauldron") as Node3D).visible, "the cauldron is back for it")
+	expect(not (workshop.get("_onion") as Node3D).visible, "Onion ducked inside")
+	expect(visit.find_child("visit_end_session", true, false) != null, "the end-session control is shown")
 	expect(not Motion.onion_voice, "Wei's lines are back afterwards")

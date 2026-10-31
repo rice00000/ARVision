@@ -338,7 +338,8 @@ func test_the_motion_dev_marker_and_coherence_control_build_and_pin_like_the_fac
 	var dev := EntryMotionDev.new()
 	add_child(dev)
 	dev.set_scene(&"Motion")
-	expect_eq(dev._label.text, "Motion", "the marker names the scene")
+	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
+	expect(marker != null and marker.text.ends_with("Motion"), "the (one) marker names the scene")
 	expect_eq(dev._buttons.size(), 7, "five presets and -5 / +5")
 	var session := Session.new()
 	add_child(session)

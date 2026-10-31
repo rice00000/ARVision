@@ -36,6 +36,7 @@ func _ready() -> void:
 	_label.no_depth_test = true
 	_label.render_priority = 10
 	App.head().add_child(_label)
+	_label.visible = false   # SceneMarker is the marker
 	_label.global_position = EntryMotionLayout.marker_spot(head)
 	_label.global_rotation = App.head().global_rotation
 	_readout = Label3D.new()
@@ -62,9 +63,11 @@ func _exit_tree() -> void:
 		Events.selected.disconnect(_on_selected)
 
 
-## Names the running scene in the marker.
+## Names the running scene in the marker. (Organizer: the one marker is SceneMarker, which rides on
+## the head across scenes; this panel's own label stays hidden so there are never two.)
 func set_scene(scene: StringName) -> void:
-	_label.text = String(WORDS.get(scene, scene))
+	_label.visible = false
+	SceneMarker.show_text(String(WORDS.get(scene, scene)))
 
 
 ## The coherence (percent) the next round runs at.
