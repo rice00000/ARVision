@@ -71,7 +71,7 @@ const SHOW_HANDS := true
 ## as that part needs it), then come back. Start plays everything, into Wei's World.
 const JUMP_PANEL := true
 ## The parts, in order: button id suffix -> label.
-const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf"}
+const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
 ## picking the gear up and setting it in.
 const USE_REAL_CARRY := false
@@ -247,6 +247,9 @@ func run() -> void:
 		if part == &"shelf":
 			await _to_shelf(true)
 			return
+		if part == &"dots":
+			_to_dots()
+			return
 		_part_running = true
 		_play(part, fast, _runner)   # not awaited: a jump button can cut in
 		var how: StringName = await _part_over
@@ -418,6 +421,16 @@ func _to_shelf(fast := false) -> void:
 	_hand_over()
 	_beat("done: Wei's World")
 	App.main.change_scene.call_deferred(&"find_object")   # Wei's scene with the World and the shelf
+
+
+## The global motion task (Wei's dots scene) in the same passthrough room. Onion and the
+## cauldron are not carried over to it yet.
+func _to_dots() -> void:
+	_beat("jump: the dots")
+	_keep_pinned()
+	Engine.time_scale = 1.0
+	_hand_over()
+	App.main.change_scene.call_deferred(&"global_motion")
 
 
 # --- Setup: four steps, for the grown-up -------------------------------------
@@ -1123,7 +1136,7 @@ func _dev_jumps() -> void:
 	var eye := App.head().global_transform
 	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	var left := ahead.rotated(Vector3.UP, deg_to_rad(38.0))
-	var at := eye.origin + left * 0.5 + Vector3.UP * 0.1
+	var at := eye.origin + left * 0.5 + Vector3.UP * 0.15
 	var words := Label3D.new()
 	words.text = "DEV · jump to"
 	words.font_size = 22
@@ -1133,7 +1146,7 @@ func _dev_jumps() -> void:
 	words.global_position = at + Vector3.UP * 0.06
 	var names: Array = PARTS.keys()
 	for i in names.size():
-		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.065), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
+		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.055), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
 
 
 # --- The shelf to the side ----------------------------------------------------

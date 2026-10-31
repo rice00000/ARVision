@@ -471,3 +471,10 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	await wait(0.5)
 	await _press(&"entry_part_shelf")
 	expect(await until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 30.0), "a jump to the shelf works mid-part too")
+
+
+func test_dots_button_goes_to_the_global_motion_task() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	expect(await _press(&"entry_part_dots"), "the Dots button is there")
+	expect(await until(func() -> bool: return App.main.current_scene == &"global_motion" and not App.main.switching, 30.0), "the Dots button opens the global motion scene")
