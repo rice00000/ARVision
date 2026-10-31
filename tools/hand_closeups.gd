@@ -48,7 +48,7 @@ func _ready() -> void:
 	world.add_child(demo)
 	var rim := Vector3(0.0, 0.12, 0.0)
 	var plans := [
-		["tap", func() -> void: demo.tap(rim), rim, [0.0, 0.9, 1.05, 1.6]],
+		["tap", func() -> void: demo.tap(rim), rim, [0.0, 0.4, 0.8, 1.0, 1.25, 1.6]],
 		["pinch_lift", func() -> void: demo.pinch_lift(gear), Vector3(0, 0.024, 0), [0.0, 1.1, 1.7, 2.9]],
 		["lower_release", func() -> void: demo.lower_release(Vector3.ZERO), Vector3(0, 0.026, 0), [0.0, 1.3, 2.4]],
 	]

@@ -27,6 +27,7 @@ const HAND_FIX_TRIM := -0.72
 const HAND_ROLL := -0.6
 ## The bones: the index fingertip (the asset calls it "Point"), and the fingers a tap folds away.
 const INDEX_TIP_BONE := "PointR_JNT3"
+const INDEX_BONES := "Point"
 const FOLDED_FINGERS: Array[String] = ["Middle", "Middel", "Ring", "Pinky"]
 
 const COLOUR := Color(0.96, 0.9, 0.8)
@@ -41,10 +42,19 @@ const YAW := 1.3
 enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE }
 ## The tap's own times: the hand is down on the rim from TAP_DOWN to TAP_UP, back up at TAP_BACK, and
 ## the loop is TAP_LOOP long. The GLB's "tap" clip (0 -> press at 0.5 -> back at 1) is scrubbed to match.
-const TAP_DOWN := 0.9
-const TAP_UP := 1.2
+const TAP_DOWN := 0.8
+const TAP_UP := 1.25
 const TAP_BACK := 2.0
 const TAP_LOOP := 3.0
+## The clip's press is small: the index finger bends this many times as far as the clip bends it.
+const TAP_PRESS_GAIN := 1.8
+## The contact moment: a soft ring spreads from the rim where the fingertip lands (seconds, and how
+## wide it ends up, metres).
+const RING_SECONDS := 0.7
+const RING_FROM := 0.02
+const RING_TO := 0.075
+const RING_COLOUR := Color(1.0, 0.92, 0.6)
+const RING_ALPHA := 0.6
 
 var _mode := Mode.NONE
 var _gesture := Mode.NONE      # the gesture last started: it keeps its look while it fades out after stop()
@@ -67,6 +77,10 @@ var _player: AnimationPlayer    # the GLB hand's clips (null: the primitive hand
 var _skeleton: Skeleton3D
 var _folded: Dictionary = {}    # bone -> its rotation in the closed pinch: the three fingers a pointing hand folds
 var _tap_tip := Vector3.ZERO    # where the index fingertip is (figure space) when the tap is pressed
+var _index_rest: Dictionary = {}     # index bone -> its rotation at rest (the tap clip's start)
+var _index_pressed: Dictionary = {}  # index bone -> its rotation at the clip's press
+var _ring: MeshInstance3D       # the contact ring (a tap only)
+var _ring_material: StandardMaterial3D
 var _shown_clip := ""
 var _shown_at := -1.0
 
@@ -80,8 +94,8 @@ func _ready() -> void:
 func tap(at: Vector3) -> void:
 	_start(Mode.TAP, [
 		[0.0, 0.13, 0.05, 0.25],
-		[TAP_DOWN, 0.012, 0.0, 0.25],
-		[TAP_UP, 0.012, 0.0, 0.25],
+		[TAP_DOWN, 0.006, 0.0, 0.25],
+		[TAP_UP, 0.006, 0.0, 0.25],
 		[TAP_BACK, 0.13, 0.05, 0.25],
 		[TAP_LOOP, 0.13, 0.05, 0.25],
 	], func() -> Vector3: return at, -0.55, false, at)
@@ -188,6 +202,7 @@ func _pose(seconds: float) -> void:
 	global_position = anchor + Vector3.UP * up - forward * back
 	global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
 	_show_fingers(open, seconds)
+	_show_ring(anchor, seconds)
 	var rounds := 1.0
 	if _fade_loop:
 		rounds = smoothstep(0.0, 0.5, seconds) * (1.0 - smoothstep(_length - 0.5, _length, seconds))
@@ -223,13 +238,49 @@ func _free_figure() -> void:
 	if _figure != null:
 		_figure.queue_free()
 	_figure = null
+	_ring = null
+	_ring_material = null
 	_player = null
 	_skeleton = null
 	_folded.clear()
+	_index_rest.clear()
+	_index_pressed.clear()
 	_index.clear()
 	_thumb.clear()
 	_shown_clip = ""
 	_shown_at = -1.0
+
+
+## The contact moment of a tap: a thin ring spreads and fades on the rim, once a loop, from the instant the
+## fingertip lands. (Nothing for the other gestures.)
+func _show_ring(at: Vector3, seconds: float) -> void:
+	if _gesture != Mode.TAP or _figure == null:
+		if _ring != null:
+			_ring.visible = false
+		return
+	if _ring == null:
+		_ring = MeshInstance3D.new()
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.9
+		torus.outer_radius = 1.0   # scaled to the width wanted: a thin ring
+		torus.rings = 48
+		torus.ring_segments = 6
+		_ring_material = StandardMaterial3D.new()
+		_ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ring_material.albedo_color = Color(RING_COLOUR, 0.0)
+		torus.material = _ring_material
+		_ring.mesh = torus
+		_ring.top_level = true   # stays on the rim, whatever the hand does
+		_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_figure.add_child(_ring)
+	var u := (seconds - TAP_DOWN) / RING_SECONDS
+	_ring.visible = u >= 0.0 and u <= 1.0
+	if _ring.visible:
+		var spread := 1.0 - pow(1.0 - u, 2.0)   # quick at first, then slow
+		_ring.global_position = at
+		_ring.scale = Vector3(1.0, 0.4, 1.0) * lerpf(RING_FROM, RING_TO, spread)
+		_ring_material.albedo_color.a = RING_ALPHA * (1.0 - u) * smoothstep(0.0, 1.0, _fade)
 
 
 ## The MRTK right hand from the GLB, turned to our frame and scaled. False (and nothing left behind)
@@ -262,6 +313,8 @@ func _build_glb_hand() -> bool:
 	_skeleton = model.find_child("Skeleton3D", true, false) as Skeleton3D
 	_player = player
 	_folded.clear()
+	_index_rest.clear()
+	_index_pressed.clear()
 	_tap_tip = Vector3.ZERO
 	if _skeleton != null:
 		player.play(&"pinch")
@@ -272,8 +325,15 @@ func _build_glb_hand() -> bool:
 				if _skeleton.get_bone_name(bone).begins_with(finger):
 					_folded[bone] = _skeleton.get_bone_pose_rotation(bone)
 		player.play(&"tap")
-		player.seek(0.5, true)   # pressed: where the index fingertip is
+		player.seek(0.0, true)
 		player.pause()
+		for bone in _skeleton.get_bone_count():
+			if _skeleton.get_bone_name(bone).begins_with(INDEX_BONES):
+				_index_rest[bone] = _skeleton.get_bone_pose_rotation(bone)
+		player.seek(0.5, true)   # pressed
+		for bone: int in _index_rest:
+			_index_pressed[bone] = _skeleton.get_bone_pose_rotation(bone)
+		_apply_tap_pose(1.0)   # the harder press this hand really makes: where the fingertip lands
 		var tip := _skeleton.find_bone(INDEX_TIP_BONE)
 		if tip >= 0:
 			_tap_tip = _figure.to_local(_skeleton.to_global(_skeleton.get_bone_global_pose(tip).origin))
@@ -307,8 +367,17 @@ func _show_fingers(open: float, seconds: float) -> void:
 		_player.seek(at, true)
 		_shown_at = at
 		if _gesture == Mode.TAP and _skeleton != null:
-			for bone: int in _folded:
-				_skeleton.set_bone_pose_rotation(bone, _folded[bone])   # and the other fingers folded
+			_apply_tap_pose(1.0 - absf(at - 0.5) * 2.0)   # 0 at rest, 1 at the press
+
+
+## The tap's fingers: the three other fingers folded, and the index finger [param press] (0 rest, 1 pressed)
+## of the way to a press made TAP_PRESS_GAIN times harder than the clip makes it.
+func _apply_tap_pose(press: float) -> void:
+	for bone: int in _folded:
+		_skeleton.set_bone_pose_rotation(bone, _folded[bone])
+	for bone: int in _index_rest:
+		var rest: Quaternion = _index_rest[bone]
+		_skeleton.set_bone_pose_rotation(bone, rest.slerp(_index_pressed[bone], press * TAP_PRESS_GAIN))
 
 
 ## Where the "tap" clip is when the loop is at [param seconds]: down on the rim, pressed at 0.5, back.

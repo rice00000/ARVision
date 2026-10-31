@@ -4,6 +4,7 @@ extends TestCase
 ## Most tests drive a Carry on a stand-in gear on the simulated room; the last one checks the
 ## real Entry configures it.
 
+const CAULDRON_PLAY_CLEAR := 0.17
 var carry: Carry
 var gear: Node3D
 var spin: GearSpin
@@ -640,6 +641,41 @@ func test_a_tap_points_with_the_index_fingertip_on_the_rim() -> void:
 	expect(demo._figure.position == Vector3.ZERO, "the hand is back at its own origin")
 
 
+func test_the_tap_presses_harder_than_the_clip_and_rings_the_rim_once_a_loop() -> void:
+	await _scene()
+	var demo := _demo()
+	var rim := cauldron + Vector3.UP * 0.12
+	demo.tap(rim)
+	await _frozen(demo, 0.3)
+	var ring := demo._ring
+	expect(ring != null and not ring.visible, "no ring before the fingertip lands")
+	var index_bone := demo._skeleton.find_bone(DemoHand.INDEX_TIP_BONE)
+	var parent := demo._skeleton.get_bone_parent(index_bone)
+	var rest := demo._skeleton.get_bone_pose_rotation(parent)   # the finger as the tap starts (frozen at 0.3 s)
+	await _frozen(demo, (DemoHand.TAP_DOWN + DemoHand.TAP_UP) * 0.5)
+	var pressed := demo._skeleton.get_bone_pose_rotation(parent)
+	var clip_pressed: Quaternion = demo._index_pressed[parent]
+	var clip_rest: Quaternion = demo._index_rest[parent]
+	var asked := clip_rest.angle_to(clip_pressed)
+	var made := clip_rest.angle_to(pressed)
+	expect(made > asked * 1.5, "the index bends at least 1.5 times as far as the clip alone (%s vs %s rad)" % [made, asked])
+	expect(ring.visible, "the ring shows as it lands")
+	expect(ring.global_position.distance_to(rim) < 0.001, "on the rim point")
+	var width := ring.scale.x
+	await _frozen(demo, DemoHand.TAP_DOWN + DemoHand.RING_SECONDS * 0.8)
+	expect(ring.scale.x > width and demo._ring_material.albedo_color.a < DemoHand.RING_ALPHA, "it spreads and fades")
+	expect(demo._ring_material.albedo_color.a <= DemoHand.RING_ALPHA + 0.001, "softly")
+	await _frozen(demo, DemoHand.TAP_BACK + 0.2)
+	expect(not ring.visible, "gone once the hand lifts")
+	demo.pinch_lift(gear)   # another gesture has no ring
+	await _frozen(demo, 1.1)
+	expect(not ring.visible, "the pinch has no ring")
+	demo.set_process(true)   # (it was held still for the checks)
+	demo.stop()
+	await wait(0.7)
+	expect_eq(demo.get_child_count(), 0, "and nothing is left of it")
+
+
 func test_without_the_glb_the_primitive_hand_does_the_same_job() -> void:
 	await _scene()
 	var plain := _demo()
@@ -874,3 +910,278 @@ func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -
 		done.finished = true
 	wait_for_it.call()
 	expect(await until(func() -> bool: return done.finished, 1.5), "the story's wait for 'set it in' ends at once")
+
+
+# --- The desktop mouse and the cauldron ----------------------------------------------------
+
+## The real opening at its Start screen (setup skipped: the default), ready for a jump button.
+func _opening_at_start() -> Entry:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = false   # a desktop: only a click presses
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_part_touch") != null, 30.0)
+	return entry
+
+
+func test_a_click_on_the_cauldron_registers_every_time_a_click_beside_it_does_not() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_touch")
+	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	var driver: DesktopDriver = entry._desktop_driver()
+	var camera := App.rig.head
+	var target: Target = entry.get("_cauldron_target")
+	var taps := record(entry._runner.cauldron_touched)
+	var clicks := 0
+	for depth: float in [0.2, 0.3, 0.45, 0.6, 0.9]:   # the wheel moves the hand in and out
+		driver.depth = depth
+		for offset: Vector3 in [Vector3.ZERO, Vector3(0.07, 0.0, 0.0), Vector3(-0.07, 0.0, 0.0), Vector3(0.0, 0.1, 0.0), Vector3(0.0, -0.05, 0.0)]:
+			driver._place_hand(camera.unproject_position(target.global_position + offset))
+			await frames(2)
+			input.press(&"right", &"trigger_click", true)
+			await frames(2)
+			input.press(&"right", &"trigger_click", false)
+			await frames(2)
+			clicks += 1
+			expect_eq(taps.size(), clicks, "click %d (depth %s, offset %s) taps the cauldron" % [clicks, depth, offset])
+	# Beside the cauldron (well outside its tap sphere) nothing happens.
+	driver.depth = 0.9
+	var before := taps.size()
+	driver._place_hand(camera.unproject_position(target.global_position + camera.global_basis.x * 0.5))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	expect_eq(taps.size(), before, "a click well beside the cauldron does nothing")
+
+
+# --- Robustness of the carry path in the real opening (round 5) --------------------------------
+
+func _glowing(entry: Entry) -> bool:
+	for mesh in (entry.get("_gear") as Node3D).find_children("*", "MeshInstance3D", true, false):
+		if (mesh as MeshInstance3D).material_overlay != null:
+			return true
+	return false
+
+
+func _line_said(said: Array, text: String) -> bool:
+	return said.any(func(args: Array) -> bool: return args[0] == text)
+
+
+## The right hand's pinch point at [param p], pinch closed or open.
+func _hand_pinch(p: Vector3, closed: bool) -> void:
+	input.press(&"right", &"trigger_click", false)   # a fresh pinch is a new press
+	await frames(2)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, p + Vector3(0.0, 0.0, 0.05)))
+	await frames(2)
+	input.press(&"right", &"trigger_click", closed)
+	await frames(2)
+
+
+## Takes the real gear in the right hand and carries it so its base is at [param base].
+func _take_real_gear(entry: Entry, base: Vector3) -> void:
+	var real_gear: Node3D = entry.get("_gear")
+	await _hand_pinch(Carry.middle_of(real_gear), true)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, base + Vector3.UP * 0.03 + Vector3(0.0, 0.0, 0.05)))
+	await wait(0.5)
+
+
+func test_grabbing_the_gear_during_the_ask_takes_the_glow_and_the_hand_away_at_once() -> void:
+	var entry := await _opening_at_start()
+	var said := record(Events.said)
+	await _press_button(&"entry_part_pickup")
+	expect(await until(func() -> bool: return _glowing(entry), 20.0), "the gear glows while Onion asks")
+	var carry_node: Carry = entry.get("_carry")
+	expect(carry_node.enabled, "and the child may already take it (a jump straight here switches Carry on)")
+	await _hand_pinch(Carry.middle_of(entry.get("_gear")), true)   # grabbed in the middle of the line
+	expect(await until(func() -> bool: return not _glowing(entry), 0.5), "the glow goes the moment it is grabbed")
+	expect(carry_node.held and not (entry.get("_demo") as DemoHand).visible, "held, and no hand is shown")
+	expect(await until(func() -> bool: return _line_said(said, "There you go."), 30.0), "the beat goes on to 'There you go.'")
+	expect(not _glowing(entry), "and the glow stays off")
+	input.press(&"right", &"trigger_click", false)
+
+
+func test_the_glow_goes_the_moment_the_gear_is_picked_up_or_reset_whatever_the_story_is_saying() -> void:
+	var entry := await _opening_at_start()
+	entry._try_carry()
+	entry._glow_gear(true)   # as the story does while it asks (a long line, as in a headset)
+	expect(_glowing(entry), "glowing")
+	await _hand_pinch(Carry.middle_of(entry.get("_gear")), true)
+	await frames(2)
+	expect(not _glowing(entry), "grabbed: the glow is gone within a couple of frames, before any line ends")
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	entry._glow_gear(true)
+	(entry.get("_demo") as DemoHand).pinch_lift(entry.get("_gear"))
+	(entry.get("_carry") as Carry).reset()   # what a jump button does
+	expect(not _glowing(entry) and (entry.get("_demo") as DemoHand)._mode == DemoHand.Mode.NONE, "reset: the glow and the hand are gone")
+
+
+func test_a_jump_button_while_the_pinch_is_shown_clears_the_glow_and_the_hand() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_pickup")
+	expect(await until(func() -> bool: return _glowing(entry), 20.0), "glowing")
+	var demo: DemoHand = entry.get("_demo")
+	expect(await until(func() -> bool: return demo.visible, 25.0), "and the hand shows the pinch")
+	await _press_button(&"entry_part_hello")   # a jump button cuts in
+	await wait(0.6)
+	expect(not _glowing(entry), "the glow is gone")
+	expect(not demo.visible and demo._mode == DemoHand.Mode.NONE, "and so is the hand")
+	expect(not (entry.get("_gear") as Node3D).visible, "the gear is put away for the new part")
+	expect(not (entry.get("_carry") as Carry).enabled, "and Carry is off")
+
+
+## The grown-up presses a jump button with the LEFT hand, while the child's right hand may be holding the gear.
+func _press_with_left(id: StringName) -> void:
+	await until(func() -> bool: return _target(id) != null, 20.0)
+	await select(_target(id).global_position, &"left")
+	await frames(2)
+	await wait(0.7)
+
+
+func test_a_jump_button_while_carrying_lets_go_cleanly() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_pickup")
+	expect(await until(func() -> bool: return _glowing(entry), 20.0), "glowing")
+	var real_gear: Node3D = entry.get("_gear")
+	var rest: Vector3 = entry.get("_gear_rest")
+	await _take_real_gear(entry, rest + Vector3(0.05, 0.12, 0.0))
+	var carry_node: Carry = entry.get("_carry")
+	expect(carry_node.held, "carrying it")
+	await _press_with_left(&"entry_part_touch")   # a jump button, mid-carry (the pinch is still closed)
+	await wait(0.5)
+	expect(not carry_node.held and not carry_node.enabled and not carry_node.has_been_picked_up(), "let go of and forgotten")
+	expect(not real_gear.visible and not _glowing(entry), "the gear is put away, with no glow")
+	var at := real_gear.global_position
+	await wait(1.5)
+	expect(real_gear.global_position == at, "nothing keeps moving it")
+	input.press(&"right", &"trigger_click", false)
+
+
+func test_a_child_who_sets_the_gear_in_while_onion_talks_is_not_asked_to() -> void:
+	var entry := await _opening_at_start()
+	entry._try_carry()   # the gear out and Carry on, as at the landing
+	var real_gear: Node3D = entry.get("_gear")
+	var socket_at: Vector3 = entry.get("_socket_at")
+	await _take_real_gear(entry, socket_at + Vector3(0.02, 0.02, 0.0))
+	input.press(&"right", &"trigger_click", false)
+	var carry_node: Carry = entry.get("_carry")
+	expect(await until(func() -> bool: return carry_node.has_docked(), 3.0), "docked early")
+	var said := record(Events.said)
+	var done := {pickup = false, place = false}
+	var run_pickup := func() -> void:
+		await entry._pickup()
+		done.pickup = true
+	run_pickup.call()
+	expect(await until(func() -> bool: return done.pickup, 20.0), "the pick-up beat does not wait for a gear that was already taken")
+	var run_place := func() -> void:
+		await entry._place()
+		done.place = true
+	run_place.call()
+	expect(await until(func() -> bool: return done.place, 20.0), "the set-in beat does not wait for a gear that was already set in")
+	expect(not _line_said(said, "Set it in here, then open your fingers."), "and does not ask for it")
+	expect(_line_said(said, "Ah. There we go."), "but still says its line")
+	expect(not (entry.get("_demo") as DemoHand).visible and not _glowing(entry), "no hand, no glow")
+	expect(real_gear.global_position.distance_to(socket_at) < 0.01, "the gear is in the socket")
+
+
+func test_tracking_lost_while_carrying_in_the_set_in_beat_sets_it_down_and_the_beat_waits() -> void:
+	var entry := await _opening_at_start()
+	var said := record(Events.said)
+	await _press_button(&"entry_part_place")
+	var demo: DemoHand = entry.get("_demo")
+	expect(await until(func() -> bool: return demo.visible, 25.0), "the hand shows the set-in")
+	var real_gear: Node3D = entry.get("_gear")
+	var rest: Vector3 = entry.get("_gear_rest")
+	await _take_real_gear(entry, rest + Vector3(0.0, 0.1, 0.0))
+	var carry_node: Carry = entry.get("_carry")
+	expect(carry_node.held, "carrying it")
+	input.track(&"right", false)
+	await wait(2.0)
+	expect(not carry_node.held, "let go when the hand is lost")
+	expect(absf(real_gear.global_position.y - rest.y) < 0.004, "set down on the table")
+	expect(not _line_said(said, "Ah. There we go."), "the beat keeps waiting: nothing was set in")
+	input.track(&"right", true)
+	await frames(3)
+	await _take_real_gear(entry, entry.get("_socket_at") + Vector3(0.02, 0.02, 0.0))
+	input.press(&"right", &"trigger_click", false)
+	expect(await until(func() -> bool: return _line_said(said, "Ah. There we go."), 25.0), "and when the child sets it in, the beat finishes")
+
+
+func _panel_gap(entry: Entry, spot: Vector3) -> float:
+	var local := (entry.get("_mechanism") as Node3D).to_local(spot)
+	var gap := Vector2(maxf(absf(local.x) - Entry.PANEL.x * 0.5, 0.0), maxf(absf(local.z) - Entry.PANEL.z * 0.5, 0.0))
+	return gap.length()
+
+
+func test_a_gear_let_go_around_the_panel_or_over_the_cauldron_never_lands_on_either() -> void:
+	var entry := await _opening_at_start()
+	var real_gear: Node3D = entry.get("_gear")
+	var carry_node: Carry = entry.get("_carry")
+	var failures: Array[String] = []
+	for layout_name in ["opening", "after the reveal's make-way"]:
+		if layout_name != "opening":
+			entry._make_way(0.0)
+		entry._try_carry()
+		var socket_at: Vector3 = entry.get("_socket_at")
+		var pot: Vector3 = (entry.get("_box") as Node3D).global_position
+		var drops: Array[Vector3] = []
+		for angle in [0.0, 70.0, 140.0, 210.0, 280.0]:   # around the socket, outside the 12 cm acceptance
+			drops.append(socket_at + Vector3(0.14, 0.02, 0.0).rotated(Vector3.UP, deg_to_rad(angle)))
+		drops.append(pot + Vector3(0.0, 0.15, 0.0))     # right over the cauldron's mouth
+		drops.append(pot + Vector3(0.09, 0.1, 0.0))     # over its rim
+		for drop in drops:
+			real_gear.global_position = entry.get("_gear_rest")
+			carry_node.begin(real_gear, socket_at)
+			await _take_real_gear(entry, drop)
+			input.press(&"right", &"trigger_click", false)
+			await wait(1.7)
+			var spot := real_gear.global_position
+			var tag := "%s, let go at %s -> landed %s" % [layout_name, snapped(drop, Vector3.ONE * 0.01), snapped(spot, Vector3.ONE * 0.01)]
+			if carry_node.has_docked():
+				continue   # inside the acceptance volume: that is the point
+			if _panel_gap(entry, spot) < 0.045:
+				failures.append(tag + " (on the panel: gap %s)" % _panel_gap(entry, spot))
+			if Vector2(spot.x - pot.x, spot.z - pot.z).length() < CAULDRON_PLAY_CLEAR:
+				failures.append(tag + " (in the cauldron)")
+	expect(failures.is_empty(), "the gear never lands on the panel or in the cauldron: %s" % ["; ".join(failures)])
+
+
+# --- The first visit's own carry (Wei's tidy trial), by simulation: nothing of his is changed ------------
+
+func test_in_the_shelf_both_hands_each_carry_one_thing_and_losing_one_hand_returns_only_its_thing() -> void:
+	var tidy := preload("res://trials/tidy/tidy.tres")
+	await boot(plan_of(tidy, 1, false, 0.0, null, {}))
+	App.session.run()
+	await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
+	await wait(0.6)
+	var trial: Trial = App.session.trial
+	var things: Array = trial.get("_things")
+	var a: Target = things[0]
+	var b: Target = things[1]
+	var eye := App.head().global_position
+	for pair: Array in [[&"right", a], [&"left", b]]:
+		var side: StringName = pair[0]
+		var thing: Target = pair[1]
+		var along := (thing.global_position - (eye + Vector3.DOWN * 0.2)).normalized()
+		input.point(side, thing.global_position - along * App.rig.pointer(side).tip_reach, thing.global_position)
+		await frames(2)
+		input.press(side, &"trigger_click", true)
+		await frames(2)
+	var carried: Dictionary = trial.get("_carried")
+	expect(carried.get(&"right") == a and carried.get(&"left") == b, "each hand holds its own thing")
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, eye + Vector3(0.15, -0.3, -0.35)))
+	input.set_hand(&"left", Transform3D(Basis.IDENTITY, eye + Vector3(-0.15, -0.3, -0.35)))
+	await wait(0.3)
+	expect(a.global_position.distance_to(b.global_position) > 0.1, "and they move apart, each with its hand")
+	input.track(&"left", false)   # the left hand is lost
+	await wait(0.6)
+	expect(not carried.has(&"left") and carried.get(&"right") == a, "only the left thing is let go")
+	expect(b.global_position.is_equal_approx(trial.get("_home")[b]), "and goes home, unscored")
+	expect_eq(trial.tries, 0, "without counting an attempt")
+	input.track(&"left", true)
+	input.press(&"left", &"trigger_click", false)
+	input.press(&"right", &"trigger_click", false)

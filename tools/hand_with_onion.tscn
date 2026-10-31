@@ -1,0 +1,4 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://tools/hand_with_onion.gd" id="1"]
+[node name="Overlap" type="Node"]
+script = ExtResource("1")
