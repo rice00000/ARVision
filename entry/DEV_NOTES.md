@@ -247,3 +247,47 @@ would clear it).
 * The material is ours (`material_override`: cream 0.96/0.90/0.80, alpha 0.4, glow 0.35, no shadows), so the fade works whatever the file brings. After `stop()` and the fade the whole hand is freed (no node left); it is built again on the next gesture.
 * Constants Megan may tune in the headset, all at the top of `demo_hand.gd`: `HAND_SCALE` (0.6; the file is 23 cm wrist to fingertip), `HAND_FIX_YAW` (PI: the file's fingers point +Z, ours -Z), `HAND_FIX_TRIM` (-0.72, straightens the file's diagonal hand), `HAND_ROLL` (-0.6, so the gap between thumb and index shows from a seat looking down; the pinch point does not move), `YAW` (1.3: the hand comes in from the right, fingers pointing left, so a child sees it from the side).
 * Pictures: `tools/entry_shots_interaction.gd` (frames of each gesture in the opening, seat and side) and `tools/hand_closeups.gd` (the hand alone against a table colour with a marker at the pinch point and the finger joints printed).
+## Layout chat (C), round 3 (Oct 31): `entry-layout-3`
+
+**Headset test sheet:** `entry/HEADSET_TEST.md`, one section per beat (Setup, Hello, Tap, Gear, Pick up, Set in, Reveal,
+First visit): what to see and hear in the story's words as built now, what to judge or measure, tick boxes; ⚠ marks
+what is not built yet (the real teaching hand, the knock sound, the lead-in line, the workshop's real assets).
+
+**Gear landing (fix).** Since the round-2 landing search, on the sim table the gear could hop from the cauldron right
+over the panel and land on its far side (in "Pick up" it sat far right, beyond the socket). Now its hop must not cross
+the panel and stays short (23-30 cm on the usual tables); the panel search keeps room for the landing on the
+cauldron's side. Only when very little table is in reach (reach 45-50 cm, table starting 30 cm out) does it still hop
+over the panel, as a last resort; the layout line in Output then says "(it hops over the panel: little table in reach)"
+(`EntryLayout.hops_over_panel()`). The plan takes about 0.3 s once, after setup.
+
+**Subtitles: proposal for Wei's `Voice` (not edited).** Today `above_gaze = 25`, `above_horizon = 20`. Looking at the
+things on the bench, the line lies across the shelf's TOP row of cubbies (about 4.5 degrees; the bottom row and the
+things stay clear). Proposed: **`above_gaze = 36`, `above_horizon = 12`.** Then, looking at the things, the line is above
+the whole shelf (usual and long reach); looking at Onion beside the shelf it sits above Onion, about 10 degrees over the
+horizon instead of up to 19 (no looking up). At a short reach (shelf 10 cm back, so near and tall in view) it can
+still touch the top row; never the first row. Pictures: `tools/round3_shots.gd -- --part=sub` (build/round3/sub_*).
+Also worth Wei's look: the line is 48 px x 0.0006 = about 2.9 cm tall at 75 cm (2.2 degrees): small for a child who
+sees poorly; 64 px would be about 3 degrees.
+
+**Teaching hand size.** right_hand_demo.glb is not in the repo or on the Mac yet, so this was measured with the
+stand-in hand scaled to the real one's length (23 cm x scale), from a seated child's eyes, over 3 s of each loop; the
+share of the target the hand hides (most / average):
+
+| scale (length) | tap: cauldron rim | pinch: gear | set in: socket |
+|---|---|---|---|
+| 0.4 (9 cm) | 27% / 5% | 8% / 4% | 27% / 13% |
+| 0.5 (12 cm) | 29% / 9% | 20% / 9% | 29% / 13% |
+| 0.6 (14 cm) | 35% / 11% | 29% / 9% | not measured |
+
+At 0.6 it never hides more than about a third of a target, and only for a moment (it is also see-through, alpha 0.4).
+Best for a 0.4-0.6 m view: **0.5 to 0.55** (11.5-12.5 cm, a young child's hand length): the gear stays clearly visible
+while pinched (at most 20%), and the hand still reads as a hand at 50 cm (about 14 degrees). 0.6 is acceptable. The
+real hand has all five fingers, so it may hide a little more: rerun `tools/round3_shots.gd` with it (set
+`STANDIN_LENGTH` to its own pinch-to-wrist length). Note for chat A: jumping straight to "Set in" without holding the
+gear, after 14 s the reminder replaces the lower-and-open hand with the pinch on the gear (fine for the story; confusing
+in a jump test).
+
+**DEV panels:** Dots and Pop sound A/C sit clear (two columns of four, the pop button under them, 63 degrees left);
+`test_the_opening_puts_things_where_the_map_says...` checks every DEV button is in reach and none overlaps another.
+
+Tests: 73 of the opening's (entry*) pass on this branch.

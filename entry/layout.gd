@@ -265,6 +265,11 @@ func reach_used() -> float:
 	return clampf(reach, REACH_MIN, REACH_MAX) if reach > 0.0 else REACH_USUAL
 
 
+## The gear's hop out of the cauldron goes over the panel (only when nothing else fits).
+func hops_over_panel() -> bool:
+	return _arc_cost(gear_rest, _rect(&"plate", mechanism, _panel_half(), mechanism_yaw, 0.0)) >= HOP_OVER_PANEL
+
+
 ## The cauldron moves when the room is revealed.
 func cauldron_moves() -> bool:
 	return not cauldron_after.is_equal_approx(cauldron)
@@ -288,7 +293,7 @@ func plan() -> EntryLayout:
 	# still in reach for the tap) so the gear can land in front of it on a shallow strip of table.
 	var best := {}
 	var best_score := -INF
-	for out: float in [cauldron_distance, reach_used() + 0.07]:
+	for out: float in [cauldron_distance, reach_used() + 0.09]:
 		cauldron = _cauldron_spot(out)
 		shelf_angle = _shelf_angle()
 		bench = bench_frame(shelf_angle)
@@ -315,6 +320,8 @@ func _problems() -> float:
 		bad += 5.0 + o.degrees
 	for o in out_of_reach():
 		bad += 5.0 + o.metres * 100.0
+	if hops_over_panel():
+		bad += 4.0
 	return -bad
 
 
@@ -494,14 +501,19 @@ func _place_mechanism() -> void:
 				continue   # it lies on the table, not hanging off its edge
 			var view := absf(angle) + rad_to_deg(atan2(PANEL.x * 0.5, distance)) - VIEW_WIDE * 0.5
 			var clear := gap(plate, pot)
-			if clear >= GAP:   # and the gear can land clear of both
-				var landing := _circle(&"landing", _gear_rest_for(p, 8), GEAR_RADIUS + FINGERS, 0.0)
+			var arc := 0.0
+			if clear >= GAP:   # and the gear can land clear of both, on the cauldron's side
+				var spot := _gear_rest_for(p)
+				var landing := _circle(&"landing", spot, GEAR_RADIUS + FINGERS, 0.0)
 				clear = minf(clear, minf(gap(landing, plate), gap(landing, pot)))
-			var score := (0.0 if clear >= GAP else -10.0 + clear) - maxf(view, 0.0) * 0.2
+				arc = _arc_cost(spot, plate)
+				if away(spot) - GEAR_RADIUS - FINGERS > hands + 0.02:   # the gear's near side must be in reach
+					arc += 15.0 + (away(spot) - hands) * 20.0
+			var score := (0.0 if clear >= GAP else -30.0 + clear) - maxf(view, 0.0) * 0.2 - arc
 			score += 0.5 if MAKE_WAY and _clear_of_bench(plate) else 0.0
 			score -= absf(angle) * 0.004 + absf(distance - 0.42) * 0.5 + p.distance_to(cauldron) * 0.5
 			if distance - SOCKET_Z > hands + 0.02:   # the socket must be in easy reach
-				score -= 5.0 + (distance - SOCKET_Z - hands) * 20.0
+				score -= 15.0 + (distance - SOCKET_Z - hands) * 20.0
 			if score > best_score:
 				best_score = score
 				mechanism = p
@@ -567,11 +579,28 @@ func _gear_rest_for(panel: Vector3, steps := 16) -> Vector3:
 			if distance > hands - 0.03:
 				score -= 5.0 + (distance - hands) * 20.0
 			score -= Vector2(spot.x - plate_socket.x, spot.z - plate_socket.z).length()
-			score -= maxf(Vector2(spot.x - cauldron.x, spot.z - cauldron.z).length() - 0.3, 0.0) * 2.0
+			score -= _arc_cost(spot, plate)
 			if score > best_score:
 				best_score = score
 				best = spot
 	return Vector3(best.x, cauldron.y, best.z)
+
+
+## What the gear's flight out of the cauldron to [param spot] costs: more than 30 cm is long (it is
+## a little hop), and flying over the panel [param plate] (over the socket, before the child has
+## even picked it up) is not allowed.
+const HOP_OVER_PANEL := 3.0
+
+
+func _arc_cost(spot: Vector3, plate: Zone) -> float:
+	var from := Vector2(cauldron.x, cauldron.z)
+	var to := Vector2(spot.x, spot.z)
+	var cost := maxf(from.distance_to(to) - 0.3, 0.0) * 1.0
+	var outline := plate.outline()
+	for i in outline.size():
+		if Geometry2D.segment_intersects_segment(from, to, outline[i], outline[(i + 1) % outline.size()]) != null:
+			return cost + HOP_OVER_PANEL
+	return cost
 
 
 ## Onion while the gear comes out: beside [param pot], above the rim, in view, clear of [param panel]
@@ -960,4 +989,5 @@ func summary() -> String:
 	return "reach %d cm, push %d cm, shelf %d deg right; cauldron %s%s; panel %s%s; gear lands %s" % [
 		roundi(reach_used() * 100), roundi(push * 100), roundi(shelf_angle),
 		where.call(cauldron), (" then " + where.call(cauldron_after)) if cauldron_moves() else "",
-		where.call(mechanism), (" then " + where.call(mechanism_after)) if mechanism_moves() else "", where.call(gear_rest)]
+		where.call(mechanism), (" then " + where.call(mechanism_after)) if mechanism_moves() else "", where.call(gear_rest)] \
+		+ (" (it hops over the panel: little table in reach)" if hops_over_panel() else "")
