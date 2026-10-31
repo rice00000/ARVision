@@ -14,13 +14,13 @@ static func show_text(text: String) -> void:
 	if label == null:
 		label = Label3D.new()
 		label.name = NAME
-		label.font_size = 28
+		label.font_size = 22
 		label.pixel_size = 0.0005
 		label.outline_size = 8
 		label.no_depth_test = true
 		label.render_priority = 30
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		label.modulate = Color(1.0, 0.95, 0.6)
-		label.position = Vector3(-0.17, 0.11, -0.4)   # top left, out of the centre of view
+		label.position = Vector3(-0.47, 0.28, -0.4)   # the top-left corner of the view
 		App.head().add_child(label)
 	label.text = "DEV · " + text
