@@ -380,7 +380,7 @@ func _touch() -> void:
 		_actions.lean_to(_runner, 0.35, 0.4))
 	await say("Thank you. Something's caught in there.")
 	_attend(_peer_point())   # holds the listening pose through the next line
-	await say("That should loosen it.")
+	await say("Let's see if it comes out now.")
 	_actions.lean_to(_runner, 0.0, 0.5)   # then straightens; _out drifts it aside (0.8 s) before the launch
 	_attend(null)
 
