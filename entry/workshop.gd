@@ -31,6 +31,8 @@ var _mechanism: Node3D
 var _mouth := Vector3.ZERO
 var _sounds: Sounds
 var _tilt := 0.0
+## The opening's zone map (EntryLayout), for the motion route's layout (EntryMotionLayout); may be null.
+var layout: EntryLayout
 
 
 ## Takes over from the opening. [param parts]: onion (holder), model, face, rest_y, glow, halo,
@@ -54,6 +56,7 @@ func take(parts: Dictionary) -> void:
 	_gear = parts.get("gear")
 	_mechanism = parts.get("mechanism")
 	_mouth = parts.get("mouth", _cauldron.global_position)
+	layout = parts.get("layout")
 	var sounds: Sounds = parts.get("sounds")
 	if sounds != null and is_instance_valid(sounds):
 		sounds.reparent(self)   # the closing's clunk and rattle

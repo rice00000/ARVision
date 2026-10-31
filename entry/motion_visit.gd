@@ -197,10 +197,20 @@ func _choose() -> StringName:
 	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	var right := ahead.cross(Vector3.UP)
 	var at := eye.origin + ahead * 0.42 + Vector3.DOWN * 0.12
-	_add_button("More shapes", &"visit_more_shelf", at - right * 0.06, Color(0.55, 0.42, 0.28))
+	var spots := _motion_layout()
+	if spots != null:   # chat C: a row on the table straight ahead, inside the reach
+		at = spots.choice_spot(0, 2)
+	_add_button("More shapes", &"visit_more_shelf", at - right * 0.06 if spots == null else at, Color(0.55, 0.42, 0.28))
 	var disc := MotionChoice.new()   # chat A: a still disc of dots, pressed deliberately (never a look)
 	add_child(disc)
-	disc.place_beside(_buttons[0], 0.1)
+	if spots != null:
+		disc.global_transform = _buttons[0].global_transform
+		disc.global_position = spots.choice_spot(1, 2)
+		var place: Dictionary = spots.onion_without_shelf(2)
+		if _onion != null:
+			_onion.float_to(place.at, 1.0)   # beside the row, out of the dots' view
+	else:
+		disc.place_beside(_buttons[0], 0.1)
 	disc.open()
 	disc.chosen.connect(func() -> void: _choice = &"motion")
 	_choice = &""
@@ -295,6 +305,13 @@ func _add_button(text: String, id: StringName, at: Vector3, colour: Color, size 
 	button.look_at(Vector3(head.x, at.y, head.z), Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)
 	_buttons.append(button)
+
+
+## Chat C's motion layout on the opening's zone map, or null (no map: the plain placement is used).
+func _motion_layout() -> EntryMotionLayout:
+	if _onion == null or _onion.layout == null:
+		return null
+	return EntryMotionLayout.new(_onion.layout)
 
 
 func _clear_buttons() -> void:

@@ -888,7 +888,7 @@ func _hand_over() -> void:
 	App.main.add_child(workshop)
 	workshop.take({onion = _orb, model = _onion, face = _face, rest_y = _onion_rest_y, glow = _glow,
 			halo = _halo, cauldron = _box, rest = _beside_shelf(), music = _music, mechanism = _mechanism, gear = _gear,
-			mouth = _mouth, sounds = _sounds})
+			mouth = _mouth, sounds = _sounds, layout = _layout})
 	if is_instance_valid(_cauldron_target):
 		_cauldron_target.queue_free()   # nothing to touch there any more
 	_onion = null   # this opening's Onion code stops; the workshop looks after it
