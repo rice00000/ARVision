@@ -490,12 +490,16 @@ func _new_ray() -> Array:
 
 # --- DESKTOP: moving the head ------------------------------------------------
 
-## Metres a second the head moves with the keys (a seated child only leans a little).
+## Metres a second the head moves with the keys (a seated child only leans a little),
+## and radians a second it turns.
 const HEAD_SPEED := 0.5
+const HEAD_TURN := 1.2
 var _head_start: Variant = null
 
-## Without a headset: W / S forward and back, A / D left and right, Q / E down and up, R back
-## where it started. Right-drag still looks around. Moves the hand with it, so the cursor stays on target.
+## Without a headset: W / S forward and back, A / D left and right, Q / E down and up; the
+## arrow keys look (left / right turn, up / down tilt); R puts everything back where it
+## started. (Right-drag looks too, but is hard on a trackpad.) The mouse hand moves with the
+## head, so the cursor stays on target.
 func _move_head(delta: float) -> void:
 	if App.xr != null or App.sim_input == null or App.rig == null:
 		return
@@ -504,25 +508,56 @@ func _move_head(delta: float) -> void:
 		_head_start = head.global_position
 	if Input.is_physical_key_pressed(KEY_R):
 		head.global_position = _head_start
+		_look(Vector3.ZERO)
 		_hand_to_cursor()
 		return
+	var turned := _turn_head(delta)
 	var forward := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
 	var right := forward.cross(Vector3.UP)
 	var step := Vector3.ZERO
 	step += forward * (float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S)))
 	step += right * (float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)))
 	step += Vector3.UP * (float(Input.is_physical_key_pressed(KEY_E)) - float(Input.is_physical_key_pressed(KEY_Q)))
-	if step == Vector3.ZERO:
-		return
-	head.global_position += step.normalized() * HEAD_SPEED * delta / maxf(Engine.time_scale, 0.05)
-	_hand_to_cursor()
+	if step != Vector3.ZERO:
+		head.global_position += step.normalized() * HEAD_SPEED * delta / maxf(Engine.time_scale, 0.05)
+	if step != Vector3.ZERO or turned:
+		_hand_to_cursor()
+
+
+## The arrow keys turn and tilt the head. True while one is down.
+func _turn_head(delta: float) -> bool:
+	var turn := float(Input.is_physical_key_pressed(KEY_LEFT)) - float(Input.is_physical_key_pressed(KEY_RIGHT))
+	var tilt := float(Input.is_physical_key_pressed(KEY_UP)) - float(Input.is_physical_key_pressed(KEY_DOWN))
+	if turn == 0.0 and tilt == 0.0:
+		return false
+	var amount := HEAD_TURN * delta / maxf(Engine.time_scale, 0.05)
+	var head := App.rig.head
+	_look(Vector3(clampf(head.rotation.x + tilt * amount, -1.3, 1.3), head.rotation.y + turn * amount, 0.0))
+	return true
+
+
+## Points the head ([param angles]: tilt, turn) and tells the mouse driver, so its own
+## right-drag carries on from here instead of jumping back.
+func _look(angles: Vector3) -> void:
+	App.rig.head.rotation = angles
+	var driver := _mouse_driver()
+	if driver != null:
+		driver.set("_pitch", angles.x)
+		driver.set("_yaw", angles.y)
+
+
+func _mouse_driver() -> DesktopDriver:
+	for sibling in get_parent().get_children():
+		if sibling is DesktopDriver:
+			return sibling as DesktopDriver
+	return null
 
 
 ## Puts the mouse hand back under the cursor (it stays where it was in the room when the head moves).
 func _hand_to_cursor() -> void:
-	for sibling in get_parent().get_children():
-		if sibling is DesktopDriver:
-			(sibling as DesktopDriver)._place_hand(get_viewport().get_mouse_position())
+	var driver := _mouse_driver()
+	if driver != null:
+		driver._place_hand(get_viewport().get_mouse_position())
 
 
 # --- Pressing -----------------------------------------------------------------

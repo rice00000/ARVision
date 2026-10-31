@@ -266,3 +266,30 @@ func test_on_desktop_the_head_moves_with_the_keys() -> void:
 	await frames(3)
 	_key(KEY_R, false)
 	expect(head.global_position.distance_to(start) < 0.01, "R puts it back")
+
+
+func test_on_desktop_the_arrow_keys_look_around() -> void:
+	await _boot_entry()
+	var head := App.rig.head
+	_key(KEY_LEFT, true)
+	await frames(30)
+	_key(KEY_LEFT, false)
+	expect(head.rotation.y > 0.3, "the left arrow turns the head left, got %s" % head.rotation.y)
+	var turned := head.rotation.y
+	await frames(10)
+	expect(is_equal_approx(head.rotation.y, turned), "and it stops when the key is let go")
+	_key(KEY_UP, true)
+	await frames(30)
+	_key(KEY_UP, false)
+	expect(head.rotation.x > 0.3, "the up arrow tilts it up, got %s" % head.rotation.x)
+	var before := head.global_position
+	_key(KEY_W, true)
+	await frames(30)
+	_key(KEY_W, false)
+	var ahead := Vector3.FORWARD.rotated(Vector3.UP, head.rotation.y)
+	var went := head.global_position - before
+	expect(went.length() > 0.1 and went.normalized().dot(ahead) > 0.95, "W then goes the way the head now faces")
+	_key(KEY_R, true)
+	await frames(3)
+	_key(KEY_R, false)
+	expect(absf(head.rotation.y) < 0.001 and absf(head.rotation.x) < 0.001, "R turns it back")
