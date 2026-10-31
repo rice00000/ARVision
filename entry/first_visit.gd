@@ -41,30 +41,10 @@ func run() -> void:
 		if App.session.trial is Node3D:
 			_shelf_spot = (App.session.trial as Node3D).global_position
 			break
-	# The shapes have just arrived beside the shelf. Onion notices them and floats closer, then
-	# explains the house brings things and placing them is its job, and invites the child
-	# (story chat's approved replacement, SCENE_ONE_CURRENT_BUILD_BRIEF.md). Picking a shape up is
-	# acceptance: from then on the remaining invitation lines are skipped, so nothing holds the
-	# child up; "It fits..." still comes at the first correct placement.
-	await get_tree().create_timer(0.9, false).timeout
-	var things := _shelf_spot + Vector3.DOWN * 0.25 if _shelf_spot != Vector3.INF else Vector3.INF
-	if _onion != null and things != Vector3.INF:
-		_onion.attend(things)
-		_onion.float_to(_onion.onion_position().lerp(Vector3(things.x, _onion.onion_position().y, things.z), 0.3), 1.0)
-	if not _started:
-		await say("Oh! I'd nearly forgotten about these.")
-	if not _started:
-		await say("They've come quite a long way.")
-	if _onion != null and things != Vector3.INF:
-		_onion.attend(_shelf_spot)   # looks across the shapes, then toward the shelf
-	if not _started:
-		await say("The house is very good at bringing things here.")
-	if not _started:
-		await say("But finding their place is usually my job.")
-	if _onion != null:
-		_onion.attend(null)   # turns toward the child
-	if not _started:
-		await say("You could join me, if you like.")
+	# The shapes and Onion's invitation came in the reveal; the shelf level starts with the rule.
+	# Picking a shape up is acceptance: the remaining lines are skipped, so nothing holds the child up;
+	# "It fits..." still comes at the first correct placement.
+	await get_tree().create_timer(0.6, false).timeout
 	if _onion != null and _shelf_spot != Vector3.INF:
 		_onion.attend(_shelf_spot)   # looks toward the shelf
 	if not _started:

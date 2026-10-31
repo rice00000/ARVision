@@ -565,7 +565,21 @@ func _reveal(fast := false) -> void:
 	_attend(null)
 	await say("Welcome to the workshop.")
 	if not fast:
-		await _wait(3.0)   # a quiet pause; the shapes arrive and Onion notices them in the first visit
+		await _wait(3.0)   # a quiet pause
+	# The shapes arrived with the shelf (the ripple showed them): Onion notices them and floats
+	# closer, explains, and invites the child (story chat's approved replacement; Megan: in the reveal).
+	var things := _shelf.global_position + Vector3.DOWN * 0.25 if _shelf != null else _ahead + App.head().global_position
+	_attend(things)
+	_actions.lean_to(_runner, 0.2, 0.8)
+	_move(_orb, _orb.global_position.lerp(Vector3(things.x, _orb.global_position.y, things.z), 0.3), 1.0)
+	await say("Oh! I'd nearly forgotten about these.")
+	await say("They've come quite a long way.")
+	_actions.lean_to(_runner, 0.0, 0.6)
+	_attend(_shelf)   # looks across the shapes, then toward the shelf
+	await say("The house is very good at bringing things here.")
+	await say("But finding their place is usually my job.")
+	_attend(null)   # turns toward the child
+	await say("You could join me, if you like.")
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
@@ -2543,20 +2557,8 @@ func _build_workshop() -> void:
 	var table_y := _box.global_position.y
 	var around := func(degrees: float, distance: float, height: float) -> Vector3:
 		return Vector3(eye.x, height, eye.z) + ahead.rotated(Vector3.UP, deg_to_rad(degrees)) * distance
-	# Beyond the circle: a soft doorway of light, ahead and to the right. Only to look at.
-	var door := Node3D.new()
-	var glow := _shape(QuadMesh.new(), Vector3(0.45, 0.8, 1.0), _material(Color(1.0, 0.85, 0.6, 0.35), true))
-	door.add_child(glow)
-	var beyond := OmniLight3D.new()
-	beyond.light_color = Color(1.0, 0.85, 0.6)
-	beyond.light_energy = 0.3
-	beyond.omni_range = 1.2
-	beyond.position = Vector3(0, 0, 0.3)
-	door.add_child(beyond)
-	_detail(door, around.call(-30.0, PLAY_RADIUS + 0.8, eye.y))
-	door.look_at(Vector3(eye.x, door.global_position.y, eye.z), Vector3.UP)
-	door.rotate_object_local(Vector3.UP, PI)   # its face to the child
-	print("ENTRY workshop: ", _details.size(), " details, the doorway ", _away(door.global_position), " m away")
+	# (The doorway of light was removed: Megan, Oct 31.)
+	print("ENTRY workshop: ", _details.size(), " details")
 
 
 ## Puts [param detail] at [param where], hidden until the ripple reaches it.
