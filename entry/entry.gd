@@ -561,7 +561,7 @@ func _reveal(fast := false) -> void:
 		_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
 	await _ripple()
 	_attend(null)   # turns toward the child
-	await _wait(0.6)   # ("I've been looking forward to showing you this." was cut: Megan)
+	await _wait(0.3)   # ("I've been looking forward to showing you this." was cut: Megan)
 	# Onion rises slightly, takes in the room, then drifts aside (story chat, approved replacement).
 	_attend(_ahead * 1.5 + App.head().global_position + Vector3.UP * 0.2)
 	await _move(_orb, _orb.global_position + Vector3.UP * 0.04, 0.8)
@@ -569,7 +569,7 @@ func _reveal(fast := false) -> void:
 	_attend(null)
 	await say("Welcome to the workshop.")
 	if not fast:
-		await _wait(3.0)   # a quiet pause
+		await _wait(1.0)   # a short quiet pause (was 3 s: Megan)
 	# The shapes arrived with the shelf (the ripple showed them): Onion notices them and floats
 	# closer, explains, and invites the child (story chat's approved replacement; Megan: in the reveal).
 	# (layout chat: toward the MIDDLE OF THE THINGS on the bench, as far as EntryLayout.invite_fraction says: 30%, or less
