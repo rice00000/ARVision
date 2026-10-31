@@ -22,13 +22,14 @@ func expect_eq(actual: Variant, expected: Variant, what: String) -> void:
 	expect(actual == expected, "%s: expected %s, got %s" % [what, expected, actual])
 
 
-## Starts main.tscn with [param plan] (none: the World's adventure). Neither
-## starts by itself: call App.session.run() or App.world.run().
+## Starts main.tscn with [param plan] (none: the World's adventure). None of
+## Session, World and Entry starts by itself: call App.session.run() or App.world.run().
 func boot(plan: SessionPlan = null) -> void:
 	app = load("res://main.tscn").instantiate()
 	var session: Session = app.get_node(^"Session")
 	session.autostart = false
 	(app.get_node(^"World") as World).autostart = false
+	(app.get_node(^"Entry") as Entry).autostart = false
 	if plan:
 		session.plan = plan
 	add_child(app)

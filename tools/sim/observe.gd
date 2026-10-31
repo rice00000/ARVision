@@ -96,10 +96,7 @@ static func levels() -> Dictionary:
 static func world() -> Dictionary:
 	var world := App.world
 	var guide: Node3D = world.get("_guide")
-	var cabinet: Cabinet = world.get("_cabinet")
-	var result := {done = world.done, colour = world.colour, treasures = world.treasures,
-		cabinet = {visible = cabinet.visible, position = cabinet.global_position} if cabinet else null,
-		place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
+	var result := {done = world.done, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
 		menu = null}
 	if world.menu and world.menu.is_inside_tree():
 		var buttons := []
@@ -115,7 +112,7 @@ static func world() -> Dictionary:
 static func stimuli() -> Dictionary:
 	var trial := App.session.trial
 	if trial == null:
-		return {targets = [], markers = [], cloud = null, named = ""}
+		return {targets = [], markers = [], cloud = null, named = "", layout = null}
 	var targets := []
 	var markers := []
 	for node: Node3D in trial.find_children("*", "Node3D", true, false):
@@ -127,7 +124,8 @@ static func stimuli() -> Dictionary:
 	if trial.condition:
 		named = String(trial.condition.value(&"target", trial.condition.value(&"object", "")))
 	var cloud: GPUParticles3D = trial.get_node_or_null(^"Cloud")
-	return {targets = targets, markers = markers, named = named, cloud = dots(cloud) if cloud else null}
+	return {targets = targets, markers = markers, named = named, cloud = dots(cloud) if cloud else null,
+		layout = trial.layout() if trial.has_method(&"layout") else null}
 
 
 static func target(node: Target) -> Dictionary:

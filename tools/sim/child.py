@@ -3,7 +3,7 @@
 The policy is a test driver, not a model of vision (see policy.py). A round can
 also follow a script of steps, for exact scenarios:
 
-    right, wrong, touch    answer (touch: reach for the named toy instead of pointing)
+    right, wrong, touch    answer (touch: reach for the named toy instead of pointing; tidy: one put)
     right:left             answer with the left hand
     invalid                a sweep too small to count (motion)
     help                   press B / Y
@@ -99,6 +99,11 @@ class Child:
         trial = observation["session"]["trial"]
         eye = observation["head"]["position"]
         view = observation["view"]
+        if kind == "tidy":
+            layout = observation["stimuli"]["layout"]
+            thing = self.next_thing(layout)
+            free = len(self.free_cells(layout))
+            return self.policy.tidy_odds(eye, thing, free, layout, trial["hint"])
         if kind == "find":
             target, others = self.toys(started, observation)
             if target is None:
@@ -129,6 +134,8 @@ class Child:
             return
         elif kind == "find":
             self.find(started, name, arg or "right")
+        elif kind == "tidy":
+            self.tidy(name, arg)
         elif kind.startswith("motion"):
             self.motion(started, name, arg or ("right" if started["condition"]["round"] % 2 == 0 else "left"))
         else:
@@ -160,6 +167,32 @@ class Child:
         self.actor.face(point)
         self.actor.point(side, point, look=False, aim=self.policy.aim_offset(observation["head"]["position"], point),
                          expect=toy["id"])
+
+    def tidy(self, name, side):
+        """One put: the thing on a fingertip, else the next one, to its own sticker (right) or another."""
+        layout = self.actor.observe()["stimuli"]["layout"]
+        thing = self.next_thing(layout)
+        cells = self.free_cells(layout)
+        cell = next(c for c in cells if c["key"] == thing["key"])
+        others = [c for c in cells if c is not cell]
+        if name == "wrong" and others:
+            cell = self.policy.rng.choice(others)
+        self.actor.wait(self.policy.perception.search * len(cells))
+        if thing["carried"]:
+            self.actor.put(thing["carried"], tuple(cell["position"]), layout["release_delay"])
+            return
+        side = side or ("left" if self.actor.body.local(tuple(thing["centre"]))[0] < 0 else "right")
+        self.actor.carry(side, tuple(thing["centre"]), thing["size"] * 0.7, tuple(cell["position"]), layout["release_delay"])
+
+    @staticmethod
+    def next_thing(layout):
+        """The thing on a fingertip, else the first still on the bench."""
+        things = [t for t in layout["things"] if not t["placed"]]
+        return next((t for t in things if t["carried"]), things[0])
+
+    @staticmethod
+    def free_cells(layout):
+        return [c for c in layout["cells"] if c["key"] and not c["filled"]]
 
     def toys(self, started, observation):
         """The named toy (None if the child did not hear or see which) and the others."""

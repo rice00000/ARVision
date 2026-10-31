@@ -4,7 +4,7 @@
     "darwin": {"name": "Samantha", "rate": 175},
     "kokoro": {"voice": "bf_isabella", "speed": 1.0, "model": "Kokoro-82M v1.0"}
   },
-  "lines": ["1", "2", "3"],
+  "lines": ["1", "2", "3", "4", "5"],
   "say_sources": ["core", "reality", "modules", "trials", "world", "entry"],
   "resource_roots": ["content"],
   "word_lists": ["trials/find/find_trial.gd:SHAPES", "trials/point_real/point_real_trial.gd:labels"],

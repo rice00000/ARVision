@@ -1,11 +1,16 @@
+class_name Entry
 extends Node3D
-## Entry scene: "Something Was Left Here" (story: claude/BUILD_STATE.md, story chat).
-## Plays before Wei's World, then starts it. Beats are written in this file.
+## Entry: "Something Was Left Here" (story: claude/BUILD_STATE.md, story chat).
+## A node in main.tscn before World: plays when there is no session plan, then
+## starts the World. Beats are written in this file.
 ## Every spoken line is a literal inside say("..."), so Wei's speech baker finds it
 ## (content/voice/speech.tts lists "entry" in say_sources).
 
 ## Seconds between lines.
 const PAUSE := 3.0
+## Play when the app starts without a session plan. Tests switch it off and call [method run].
+@export var autostart := true
+
 ## The cauldron (story chat's asset, CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
 const CAULDRON_WIDTH := 0.22
@@ -33,6 +38,7 @@ var _found: Array[Node3D] = []      # the objects that tumble out
 var _cabinet := Node3D.new()        # stand-in for the cabinet beside the chair
 var _seal := MeshInstance3D.new()   # the sealed patch on the wall behind
 var _beat_label := Label3D.new()    # DEBUG: which beat is playing, in view
+
 ## While > -1, the child is looking for the object with this index.
 var _wanted := -1
 ## DEBUG: show the beat in the headset and in Output.
@@ -47,19 +53,20 @@ signal _piece_picked(index: int)
 
 
 func _ready() -> void:
-	print("ENTRY 1: ready, pausing World")
-	# Wei's World starts by itself unless told to wait.
-	var world := get_node("../Main/World")
-	world.autostart = false
+	if autostart and App.session.plan == null:
+		print("ENTRY 1: ready, pausing World")
+		# Wei's World starts by itself unless told to wait (it is readied after this node).
+		(get_node(^"../World") as World).autostart = false
+		run.call_deferred()   # run the opening once everything is set up
+
+
+## Plays the opening, then starts the World.
+func run() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_target(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(target))
 	Events.help_requested.connect(_on_help)
 	# Onion moves while a line plays: about as long as the subtitle stays.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
-	_play.call_deferred()   # run the opening once everything is set up
-
-
-func _play() -> void:
 	# Wait until the headset has found the real table.
 	if not App.reality.is_settled:
 		await App.reality.settled
@@ -86,7 +93,7 @@ func _play() -> void:
 	await _lid_touched
 	await _open_lid()
 
-	# Beat 3: the room shows another identity, still faded.
+	# Beat 3: the room shows another identity.
 	_beat("3: the room reveals")
 	_reveal_room()
 	await say("There it is.")
@@ -114,12 +121,11 @@ func _play() -> void:
 	_wanted = -1
 	_orb_to(_box.global_position + Vector3.UP * (_rim + 0.15))
 
-	# Beat 6: a fragment inside; colour comes back to the cabinet; a mark on the seal.
+	# Beat 6: a fragment inside; it finds the cabinet; a mark on the seal.
 	_beat("6: the fragment")
 	var fragment := await _unfold(_found[1])
 	await say("Someone put that inside?")
 	await _fly(fragment, _cabinet.global_position + Vector3.UP * 0.12)
-	_tint(_cabinet, Color(0.85, 0.55, 0.25))
 	await say("It belongs here.")
 	_mark(_seal)
 	await say("And apparently... there.")
@@ -314,6 +320,7 @@ func _open_lid() -> void:
 	await rise.finished
 
 	var shapes: Array[Mesh] = [SphereMesh.new(), CylinderMesh.new(), PrismMesh.new()]
+	var colours := [Color(0.35, 0.65, 0.85), Color(0.85, 0.55, 0.25), Color(0.5, 0.75, 0.4)]
 	var spots := [Vector2(-0.35, 0.3), Vector2(0.0, 0.45), Vector2(0.35, 0.3)]   # around the box, toward the child
 	for i in shapes.size():
 		var piece := MeshInstance3D.new()
@@ -323,9 +330,9 @@ func _open_lid() -> void:
 		mesh.set("top_radius", 0.03)
 		mesh.set("bottom_radius", 0.03)
 		mesh.set("size", Vector3(0.07, 0.07, 0.07))
-		var grey := StandardMaterial3D.new()
-		grey.albedo_color = Color(0.6, 0.6, 0.6)   # faded: the colour has drained away
-		mesh.material = grey
+		var material := StandardMaterial3D.new()
+		material.albedo_color = colours[i]
+		mesh.material = material
 		piece.mesh = mesh
 		piece.add_child(Target.sphere(StringName("entry_piece_%d" % i), 0.08))
 		add_child(piece)
@@ -339,17 +346,17 @@ func _open_lid() -> void:
 
 
 ## Faint markings on the table, a cabinet beside the chair, a sealed patch on the
-## wall behind: all faded grey.
+## wall behind.
 func _reveal_room() -> void:
-	var grey := StandardMaterial3D.new()
-	grey.albedo_color = Color(0.7, 0.7, 0.7, 0.5)
-	grey.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var markings := StandardMaterial3D.new()
+	markings.albedo_color = Color(0.85, 0.65, 0.3, 0.5)
+	markings.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 	var ring := MeshInstance3D.new()   # markings around the box
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.2
 	torus.outer_radius = 0.22
-	torus.material = grey
+	torus.material = markings
 	ring.mesh = torus
 	_box.add_child(ring)
 	ring.position = Vector3.UP * 0.003
@@ -365,7 +372,7 @@ func _reveal_room() -> void:
 	var shelf_shape := BoxMesh.new()
 	shelf_shape.size = Vector3(0.3, 0.4, 0.15)
 	shelf_shape.material = StandardMaterial3D.new()
-	(shelf_shape.material as StandardMaterial3D).albedo_color = Color(0.55, 0.55, 0.55)
+	(shelf_shape.material as StandardMaterial3D).albedo_color = Color(0.85, 0.55, 0.25)
 	shelf.mesh = shelf_shape
 	_cabinet.add_child(shelf)
 	_cabinet.look_at(eye.origin, Vector3.UP)
@@ -373,7 +380,7 @@ func _reveal_room() -> void:
 	# The sealed patch: on the wall behind, where Wei's spell wall is.
 	var patch := QuadMesh.new()
 	patch.size = Vector2(0.5, 0.5)
-	patch.material = grey
+	patch.material = markings
 	_seal.mesh = patch
 	add_child(_seal)
 	_seal.global_position = App.world.position_of(App.world.adventure.places[1])
@@ -441,14 +448,6 @@ func _fly(thing: Node3D, where: Vector3) -> void:
 	var flight := create_tween()
 	flight.tween_property(thing, "global_position", where, 1.2).set_trans(Tween.TRANS_SINE)
 	await flight.finished
-
-
-## Colour comes back to [param node] (every mesh under it).
-func _tint(node: Node, colour: Color) -> void:
-	for child in node.find_children("*", "MeshInstance3D", true, false):
-		var paint := StandardMaterial3D.new()
-		paint.albedo_color = colour
-		(child as MeshInstance3D).material_override = paint
 
 
 ## The fragment's mark appears on the seal, glowing for a moment.

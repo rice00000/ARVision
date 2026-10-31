@@ -12,9 +12,6 @@ extends Resource
 @export var levels: Array[SessionPlan] = []
 @export var requires: Array[Task] = []
 
-## Steps of colour given back the first time the task is done.
-@export var colour := 0
-
 var id: StringName:
 	get:
 		return StringName(resource_path.get_file().get_basename())

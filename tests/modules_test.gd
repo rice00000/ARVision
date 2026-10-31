@@ -1,25 +1,21 @@
 extends TestCase
-## The optional story and data modules: Magic's sparkles and flying treasure, and the
-## Picks CSV.
+## The optional story and data modules: Magic's sparkles, and the Picks CSV.
 
 const FIND := preload("res://trials/find/find.tres")
 
 
-func test_a_right_pick_sparkles_and_a_new_treasure_flies_to_its_slot() -> void:
+func test_a_right_pick_and_a_level_done_sparkle() -> void:
 	await boot()
 	var magic := App.module(&"Magic")
 	Events.feedback.emit(&"good", Vector3(0.0, 0.8, -0.4))
 	Events.feedback.emit(&"bad", Vector3(0.0, 0.8, -0.4))
-	expect_eq(magic.find_children("Sparkles*", "CPUParticles3D", false, false).size(), 1, "sparkles for good only")
-	var slot := Vector3(-0.5, 1.0, -0.5)
-	Events.report(&"task_done", {task = &"find_toys", level = 1, colour = 1, treasure = {shape = "ring", colour = "ff8040"},
-		slot = slot, size = 0.05, arrive = 1.8})
-	var treasure := magic.find_child("Treasure", false, false) as Node3D
-	expect(treasure != null, "the treasure shows")
+	expect_eq(magic.find_children("*", "CPUParticles3D", false, false).size(), 1, "sparkles for good only")
+	Events.report(&"task_done", {task = &"tidy_shelf", level = 1, colour = 1})
+	var puffs := magic.find_children("*", "CPUParticles3D", false, false)
+	expect_eq(puffs.size(), 2, "a level done: a puff")
 	var eye := App.head().global_position
-	expect(treasure.global_position.y < eye.y and treasure.global_position.distance_to(eye) < 0.6, "below the eyes, in front")
-	await wait(1.75)
-	expect(treasure.global_position.distance_to(slot) < 0.02, "and lands in its slot")
+	var puff := puffs.back() as Node3D
+	expect(puff.global_position.y < eye.y and puff.global_position.distance_to(eye) < 0.6, "below the eyes, in front")
 	expect(await until(func() -> bool: return magic.get_child_count() == 0, 3.0), "it all goes by itself")
 
 

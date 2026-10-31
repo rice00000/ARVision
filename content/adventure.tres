@@ -4,15 +4,9 @@
 [ext_resource type="Script" path="res://world/place.gd" id="2_place"]
 [ext_resource type="Resource" path="res://content/places/table.tres" id="3_table"]
 [ext_resource type="Resource" path="res://content/places/behind.tres" id="8_behind"]
-[ext_resource type="Script" path="res://reality/view.gd" id="4_view"]
-[ext_resource type="Resource" path="res://content/views/black_white.tres" id="5_bw"]
-[ext_resource type="Resource" path="res://content/views/muted.tres" id="6_muted"]
-[ext_resource type="Resource" path="res://content/views/normal.tres" id="7_normal"]
 
 [resource]
 script = ExtResource("1_adventure")
-greeting = "Welcome, young alchemist! A grey spell has taken the colours from your workshop. Find treasures to bring them back."
-new_treasure = "You found a treasure! It goes in your cabinet."
+greeting = "Welcome, young alchemist! Your workshop needs tidying. Put each thing back where it belongs."
 level_done = "Well done, alchemist!"
 places = Array[ExtResource("2_place")]([ExtResource("3_table"), ExtResource("8_behind")])
-colours = Array[ExtResource("4_view")]([ExtResource("5_bw"), ExtResource("6_muted"), ExtResource("7_normal")])

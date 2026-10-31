@@ -1,7 +1,7 @@
 class_name Shapes
 extends RefCounted
-## The meshes of the toys (and treasures): ball, block, cone, drum, ring, egg,
-## and gem (a treasure no trial asks for). [param size] is the height, metres.
+## The meshes of the toys: ball, block, cone, drum, ring, egg and gem.
+## [param size] is the height, metres.
 
 
 static func mesh(shape: StringName, size: float) -> Mesh:

@@ -85,6 +85,24 @@ class Policy:
         ranked = sorted(others, key=lambda toy: distance(toy["centre"], target["centre"]))
         return ranked[0] if self.chance(0.6) else self.rng.choice(others)
 
+    # -- tidy up ----------------------------------------------------------------
+
+    def tidy_odds(self, eye, thing, free, layout, hint):
+        """Putting `thing` on its own sticker among `free` stickers left."""
+        p = self.perception
+        size = Body.angular_size(eye, thing["centre"], thing["size"])
+        odds = p.accuracy * logistic((size - p.acuity) / (0.25 * p.acuity))
+        odds *= (1.0 - p.clutter_cost) ** (free - 1)
+        if layout["outline"]:
+            odds *= 0.95  # only the edge to go by
+        if layout["match"] == 1:
+            odds *= 0.9  # sizes look alike from afar
+        if hint >= 1:
+            odds += (1.0 - odds) * 0.5  # its sticker wiggles
+        if hint >= 2:
+            odds += (1.0 - odds) * 0.8  # its cubby shines
+        return max(min(odds, 1.0), 1.0 / free)
+
     # -- read the flow -----------------------------------------------------------
 
     def motion_odds(self, coherence, plane, competing):

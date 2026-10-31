@@ -55,8 +55,10 @@ var side: StringName
 var aimed: Target
 
 @onready var _controller := get_parent() as XRController3D
-var _beam: MeshInstance3D
-var _distance := 0.0
+var _finger: Area3D
+var _marker: MeshInstance3D
+var _last_tip := Vector3.INF
+var _tip_moved := false
 ## Where the fingertip last moved to, and for how long it has stayed near it.
 var _rest_at := Vector3.INF
 var _rest_for := 0.0
@@ -85,10 +87,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_beam.visible = ray_on()
-	aimed = cast() if _beam.visible else null
-	_beam.scale.z = _distance
-	_beam.position.z = -_distance * 0.5
+	aimed = cast() if ray_on() else null
+	_marker.visible = App.xr == null and tracked()
 
 
 ## The ray points: while the facilitator panel is open, and in blocks that use it.
@@ -100,6 +100,11 @@ func ray_on() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	_finger.monitoring = tracked()
+	var fingertip := tip()
+	_tip_moved = _last_tip.is_finite() and not fingertip.is_equal_approx(_last_tip)
+	_last_tip = fingertip
+	_finger.global_position = fingertip
 	if tip().distance_to(_rest_at) > rest_radius:
 		_rest_at = tip()
 		_rest_for = 0.0
@@ -166,13 +171,27 @@ func cast() -> Target:
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	_distance = global_position.distance_to(hit.position) if hit else length
 	return hit.collider as Target if hit else null
 
 
 ## Where the fingertip is.
 func tip() -> Vector3:
+	var hand := App.rig.tracked_hand(side)
+	if hand.has_joints():
+		return hand.fingertip()
 	return global_position - global_basis.z * tip_reach
+
+
+## The pinch between thumb and index, oriented with the palm. Desktop uses its synthetic tip.
+func grip() -> Transform3D:
+	var hand := App.rig.tracked_hand(side)
+	if hand.has_joints():
+		return hand.pinch()
+	return Transform3D(global_basis, tip())
+
+
+func tracked() -> bool:
+	return App.rig.tracked_hand(side).has_joints() if App.xr != null else _controller.get_has_tracking_data()
 
 
 func _on_button(action: String, pressed: bool) -> void:
@@ -209,13 +228,6 @@ func _build() -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.albedo_color = Color(1.0, 1.0, 1.0, 0.45)
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.003, 0.003, 1.0)
-	mesh.material = material
-	_beam = MeshInstance3D.new()
-	_beam.mesh = mesh
-	_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_beam)
 	var finger := Area3D.new()
 	finger.name = "Tip"
 	finger.position = Vector3(0, 0, -tip_reach)
@@ -231,7 +243,9 @@ func _build() -> void:
 	(ball.mesh as SphereMesh).height = 0.024
 	(ball.mesh as SphereMesh).material = material
 	finger.add_child(ball)
+	_finger = finger
+	_marker = ball
 	finger.area_entered.connect(func(area: Area3D) -> void:
-		if area is Target and not resting():
+		if area is Target and _tip_moved and not resting():
 			Events.touched.emit(side, area))
 	add_child(finger)

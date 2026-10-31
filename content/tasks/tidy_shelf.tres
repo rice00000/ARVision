@@ -1,0 +1,94 @@
+[gd_resource type="Resource" script_class="Task" format=3]
+
+[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="4_tidy"]
+
+[sub_resource type="Resource" id="tidy_1"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.0
+intro = "Your things fell off the shelf! Each cubby shows the shadow of what goes in it. Pinch a thing, carry it to its shadow, then let go. Raise your hand if you need help."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_1"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 1"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_1")])
+
+[sub_resource type="Resource" id="tidy_2"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 1.0
+intro = "Everything fell down this time, and some things look alike. Look closely at each shadow!"
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_2"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 2"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_2")])
+
+[sub_resource type="Resource" id="tidy_3"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.67
+pins = Dictionary[StringName, float]({&"outline": 1.0})
+intro = "Now the stickers show only the edges. Find the outline that fits!"
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_3"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 3"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_3")])
+
+[sub_resource type="Resource" id="tidy_4"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.34
+pins = Dictionary[StringName, float]({&"match": 1.0})
+intro = "These are all the same shape, in different sizes. Big ones go on big shadows, small ones on small shadows."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_4"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 4"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_4")])
+
+[sub_resource type="Resource" id="tidy_5"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.67
+pins = Dictionary[StringName, float]({&"match": 2.0})
+intro = "These all have one shape. Put each one on its own colour!"
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_5"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 5"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_5")])
+
+[resource]
+script = ExtResource("1_task")
+title = "Tidy the shelf"
+levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2"), SubResource("level_3"), SubResource("level_4"), SubResource("level_5")])

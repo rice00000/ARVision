@@ -1,10 +1,10 @@
-[gd_resource type="Resource" script_class="Task" format=3 uid="uid://btk3fl3p5gbax"]
+[gd_resource type="Resource" script_class="Task" format=3]
 
-[ext_resource type="Script" uid="uid://btq5nanphne2n" path="res://world/task.gd" id="1_task"]
-[ext_resource type="Script" uid="uid://c2uh7fjvtafom" path="res://trials/session_plan.gd" id="2_plan"]
-[ext_resource type="Script" uid="uid://b0nl06crubwd" path="res://trials/block.gd" id="3_block"]
-[ext_resource type="Resource" uid="uid://d3v1c8xgcattc" path="res://trials/motion/motion_demo.tres" id="4_motion"]
-[ext_resource type="Resource" uid="uid://i7vh6colt4u1" path="res://content/tasks/find_toys.tres" id="5_find_toys"]
+[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" path="res://trials/motion/motion_demo.tres" id="4_motion"]
+[ext_resource type="Resource" path="res://content/tasks/tidy_shelf.tres" id="5_tidy_shelf"]
 
 [sub_resource type="Resource" id="wall_1"]
 script = ExtResource("3_block")
@@ -42,5 +42,4 @@ blocks = Array[ExtResource("3_block")]([SubResource("wall_2")])
 script = ExtResource("1_task")
 title = "Break the spell wall"
 levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2")])
-requires = Array[ExtResource("1_task")]([ExtResource("5_find_toys")])
-colour = 1
+requires = Array[ExtResource("1_task")]([ExtResource("5_tidy_shelf")])

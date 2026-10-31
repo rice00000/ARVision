@@ -140,6 +140,33 @@ class Actor:
         self.wait(0.15)
         self.move_hand(side, ready, at=point)
 
+    def carry(self, side, point, radius, to, release_delay):
+        """Tidy up: comes down onto the thing at `point` from above (passing over the others), so it
+        pinches it, takes it to `to` (where it hangs on a sticker), then lets go."""
+        above = add(point, (0.0, radius + 0.06, 0.0))
+        self.face(point)
+        self.body.check_view(self.observe()["head"], point)
+        self.move_hand(side, self.lifted(side), at=point)
+        self.move_hand(side, add(above, (0.0, TIP_REACH, 0.0)), at=point)
+        self.move_hand(side, add(point, (0.0, TIP_REACH, 0.0)), at=add(point, (0.0, -1.0, 0.0)))
+        self.sim.button(side, "trigger_click", True)
+        self.put(side, to, release_delay)
+
+    def put(self, side, to, release_delay):
+        """Brings the pinched thing to `to`, releases, then lifts the hand clear."""
+        lifted = self.lifted(side)
+        self.face(to)
+        self.body.check_view(self.observe()["head"], to)
+        along = unit(sub(to, lifted))
+        self.move_hand(side, sub(to, mul(along, TIP_REACH)), at=add(to, along))
+        self.sim.button(side, "trigger_click", False)
+        self.wait(release_delay + 0.2)
+        self.move_hand(side, lifted, at=to)
+
+    def lifted(self, side):
+        """The ready pose raised clear of things on a bench as high as a tall table."""
+        return add(self.body.ready(side), (0.0, 0.12, 0.0))
+
     def sweep(self, side, direction, length=0.25, seconds=0.35):
         """Sweeps the hand `length` metres along `direction` (world) in `seconds`, then holds
         still: the right way is judged as the hand goes, a wrong way once it has stopped. The hand

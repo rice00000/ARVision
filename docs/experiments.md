@@ -5,6 +5,7 @@ What the team is likely to try (design doc, team sketch) and what the framework 
 | Experiment | Skill / layer | Built from | Status |
 |---|---|---|---|
 | **Find it** on the real table: name a toy among virtual clutter | objects in clutter, perception | `trials/find`, `work_surface()` | ready |
+| **Tidy up:** put each thing back on its shadow, outline, size or colour sticker | shape matching, vision for action | `trials/tidy` ([tidy up](tidy.md)) | ready (sim); headset unverified |
 | **Real objects:** point at the real cup the camera sees | recognition, real world | `trials/point_real`, Detector | ready (sim); Quest camera unverified |
 | **Global motion (RDK in 3D):** sweep in the dots' direction | motion perception | `trials/motion` (Megan's trial) | ready (sim); headset unverified |
 | **Passthrough filter A/B:** same trial under normal vs high contrast / greyscale / B&W / edges | visual function, contrast | `Block.view`, `content/views/` | ready |

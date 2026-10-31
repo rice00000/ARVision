@@ -100,6 +100,21 @@ func test_a_resting_fingertip_touches_nothing() -> void:
 	expect_eq(touched.size(), 1, "reaching in touches it")
 
 
+func test_a_new_target_under_a_hand_that_just_stopped_is_not_touched() -> void:
+	await boot(plan_of(FIND, 1))
+	var touched := record(Events.touched)
+	var pointer := App.rig.pointer(&"right")
+	var spot := Vector3(0.3, 0.9, -0.5)
+	input.point(&"right", spot + Vector3(0, 0, pointer.tip_reach), spot)
+	await frames(3)
+	expect(not pointer.resting(), "it has only just stopped")
+	var target := Target.sphere(&"probe", 0.05)
+	app.add_child(target)
+	target.global_position = spot
+	await frames(3)
+	expect(touched.is_empty(), "a new toy is not a reach, even before the rest timer elapses")
+
+
 func test_pinches_raised_hands_the_menu_pinch_and_tracking_become_events() -> void:
 	await boot(plan_of(FIND, 1))
 	var buttons := record(Events.button)

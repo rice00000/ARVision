@@ -1,9 +1,8 @@
 extends TestCase
 ## The World: the guide points the way, facing the table unfolds its task menu,
-## locked levels stay locked, done tasks give back colour and stones, and all of
-## it is saved.
+## locked levels stay locked, the room stays in colour, and progress is saved.
 
-const FIND := preload("res://content/tasks/find_toys.tres")
+const TIDY := preload("res://content/tasks/tidy_shelf.tres")
 const WALL := preload("res://content/tasks/break_wall.tres")
 
 
@@ -23,44 +22,33 @@ func _button(id: String) -> Target:
 func test_levels_and_tasks_unlock_in_order() -> void:
 	await boot()
 	var world := App.world
-	expect(world.can_play(FIND, 0), "the first task's level 1 is open")
-	expect(not world.can_play(FIND, 1), "level 2 waits for level 1")
-	expect(not world.can_play(WALL, 0), "the wall waits for the toys")
-	await world._complete(FIND, 0)
-	expect(world.can_play(FIND, 1), "level 2 opens")
+	expect(world.can_play(TIDY, 0), "the first task's level 1 is open")
+	expect(not world.can_play(TIDY, 1), "level 2 waits for level 1")
+	expect(not world.can_play(WALL, 0), "the wall waits for the shelf")
+	await world._complete(TIDY, 0)
+	expect(world.can_play(TIDY, 1), "level 2 opens")
 	expect(world.can_play(WALL, 0), "the wall opens")
 	expect(not world.can_play(WALL, 1), "but not its level 2")
 
 
-func test_colour_comes_back_the_first_time_each_task_is_done() -> void:
+func test_the_room_stays_in_normal_colour_before_and_after_tasks() -> void:
 	await boot()
 	var world := App.world
-	var said := record(Events.said)
-	world._show_colour()
-	expect_eq(App.reality.view.title, "Black and white", "the room starts in black and white")
-	await world._complete(FIND, 0)
-	expect_eq(world.colour, 1, "a step of colour")
-	expect_eq(App.reality.view.title, "A little colour", "the room shows it")
-	expect_eq(App.session.base_view.title, "A little colour", "and the next task plays in it")
-	expect(said.back()[0].contains("Colour is coming back"), "the guide says so: %s" % said.back()[0])
-	await world._complete(FIND, 1)
-	expect_eq(world.colour, 1, "another level of the same task: no more colour")
-	await world._complete(WALL, 0)
-	expect_eq(world.colour, 2, "the second task brings full colour")
-	expect_eq(App.reality.view.title, "Normal", "full colour")
-	expect(said.back()[0].contains("all its colours"), "and the guide says so: %s" % said.back()[0])
+	expect_eq(App.reality.view.title, "Normal", "the room starts in normal colour")
+	for completed in [[TIDY, 0], [TIDY, 1], [WALL, 0]]:
+		await world._complete(completed[0], completed[1])
+		expect(not App.reality.view.is_graded() and not App.reality.view.black_and_white, "completing a task never changes the room's colour")
+		expect_eq(App.session.base_view.title, "Normal", "the next task also plays in normal colour")
 
 
 func test_progress_is_saved_and_read_back() -> void:
 	await boot()
-	await App.world._complete(FIND, 0)
+	await App.world._complete(TIDY, 0)
 	App.world.done = {}
-	App.world.colour = 0
 	Save.reload()
-	expect_eq(App.world.done, {&"find_toys": [0]}, "levels done")
-	expect_eq(App.world.colour, 1, "colour")
+	expect_eq(App.world.done, {&"tidy_shelf": [0]}, "levels done")
 	Profile.wipe()
-	expect_eq([App.world.done, App.world.colour], [{}, 0], "a wiped profile starts fresh")
+	expect_eq(App.world.done, {}, "a wiped profile starts fresh")
 
 
 func test_turning_to_the_table_unfolds_its_menu() -> void:
@@ -87,7 +75,7 @@ func test_turning_to_the_table_unfolds_its_menu() -> void:
 	expect(reports.any(func(args: Array) -> bool: return args[0] == &"place_entered"), "logged")
 	var menu := App.world.menu
 	expect(menu.global_position.distance_to(App.head().global_position) < 0.5, "within reach")
-	expect_eq(menu.find_children("task_*", "Target", false, false).size(), FIND.levels.size(), "the table's one task, every level")
+	expect_eq(menu.find_children("task_*", "Target", false, false).size(), TIDY.levels.size(), "the table's one task, every level")
 
 
 func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
@@ -96,20 +84,35 @@ func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
 	var started := record(Events.trial_started)
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "facing the table: the menu")
-	await select(_button("task_find_toys_2").global_position)
+	await select(_button("task_tidy_shelf_2").global_position)
 	expect(said.back()[0].contains("still locked"), "level 2 before level 1: %s" % said.back()[0])
 	expect(App.world.menu != null and not App.session.running, "nothing starts")
-	await select(_button("task_find_toys_1").global_position)
+	await select(_button("task_tidy_shelf_1").global_position)
 	expect(await until(func() -> bool: return started.size() == 1, 15.0), "the task plays")
-	expect_eq(App.session.plan, FIND.levels[0], "level 1's plan")
-	expect(is_equal_approx(App.session.level(), FIND.levels[0].blocks[0].difficulty), "at level 1's difficulty")
+	expect_eq(App.session.plan, TIDY.levels[0], "level 1's plan")
+	expect(is_equal_approx(App.session.level(), TIDY.levels[0].blocks[0].difficulty), "at level 1's difficulty")
 	expect(App.world.menu == null, "the menu folded away")
-	expect_eq(started[0][1].view.title, "Black and white", "still in black and white")
+	expect_eq(started[0][1].view.title, "Normal", "played in normal colour")
+
+
+func test_a_fingertip_near_a_button_hears_what_it_is() -> void:
+	await boot()
+	var said := record(Events.said)
+	App.world.run()
+	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "facing the table: the menu")
+	for case in [["task_tidy_shelf_1", "Level 1. A new one!"], ["task_tidy_shelf_2", "Level 2. Still locked."]]:
+		var button := _button(case[0])
+		var front := button.global_basis.z
+		input.point(&"right", button.global_position + front * (0.05 + 0.04), button.global_position) # fingertip 4 cm out
+		await frames(3)
+		expect_eq(said.back()[0], case[1], "read out")
+		expect((button.get_node(^"Look") as Node3D).position.z > 0.0, "lifted toward the hand")
+	expect(App.world.menu != null and not App.session.running, "hovering chooses nothing")
 
 
 func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	await boot()
-	App.world.done = {&"find_toys": [0]}
+	App.world.done = {&"tidy_shelf": [0]}
 	var said := record(Events.said)
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "the table's menu")
@@ -129,30 +132,7 @@ func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	var at_wall := func() -> bool: return App.world.place == behind and App.world.menu != null and App.world.menu.get("_open")
 	expect(await until(at_wall, 5.0), "turned around: the wall's menu")
 	expect(not guide.visible, "the guide's job is done")
-	expect(_button("task_break_wall_1") != null and _button("task_find_toys_1") == null, "the wall's list only")
+	expect(_button("task_break_wall_1") != null and _button("task_tidy_shelf_1") == null, "the wall's list only")
 	await select(_button("task_break_wall_1").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")
 	expect_eq(App.session.plan, WALL.levels[0], "level 1's plan")
-
-
-func test_a_level_done_the_first_time_puts_what_was_found_in_the_cabinet() -> void:
-	await boot()
-	var world := App.world
-	var reports := record(Events.reported)
-	world._found = {shape = "cone", colour = "3366ff"}
-	await world._complete(FIND, 0)
-	expect_eq(world.treasures, {"find_toys:0": {shape = "cone", colour = "3366ff"}}, "what was found")
-	var done: Dictionary = reports.filter(func(args: Array) -> bool: return args[0] == &"task_done").back()[1]
-	expect(done.slot.is_equal_approx(world.cabinet().slot_position(FIND, 0)), "Magic is told where it goes")
-	await wait(Cabinet.ARRIVE + 0.1)
-	var slot := world.cabinet().find_child("find_toys_1", true, false)
-	expect_eq(slot.get_child(0).name, "Treasure", "it shows once it has arrived")
-	world._found = {shape = "ball", colour = "ff0000"}
-	await world._complete(FIND, 0)
-	expect_eq(world.treasures["find_toys:0"].shape, "cone", "done again: the first treasure stays")
-	world._found = {}
-	await world._complete(WALL, 0)
-	expect_eq(world.treasures["break_wall:0"].shape, "gem", "nothing to find: a gem")
-	world.treasures = {}
-	Save.reload()
-	expect_eq(world.treasures.size(), 2, "saved")
