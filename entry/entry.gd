@@ -357,6 +357,8 @@ func _hello(fast := false) -> void:
 func _touch() -> void:
 	_beat("2: tap the cauldron")
 	_tap_open = true
+	if _rattle_amp < 0.006:
+		_rattle(0.006)   # (a jump straight here) the faint rattle goes on until the tap
 	if not _tapped:
 		_cue = true   # the cauldron glows slowly
 		_tap_cycle()   # the hand shows the tap twice, then rests; the interval and one slow straighten
@@ -383,7 +385,7 @@ func _touch() -> void:
 	_attend(null)
 
 
-## The tap demonstration twice, a quiet interval, and (after 10 s of nothing) one slow straighten
+## The tap demonstration once, a quiet interval, and (after 10 s of nothing) one slow straighten
 ## toward the child, then it starts again. Runs until the cauldron has been tapped or the part ends.
 func _tap_cycle() -> void:
 	var runner := _runner
@@ -391,12 +393,13 @@ func _tap_cycle() -> void:
 	var straightened := false
 	while not _tapped and runner == _runner and is_instance_valid(runner):
 		_demo.tap(_rim_point())
-		await runner.wait(6.0)   # two loops of the hand
+		await runner.wait(3.0)   # one tap (one loop of the hand)
 		if _tapped or runner != _runner or not is_instance_valid(runner):
 			break
 		_demo.stop()
+		_sounds.play(&"rattle_soft", _box.global_position)   # the faint rattle goes on until the tap
 		await runner.wait(4.0)   # a quiet interval
-		waited += 10.0
+		waited += 7.0
 		if not straightened and not _tapped and runner == _runner and is_instance_valid(runner):
 			straightened = true
 			_attend(null)
@@ -415,7 +418,7 @@ func _later(seconds: float, what: Callable) -> void:
 ## Beside the mouth, on the side away from the demonstration hand's body.
 func _beside_mouth() -> Vector3:
 	var side := _toward_child().rotated(Vector3.UP, -0.85)
-	return _peek_spot() + side * 0.07
+	return _peek_spot() + side * 0.13 + Vector3.UP * 0.04   # up and to the side: clear of the cauldron
 
 
 ## 3. Onion clears the opening; a heavier rattle; the gear pops up, Onion hops back with a "!"
@@ -1557,8 +1560,8 @@ func _build_cauldron(spot: Vector3) -> void:
 	_mouth_radius = CAULDRON_WIDTH * 0.25 if brew.size == Vector3.ZERO else minf(brew.size.x, brew.size.z) * 0.5
 	print("ENTRY cauldron: rim ", snappedf(_rim, 0.001), " m, opening radius ", snappedf(_mouth_radius, 0.001),
 			" m, ", snappedf(spot.y + _rim - _mouth.y, 0.001), " m below the rim")
-	var target := Target.sphere(&"entry_cauldron", CAULDRON_WIDTH * 0.6)
-	target.position = Vector3.UP * _rim * 0.5
+	var target := Target.sphere(&"entry_cauldron", CAULDRON_WIDTH * 0.75)   # forgiving: the whole pot and a margin
+	target.position = Vector3.UP * _rim * 0.6
 	_box.add_child(target)
 	_cauldron_target = target
 
