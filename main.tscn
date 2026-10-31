@@ -7,9 +7,6 @@
 [ext_resource type="Script" path="res://modules/feedback/feedback.gd" id="5_feedback"]
 [ext_resource type="Script" path="res://modules/cv/detector.gd" id="6_detector"]
 [ext_resource type="Script" path="res://modules/facilitator/facilitator.gd" id="7_facilitator"]
-[ext_resource type="Script" path="res://trials/session.gd" id="8_session"]
-[ext_resource type="Script" path="res://world/world.gd" id="9_world"]
-[ext_resource type="Resource" path="res://content/adventure.tres" id="18_adventure"]
 [ext_resource type="Resource" path="res://content/views/normal.tres" id="10_normal"]
 [ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="11_contrast"]
 [ext_resource type="Resource" path="res://content/views/greyscale.tres" id="12_grey"]
@@ -20,7 +17,6 @@
 [ext_resource type="Script" path="res://reality/view.gd" id="17_view"]
 [ext_resource type="Script" path="res://modules/magic/magic.gd" id="19_magic"]
 [ext_resource type="Script" path="res://modules/picks/picks.gd" id="20_picks"]
-[ext_resource type="Script" path="res://entry/entry.gd" id="21_entry"]
 
 [sub_resource type="Environment" id="environment"]
 background_mode = 1
@@ -65,13 +61,3 @@ script = ExtResource("19_magic")
 
 [node name="Picks" type="Node" parent="Modules"]
 script = ExtResource("20_picks")
-
-[node name="Session" type="Node" parent="."]
-script = ExtResource("8_session")
-
-[node name="Entry" type="Node3D" parent="."]
-script = ExtResource("21_entry")
-
-[node name="World" type="Node" parent="."]
-script = ExtResource("9_world")
-adventure = ExtResource("18_adventure")

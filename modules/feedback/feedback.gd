@@ -15,6 +15,9 @@ func _ready() -> void:
 	for kind: StringName in NOTES:
 		_sounds[kind] = _chime(NOTES[kind])
 	Events.feedback.connect(_on_feedback)
+	Events.scene_changing.connect(func() -> void:
+		for node in get_children():
+			node.free())
 
 
 func _on_feedback(kind: StringName, at: Vector3) -> void:

@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://trials/session.gd" id="1_session"]
+[ext_resource type="Script" path="res://world/world.gd" id="2_world"]
+[ext_resource type="Resource" path="res://content/adventure.tres" id="3_adventure"]
+
+[node name="FindTheObject" type="Node3D"]
+
+[node name="Session" type="Node" parent="."]
+script = ExtResource("1_session")
+
+[node name="World" type="Node" parent="."]
+script = ExtResource("2_world")
+adventure = ExtResource("3_adventure")

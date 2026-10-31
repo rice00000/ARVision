@@ -1,6 +1,6 @@
 class_name World
 extends Node
-## Plays the [Adventure] when the Session has no plan.
+## Plays the active scene's [Adventure]. Main owns when it starts and stops.
 ## Each [Place] has its own list of tasks. The guide points the way to
 ## the first place ("this way"); once the child turns to face it, its
 ## [TaskMenu] unfolds there. The chosen task plays at the chosen level, then
@@ -19,8 +19,6 @@ const FACING_SECONDS := 0.5
 const BEHIND := 1.5
 
 @export var adventure: Adventure
-## Start once the app is up, when the Session has no plan. Tests switch it off and call [method run].
-@export var autostart := true
 
 var save_key := "world"
 ## Task id -> the levels done (0 = level 1).
@@ -44,8 +42,6 @@ signal _picked(result: Array)
 func _ready() -> void:
 	App.world = self
 	add_child(_guide)
-	if autostart and App.session.plan == null:
-		run.call_deferred()
 
 
 func save_state() -> Dictionary:

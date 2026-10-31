@@ -1,15 +1,13 @@
 class_name Entry
 extends Node3D
 ## Entry: "Something Was Left Here" (story: claude/BUILD_STATE.md, story chat).
-## A node in main.tscn before World: plays when there is no session plan, then
-## starts the World. Beats are written in this file.
+## The Intro scene: finishes by switching to Find the object.
+## Beats are written in this file.
 ## Every spoken line is a literal inside say("..."), so Wei's speech baker finds it
 ## (content/voice/speech.tts lists "entry" in say_sources).
 
 ## Seconds between lines.
 const PAUSE := 3.0
-## Play when the app starts without a session plan. Tests switch it off and call [method run].
-@export var autostart := true
 
 ## The cauldron (story chat's asset, CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
@@ -48,15 +46,14 @@ signal _begin_chosen
 signal _piece_picked(index: int)
 
 
-func _ready() -> void:
-	if autostart and App.session.plan == null:
-		print("ENTRY 1: ready, pausing World")
-		# Wei's World starts by itself unless told to wait (it is readied after this node).
-		(get_node(^"../World") as World).autostart = false
-		run.call_deferred()   # run the opening once everything is set up
+func _exit_tree() -> void:
+	_beat_label.free() # attached to the persistent head, but owned by this opening
+	for node in [_orb, _box, _music, _cabinet, _seal]:
+		if is_instance_valid(node) and node.get_parent() == null:
+			node.free()
 
 
-## Plays the opening, then starts the World.
+## Plays the opening, then switches scenes when the child chooses to begin.
 func run() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_target(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(target))
@@ -73,11 +70,11 @@ func run() -> void:
 
 	# Beat 1: a small invitation. The orb (stand-in for Onion) peeks over the rim, ducks, peeks again.
 	_beat("1: the orb peeks out")
-	await get_tree().create_timer(2.0).timeout   # nothing rushes the child
+	await get_tree().create_timer(2.0, false).timeout   # nothing rushes the child
 	await _peek()
 	await say("Oh. You can see me?")
 	await _duck()
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(1.0, false).timeout
 	await _peek()
 	await say("Good. I've been making rather a lot of noise.")
 
@@ -134,17 +131,17 @@ func run() -> void:
 	await _begin_chosen
 	begin_button.queue_free()
 	_beat("done: Wei's World")
-	App.world.run()
+	App.main.change_scene.call_deferred(&"find_object")
 
 
 ## Speaks [param text] (baked audio + subtitle) and waits a moment.
 func say(text: String) -> void:
 	Events.say(text)
-	await get_tree().create_timer(PAUSE).timeout
+	await get_tree().create_timer(PAUSE, false).timeout
 
 
 func _on_target(target: Target) -> void:
-	if target == null:
+	if target == null or get_tree().paused:
 		return
 	if DEBUG:
 		print("ENTRY touched/picked: ", target.id)
@@ -159,7 +156,7 @@ func _on_target(target: Target) -> void:
 ## Help (hand raised): the orb floats over the wanted object. Logged by Wei's
 ## modules as help, like in his trials.
 func _on_help() -> void:
-	if _wanted >= 0:
+	if _wanted >= 0 and not get_tree().paused:
 		_orb_to(_found[_wanted].global_position + Vector3.UP * 0.12)
 		Events.say("This one.")
 
@@ -272,8 +269,8 @@ func _open_lid() -> void:
 		var land := _table.point(spots[i].x, spots[i].y) + Vector3.UP * 0.035
 		var fall := create_tween()
 		fall.tween_property(piece, "global_position", land, 0.6).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
-		await get_tree().create_timer(0.25).timeout
-	await get_tree().create_timer(0.6).timeout
+		await get_tree().create_timer(0.25, false).timeout
+	await get_tree().create_timer(0.6, false).timeout
 
 
 ## Faint markings on the table, a cabinet beside the chair, a sealed patch on the
@@ -314,7 +311,8 @@ func _reveal_room() -> void:
 	patch.material = markings
 	_seal.mesh = patch
 	add_child(_seal)
-	_seal.global_position = App.world.position_of(App.world.adventure.places[1])
+	var table := _table.transform.origin
+	_seal.global_position = eye.origin + Vector3(eye.origin.x - table.x, 0, eye.origin.z - table.z).normalized() * 1.5
 	_seal.look_at(eye.origin, Vector3.UP)
 	_seal.rotate_object_local(Vector3.UP, PI)   # face the child
 

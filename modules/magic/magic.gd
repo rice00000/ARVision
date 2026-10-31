@@ -12,6 +12,9 @@ const BELOW := 0.25
 
 
 func _ready() -> void:
+	Events.scene_changing.connect(func() -> void:
+		for node in get_children():
+			node.free())
 	Events.feedback.connect(func(kind: StringName, at: Vector3) -> void:
 		if kind == &"good":
 			sparkle(at, GOLD, 24))

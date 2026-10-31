@@ -55,9 +55,9 @@ func _ready() -> void:
 	_trace = FileAccess.open(_out.path_join("trace.jsonl"), FileAccess.WRITE)
 	_listen_to_events()
 	_main = load("res://main.tscn").instantiate()
-	_main.get_node(^"Entry").autostart = args.has("entry") # the opening, only when asked
+	_main.initial_scene = "intro" if args.has("entry") else "find_object"
 	if args.has("plan-spec"):
-		_main.get_node(^"Session").plan = _plan(JSON.parse_string(FileAccess.get_file_as_string(args["plan-spec"])))
+		_main.plan = _plan(JSON.parse_string(FileAccess.get_file_as_string(args["plan-spec"])))
 	for module_name in String(args.get("unplug", "")).split(",", false):
 		_main.get_node("Modules/" + module_name).free() # what deleting the node from main.tscn does
 	if args.has("seat"):

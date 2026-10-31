@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="Adventure" format=3]
+
+[ext_resource type="Script" path="res://world/adventure.gd" id="1_adventure"]
+[ext_resource type="Script" path="res://world/place.gd" id="2_place"]
+[ext_resource type="Resource" path="res://content/places/motion.tres" id="3_motion"]
+
+[resource]
+script = ExtResource("1_adventure")
+greeting = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
+level_done = "Well done, alchemist!"
+places = Array[ExtResource("2_place")]([ExtResource("3_motion")])

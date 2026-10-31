@@ -13,6 +13,7 @@ extends Node3D
 ## it, so pointing works the same over passthrough and in the simulated room.
 
 const TARGET_LAYER := 1
+const MENU_LAYER := 4
 ## How close the fingertip must be to a Target to grab it, metres.
 const GRAB_RADIUS := 0.07
 ## A hand rising or falling more steeply than this (the sine of 50 degrees) is not sweeping.
@@ -87,6 +88,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_finger.collision_mask = _input_layer()
 	aimed = cast() if ray_on() else null
 	_marker.visible = App.xr == null and tracked()
 
@@ -167,11 +169,17 @@ func resting() -> bool:
 ## The Target under the ray, or null.
 func cast() -> Target:
 	var query := PhysicsRayQueryParameters3D.create(global_position,
-		global_position - global_basis.z * length, TARGET_LAYER)
+		global_position - global_basis.z * length, _input_layer())
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	return hit.collider as Target if hit else null
+
+
+## The open panel owns input, even when a game target sits in front of it.
+func _input_layer() -> int:
+	var panel := App.module(&"Facilitator")
+	return MENU_LAYER if panel and panel.is_open else TARGET_LAYER
 
 
 ## Where the fingertip is.
@@ -211,7 +219,7 @@ func _grab() -> void:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = ball
 	query.transform = Transform3D(Basis.IDENTITY, tip())
-	query.collision_mask = TARGET_LAYER
+	query.collision_mask = _input_layer()
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var near: Target

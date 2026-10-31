@@ -5,22 +5,29 @@ extends Node3D
 ## `-- --sim` is given. Without XR it creates the synthetic hands (SimInput)
 ## and lets the mouse drive them (DesktopDriver).
 ##
-## The game in play is the Session, the World and what they put on the stage;
-## [method restart] builds it again (another save was opened). The room, the
-## rig and the modules stay.
+## One activity scene at a time; the room, rig and modules stay across switches.
+
+const SCENES := {
+	&"intro": {title = "Intro", path = "res://scenes/intro.tscn"},
+	&"find_object": {title = "Find the object", path = "res://scenes/find_object.tscn"},
+	&"global_motion": {title = "Global motion", path = "res://scenes/global_motion.tscn"},
+}
 
 @export var sim_room: PackedScene
+@export_enum("intro", "find_object", "global_motion") var initial_scene: String = "intro"
+@export var plan: SessionPlan
+@export var autostart := true
 
-## Session and World as they were set up, before they ran: what a fresh game is made from.
-var _fresh: Array[PackedScene] = []
+var current_scene: StringName
+var switching := false
+var _scene: Node
+var _fade := StandardMaterial3D.new()
 
 
 func _enter_tree() -> void:
 	App.main = self
-	for node: Node in [$Session, $World]:
-		var scene := PackedScene.new()
-		scene.pack(node)
-		_fresh.append(scene)
+	App.session = null
+	App.world = null
 
 
 func _ready() -> void:
@@ -37,19 +44,98 @@ func _ready() -> void:
 	if App.xr == null:
 		App.sim_input = SimInput.new(App.rig)
 		add_child(DesktopDriver.new())
+	_build_fade()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--plan="):
+			plan = load(arg.trim_prefix("--plan="))
+	_load_scene(&"find_object" if plan else StringName(initial_scene))
 
 
-## Ends the game in play, runs [param between] (the files are swapped) and
-## starts a fresh one.
+## Switch after the input event has reached all listeners. Interrupted rounds
+## are abandoned, never scored. The brief fade also works inside the headset.
+func change_scene(id: StringName) -> void:
+	if switching or id == current_scene:
+		return
+	switching = true
+	App.hold_pause(&"scene", true)
+	await _fade_to(1.0, 0.18)
+	Save.write()
+	var previous := current_scene
+	_clear_scene()
+	plan = null
+	App.reality.apply_view(View.new())
+	_load_scene(id)
+	Events.report(&"scene_changed", {from = previous, to = id})
+	await _fade_to(0.0, 0.22)
+	App.hold_pause(&"scene", false)
+	switching = false
+
+
+## Another save was opened: rebuild the current scene on the new files.
 func restart(between: Callable) -> void:
-	for node in [$Session, $World] + App.stage.get_children():
-		node.free()
+	_clear_scene()
 	between.call()
-	for scene in _fresh:
-		add_child(scene.instantiate())
+	App.reality.apply_view(View.new())
+	_load_scene(current_scene)
+
+
+func _load_scene(id: StringName) -> void:
+	current_scene = id
+	_scene = load(SCENES[id].path).instantiate()
+	if plan:
+		_scene.get_node(^"Session").plan = plan
+	add_child(_scene)
+	if autostart:
+		_start_scene.call_deferred()
+
+
+func _start_scene() -> void:
+	if plan:
+		App.session.run()
+	elif current_scene == &"intro":
+		_scene.get_node(^"Entry").run()
+	else:
+		App.world.run()
+
+
+func _clear_scene() -> void:
+	Events.scene_changing.emit()
+	var trial := App.session.trial
+	_scene.free() # stop the awaiting Session / World / Entry before ending a round
+	App.session = null
+	App.world = null
+	if trial:
+		trial.abandon()
+	for node in App.stage.get_children():
+		node.free()
+
+
+func _build_fade() -> void:
+	_fade.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_fade.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_fade.cull_mode = BaseMaterial3D.CULL_FRONT
+	_fade.no_depth_test = true
+	_fade.render_priority = 127
+	_fade.albedo_color = Color(0, 0, 0, 0)
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.15
+	sphere.height = 0.3
+	sphere.material = _fade
+	var cover := MeshInstance3D.new()
+	cover.name = "SceneFade"
+	cover.mesh = sphere
+	cover.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	App.head().add_child(cover)
+
+
+func _fade_to(alpha: float, seconds: float) -> Signal:
+	var tween := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(_fade, ^"albedo_color:a", alpha, seconds).set_trans(Tween.TRANS_SINE)
+	return tween.finished
 
 
 func _exit_tree() -> void:
+	App.hold_pause(&"scene", false)
 	if App.sim_input:
 		App.sim_input.release()
 		App.sim_input = null

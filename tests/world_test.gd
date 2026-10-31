@@ -24,7 +24,7 @@ func test_levels_and_tasks_unlock_in_order() -> void:
 	var world := App.world
 	expect(world.can_play(TIDY, 0), "the first task's level 1 is open")
 	expect(not world.can_play(TIDY, 1), "level 2 waits for level 1")
-	expect(not world.can_play(WALL, 0), "the wall waits for the shelf")
+	expect(world.can_play(WALL, 0), "motion is independent of the shelf")
 	await world._complete(TIDY, 0)
 	expect(world.can_play(TIDY, 1), "level 2 opens")
 	expect(world.can_play(WALL, 0), "the wall opens")
@@ -110,28 +110,20 @@ func test_a_fingertip_near_a_button_hears_what_it_is() -> void:
 	expect(App.world.menu != null and not App.session.running, "hovering chooses nothing")
 
 
-func test_something_new_behind_turning_around_opens_its_menu() -> void:
+func test_motion_is_only_in_its_own_scene_and_needs_no_shelf_progress() -> void:
 	await boot()
-	App.world.done = {&"tidy_shelf": [0]}
-	var said := record(Events.said)
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "the table's menu")
 	expect_eq(App.world.place.title, "Alchemy table", "at the table")
-	var guide: Node3D = App.world.get("_guide")
-	expect(guide.visible, "the guide points to the new thing")
-	expect(said.back()[0].contains("behind you"), "and says so: %s" % said.back()[0])
-	var behind: Place = App.world.adventure.places[1]
-	var eye := App.head().global_position
-	var to_table := App.reality.work_surface().transform.origin - eye
-	var to_behind := App.world.position_of(behind) - eye
-	expect(rad_to_deg(Vector2(to_table.x, to_table.z).angle_to(Vector2(to_behind.x, to_behind.z))) > 179.0, "the other way")
-	await _turn_from_table(100.0)
-	await wait(1.0)
-	expect_eq(App.world.place.title, "Alchemy table", "half way round is nowhere new")
+	expect_eq(App.world.adventure.places.size(), 1, "no motion place in the object scene")
 	await _turn_from_table(180.0)
-	var at_wall := func() -> bool: return App.world.place == behind and App.world.menu != null and App.world.menu.get("_open")
-	expect(await until(at_wall, 5.0), "turned around: the wall's menu")
-	expect(not guide.visible, "the guide's job is done")
+	await wait(1.0)
+	expect_eq(App.world.place.title, "Alchemy table", "turning around cannot enter motion")
+	await _turn_from_table(0.0)
+	app.autostart = true
+	await App.main.change_scene(&"global_motion")
+	var at_wall := func() -> bool: return App.world.menu != null and App.world.menu.get("_open")
+	expect(await until(at_wall, 15.0), "motion has its own menu")
 	expect(_button("task_break_wall_1") != null and _button("task_tidy_shelf_1") == null, "the wall's list only")
 	await select(_button("task_break_wall_1").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")

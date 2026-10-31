@@ -17,11 +17,11 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 800)
 	Profile.wipe()
 	var app: Node3D = load("res://main.tscn").instantiate()
-	app.get_node(^"Session").autostart = false
+	app.autostart = false
 	var plan := TestCase.plan_of(load("res://trials/find/find.tres"), 1, false, 0.6)
 	for kind in STICKERS:
 		plan.blocks.append(TestCase.plan_of(TIDY, 1, false, 1.0 if kind == "shadow" else 0.67, null, STICKERS[kind]).blocks[0])
-	app.get_node(^"Session").plan = plan
+	app.plan = plan
 	add_child(app)
 	await get_tree().process_frame
 	App.session.run()

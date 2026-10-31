@@ -1,5 +1,5 @@
 extends TestCase
-## Megan's opening (Entry in main.tscn): it plays before the World unless a
+## Megan's opening (the Intro scene): it plays before the World unless a
 ## session plan is given; the cauldron on the real table, touching it, finding
 ## the piece again (wrong pick, help, right pick), and the World waiting until
 ## the child chooses to begin.
@@ -11,8 +11,9 @@ var entry: Entry
 
 ## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
-	await boot()
-	entry = app.get_node(^"Entry")
+	await boot(null, &"intro")
+	app.autostart = true # following the invitation should start the next scene
+	entry = app.get_node(^"Intro/Entry")
 	entry.run()
 
 
@@ -46,10 +47,10 @@ func _touch_cauldron(said: Array) -> void:
 	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15)) # hand back
 
 
-## Launches main.tscn as the game does, with only the session's autostart set by [param plan].
+## Launches main.tscn as the game does, with an optional fixed plan.
 func _launch(plan: SessionPlan) -> void:
 	app = load("res://main.tscn").instantiate()
-	(app.get_node(^"Session") as Session).plan = plan
+	app.plan = plan
 	add_child(app)
 	input = App.sim_input
 	await frames(2)
@@ -58,9 +59,9 @@ func _launch(plan: SessionPlan) -> void:
 func test_a_launch_plays_the_opening_before_the_world() -> void:
 	var said := record(Events.said)
 	await _launch(null)
-	expect(not App.world.autostart, "the opening holds the World back")
+	expect(App.world == null, "the World is not loaded during the opening")
 	expect(await _until_said(said, "Oh. You can see me?"), "the opening plays")
-	expect(not _said_line(said, App.world.adventure.greeting), "and the World has not started")
+	expect_eq(App.main.current_scene, &"intro", "the opening stays in its own scene")
 
 
 func test_a_session_plan_skips_the_opening() -> void:
@@ -68,7 +69,7 @@ func test_a_session_plan_skips_the_opening() -> void:
 	await _launch(plan_of(TIDY, 1))
 	await wait(4.0)
 	expect(not _said_line(said, "Oh. You can see me?"), "no opening before a planned session")
-	expect((app.get_node(^"Entry") as Entry).get("_found").is_empty(), "and nothing of it is built")
+	expect(app.find_child("Entry", true, false) == null, "and the opening is not loaded")
 
 
 func test_the_cauldron_stands_on_the_table_and_waits_for_a_touch() -> void:
@@ -121,11 +122,12 @@ func test_the_world_starts_only_when_the_child_chooses() -> void:
 	await until(func() -> bool: return entry.get("_wanted") == 1, 30.0)
 	await select(entry.get("_found")[1].global_position)
 	expect(await until(func() -> bool: return _target(&"entry_begin") != null, 30.0), "a button to begin appears")
-	var greeting := App.world.adventure.greeting
+	var greeting: String = load("res://content/adventure.tres").greeting
 	await wait(8.0)
 	expect(not _said_line(said, greeting), "the World waits while the child looks around")
 	await select(_target(&"entry_begin").global_position)
 	expect(await _until_said(said, greeting), "choosing the button starts the World")
 	await frames(2)
-	expect(_target(&"entry_begin") == null, "and the button goes")
+	expect(not is_instance_valid(entry), "the entire opening is removed")
+	expect_eq(App.main.current_scene, &"find_object", "the next scene is Find the object")
 	expect(not App.reality.view.is_graded() and not App.reality.view.black_and_white, "entering the World keeps the room in normal colour")

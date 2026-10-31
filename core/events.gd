@@ -57,6 +57,8 @@ signal session_finished
 signal detected(detections: Array)
 ## The facilitator panel opened or closed. Play pauses while it is open.
 signal facilitator_toggled(open: bool)
+## The active scene is leaving: persistent modules clear their transient output.
+signal scene_changing
 ## Any other fact worth a line in the research log.
 signal reported(what: StringName, data: Dictionary)
 

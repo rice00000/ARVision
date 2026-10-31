@@ -1,7 +1,8 @@
 extends Module
 ## The facilitator's panel, hidden from the child: the left-hand menu pinch
 ## (palm facing you, pinch) opens and closes it (desktop: M), and play pauses
-## while it is open. Point and pinch to press a button. Two tabs, as in XRVision:
+## while it is open. Point and pinch to press a button.
+## Scenes: switch freely between Intro, Find the object and Global motion.
 ##
 ## Training
 ##   Easier / Harder   pin the level 0.1 lower / higher for the rest of the session
@@ -31,6 +32,7 @@ var _panel := Node3D.new()
 var _pages: Dictionary[StringName, Node3D] = {}
 var _page_shown: StringName = &"Training"
 var _status := Label3D.new()
+var _scene_label := Label3D.new()
 var _playing := Label3D.new()
 var _page_label := Label3D.new()
 var _name := Label3D.new()
@@ -50,6 +52,8 @@ func _ready() -> void:
 		if hand == &"left" and action == &"menu_pressed" and pressed:
 			toggle())
 	Events.selected.connect(_on_selected)
+	Events.touched.connect(func(hand: StringName, target: Target) -> void:
+		_on_selected(hand, target, Vector3.ZERO, Vector3.ZERO))
 
 
 func _exit_tree() -> void:
@@ -63,6 +67,8 @@ func _exit_tree() -> void:
 
 
 func toggle() -> void:
+	if App.main.switching:
+		return
 	is_open = not is_open
 	if is_open:
 		var eye := App.head().global_transform
@@ -88,7 +94,12 @@ func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _directio
 	if String(target.id).begins_with("fac_slot_"):
 		_open_save(StringName(String(target.id).trim_prefix("fac_slot_")))
 		return
+	if String(target.id).begins_with("fac_scene_"):
+		_switch_scene.call_deferred(StringName(String(target.id).trim_prefix("fac_scene_")))
+		return
 	match target.id:
+		&"fac_scenes":
+			_show(&"Scenes")
 		&"fac_easier":
 			App.session.nudge(-0.1)
 		&"fac_harder":
@@ -126,6 +137,12 @@ func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _directio
 	_refresh()
 
 
+func _switch_scene(id: StringName) -> void:
+	toggle()
+	_view_index = 0
+	App.main.change_scene(id)
+
+
 ## Closes the panel and plays [param save]: the game starts again from it.
 func _open_save(save: StringName) -> void:
 	toggle.call_deferred()
@@ -145,6 +162,9 @@ func _show(page: StringName) -> void:
 
 
 func _refresh() -> void:
+	_scene_label.text = "Current: %s" % Main.SCENES[App.main.current_scene].title
+	for id: StringName in Main.SCENES:
+		_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
 	_refresh_training()
 	_refresh_saves()
 	_name.text = "Name: %s_" % _typed
@@ -198,14 +218,21 @@ func _build() -> void:
 	var back := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(WIDTH, HEIGHT)
-	quad.material = _material(Color(0.08, 0.09, 0.12))
+	quad.material = _material(Color(0.08, 0.09, 0.12), 20)
 	back.mesh = quad
 	back.position = Vector3(0.0, 0.0, -0.012)
 	_panel.add_child(back)
-	var tab_x := [-0.145, 0.0, 0.145]
-	for i in 3:
-		_button(["fac_training", "fac_saves", "fac_close"][i], ["Training", "Saves", "Close"][i],
-			Vector2(0.13, 0.05), Vector2(tab_x[i], 0.17), _panel)
+	for i in 4:
+		_button(["fac_scenes", "fac_training", "fac_saves", "fac_close"][i], ["Scenes", "Training", "Saves", "Close"][i],
+			Vector2(0.1, 0.05), Vector2(-0.165 + i * 0.11, 0.17), _panel)
+
+	var scenes := _page(&"Scenes")
+	_text(_scene_label, Vector2(0.0, 0.1), scenes)
+	var row := 0
+	for id: StringName in Main.SCENES:
+		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.065),
+			Vector2(0.0, 0.025 - row * 0.085), scenes)
+		row += 1
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)
@@ -248,6 +275,9 @@ func _text(label: Label3D, at: Vector2, parent: Node3D) -> void:
 	label.position = Vector3(at.x, at.y, 0.0)
 	label.pixel_size = 0.0004
 	label.font_size = 40
+	label.no_depth_test = true
+	label.render_priority = 23
+	label.outline_render_priority = 22
 	parent.add_child(label)
 
 
@@ -255,6 +285,7 @@ func _button(id: String, text: String, size: Vector2, at: Vector2, parent: Node3
 	var button := Target.new()
 	button.id = StringName(id)
 	button.name = id
+	button.collision_layer = Pointer.MENU_LAYER
 	button.position = Vector3(at.x, at.y, 0.0)
 	var shape := CollisionShape3D.new()
 	shape.shape = BoxShape3D.new()
@@ -271,6 +302,9 @@ func _button(id: String, text: String, size: Vector2, at: Vector2, parent: Node3
 	label.pixel_size = 0.0004
 	label.font_size = 40 if size.y < 0.05 else 48
 	label.position.z = 0.006
+	label.no_depth_test = true
+	label.render_priority = 23
+	label.outline_render_priority = 22
 	button.add_child(label)
 	parent.add_child(button)
 	return button
@@ -282,8 +316,11 @@ func _enable(button: Target, on: bool) -> void:
 	(button.get_node(^"Face") as MeshInstance3D).material_override = _face if on else _greyed
 
 
-static func _material(colour: Color) -> StandardMaterial3D:
+static func _material(colour: Color, priority := 21) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.no_depth_test = true
+	material.render_priority = priority
 	material.albedo_color = colour
 	return material
