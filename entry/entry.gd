@@ -18,6 +18,8 @@ extends Node3D
 const PAUSE := 1.2
 ## The breath after a line the voice has finished, seconds.
 const BREATH := 0.5
+## How high above the brew Onion stands once it has popped up and settled, metres.
+const PEEK_LIFT := 0.06
 ## Without a headset (desktop), only a click presses: moving the mouse over a button
 ## doesn't. Tests turn this on to drive the hands by fingertip.
 @export var poke_in_sim := false
@@ -332,7 +334,7 @@ func _hello(fast := false) -> void:
 	_actions.hop(_runner)   # a small startled hop
 	await _wait(0.5)   # then an angled peek into the opening
 	_attend(null)   # a glance back at the child, still leaning over the cauldron
-	await say("Uh... nearly ready.")
+	await say("Nearly ready.")
 	_actions.lean_in(_runner, false)   # straightens up
 	await _wait(0.4)
 	await say("I'm Onion, by the way.")
@@ -351,13 +353,14 @@ func _touch() -> void:
 	if not _tapped:
 		_cue = true   # the cauldron glows slowly
 		_demo.tap(_rim_point())   # shows one tap, looping until stop() (the interaction chat's)
+		_watch_for_tap()   # Onion's eyes go to the rim and back to the child while it waits
 		await say("Give the cauldron a little tap.")
 		if not _tapped:
 			await _runner.cauldron_touched
 		_demo.stop()
 	_cue = false
 	_rattle(0.0)   # an accepted touch stops the rattle
-	_attend(_mouth)
+	_attend(_peer_point())
 	_actions.lean_in(_runner, true)
 	await _wait(0.5)
 	await say("Thank you. Something's caught in there.")
@@ -1739,7 +1742,7 @@ func _peek() -> void:
 
 
 func _peek_spot() -> Vector3:
-	return _mouth + Vector3.UP * 0.035
+	return _mouth + Vector3.UP * PEEK_LIFT
 
 
 ## Onion ducks back under the brew.
@@ -2067,6 +2070,29 @@ func _peer_point() -> Vector3:
 	var away := -_toward_child()
 	var side := away.cross(Vector3.UP).normalized()
 	return _mouth + Vector3.DOWN * 0.04 + away * 0.05 + side * 0.04
+
+
+## While the child has not tapped yet: Onion looks at the rim where the hand taps, then at the
+## child, over and over, leaning a little toward the rim; after a long wait a small hop and
+## a look at the rim ask again. Stops by itself when the tap comes (or the part is cut).
+func _watch_for_tap() -> void:
+	var runner := _runner
+	var at_rim := true
+	var waited := 0.0
+	var hopped := false
+	while not _tapped and runner == _runner and is_instance_valid(runner):
+		_attend(_rim_point() if at_rim else null)
+		_actions.lean_in(runner, at_rim)
+		var seconds := 2.2 if at_rim else 1.4
+		await runner.wait(seconds)
+		waited += seconds
+		at_rim = not at_rim
+		if waited > 10.0 and not hopped:
+			hopped = true
+			_actions.hop(runner)
+	if runner == _runner and is_instance_valid(runner):
+		_attend(null)
+		_actions.lean_in(runner, false)
 
 
 ## Onion shifts a little from side to side over the opening, twice: searching.

@@ -69,7 +69,7 @@ API changes: Carry gained (nothing removed): `configure(floor_y, eyes, reach, ya
 
 ## Decisions from the story chat's final UPDATE (BUILD_CHAT_UPDATE_2026-10-31.md, last section; it supersedes earlier lines)
 
-* Lines changed: "Uh... nearly ready." (not "Nearly ready."); after seating "Ah. There we go." (do NOT say the room is waking up);
+* Lines changed: "Nearly ready." (the later UPDATE shortened it again; the pause, sheepish glance and half-lean carry the hesitation); after seating "Ah. There we go." (do NOT say the room is waking up);
   after the reveal "I've been looking forward to showing you this."; then, after a pause to enjoy the room: "Oh!" / "Things come
   through, but they don't always land in the right place." / "Would you help me put them where they belong?"; the first shelf round:
   "The shapes on the shelf show where things go." / "Can you find a place for one of these?"; the first placement only: "It fits.

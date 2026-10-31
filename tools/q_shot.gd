@@ -18,7 +18,7 @@ func _ready() -> void:
 		n += 1
 	await get_tree().create_timer(0.5).timeout
 	entry._on_target(entry.find_child("entry_part_hello", true, false) as Target)
-	var wanted := ["I was getting things ready.", "Uh... nearly ready.", "I'm Onion, by the way."]
+	var wanted := ["I was getting things ready.", "Nearly ready.", "I'm Onion, by the way."]
 	var shots := 0
 	n = 0
 	while shots < wanted.size() and n < 6000:
