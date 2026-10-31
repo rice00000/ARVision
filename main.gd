@@ -10,6 +10,7 @@ extends Node3D
 const SCENES := {
 	&"intro": {title = "Intro", path = "res://scenes/intro.tscn"},
 	&"find_object": {title = "Find the object", path = "res://scenes/find_object.tscn"},
+	&"first_visit": {title = "First visit (Onion)", path = "res://scenes/first_visit.tscn"},
 	&"global_motion": {title = "Global motion", path = "res://scenes/global_motion.tscn"},
 }
 
@@ -94,6 +95,8 @@ func _start_scene() -> void:
 		App.session.run()
 	elif current_scene == &"intro":
 		_scene.get_node(^"Entry").run()
+	elif current_scene == &"first_visit":
+		_scene.get_node(^"Visit").run()
 	else:
 		App.world.run()
 

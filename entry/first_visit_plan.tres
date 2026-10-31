@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="SessionPlan" format=3]
+
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="1_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
+[ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="3_tidy"]
+
+[sub_resource type="Resource" id="block"]
+script = ExtResource("2_block")
+trial = ExtResource("3_tidy")
+rounds = 2
+difficulty = 0.0
+intro = ""
+ray = false
+pause_between = 1.0
+
+[resource]
+script = ExtResource("1_plan")
+title = "First visit: the shelf, level 1 (Onion speaks)"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("2_block")]([SubResource("block")])

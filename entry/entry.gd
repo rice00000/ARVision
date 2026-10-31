@@ -196,6 +196,8 @@ func _exit_tree() -> void:
 	# This opening owns what it hung on the persistent head (the beat label) and whatever
 	# it made but never added; the rest goes with the scene.
 	Engine.time_scale = 1.0
+	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
+		ShelfCopy.push = 0.0
 	if is_instance_valid(_beat_label):
 		_beat_label.free()
 	for node in [_orb, _box, _music]:
@@ -361,6 +363,8 @@ func _out() -> void:
 	await _emerge_gear()
 	await _wait(0.3)
 	_attend(_gear)
+	if USE_REAL_CARRY:
+		_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
 	await say("There it is! The table's missing piece.")
 	_attend(_socket_at)
 	await say("I've been looking for that.")
@@ -371,9 +375,12 @@ func _out() -> void:
 func _pickup() -> void:
 	_beat("4: pick it up")
 	_attend(null)
-	await say("Would you pick it up for me?")   # picking it up is the child agreeing to help
-	_demo.pinch_lift(_gear)   # shows the gesture; the real gear stays where it is
-	await say("Pinch your fingers together, and keep them closed.")
+	var already := USE_REAL_CARRY and _carry.has_been_picked_up()   # the child did it before being asked
+	if not already:
+		await say("Would you pick it up for me?")   # picking it up is the child agreeing to help
+		if not (USE_REAL_CARRY and _carry.has_been_picked_up()):
+			_demo.pinch_lift(_gear)   # shows the gesture; the real gear stays where it is
+			await say("Pinch your fingers together, and keep them closed.")
 	await _child_picks_up()
 	_demo.stop()
 	_attend(_gear)
@@ -409,10 +416,14 @@ func _reveal(fast := false) -> void:
 	await say("I've been looking forward to showing you this.")
 	if not fast:
 		await _wait(2.5)   # time to enjoy the room first
+	_attend(_shelf)   # looks down at the things scattered beside the shelf
+	_actions.lean_in(_runner, true)
 	_actions.hop(_runner)
 	await say("Oh!")
 	await say("Things come through, but they don't always land in the right place.")
 	await say("Would you help me put them where they belong?")
+	_actions.lean_in(_runner, false)
+	_attend(null)
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
@@ -422,7 +433,7 @@ func _to_shelf(fast := false) -> void:
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
 	_beat("done: Wei's World")
-	App.main.change_scene.call_deferred(&"find_object")   # Wei's scene with the World and the shelf
+	App.main.change_scene.call_deferred(&"first_visit")   # Onion leads the first shelf level
 
 
 ## The global motion task (Wei's dots scene) in the same passthrough room. Onion and the
@@ -650,6 +661,8 @@ func _set_up_for(part: StringName) -> void:
 	_actions.attention = null
 	_actions.hop_y = 0.0
 	_actions.lean = 0.0
+	if USE_REAL_CARRY:
+		_carry.reset()
 	_surface_points.clear()
 	_gear.visible = false
 	_gear_spin.running = false
@@ -2023,8 +2036,11 @@ func _surprise() -> void:
 ## (USE_REAL_CARRY), a stand-in plays the child doing it.
 func _child_picks_up() -> void:
 	var runner := _runner
+	if USE_REAL_CARRY and _carry.has_been_picked_up():
+		return
 	if USE_REAL_CARRY:
-		_carry.begin(_gear, _socket_at)
+		if not _carry.enabled:
+			_carry.begin(_gear, _socket_at)
 		_carry.picked_up.connect(func() -> void:
 			if is_instance_valid(runner):
 				runner.picked_up.emit(), CONNECT_ONE_SHOT)

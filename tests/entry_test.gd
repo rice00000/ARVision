@@ -5,6 +5,7 @@ extends TestCase
 ## coming out, the ripple, and Wei's shelf with Onion as the guide.
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
+const Tidy := preload("res://trials/tidy/tidy_trial.gd")
 const ADVENTURE := preload("res://content/adventure.tres")
 
 var entry: Entry
@@ -124,8 +125,9 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
 	expect(await _until_said(said, "Would you help me put them where they belong?", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
-	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "Wei's World starts")
-	expect_eq(App.main.current_scene, &"find_object", "in its own scene")
+	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "Onion leads the first shelf level")
+	expect_eq(App.main.current_scene, &"first_visit", "in its own scene")
+	expect(not _said_line(said, ADVENTURE.greeting), "without Wei's welcome stacked on top")
 
 
 func test_jumping_to_each_part_plays_only_that_part() -> void:
@@ -178,8 +180,8 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 
 	# Shelf: straight into Wei's World.
 	await _press(&"entry_part_shelf")
-	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "shelf: Wei's World starts")
-	expect_eq(App.main.current_scene, &"find_object", "shelf: in its own scene")
+	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "shelf: Onion leads the first level")
+	expect_eq(App.main.current_scene, &"first_visit", "shelf: in its own scene")
 
 
 ## Puts the right fingertip at [param point] (button space), the hand behind it pointing into the plate.
@@ -423,7 +425,7 @@ func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> 
 	await _boot_entry()
 	await _to_setup_panel()
 	await _press(&"entry_part_shelf")
-	expect(await until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 30.0), "the shelf scene loads")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the shelf scene loads")
 	await wait(1.5)
 	var workshop := App.main.get_node_or_null(^"Workshop") as Workshop
 	expect(workshop != null, "the workshop is still there")
@@ -431,9 +433,7 @@ func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> 
 		return
 	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "with Onion (and its light)")
 	expect(workshop.get_children().filter(func(n: Node) -> bool: return n is Node3D and n.find_children("*", "Target", true, false).is_empty() == false).is_empty(), "the cauldron cannot be touched any more")
-	var guides := App.world.get_children().filter(func(n: Node) -> bool: return n is Guide)
-	expect_eq(guides.size(), 1, "the World has its guide")
-	expect(guides[0].body != null, "and Onion is its body")
+	expect(App.world == null, "no World welcome or menu in the first visit")
 	await App.main.change_scene(&"global_motion")
 	await wait(0.5)
 	expect(not is_instance_valid(workshop), "the workshop goes when the child leaves that scene")
@@ -471,7 +471,7 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	await _press(&"entry_part_touch")
 	await wait(0.5)
 	await _press(&"entry_part_shelf")
-	expect(await until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 30.0), "a jump to the shelf works mid-part too")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "a jump to the shelf works mid-part too")
 
 
 func test_dots_button_goes_to_the_global_motion_task() -> void:
@@ -479,3 +479,29 @@ func test_dots_button_goes_to_the_global_motion_task() -> void:
 	await _to_setup_panel()
 	expect(await _press(&"entry_part_dots"), "the Dots button is there")
 	expect(await until(func() -> bool: return App.main.current_scene == &"global_motion" and not App.main.switching, 30.0), "the Dots button opens the global motion scene")
+
+
+func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await _press(&"entry_part_shelf")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the first visit loads")
+	expect(Tidy.onion_voice, "Wei's own spoken lines are switched off while Onion leads")
+	await wait(1.0)
+	var visit := App.main.get_node(^"FirstVisit/Visit") as FirstVisit
+	Engine.time_scale = 4.0
+	await visit._closing()
+	Engine.time_scale = 1.0
+	expect(_said_line(said, "There. Everything's found its place."), "Onion closes the level")
+	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
+	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
+	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
+
+
+## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
+func shutdown() -> void:
+	await super.shutdown()
+	Tidy.push = 0.0
+	Tidy.onion_voice = false
+	Engine.time_scale = 1.0

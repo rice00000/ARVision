@@ -129,6 +129,13 @@ func stop() -> void:
 		_let_go()
 
 
+## Forgets everything: not enabled, not picked up, not docked. (The story chat's jump buttons.)
+func reset() -> void:
+	stop()
+	_picked = false
+	_docked = false
+
+
 ## True once the child has picked the gear up (since [method begin]).
 func has_been_picked_up() -> bool:
 	return _picked

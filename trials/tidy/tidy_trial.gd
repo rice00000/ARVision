@@ -41,6 +41,8 @@ const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 ## in front of the player. 0 is Wei's original. The opening sets it, and it stays for the
 ## shelf scene, so the opening's shelf and the real one stand in the same place.
 static var push := 0.0
+## While Onion leads the first visit it speaks for the shelf: the instruction, the first "fits" and the end.
+static var onion_voice := false
 
 ## The bench, metres from the eyes: the shelf's front; the bench top below the
 ## eyes, the work surface's height kept within this range.
@@ -148,13 +150,14 @@ func _setup(round_condition: TrialCondition) -> void:
 		thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
 		_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
 	round_condition.set_value(&"stickers", ",".join(_cell_key))
-	match _match:
-		SIZE:
-			say("Put each one on the shadow of its size!")
-		COLOUR:
-			say("Put each one on its colour!")
-		_:
-			say("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!")
+	if not onion_voice:
+		match _match:
+			SIZE:
+				say("Put each one on the shadow of its size!")
+			COLOUR:
+				say("Put each one on its colour!")
+			_:
+				say("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!")
 
 
 ## Where [param count] things lie on the bench: a jumbled zigzag across it, near and far in turn,
@@ -369,10 +372,12 @@ func _put(hand: StringName, cell: int) -> void:
 	judge(&"good", _cell_point[cell])
 	_unhint()
 	if _placed.size() == _things.size():
-		say("All tidy! Everything is back home.")
+		if not onion_voice:
+			say("All tidy! Everything is back home.")
 		finish(true, {puts = _puts.duplicate()})
 		return
-	say("It fits!")
+	if not onion_voice:
+		say("It fits!")
 	_arm_hint() # a thing put back is progress
 	if hint_level > 0:
 		_show_hint(hint_level)

@@ -23,6 +23,8 @@ var _guiding := false
 var _clock := 0.0
 var _talk_until := 0.0
 var _switches := 0
+var _attention: Variant = null   # a Node3D or a position to look at instead of the child
+var _cheer_until := 0.0
 
 
 ## Takes over from the opening. [param parts]: onion (holder), model, face, rest_y, glow, halo,
@@ -54,6 +56,16 @@ func take(parts: Dictionary) -> void:
 	Events.reported.connect(_on_reported)
 
 
+## Onion looks at [param what] (a Node3D or a position) instead of the child; null: back to the child.
+func attend(what: Variant) -> void:
+	_attention = what
+
+
+## A small satisfied bob.
+func cheer() -> void:
+	_cheer_until = _clock + 1.2
+
+
 func _on_scene_changing() -> void:
 	_switches += 1
 	if _switches > 1:
@@ -63,9 +75,10 @@ func _on_scene_changing() -> void:
 func _on_reported(what: StringName, data: Dictionary) -> void:
 	if what != &"scene_changed":
 		return
-	if data.get("to") == &"find_object":
+	var scene: StringName = data.get("to", &"")
+	if scene == &"find_object":
 		_become_guide()
-	else:
+	elif scene != &"first_visit":
 		queue_free()
 
 
@@ -90,10 +103,17 @@ func _process(delta: float) -> void:
 		_guiding = _guide.visible
 	var talking := _clock < _talk_until
 	var bob := sin(_clock * 7.0) * 0.006 if talking else sin(_clock * 1.5) * 0.002
+	if _clock < _cheer_until:
+		bob += sin((_cheer_until - _clock) / 1.2 * PI * 2.0) * 0.012
 	_model.position.y = lerpf(_model.position.y, _model_rest_y + bob, minf(1.0, delta * 10.0))
 	_halo.albedo_color.a = 0.3 if talking else 0.22
 	_glow.light_energy = 0.6 + (0.35 * (0.5 + 0.5 * sin(_clock * 9.0)) if talking else 0.0)
-	var to_child := App.head().global_position - _onion.global_position
+	var look_at: Vector3 = App.head().global_position
+	if _attention is Node3D and is_instance_valid(_attention):
+		look_at = (_attention as Node3D).global_position
+	elif _attention is Vector3:
+		look_at = _attention
+	var to_child := look_at - _onion.global_position
 	to_child.y = 0.0
 	if to_child.length() < 0.01:
 		return

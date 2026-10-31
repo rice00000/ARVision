@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://trials/session.gd" id="1_session"]
+[ext_resource type="Script" path="res://entry/first_visit.gd" id="2_visit"]
+[ext_resource type="Resource" path="res://entry/first_visit_plan.tres" id="3_plan"]
+
+[node name="FirstVisit" type="Node3D"]
+
+[node name="Session" type="Node" parent="."]
+script = ExtResource("1_session")
+
+[node name="Visit" type="Node" parent="."]
+script = ExtResource("2_visit")
+plan = ExtResource("3_plan")
