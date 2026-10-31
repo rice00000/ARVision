@@ -240,3 +240,10 @@ in view.
 **Not done** (next): the UI audit and proposals for Wei's World (task menu, level announcements, subtitles: when
 the child looks at the things, the subtitle (25 degrees over the gaze) lies on the shelf's top row by 4.5 degrees; 36 degrees (`Voice.above_gaze`)
 would clear it).
+
+## Interaction chat, round 4: the real teaching hand (branch `entry-interaction-4`)
+* `DemoHand` now shows the MRTK right hand (`entry/assets/hand/`, MIT notice kept; `USE_GLB_HAND := true`). If the file is missing or is not a hand, the primitive stand-in is built instead (same calls, same behaviour). API unchanged: `tap`, `pinch_lift`, `lower_release`, `stop`.
+* The clips are scrubbed, never played: the keyframe table's `open` 1.0 -> `pinch` at 0, 0.0 -> 1.0 (tips meet at the origin); the tap scrubs `tap` along `TAP_DOWN`/`TAP_UP`/`TAP_BACK`. `idle` is set to loop in code (the import gives no loop flag). A tap points: the three other fingers are folded (their closed-pinch pose) and the hand is placed so the INDEX FINGERTIP lands on the rim.
+* The material is ours (`material_override`: cream 0.96/0.90/0.80, alpha 0.4, glow 0.35, no shadows), so the fade works whatever the file brings. After `stop()` and the fade the whole hand is freed (no node left); it is built again on the next gesture.
+* Constants Megan may tune in the headset, all at the top of `demo_hand.gd`: `HAND_SCALE` (0.6; the file is 23 cm wrist to fingertip), `HAND_FIX_YAW` (PI: the file's fingers point +Z, ours -Z), `HAND_FIX_TRIM` (-0.72, straightens the file's diagonal hand), `HAND_ROLL` (-0.6, so the gap between thumb and index shows from a seat looking down; the pinch point does not move), `YAW` (1.3: the hand comes in from the right, fingers pointing left, so a child sees it from the side).
+* Pictures: `tools/entry_shots_interaction.gd` (frames of each gesture in the opening, seat and side) and `tools/hand_closeups.gd` (the hand alone against a table colour with a marker at the pinch point and the finger joints printed).

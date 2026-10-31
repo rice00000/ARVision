@@ -557,6 +557,128 @@ func test_the_pinch_lift_hand_stays_with_its_thing_and_never_points_at_a_place()
 	expect(not demo.visible or not demo.is_processing() or demo.global_position.is_finite(), "a thing that goes away does not leave the hand stuck")
 
 
+func _frozen(demo: DemoHand, seconds: float) -> void:
+	demo.set_process(false)   # held at an exact moment of the loop
+	demo._fade = 1.0
+	demo._t = seconds
+	demo._pose(seconds)
+	await frames(2)
+
+
+func _joint(demo: DemoHand, joint: String) -> Vector3:
+	return demo.to_local(demo._skeleton.to_global(demo._skeleton.get_bone_global_pose(demo._skeleton.find_bone(joint)).origin))
+
+
+func test_the_demo_hand_is_the_glb_hand_translucent_and_without_shadows() -> void:
+	await _scene()
+	var demo := _demo()
+	demo.pinch_lift(gear)
+	expect(demo._player != null and demo._skeleton != null, "the GLB hand is used")
+	var meshes := demo.find_children("*", "MeshInstance3D", true, false)
+	expect(not meshes.is_empty(), "it has a mesh")
+	for node in meshes:
+		var mesh := node as MeshInstance3D
+		expect(mesh.material_override == demo._material, "our translucent material overrides the file's")
+		expect_eq(mesh.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "no shadows")
+	expect(demo._material.albedo_color.is_equal_approx(Color(0.96, 0.9, 0.8, demo._material.albedo_color.a)), "the stand-in's colour")
+	expect(is_equal_approx(demo._material.emission_energy_multiplier, 0.35), "and its glow")
+	expect(demo._material.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED, "so that alpha fades work")
+	expect(is_equal_approx(demo._figure.get_child(0).scale.x, DemoHand.HAND_SCALE), "scaled by the one constant")
+	await _frozen(demo, 1.1)
+	expect(demo._material.albedo_color.a <= DemoHand.ALPHA + 0.001 and demo._material.albedo_color.a > 0.3, "softly translucent")
+
+
+func test_the_glb_hand_has_its_fingers_forward_and_its_tips_meet_at_the_pinch_point() -> void:
+	await _scene()
+	var demo := _demo()
+	demo.pinch_lift(gear)
+	await _frozen(demo, 1.1)   # open
+	var index_tip := _joint(demo, "PointR_JNT3")
+	var thumb_tip := _joint(demo, "ThumbR_JNT3")
+	var middle_tip := _joint(demo, "MiddleR_JNT3")
+	var wrist := _joint(demo, "WristR_JNT")
+	expect(middle_tip.z < wrist.z - 0.05, "the fingers point -Z, the wrist is behind (%s vs %s)" % [middle_tip.z, wrist.z])
+	expect(index_tip.y > thumb_tip.y + 0.01, "the index finger is above the thumb")
+	await _frozen(demo, 1.7)   # closed
+	expect(_joint(demo, "PointR_JNT3").length() < 0.006 and _joint(demo, "ThumbR_JNT3").length() < 0.006, "closed, both tips are at the pinch point")
+
+
+func test_open_maps_to_the_pinch_clip_and_the_tap_follows_its_own_keys() -> void:
+	await _scene()
+	var demo := _demo()
+	demo.pinch_lift(gear)
+	await _frozen(demo, 1.1)   # open 1.0
+	expect_eq(demo._shown_clip, "pinch", "the pinch clip")
+	expect(absf(demo._shown_at - 0.0) < 0.001, "open 1.0 is the clip's start (%s)" % demo._shown_at)
+	await _frozen(demo, 2.0)   # open 0.0
+	expect(absf(demo._shown_at - 1.0) < 0.001, "open 0.0 is the clip's end (%s)" % demo._shown_at)
+	demo.stop()
+	await wait(0.6)
+	demo.tap(cauldron)
+	await _frozen(demo, DemoHand.TAP_DOWN * 0.5)
+	expect_eq(demo._shown_clip, "tap", "the tap clip")
+	expect(absf(demo._shown_at - 0.25) < 0.001, "halfway down is a quarter in (%s)" % demo._shown_at)
+	await _frozen(demo, (DemoHand.TAP_DOWN + DemoHand.TAP_UP) * 0.5)
+	expect(absf(demo._shown_at - 0.5) < 0.001, "on the rim it is pressed (%s)" % demo._shown_at)
+	await _frozen(demo, DemoHand.TAP_LOOP - 0.1)
+	expect(absf(demo._shown_at - 1.0) < 0.001, "and back at rest")
+
+
+func test_a_tap_points_with_the_index_fingertip_on_the_rim() -> void:
+	await _scene()
+	var demo := _demo()
+	var rim := cauldron + Vector3.UP * 0.12
+	demo.tap(rim)
+	await _frozen(demo, (DemoHand.TAP_DOWN + DemoHand.TAP_UP) * 0.5)
+	var tip := demo.to_global(_joint(demo, "PointR_JNT3"))
+	expect(tip.distance_to(rim) < 0.02, "the index fingertip is on the rim, within 2 cm (%s)" % tip.distance_to(rim))
+	var middle := _joint(demo, "MiddleR_JNT3")
+	var index := _joint(demo, "PointR_JNT3")
+	expect(middle.distance_to(index) < 0.07 and middle.z > index.z - 0.02, "the other fingers are folded, not reaching past it")
+	demo.pinch_lift(gear)   # the next gesture starts from a plain hand again
+	await _frozen(demo, 1.1)
+	expect(demo._figure.position == Vector3.ZERO, "the hand is back at its own origin")
+
+
+func test_without_the_glb_the_primitive_hand_does_the_same_job() -> void:
+	await _scene()
+	var plain := _demo()
+	plain.use_glb = false
+	plain.pinch_lift(gear)
+	expect(plain._player == null and plain._index.size() == 2, "the primitives are built")
+	await wait(1.9)
+	expect(plain.visible and plain.global_position.distance_to(Carry.middle_of(gear)) < 0.03, "and work")
+	var missing := _demo()
+	missing.hand_file = "res://entry/assets/hand/not_there.glb"
+	missing.tap(cauldron)
+	expect(missing._player == null and missing._index.size() == 2, "a missing file falls back as well")
+	await wait(0.9)
+	expect(missing.visible, "and shows")
+	var broken := _demo()
+	broken.hand_file = "res://entry/assets/hand/LICENSE.md"   # exists, but is no hand
+	broken.lower_release(socket)
+	expect(broken._player == null and broken._index.size() == 2, "a file that does not load as a hand falls back")
+
+
+func test_stop_is_safe_to_repeat_and_leaves_nothing_behind() -> void:
+	await _scene()
+	var demo := _demo()
+	demo.stop()   # before anything was shown
+	demo.pinch_lift(gear)
+	await wait(0.6)
+	demo.stop()
+	demo.stop()
+	await wait(0.7)
+	expect(not demo.visible and demo.get_child_count() == 0 and not demo.is_processing(), "gone: no node, no work")
+	demo.stop()
+	demo.tap(cauldron)   # and it can show again
+	await wait(0.6)
+	expect(demo.visible and demo.get_child_count() == 1, "again, one hand")
+	demo.stop()
+	await wait(0.7)
+	expect_eq(demo.get_child_count(), 0, "gone again")
+
+
 func test_the_demo_hand_shows_one_gesture_and_stop_takes_it_away() -> void:
 	await _scene()
 	var demo := _demo()
@@ -574,20 +696,20 @@ func test_the_demo_hand_shows_one_gesture_and_stop_takes_it_away() -> void:
 	await wait(0.8)
 	expect(not demo.visible, "stop takes the hand away")
 	expect(not demo.is_processing(), "and it does no work")
+	expect_eq(demo.get_child_count(), 0, "and no hand node is left")
 
 
 func test_the_demo_hand_fades_softly_and_never_flashes() -> void:
 	await _scene()
 	var demo := _demo()
 	demo.lower_release(socket)
-	var material: StandardMaterial3D = null
+	var material: StandardMaterial3D = demo._material
 	var last := 0.0
 	var biggest_step := 0.0
 	var peak := 0.0
 	for i in 400:   # more than a full round of 3.8 s at 60 frames a second
 		await frames(1)
-		if material == null:
-			material = (demo.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh.material as StandardMaterial3D
+		material = demo._material
 		var a := material.albedo_color.a
 		biggest_step = maxf(biggest_step, absf(a - last))
 		peak = maxf(peak, a)

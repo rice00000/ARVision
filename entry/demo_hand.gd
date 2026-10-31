@@ -9,7 +9,25 @@ extends Node3D
 ## shelf slot. It never flashes, and its calls return at once: everything it
 ## does runs from its own [method _process], so [method stop] (or freeing it) cancels it, and
 ## nothing waits on a timer or a tween that could outlive a part.
-## Later the MRTK Hand Coach rigs may replace the stand-in (see hand-coach/README.md).
+## The hand is the MRTK-derived right hand (entry/assets/hand/right_hand_demo.glb, MIT, see its
+## LICENSE.md): [constant USE_GLB_HAND]. If that file is missing or does not load, the primitive
+## stand-in below is used instead, with the same behaviour. Its clips: "pinch" (0 = open, 1 s =
+## closed, the tips meeting at the origin) and "tap"; both are scrubbed by code, never played.
+
+## Use the GLB hand (false, or a file that will not load: the primitives).
+const USE_GLB_HAND := true
+const HAND_FILE := "res://entry/assets/hand/right_hand_demo.glb"
+## How big the GLB hand is (it is about 23 cm from wrist to fingertip at 1.0). Megan judges it in the headset.
+const HAND_SCALE := 0.6
+## The GLB's fingers point +Z, ours -Z: one fixed turn about Y, plus a trim by eye (radians).
+const HAND_FIX_YAW := PI
+const HAND_FIX_TRIM := -0.72
+## A roll about the fingers' axis (the pinch point stays put), so that the gap between the thumb and the
+## index finger shows to a child looking down at the table instead of hiding under the index finger.
+const HAND_ROLL := -0.6
+## The bones: the index fingertip (the asset calls it "Point"), and the fingers a tap folds away.
+const INDEX_TIP_BONE := "PointR_JNT3"
+const FOLDED_FINGERS: Array[String] = ["Middle", "Middel", "Ring", "Pinky"]
 
 const COLOUR := Color(0.96, 0.9, 0.8)
 ## How solid it looks at most, and how long it takes to appear or go, seconds.
@@ -18,11 +36,18 @@ const FADE_SECONDS := 0.4
 const RADIUS := 0.0085
 ## It comes in like a right hand: turned this many radians to the left of straight away from the
 ## child, so thumb and finger are seen from the side, not end-on.
-const YAW := 0.85
+const YAW := 1.3
 
 enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE }
+## The tap's own times: the hand is down on the rim from TAP_DOWN to TAP_UP, back up at TAP_BACK, and
+## the loop is TAP_LOOP long. The GLB's "tap" clip (0 -> press at 0.5 -> back at 1) is scrubbed to match.
+const TAP_DOWN := 0.9
+const TAP_UP := 1.2
+const TAP_BACK := 2.0
+const TAP_LOOP := 3.0
 
 var _mode := Mode.NONE
+var _gesture := Mode.NONE      # the gesture last started: it keeps its look while it fades out after stop()
 var _t := 0.0
 var _fade := 0.0
 var _keys: Array = []           # [seconds, up, back, open]: where the pinch point is, and how open
@@ -31,15 +56,23 @@ var _anchor := Callable()       # () -> Vector3: the spot the keys are measured 
 var _pitch := 0.0               # radians, negative: pointing down
 var _fade_loop := false         # fade out and in between rounds (when the end does not match the start)
 var _key: Variant = null        # what the gesture is about (the gear, a spot): asking again for it changes nothing
+## Which body to build (the constants by default; tests change them to check the fallback).
+var use_glb := USE_GLB_HAND
+var hand_file := HAND_FILE
 var _material: StandardMaterial3D
 var _figure: Node3D
 var _index: Array[MeshInstance3D] = []
 var _thumb: Array[MeshInstance3D] = []
+var _player: AnimationPlayer    # the GLB hand's clips (null: the primitive hand)
+var _skeleton: Skeleton3D
+var _folded: Dictionary = {}    # bone -> its rotation in the closed pinch: the three fingers a pointing hand folds
+var _tap_tip := Vector3.ZERO    # where the index fingertip is (figure space) when the tap is pressed
+var _shown_clip := ""
+var _shown_at := -1.0
 
 
 func _ready() -> void:
-	_ensure_built()
-	visible = false
+	visible = false   # nothing is built until a gesture is asked for, and it is freed again after the fade
 	set_process(false)
 
 
@@ -47,10 +80,10 @@ func _ready() -> void:
 func tap(at: Vector3) -> void:
 	_start(Mode.TAP, [
 		[0.0, 0.13, 0.05, 0.25],
-		[0.9, 0.012, 0.0, 0.25],
-		[1.2, 0.012, 0.0, 0.25],
-		[2.0, 0.13, 0.05, 0.25],
-		[3.0, 0.13, 0.05, 0.25],
+		[TAP_DOWN, 0.012, 0.0, 0.25],
+		[TAP_UP, 0.012, 0.0, 0.25],
+		[TAP_BACK, 0.13, 0.05, 0.25],
+		[TAP_LOOP, 0.13, 0.05, 0.25],
 	], func() -> Vector3: return at, -0.55, false, at)
 
 
@@ -99,6 +132,7 @@ func _start(mode: Mode, keys: Array, anchor: Callable, pitch: float, fade_loop: 
 		_fade = 0.0   # one gesture at a time: the old one is gone before the new one shows
 	_key = key
 	_mode = mode
+	_gesture = mode
 	_keys = keys
 	_length = keys[keys.size() - 1][0]
 	_anchor = anchor
@@ -114,6 +148,7 @@ func _process(delta: float) -> void:
 	_fade = move_toward(_fade, 1.0 if _mode != Mode.NONE else 0.0, delta / FADE_SECONDS)
 	if _mode == Mode.NONE:
 		if _fade <= 0.0:
+			_free_figure()   # gone: no hand node left, nothing running
 			visible = false
 			set_process(false)
 		else:
@@ -144,7 +179,7 @@ func _pose(seconds: float) -> void:
 		stop()   # what it was showing is gone
 		return
 	var forward := Vector3.FORWARD   # away from the child
-	if App.head() != null:
+	if App.rig != null and App.head() != null:
 		var flat := anchor - App.head().global_position
 		flat.y = 0.0
 		if flat.length() > 0.01:
@@ -152,7 +187,7 @@ func _pose(seconds: float) -> void:
 	forward = forward.rotated(Vector3.UP, YAW)
 	global_position = anchor + Vector3.UP * up - forward * back
 	global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
-	_pose_fingers(open)
+	_show_fingers(open, seconds)
 	var rounds := 1.0
 	if _fade_loop:
 		rounds = smoothstep(0.0, 0.5, seconds) * (1.0 - smoothstep(_length - 0.5, _length, seconds))
@@ -167,17 +202,128 @@ func _pose(seconds: float) -> void:
 func _ensure_built() -> void:
 	if _figure != null:
 		return
+	if _material == null:
+		_material = StandardMaterial3D.new()
+		_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_material.albedo_color = Color(COLOUR, 0.0)
+		_material.emission_enabled = true
+		_material.emission = COLOUR
+		_material.emission_energy_multiplier = 0.35
+		_material.roughness = 0.9
+		_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_figure = Node3D.new()
 	add_child(_figure)
-	_material = StandardMaterial3D.new()
-	_material.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
-	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_material.albedo_color = Color(COLOUR, 0.0)
-	_material.emission_enabled = true
-	_material.emission = COLOUR
-	_material.emission_energy_multiplier = 0.35
-	_material.roughness = 0.9
-	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if not (use_glb and _build_glb_hand()):
+		_build_primitive_hand()
+
+
+## Takes the hand away for good (after it has faded): nothing of it is left in the tree.
+func _free_figure() -> void:
+	if _figure != null:
+		_figure.queue_free()
+	_figure = null
+	_player = null
+	_skeleton = null
+	_folded.clear()
+	_index.clear()
+	_thumb.clear()
+	_shown_clip = ""
+	_shown_at = -1.0
+
+
+## The MRTK right hand from the GLB, turned to our frame and scaled. False (and nothing left behind)
+## if the file is missing or is not what we expect: the caller then builds the primitive hand.
+func _build_glb_hand() -> bool:
+	if not ResourceLoader.exists(hand_file):
+		return false
+	var scene := load(hand_file) as PackedScene
+	if scene == null:
+		return false
+	var model := scene.instantiate() as Node3D
+	if model == null:
+		return false
+	var player := model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var meshes := model.find_children("*", "MeshInstance3D", true, false)
+	if player == null or meshes.is_empty() or not player.has_animation(&"pinch") or not player.has_animation(&"tap"):
+		model.free()
+		return false
+	var wrapper := Node3D.new()   # the one fixed correction lives here, not in the asset
+	wrapper.rotation = Vector3(0.0, HAND_FIX_YAW + HAND_FIX_TRIM, HAND_ROLL)
+	wrapper.scale = Vector3.ONE * HAND_SCALE
+	_figure.add_child(wrapper)
+	wrapper.add_child(model)
+	for node in meshes:
+		var mesh := node as MeshInstance3D
+		mesh.material_override = _material   # ours, so that the fade works on whatever the file brought
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if player.has_animation(&"idle"):
+		player.get_animation(&"idle").loop_mode = Animation.LOOP_LINEAR   # the import gives no loop flag
+	_skeleton = model.find_child("Skeleton3D", true, false) as Skeleton3D
+	_player = player
+	_folded.clear()
+	_tap_tip = Vector3.ZERO
+	if _skeleton != null:
+		player.play(&"pinch")
+		player.seek(1.0, true)   # closed: the fingers a pointing hand folds away are curled here
+		player.pause()
+		for bone in _skeleton.get_bone_count():
+			for finger in FOLDED_FINGERS:
+				if _skeleton.get_bone_name(bone).begins_with(finger):
+					_folded[bone] = _skeleton.get_bone_pose_rotation(bone)
+		player.play(&"tap")
+		player.seek(0.5, true)   # pressed: where the index fingertip is
+		player.pause()
+		var tip := _skeleton.find_bone(INDEX_TIP_BONE)
+		if tip >= 0:
+			_tap_tip = _figure.to_local(_skeleton.to_global(_skeleton.get_bone_global_pose(tip).origin))
+	player.play(&"pinch")
+	player.seek(0.0, true)
+	player.pause()   # from now on only scrubbed, never played
+	_shown_clip = ""
+	return true
+
+
+## Puts the fingers where [param open] (and, for the tap, [param seconds] of the loop) say.
+func _show_fingers(open: float, seconds: float) -> void:
+	if _player == null:
+		_pose_fingers(open)
+		return
+	var clip := &"pinch"
+	var at := 0.0
+	if _gesture == Mode.TAP:
+		clip = &"tap"
+		at = _tap_clip_at(seconds)
+	else:
+		at = (1.0 - clampf(open, 0.0, 1.0)) * _player.get_animation(clip).length   # open 1 -> 0, closed 0 -> the end
+	if String(clip) != _shown_clip:
+		_player.play(clip)
+		_player.pause()
+		_shown_clip = String(clip)
+		_shown_at = -1.0
+		# A tap points: the hand is placed so the index fingertip, not the pinch point, is on the rim.
+		_figure.position = -_tap_tip if _gesture == Mode.TAP else Vector3.ZERO
+	if not is_equal_approx(at, _shown_at):
+		_player.seek(at, true)
+		_shown_at = at
+		if _gesture == Mode.TAP and _skeleton != null:
+			for bone: int in _folded:
+				_skeleton.set_bone_pose_rotation(bone, _folded[bone])   # and the other fingers folded
+
+
+## Where the "tap" clip is when the loop is at [param seconds]: down on the rim, pressed at 0.5, back.
+func _tap_clip_at(seconds: float) -> float:
+	if seconds < TAP_DOWN:
+		return 0.5 * seconds / TAP_DOWN
+	if seconds < TAP_UP:
+		return 0.5
+	if seconds < TAP_BACK:
+		return 0.5 + 0.5 * (seconds - TAP_UP) / (TAP_BACK - TAP_UP)
+	return 1.0
+
+
+## The stand-in made of primitives (the fallback).
+func _build_primitive_hand() -> void:
 	var palm := MeshInstance3D.new()
 	var palm_mesh := BoxMesh.new()
 	palm_mesh.size = Vector3(0.022, 0.066, 0.07)
