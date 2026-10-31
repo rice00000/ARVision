@@ -1,12 +1,11 @@
 {
-  "fingerprint": "af3c43bf414200682064fd9fdb2a8414c7325322f89f9a998f78fac2101a53d5",
+  "fingerprint": "215024d8e6cbfb64f7169143e9e6b5d59c2f3ff9d8ee6bfab5f0dad49636f879",
   "clips": {
     "1": "res://content/voice/generated/d21947acd5d6b2ca25830ae4.ogg",
     "2": "res://content/voice/generated/9f8d4810ad1c015832841c6e.ogg",
     "3": "res://content/voice/generated/3f7d47dfaf567a14700de60a.ogg",
     "4": "res://content/voice/generated/760e6e63b816ffc06c1580dd.ogg",
     "5": "res://content/voice/generated/b9e3cc188352bc0187f3b996.ogg",
-    "a little colour": "res://content/voice/generated/b618e1b1569a7234f774dc01.ogg",
     "a new one": "res://content/voice/generated/876e33ec7c5a1f5d4532cbc2.ogg",
     "a spell wall touch a button to play the glowing one is new": "res://content/voice/generated/3ce540bbaba536fb05f230db.ogg",
     "airplane": "res://content/voice/generated/763c71463ad193ae8a01191c.ogg",
@@ -91,7 +90,6 @@
     "let's find that one again you can take your time": "res://content/voice/generated/360562f7065216968232b9f5.ogg",
     "level": "res://content/voice/generated/b8e5743bcac332f43c136bbe.ogg",
     "look around the room": "res://content/voice/generated/53bfa2970f9124317d2e6737.ogg",
-    "look colour is coming back to your room": "res://content/voice/generated/6db08cff3502e893613f3e16.ogg",
     "look for the": "res://content/voice/generated/6e36dbd42220e789087da9fc.ogg",
     "look its spot is shining": "res://content/voice/generated/eb8b33b198856a06ad154104.ogg",
     "magic dots sweep your hand the way they flow then hold still get it right and the spell wall cracks": "res://content/voice/generated/f852b67883cdcd410f66414c.ogg",
@@ -160,7 +158,6 @@
     "that's the": "res://content/voice/generated/98ead351d6e7429fb5519bab.ogg",
     "that's the demo thanks for playing": "res://content/voice/generated/aba9a5730b9f53610a7b7e4e.ogg",
     "the": "res://content/voice/generated/d38d98a82c6f035f35367472.ogg",
-    "the grey spell knocked your things off the shelf each cubby shows the shadow of what goes in it touch a thing then hold it still on its shadow raise your hand if you need help": "res://content/voice/generated/75c27085a182abd7dae5b405.ogg",
     "there it is": "res://content/voice/generated/ea80e5ceaff73844abfafc17.ogg",
     "these all have one shape put each one on its own colour": "res://content/voice/generated/d48dc9c8ce138dac180298c1.ogg",
     "these are all the same shape in different sizes big ones go on big shadows small ones on small shadows": "res://content/voice/generated/c1ec3c55c5f282da8315f9ad.ogg",
@@ -188,7 +185,7 @@
     "watch the dots sweep your hand the way most of them go": "res://content/voice/generated/ed8e7841d8bd0358463d0df7.ogg",
     "we could look through the rest of the box or leave it here until you're ready": "res://content/voice/generated/431db9980ca9371333415c9e.ogg",
     "welcome to ar vision let's play": "res://content/voice/generated/0d1208b680345e967ce02afb.ogg",
-    "welcome young alchemist a grey spell has taken the colours from your workshop and made a mess of your shelf tidy it up to bring the colours back": "res://content/voice/generated/c83106b989884f416014c1dd.ogg",
+    "welcome young alchemist your workshop needs tidying put each thing back where it belongs": "res://content/voice/generated/90730f6b9fc67a80c17e9935.ogg",
     "well done alchemist": "res://content/voice/generated/2bebc7bb312a5bdc5c25f6f8.ogg",
     "well that's somewhere to start": "res://content/voice/generated/c3b61a5694fc6afd273c69d5.ogg",
     "which way do the dots go sweep your hand that way then hold still": "res://content/voice/generated/2d52fee6f2eff13c19567f56.ogg",
@@ -198,7 +195,7 @@
     "yes that's the": "res://content/voice/generated/2c804d419c07ada7e750bccd.ogg",
     "yes that's the one": "res://content/voice/generated/75966711246ec07f4e9dd515.ogg",
     "your alchemy table touch a button to play the glowing one is new": "res://content/voice/generated/e8bddc46f60fd211dbd6ec90.ogg",
-    "your room has all its colours back": "res://content/voice/generated/cb21c3402e4da1ae18a6225f.ogg",
+    "your things fell off the shelf each cubby shows the shadow of what goes in it pinch a thing carry it to its shadow then let go raise your hand if you need help": "res://content/voice/generated/cde560ea3a89280801337270.ogg",
     "zebra": "res://content/voice/generated/dfe5a0d860f823357f6389e1.ogg"
   }
 }

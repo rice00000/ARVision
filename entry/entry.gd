@@ -87,7 +87,7 @@ func run() -> void:
 	await _lid_touched
 	await _open_lid()
 
-	# Beat 3: the room shows another identity, still faded.
+	# Beat 3: the room shows another identity.
 	_beat("3: the room reveals")
 	_reveal_room()
 	await say("There it is.")
@@ -115,12 +115,11 @@ func run() -> void:
 	_wanted = -1
 	_orb_to(_box.global_position + Vector3.UP * (_rim + 0.15))
 
-	# Beat 6: a fragment inside; colour comes back to the cabinet; a mark on the seal.
+	# Beat 6: a fragment inside; it finds the cabinet; a mark on the seal.
 	_beat("6: the fragment")
 	var fragment := await _unfold(_found[1])
 	await say("Someone put that inside?")
 	await _fly(fragment, _cabinet.global_position + Vector3.UP * 0.12)
-	_tint(_cabinet, Color(0.85, 0.55, 0.25))
 	await say("It belongs here.")
 	_mark(_seal)
 	await say("And apparently... there.")
@@ -252,6 +251,7 @@ func _open_lid() -> void:
 	await rise.finished
 
 	var shapes: Array[Mesh] = [SphereMesh.new(), CylinderMesh.new(), PrismMesh.new()]
+	var colours := [Color(0.35, 0.65, 0.85), Color(0.85, 0.55, 0.25), Color(0.5, 0.75, 0.4)]
 	var spots := [Vector2(-0.35, 0.3), Vector2(0.0, 0.45), Vector2(0.35, 0.3)]   # around the box, toward the child
 	for i in shapes.size():
 		var piece := MeshInstance3D.new()
@@ -261,9 +261,9 @@ func _open_lid() -> void:
 		mesh.set("top_radius", 0.03)
 		mesh.set("bottom_radius", 0.03)
 		mesh.set("size", Vector3(0.07, 0.07, 0.07))
-		var grey := StandardMaterial3D.new()
-		grey.albedo_color = Color(0.6, 0.6, 0.6)   # faded: the colour has drained away
-		mesh.material = grey
+		var material := StandardMaterial3D.new()
+		material.albedo_color = colours[i]
+		mesh.material = material
 		piece.mesh = mesh
 		piece.add_child(Target.sphere(StringName("entry_piece_%d" % i), 0.06))
 		add_child(piece)
@@ -277,17 +277,17 @@ func _open_lid() -> void:
 
 
 ## Faint markings on the table, a cabinet beside the chair, a sealed patch on the
-## wall behind: all faded grey.
+## wall behind.
 func _reveal_room() -> void:
-	var grey := StandardMaterial3D.new()
-	grey.albedo_color = Color(0.7, 0.7, 0.7, 0.5)
-	grey.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var markings := StandardMaterial3D.new()
+	markings.albedo_color = Color(0.85, 0.65, 0.3, 0.5)
+	markings.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 
 	var ring := MeshInstance3D.new()   # markings around the box
 	var torus := TorusMesh.new()
 	torus.inner_radius = 0.2
 	torus.outer_radius = 0.22
-	torus.material = grey
+	torus.material = markings
 	ring.mesh = torus
 	_box.add_child(ring)
 	ring.position = Vector3.UP * 0.003
@@ -303,7 +303,7 @@ func _reveal_room() -> void:
 	var shelf_shape := BoxMesh.new()
 	shelf_shape.size = Vector3(0.3, 0.4, 0.15)
 	shelf_shape.material = StandardMaterial3D.new()
-	(shelf_shape.material as StandardMaterial3D).albedo_color = Color(0.55, 0.55, 0.55)
+	(shelf_shape.material as StandardMaterial3D).albedo_color = Color(0.85, 0.55, 0.25)
 	shelf.mesh = shelf_shape
 	_cabinet.add_child(shelf)
 	_cabinet.look_at(eye.origin, Vector3.UP)
@@ -311,7 +311,7 @@ func _reveal_room() -> void:
 	# The sealed patch: on the wall behind, where Wei's spell wall is.
 	var patch := QuadMesh.new()
 	patch.size = Vector2(0.5, 0.5)
-	patch.material = grey
+	patch.material = markings
 	_seal.mesh = patch
 	add_child(_seal)
 	_seal.global_position = App.world.position_of(App.world.adventure.places[1])
@@ -374,14 +374,6 @@ func _fly(thing: Node3D, where: Vector3) -> void:
 	var flight := create_tween()
 	flight.tween_property(thing, "global_position", where, 1.2).set_trans(Tween.TRANS_SINE)
 	await flight.finished
-
-
-## Colour comes back to [param node] (every mesh under it).
-func _tint(node: Node, colour: Color) -> void:
-	for child in node.find_children("*", "MeshInstance3D", true, false):
-		var paint := StandardMaterial3D.new()
-		paint.albedo_color = colour
-		(child as MeshInstance3D).material_override = paint
 
 
 ## The fragment's mark appears on the seal, glowing for a moment.

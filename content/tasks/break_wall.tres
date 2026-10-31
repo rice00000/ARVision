@@ -43,4 +43,3 @@ script = ExtResource("1_task")
 title = "Break the spell wall"
 levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2")])
 requires = Array[ExtResource("1_task")]([ExtResource("5_tidy_shelf")])
-colour = 1

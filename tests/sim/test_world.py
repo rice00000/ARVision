@@ -1,5 +1,5 @@
 """The adventure played by a seated child: turn to the table, pick a level from its menu by hand,
-play it, follow the guide round to the wall behind, play there, get colour back, and find it all
+play it, follow the guide round to the wall behind, play there, and find it all
 again after a relaunch."""
 
 import csv
@@ -32,7 +32,7 @@ class Adventure(SimCase):
     def test_table_then_turn_around_to_the_wall(self):
         sim = self.launch(None, profile="test_sim_world", seat=(0.0, 0.0, 40))
         actor = Actor(sim)
-        self.assertEqual(sim.observe()["view"]["title"], "Black and white", "the room starts without colour")
+        self.assertEqual(sim.observe()["view"]["title"], "Normal", "the room starts in normal colour")
         for _ in range(30):
             if sim.observe()["world"]["guide"]["visible"]:
                 break
@@ -53,7 +53,7 @@ class Adventure(SimCase):
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         ends = self.round_ends(sim)
         self.assertEqual(len(ends), 2)
-        self.assertTrue(all(e["data"]["view"]["title"] == "Black and white" for e in ends), "played without colour")
+        self.assertTrue(all(e["data"]["view"]["title"] == "Normal" for e in ends), "played in normal colour")
         self.assertTrue(all(e["data"]["level"] == 0.0 and e["data"]["values"]["things"] == 3 for e in ends), "level 1: three things")
         with open(Path(sim.observe()["profile_dir"]) / "picks.csv", encoding="utf-8") as file:
             picks = list(csv.DictReader(file))
@@ -62,7 +62,7 @@ class Adventure(SimCase):
         self.assertEqual([row["correct"] == "1" for row in picks], [put["correct"] for put in puts], "a row per put")
 
         world = self.menu_at(sim, "Alchemy table")
-        self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (1, "A little colour"))
+        self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertTrue(world["guide"]["visible"], "the wall opened: the guide points behind")
         self.assertIn("behind you", self.last_said(sim))
         self.assertEqual([b["open"] for b in world["menu"]["buttons"]], [True, True, False, False, False],
@@ -79,17 +79,17 @@ class Adventure(SimCase):
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=15))
         ends = [e for e in self.round_ends(sim) if e["skill"] != "visual_matching"]
         self.assertEqual(len(ends), 3, "three wall rounds")
-        self.assertTrue(all(e["data"]["view"]["title"] == "A little colour" for e in ends))
+        self.assertTrue(all(e["data"]["view"]["title"] == "Normal" for e in ends))
         world = self.menu_at(sim, "Spell wall")
-        self.assertEqual((world["colour"], sim.observe()["view"]["title"]), (2, "Normal"), "all the colour is back")
+        self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the wall keeps normal colour")
         self.assertEqual(len(sim.events("reported", "place_entered")), 2, "the table once, the wall once")
         self.assert_log_ok(sim)
         sim.close(keep_profile=True)
 
         again = self.launch(None, profile="test_sim_world", keep_profile=True)
         world = self.menu_at(again, "Alchemy table")
-        self.assertEqual((world["done"], world["colour"]), ({"tidy_shelf": [0], "break_wall": [0]}, 2), "saved")
-        self.assertEqual(again.observe()["view"]["title"], "Normal", "the colour stays")
+        self.assertEqual(world["done"], {"tidy_shelf": [0], "break_wall": [0]}, "saved")
+        self.assertEqual(again.observe()["view"]["title"], "Normal", "relaunching keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "everything open was seen before: no nagging")
 
     def test_every_button_is_in_reach_of_every_body(self):

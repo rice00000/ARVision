@@ -30,14 +30,10 @@ script = ExtResource("2_pointer")
 [node name="Menu" type="XRController3D" parent="."]
 tracker = &"/user/fbhandaim/left"
 
-[node name="LeftJoints" type="XRNode3D" parent="."]
-tracker = &"/user/hand_tracker/left"
-show_when_tracked = true
+[node name="LeftJoints" type="Node" parent="."]
 script = ExtResource("3_hand")
 side = &"left"
 
-[node name="RightJoints" type="XRNode3D" parent="."]
-tracker = &"/user/hand_tracker/right"
-show_when_tracked = true
+[node name="RightJoints" type="Node" parent="."]
 script = ExtResource("3_hand")
 side = &"right"

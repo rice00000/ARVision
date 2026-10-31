@@ -96,7 +96,7 @@ static func levels() -> Dictionary:
 static func world() -> Dictionary:
 	var world := App.world
 	var guide: Node3D = world.get("_guide")
-	var result := {done = world.done, colour = world.colour, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
+	var result := {done = world.done, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
 		menu = null}
 	if world.menu and world.menu.is_inside_tree():
 		var buttons := []

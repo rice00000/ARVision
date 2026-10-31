@@ -35,19 +35,17 @@ func test_touch_and_grip_use_real_joints_in_the_rigs_world_frame() -> void:
 		expect(pointer.grip().is_equal_approx(App.rig.global_transform * palm), "%s pinches between the fingertips with palm rotation" % side)
 
 
-func test_hand_meshes_use_the_builtin_modifier_and_hide_when_tracking_is_lost() -> void:
+func test_joint_data_is_unavailable_when_tracking_is_lost() -> void:
 	await boot()
 	for side: StringName in [&"left", &"right"]:
 		var tracker := _tracked(side)
 		await frames(2)
 		var hand := App.rig.tracked_hand(side)
-		expect(hand.visible, "%s shows while tracked" % side)
-		var modifier := hand.find_children("*", "XRHandModifier3D", true, false)[0] as XRHandModifier3D
-		expect_eq(modifier.hand_tracker, tracker.name, "Godot animates the matching hand")
+		expect(hand.has_joints(), "%s joints are available while tracked" % side)
 		tracker.has_tracking_data = false
 		tracker.invalidate_pose(&"default")
 		await frames(2)
-		expect(not hand.visible and not hand.has_joints(), "%s has no frozen hand after tracking loss" % side)
+		expect(not hand.has_joints(), "%s does not use stale joints after tracking loss" % side)
 
 
 func shutdown() -> void:

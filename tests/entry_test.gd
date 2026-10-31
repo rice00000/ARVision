@@ -86,6 +86,8 @@ func test_the_cauldron_stands_on_the_table_and_waits_for_a_touch() -> void:
 	expect_eq(found.size(), 3, "three objects tumble out")
 	for piece: Node3D in found:
 		expect(absf(piece.global_position.y - table.transform.origin.y - 0.035) < 0.01, "%s landed on the table" % piece)
+		var colour: Color = (piece as MeshInstance3D).mesh.material.albedo_color
+		expect(not is_equal_approx(colour.r, colour.b), "each piece starts in colour")
 
 
 func test_finding_the_piece_again_with_a_wrong_pick_and_help() -> void:
@@ -126,3 +128,4 @@ func test_the_world_starts_only_when_the_child_chooses() -> void:
 	expect(await _until_said(said, greeting), "choosing the button starts the World")
 	await frames(2)
 	expect(_target(&"entry_begin") == null, "and the button goes")
+	expect(not App.reality.view.is_graded() and not App.reality.view.black_and_white, "entering the World keeps the room in normal colour")

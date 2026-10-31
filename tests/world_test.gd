@@ -1,6 +1,6 @@
 extends TestCase
 ## The World: the guide points the way, facing the table unfolds its task menu,
-## locked levels stay locked, done tasks give back colour, and all of it is saved.
+## locked levels stay locked, the room stays in colour, and progress is saved.
 
 const TIDY := preload("res://content/tasks/tidy_shelf.tres")
 const WALL := preload("res://content/tasks/break_wall.tres")
@@ -31,35 +31,24 @@ func test_levels_and_tasks_unlock_in_order() -> void:
 	expect(not world.can_play(WALL, 1), "but not its level 2")
 
 
-func test_colour_comes_back_the_first_time_each_task_is_done() -> void:
+func test_the_room_stays_in_normal_colour_before_and_after_tasks() -> void:
 	await boot()
 	var world := App.world
-	var said := record(Events.said)
-	world._show_colour()
-	expect_eq(App.reality.view.title, "Black and white", "the room starts in black and white")
-	await world._complete(TIDY, 0)
-	expect_eq(world.colour, 1, "a step of colour")
-	expect_eq(App.reality.view.title, "A little colour", "the room shows it")
-	expect_eq(App.session.base_view.title, "A little colour", "and the next task plays in it")
-	expect(said.back()[0].contains("Colour is coming back"), "the guide says so: %s" % said.back()[0])
-	await world._complete(TIDY, 1)
-	expect_eq(world.colour, 1, "another level of the same task: no more colour")
-	await world._complete(WALL, 0)
-	expect_eq(world.colour, 2, "the second task brings full colour")
-	expect_eq(App.reality.view.title, "Normal", "full colour")
-	expect(said.back()[0].contains("all its colours"), "and the guide says so: %s" % said.back()[0])
+	expect_eq(App.reality.view.title, "Normal", "the room starts in normal colour")
+	for completed in [[TIDY, 0], [TIDY, 1], [WALL, 0]]:
+		await world._complete(completed[0], completed[1])
+		expect(not App.reality.view.is_graded() and not App.reality.view.black_and_white, "completing a task never changes the room's colour")
+		expect_eq(App.session.base_view.title, "Normal", "the next task also plays in normal colour")
 
 
 func test_progress_is_saved_and_read_back() -> void:
 	await boot()
 	await App.world._complete(TIDY, 0)
 	App.world.done = {}
-	App.world.colour = 0
 	Save.reload()
 	expect_eq(App.world.done, {&"tidy_shelf": [0]}, "levels done")
-	expect_eq(App.world.colour, 1, "colour")
 	Profile.wipe()
-	expect_eq([App.world.done, App.world.colour], [{}, 0], "a wiped profile starts fresh")
+	expect_eq(App.world.done, {}, "a wiped profile starts fresh")
 
 
 func test_turning_to_the_table_unfolds_its_menu() -> void:
@@ -103,7 +92,7 @@ func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
 	expect_eq(App.session.plan, TIDY.levels[0], "level 1's plan")
 	expect(is_equal_approx(App.session.level(), TIDY.levels[0].blocks[0].difficulty), "at level 1's difficulty")
 	expect(App.world.menu == null, "the menu folded away")
-	expect_eq(started[0][1].view.title, "Black and white", "still in black and white")
+	expect_eq(started[0][1].view.title, "Normal", "played in normal colour")
 
 
 func test_a_fingertip_near_a_button_hears_what_it_is() -> void:

@@ -190,7 +190,7 @@ class Panel(SimCase):
         observation = sim.observe()
         self.assertEqual((observation["profile"], observation["paused"], observation["facilitator"]["open"]),
                          ("test_sim_saves_s1", False, False), "plays the new save at once")
-        self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({}, "Black and white"), "from the start")
+        self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({}, "Normal"), "from the start")
         self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, False, False, False, False])
 
         self.facilitator.open()
@@ -202,7 +202,7 @@ class Panel(SimCase):
         sim.wait(0.5)
         observation = sim.observe()
         self.assertEqual(observation["profile"], "test_sim_saves")
-        self.assertEqual((observation["world"]["done"], observation["world"]["colour"]), ({"tidy_shelf": [0]}, 1), "where it was left")
+        self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({"tidy_shelf": [0]}, "Normal"), "where it was left")
         self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, True, False, False, False])
 
         self.facilitator.open()

@@ -1,5 +1,5 @@
 extends Trial
-## Tidy up: the grey spell knocked the alchemist's things off the shelf. Every
+## Tidy up: the alchemist's things fell off the shelf. Every
 ## cubby shows what belongs in it on a sticker: a black shadow, a black outline,
 ## a shadow of its size, or a shadow in its colour. The child pinches a thing,
 ## carries it to a sticker and lets go. The right thing
