@@ -25,6 +25,7 @@ Get ARVision building and running on the headset. Later sessions: camera frames 
 | Oct 29 | Repo | Now at `~/quest-cv/ARVision`, branch `megan-native-quest-AR`. The first clone in `Documents/Virtual Reality` broke because Documents syncs to iCloud (`git status`: "unable to map index file: Operation timed out"). Keep Git repos out of iCloud. |
 | Oct 29 | Java 17 | Azul Zulu 17.0.21 via `brew install --cask zulu@17` (needs the Mac login password) |
 | Oct 29 | Android SDK | Android Studio 2026.2.2 setup wizard (Standard) → `~/Library/Android/sdk` |
+| Oct 30 | Desktop testing (no headset) | Press ▶ in Godot: Wei's simulated room. Controls only reach the game when the Game tab's toolbar is in **Input** mode (selection modes catch the clicks). Right-drag look, left-click pinch, left-drag sweep, H help, M facilitator. |
 | Oct 30 | USB debugging | Headset showed `unauthorized` with no prompt, even after `adb kill-server`. Fix: restart the headset, then replug while wearing it. |
 | Oct 29 | Godot Editor Settings → Export → Android | Java SDK Path `/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home`, Android SDK Path `~/Library/Android/sdk`; debug keystore made automatically |
 | Oct 29 | Export templates + Android build template | 4.7.2 installed |
@@ -103,14 +104,23 @@ Get ARVision building and running on the headset. Later sessions: camera frames 
 
 | Check | What to do | Observed | OK? |
 |---|---|---|---|
-| Four directions, both hands | Sweep right, left, toward, away; once with each hand | | |
-| Dots visible over passthrough at 2.2 m | Can you see the cloud clearly in your room? | | |
-| Radial "gathering" motion | Does toward/away look right, or wrong / too hard? | | |
-| Frame rate | Smooth, or stutters? | | |
+| Four directions, both hands | Sweep right, left, toward, away; once with each hand | Worked well with hands | ✅ |
+| Dots visible over passthrough at 2.2 m | Can you see the cloud clearly in your room? | Clear | ✅ |
+| Radial "gathering" motion | Does toward/away look right, or wrong / too hard? | Looked good | ✅ |
+| Frame rate | Smooth, or stutters? | Smooth | ✅ |
 | Help vs probe | Raise a hand: do all dots follow the flow? (not in probes) | | |
 | Tracking loss | Hide a hand, bring it back | | |
 | System-menu pause | Open the Quest menu mid-round, come back | | |
-| Reach comfort | Sweeps comfortable seated? | | |
-| Sweep thresholds | Do gentle sweeps count? (child-speed later) | | |
+| Reach comfort | Sweeps comfortable seated? | OK seated | ✅ |
+| Sweep thresholds | Do gentle sweeps count? (child-speed later) | Sweeps OK (adult) | ✅ |
 
-- **Result / Conclusion / Next:** after the run.
+- **Result (Oct 30, first pass):** directions, visibility, smoothness, seated comfort and sweeps all fine with hands; help, tracking loss and system-menu pause reported as looking good in general (not each checked separately). Toward/away ("gathering") looked good. Felt queasy by the end of the session (after a long day of putting the headset on and off; cause not separated).
+- **Conclusion:** PASS on all items tried; no fixes needed from this check.
+- **Next:** polish global motion as a game moment (story intro), in Wei's adventure; note whether the dot motion itself causes discomfort, which matters for children.
+
+## E1 · Entry scene, beat 1 (Oct 30)
+
+- **What:** `entry/entry.gd` + test scene `entry/entry_test.tscn` (Entry node + Wei's `main.tscn` unchanged). Entry pauses Wei's World (`autostart = false`), waits for the table, puts a box on its centre with a glowing orb above, plays the orb's first two lines, then starts Wei's World. Story: "Something Was Left Here" (story chat).
+- **Runs on the laptop** with **Run Specific Scene → entry/entry_test.tscn** (▶ always runs Wei's `main.tscn`). Recipe "Meta Quest 3 Entry" for the headset.
+- **Learned:** new lines must be baked (`python3 tools/bake_speech.py`, after `pip install -r tools/requirements.txt`); a word list must be declared on **one line** for the baker to find it (`content/voice/speech.tts` → `word_lists` has `entry/entry.gd:OPENING`). An unbaked line crashes Wei's voice module (`get_length` on null) instead of staying silent: tell Wei.
+- **Next:** beat 2, touch the lid to open the box.
