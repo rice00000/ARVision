@@ -507,3 +507,37 @@ frame; shader compile is not measurable headless. If the freeze persists on the 
 scene switch) is still available.
 
 Tests: 225 pass on `entry-layout-6` (the base's 222 plus mine; `entry_test` waits for the socket to settle after a jump to the ripple).
+
+## Motion route, round 1 (chat C): `entry/motion_layout.gd`, `entry/motion_dev.gd`
+
+Wei's cloud (not changed): a box of half sizes **0.8 wide x 0.5 high x 0.8 deep** (motion.tres; a test checks them) round a
+centre 2.2 m ahead at EYE height, so its near face is 1.4 m from the eyes (Wei's rule: at least 0.6) and it spans 60 degrees
+across and 39 degrees up and down, seen from the near face.
+
+1. **Where the dots appear and sit.** `EntryMotionLayout.entrance()`: the group (a ball of 18 cm) starts hidden 20 cm behind the
+   table's far edge and 30 cm under the table top, rises past the far edge and eases into the cloud's middle in `RISE_SECONDS`
+   (1.4 s), one soft swoosh (Wei's `SweepTrail` whoosh, quieter, until the swoosh is sourced). On all 42 test tables the far edge is at
+   most 1.2 m out, so the cloud never touches the table, and the entrance is at least 0.4 m clear of the bench, shelf and things.
+   Onion: the shelf scene's resting spot is INSIDE the dots' view (29 to 35 degrees left, the cloud reaches 30 degrees), so while
+   the dots play `EntryMotionLayout.onion_spot()` moves him to the nearest clear spot along the shelf's end that is 4+ degrees out
+   of the dots' view (about 40 degrees to the side, 10 to 20 degrees down, within 55 degrees: in view, not covering dots).
+   **Subtitles: the line at Voice's 20 degrees covers the dots, and the proposed 12 degrees would cover them more** (the proposal
+   was for the shelf; do not apply it to the motion part). To clear the dots the line has to be at 26 degrees or more
+   (`Voice.above_horizon`, set by the motion scene while it plays, back after; a setting, not a code change in Wei's file).
+2. **The choice panel** is not done: I need Wei's shelf-level choice targets (World's `task_menu`) to place the motion target
+   beside them; say if the organizer wants them side by side above the shelf and I will lay it out next.
+3. **Scene marker and coherence control (built, ready for the organizer's scene).** `EntryMotionDev`: add it as a child, call
+   `set_scene(&"Motion")` (also `Opening`, `Tutorial`, `Shelf`). Head-locked top-left marker (34 degrees left, 18 up, 75 cm,
+   outside the dots' 30 degrees and the subtitle). Under the DEV jump panel: a readout ("DEV · coherence 70 % (pinned, next
+   round)") and buttons 90 / 70 / 50 / 30 / 15 and -5 / +5. They pin like Wei's Easier/Harder: `Session.pinned` plus a
+   `level_pinned` event (with the percent and `source = dev_coherence`), so it is logged. Level 0 is 90 %, level 1 is 15 %
+   (`EntryMotionLayout.level_for` / `percent_for`). A pin applies from the NEXT round (the round in play has its condition).
+4. **The wall effect** (`build/round4/wall_*.png`, the simulated room, wall 3 m away, effect at eye height): the hole is
+   2.4 x 1.7 m up to 3 m, shrinking in metres beyond (so about 43 x 32 degrees of view at up to 3 m, 33 x 24 at 4 m). It fills a
+   third of the child's view width, and its lower part sits behind the shelf's top (the shelf reaches about 10 degrees under
+   the horizon). CRACK: the picture ripples and cracks, quiet colours, 3 s; SPACE: a glowing yellow rim round a purple hole,
+   6 s. **Proposal for "restrained" (Wei's constants, not changed): use CRACK, not SPACE; `HOLE_SIZE` 2.4 x 1.7 to 1.7 x 1.2
+   (about 31 x 22 degrees at 3 m), centre it a little above the eye line so the shelf does not cover it; keep `STAY_SECONDS` 3.**
+
+Tests: `entry_layout_test` has four new ones (the numbers against `motion.tres`; the dots on all 42 tables; the subtitle;
+the coherence mapping and the marker). The pinning buttons are not tested with hands (needs the headset).
