@@ -40,6 +40,8 @@ const PLAY_RADIUS := 0.75
 ## The shelf and the things to tidy stand this much farther along the table than Wei's
 ## original, metres, so they are not right in front of the player. See TidyTrial.push.
 const SHELF_PUSH := 0.22
+## The back of Wei's shelf from the eyes before the push: SHELF_AHEAD 0.31 + DEPTH 0.09, metres.
+const SHELF_BACK := 0.40
 ## The cauldron stands near the middle, a little left, this far from the eyes. TO TEST: reach.
 const CAULDRON_DISTANCE := 0.5
 const CAULDRON_ANGLE := 30.0
@@ -183,7 +185,6 @@ func _exit_tree() -> void:
 
 ## Plays the arrival, then starts the World.
 func run() -> void:
-	ShelfCopy.push = shelf_push
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
@@ -198,6 +199,7 @@ func run() -> void:
 	if DEBUG:
 		_debug_buttons()
 	await _setup()
+	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
 	_on_table = _cauldron_on_table()
 	_shelf_to_the_side()
@@ -385,7 +387,11 @@ func _step_reach() -> bool:
 			break
 		await get_tree().process_frame
 	_cauldron_distance = clampf(_reach_seen * 0.75, 0.35, 0.6) if used else CAULDRON_DISTANCE
-	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ", snappedf(_cauldron_distance, 0.01), " m out")
+	# The shelf's back (its farthest cubby, SHELF_BACK from the play set's start) stands at about
+	# 90% of the easy reach: never closer than Wei's original, never more than 30 cm back.
+	shelf_push = clampf(_reach_seen * 0.9 - SHELF_BACK, 0.0, 0.3) if used else SHELF_PUSH
+	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ",
+			snappedf(_cauldron_distance, 0.01), " m out, the shelf stands ", snappedf(shelf_push, 0.01), " m back")
 	return false
 
 

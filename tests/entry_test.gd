@@ -383,12 +383,14 @@ func test_the_reach_step_brings_the_cauldron_in_to_the_childs_reach() -> void:
 	await _press(&"entry_step_next")   # Done
 	await wait(0.2)
 	expect(absf(float(entry.get("_cauldron_distance")) - 0.465) < 0.02, "the cauldron goes three quarters of the reach out, got %s" % entry.get("_cauldron_distance"))
+	expect(absf(float(entry.get("shelf_push")) - (0.62 * 0.9 - Entry.SHELF_BACK)) < 0.02, "the shelf stands back so its farthest cubby is at nine tenths of the reach, got %s" % entry.get("shelf_push"))
 
 
 func test_without_a_measured_reach_the_cauldron_keeps_its_usual_spot() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	expect_eq(entry.get("_cauldron_distance"), Entry.CAULDRON_DISTANCE, "the usual 50 cm")
+	expect_eq(entry.get("shelf_push"), Entry.SHELF_PUSH, "and the shelf its usual 22 cm back")
 
 
 func test_a_jump_button_during_setup_skips_the_rest() -> void:
