@@ -30,6 +30,9 @@ const ARM_SECONDS := 0.8
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
+## While Onion leads the motion route it speaks for the task: Wei's round line, his "Yes!..." and his
+## hint line stay quiet (wrong-direction feedback stays until the story chat replaces it).
+static var onion_voice := false
 @export var wall_style: WallBreak.Style = WallBreak.Style.CRACK
 
 var _rng := RandomNumberGenerator.new()
@@ -95,7 +98,8 @@ func _setup(round_condition: TrialCondition) -> void:
 	round_condition.set_value(&"flow", _flow)
 	round_condition.set_value(&"signal_dots", signal_dots)
 	round_condition.set_value(&"seed", trial_seed)
-	say("Which way do the dots go? Sweep your hand that way, then hold still.")
+	if not onion_voice:
+		say("Which way do the dots go? Sweep your hand that way, then hold still.")
 
 
 func focus_point() -> Vector3:
@@ -122,7 +126,8 @@ func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float)
 	_attempts.append(result)
 	Events.report(&"motion_attempt", result)
 	judge(&"good", _cloud.global_position)
-	say("Yes! Now they all go together.")
+	if not onion_voice:
+		say("Yes! Now they all go together.")
 	if break_wall:
 		var eye := App.head().global_position
 		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow, wall_style)
@@ -156,7 +161,8 @@ func _notification(what: int) -> void:
 func _hint(_level: int) -> void:
 	_show_signal(_dots)
 	judge(&"hint", _cloud.global_position)
-	say("Now every dot goes the same way. Watch, then sweep.")
+	if not onion_voice:
+		say("Now every dot goes the same way. Watch, then sweep.")
 
 
 func _show_signal(count: int) -> void:
