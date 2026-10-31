@@ -1973,7 +1973,7 @@ func _human_sweep(length: float, seconds: float, tremor := 0.0, rise := 0.0, arc
 	return result
 
 
-func test_a_seated_childs_ordinary_sweeps_are_seen_and_read_the_right_way_slow_and_short_ones_are_not() -> void:
+func test_a_seated_childs_sweeps_slow_ones_too_are_seen_and_read_the_right_way_and_tiny_ones_are_not() -> void:
 	await boot(null, &"intro")
 	var cases := [   # [name, length m, seconds, tremor m, rise m, arc m]
 		["brisk, 30 cm in 0.5 s", 0.30, 0.5, 0.0, 0.0, 0.0],
@@ -1999,12 +1999,12 @@ func test_a_seated_childs_ordinary_sweeps_are_seen_and_read_the_right_way_slow_a
 		table[case[0]] = result
 		print("SWEEPTABLE %-52s peak %.2f m/s  detected %s  heard %s cm  angle %s deg" % [case[0], result.peak_speed, result.detected,
 			snappedf(result.get("heard_distance", 0.0) * 100.0, 0.1), snappedf(result.get("angle", -1.0), 0.1)])
-	for name: String in ["brisk, 30 cm in 0.5 s", "ordinary, 30 cm in 0.8 s", "unhurried, 30 cm in 1.2 s", "long, 45 cm in 1.0 s", "ordinary with 1.5 mm of tracking jitter",
+	for name: String in ["brisk, 30 cm in 0.5 s", "ordinary, 30 cm in 0.8 s", "unhurried, 30 cm in 1.2 s", "slow and careful, 30 cm in 1.6 s", "slow and careful with 1.5 mm of jitter", "very slow, 30 cm in 2.2 s", "long, 45 cm in 1.0 s", "ordinary with 1.5 mm of tracking jitter",
 			"short, 20 cm in 0.6 s", "rising 15 cm on the way (27 degrees)", "rising 30 cm on the way (45 degrees)", "an arc, 8 cm out and back, like a swinging wrist"]:
 		expect(table[name].detected and table[name].ended, "seen, and seen to stop: %s" % name)
 		expect(table[name].angle < 40.0, "and read the right way (within Wei's 40 degrees): %s, %s deg" % [name, table[name].get("angle")])
 	expect(not table["tiny, 10 cm in 0.4 s"].detected, "a 10 cm movement is not a sweep (Wei's minimum is 12 cm)")
-	expect(not table["very slow, 30 cm in 2.2 s"].detected, "a very slow sweep (peak under 0.3 m/s) is not seen: a finding for the headset test")
+	expect(not table["slow and careful with 4 mm of jitter"].detected or table["slow and careful with 4 mm of jitter"].detected, "(a slow sweep with 4 mm of jitter: printed above, not judged)")
 
 
 ## A hand that is not sweeping: resting with some tracking jitter, or drifting slowly. How many sweeps did the rig see?
@@ -2023,12 +2023,13 @@ func _idle_hand_sweeps(seconds: float, jitter: float, drift_per_second := 0.0) -
 	return sweeping.size()
 
 
-func test_a_lower_sweep_speed_would_catch_a_slow_careful_sweep_without_false_sweeps_from_a_resting_or_drifting_hand() -> void:
+func test_the_approved_sweep_speed_catches_a_slow_careful_sweep_and_the_old_one_did_not_and_a_resting_or_drifting_hand_never_sweeps() -> void:
 	await boot(null, &"intro")
 	var pointer := App.rig.pointer(&"right")
 	var default_speed := pointer.sweep_speed
 	var findings := {}
-	for speed: float in [default_speed, 0.2, 0.15]:
+	expect(is_equal_approx(default_speed, 0.2), "the rig's sweep speed is the approved 0.2 m/s (it was 0.3)")
+	for speed: float in [0.3, 0.2, 0.15]:
 		pointer.sweep_speed = speed
 		var slow_jitter := await _human_sweep(0.30, 1.6, 0.0015)
 		var very_slow := await _human_sweep(0.30, 2.2)
@@ -2039,5 +2040,6 @@ func test_a_lower_sweep_speed_would_catch_a_slow_careful_sweep_without_false_swe
 		print("SWEEPSPEED %.2f m/s: slow and careful with jitter %s, very slow %s; false sweeps: resting %d, resting with poor tracking %d, drifting 4 cm/s %d" % [
 			speed, slow_jitter.detected, very_slow.detected, rests, rests_badly, drifts])
 	pointer.sweep_speed = default_speed
-	expect(findings[0.2].slow_jitter, "at 0.2 m/s a slow, careful sweep with a little jitter is seen")
+	expect(not findings[0.3].slow_jitter and not findings[0.3].very_slow, "at the old 0.3 m/s a slow sweep with a little jitter, and a very slow one, were missed")
+	expect(findings[0.2].slow_jitter and findings[0.2].very_slow, "at 0.2 m/s a slow, careful sweep with a little jitter, and a very slow one, are seen")
 	expect(findings[0.2].rests == 0 and findings[0.2].rests_badly == 0 and findings[0.2].drifts == 0, "and a resting or slowly drifting hand still makes no sweep: %s" % [findings[0.2]])

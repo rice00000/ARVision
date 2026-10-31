@@ -337,7 +337,7 @@ Notes:
 **Your own sweep (Wei's detection, seated, one hand).** Do each, five times, with the hand you like; note how many the game saw (the white streak and the whoosh show a sweep was seen; the dots go together when it was the right way):
 - [ ] An ordinary sweep, about 30 cm in a second: ______ of 5.
 - [ ] A short sweep, about 15 cm: ______ of 5.
-- [ ] A slow, careful sweep, about 30 cm in two seconds: ______ of 5. (By simulation this is the one that is missed at the moment: Wei's speed limit, 0.3 m/s, is just under such a sweep. If it is missed here too, lowering it to 0.2 m/s is recommended: see the DEV_NOTES.)
+- [ ] A slow, careful sweep, about 30 cm in two seconds: ______ of 5. (By simulation this is the one the old speed limit, 0.3 m/s, missed; the limit is now 0.2 m/s, Megan's OK: see the DEV_NOTES. If it is still missed here, tell us how slowly you moved.)
 - [ ] A sweep that rises a little on the way, or swings in an arc like a wrist: seen. ______
 - [ ] Sweeping with the other hand: same ______.
 - [ ] A hand resting or drifting slowly never makes a sweep by itself: false streaks ______.
