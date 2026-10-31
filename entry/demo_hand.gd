@@ -13,6 +13,9 @@ const COLOUR := Color(0.96, 0.9, 0.8)
 const ALPHA := 0.4
 const FADE_SECONDS := 0.4
 const RADIUS := 0.0085
+## It comes in like a right hand: turned this many radians to the left of straight away from the
+## child, so thumb and finger are seen from the side, not end-on.
+const YAW := 0.85
 
 enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE }
 
@@ -135,6 +138,7 @@ func _pose(seconds: float) -> void:
 		flat.y = 0.0
 		if flat.length() > 0.01:
 			forward = flat.normalized()
+	forward = forward.rotated(Vector3.UP, YAW)
 	global_position = anchor + Vector3.UP * up - forward * back
 	global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
 	_pose_fingers(open)
