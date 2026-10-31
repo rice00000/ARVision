@@ -57,11 +57,11 @@ func _ready() -> void:
 	visible = false
 
 
-## Stands the panel [param distance] metres ahead of [param head], facing it.
-func place(head: Transform3D, distance := 0.55) -> void:
-	var ahead := Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
+## Stands the panel ahead of [param head], facing it, a little above the eyes (EntryLayout.setup_spot):
+## its buttons stay above the shelf and the table things in view.
+func place(head: Transform3D) -> void:
 	add_to_group(&"entry_panel")
-	global_position = head.origin + ahead * distance + Vector3.UP * 0.02
+	global_position = EntryLayout.setup_spot(head)
 	look_at(Vector3(head.origin.x, global_position.y, head.origin.z), Vector3.UP)
 	rotate_object_local(Vector3.UP, PI)   # its face (+z) to the child
 

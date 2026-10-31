@@ -39,17 +39,13 @@ const MUSIC_DB := -12.0
 const PLAY_RADIUS := 0.75
 ## The shelf and the things to tidy stand this much farther along the table than Wei's
 ## original, metres, so they are not right in front of the player. See TidyTrial.push.
-const SHELF_PUSH := 0.22
+const SHELF_PUSH := EntryLayout.SHELF_PUSH
 ## The back of Wei's shelf from the eyes before the push: SHELF_AHEAD 0.31 + DEPTH 0.09, metres.
-const SHELF_BACK := 0.40
+const SHELF_BACK := EntryLayout.SHELF_BACK
 ## The cauldron stands near the middle, a little left, this far from the eyes. TO TEST: reach.
-const CAULDRON_DISTANCE := 0.5
-const CAULDRON_ANGLE := 30.0
-## Wei's shelf stands to the right, this many degrees off straight ahead: in view, clear
-## of the cauldron. (It goes where his code's table point is, so that point is moved.)
-const SHELF_ANGLE := 0.0
-## Gap the cauldron keeps from the bench, metres; if it can't, it goes beside the bench.
-const CAULDRON_GAP := 0.02
+## WHERE everything stands (the cauldron's angle, the shelf's, the panel, the gear's landing spot,
+## Onion's spots, the setup panel, the dev buttons) is worked out in entry/layout.gd (EntryLayout).
+const CAULDRON_DISTANCE := EntryLayout.CAULDRON_DISTANCE
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
 ## Seconds the ripple takes to spread across the play circle. Slow and soft: no flash.
 const RIPPLE_SECONDS := 5.0
@@ -155,9 +151,7 @@ var _early_part: StringName = &""   # a jump button pressed during setup: skip t
 var _show_hands_now := false        # the hands step shows the outlines even with SHOW_HANDS off
 ## Where things stand, degrees off straight ahead (shelf: to the right, cauldron: to the left).
 ## Variables so a picture or a test can try another layout; the constants are the defaults.
-var shelf_angle := SHELF_ANGLE
 var shelf_push := SHELF_PUSH
-var cauldron_angle := CAULDRON_ANGLE
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
 var _sounds: Sounds
@@ -166,6 +160,10 @@ var _actions: OnionActions          # where Onion looks, its hop and lean, the ?
 var _tapped := false               # the child has tapped the cauldron (it counts from when Onion is up)
 var _tap_open := false             # a tap on the cauldron counts now, even before it is asked for
 var _rattle_amp := 0.0             # how much the cauldron trembles, radians
+var _reach_measured := 0.0          # the reach the layout uses: _reach_seen when Done was pressed, else 0
+var _layout: EntryLayout            # WHERE everything stands (entry/layout.gd), worked out once after setup
+var _zones: EntryZoneOverlay        # DEV: the zone map drawn on the table (the "Zones" button)
+var _made_way := false              # the cauldron and the panel stand at their spots for the revealed room
 var _runner: PartRunner             # what the playing part waits on; freed to cancel it
 var _part_running := false          # a part is playing (a jump button cuts in on it)
 var _pending: StringName = &""      # the part a jump button asked for while another was playing
@@ -416,6 +414,7 @@ func _place() -> void:
 ## been looking forward to it; a pause to enjoy the room; then it notices the scattered things.
 func _reveal(fast := false) -> void:
 	_beat("6: the reveal")
+	await _make_way()   # layout chat: what stands where the bench goes glides aside first
 	await _ripple()
 	_attend(null)
 	await say("I've been looking forward to showing you this.")
@@ -555,10 +554,12 @@ func _step_reach() -> bool:
 		if pressed == &"entry_step_alt":
 			break
 		await get_tree().process_frame
-	_cauldron_distance = clampf(_reach_seen * 0.75, 0.35, 0.6) if used else CAULDRON_DISTANCE
+	_reach_measured = _reach_seen if used else 0.0
+	_cauldron_distance = EntryLayout.cauldron_out(_reach_measured)
 	# The shelf's back (its farthest cubby, SHELF_BACK from the play set's start) stands at about
-	# 90% of the easy reach: never closer than Wei's original, never more than 30 cm back.
-	shelf_push = clampf(_reach_seen * 0.9 - SHELF_BACK, 0.0, 0.3) if used else SHELF_PUSH
+	# 90% of the easy reach: at least 10 cm back (Wei's things then never lie under the chin or
+	# wider than the view), never more than 30 cm. See EntryLayout.shelf_push.
+	shelf_push = EntryLayout.shelf_push(_reach_measured)
 	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ",
 			snappedf(_cauldron_distance, 0.01), " m out, the shelf stands ", snappedf(shelf_push, 0.01), " m back")
 	return false
@@ -659,6 +660,7 @@ func _take_press(ids: Array) -> StringName:
 ## Puts everything as [param part] finds it, at once: Onion's place, the things on
 ## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
 func _set_up_for(part: StringName) -> void:
+	_make_way(0.0, part in [&"hello", &"touch", &"emerge"])   # layout chat: the cauldron and panel where this part finds them
 	_cue = false
 	_tapped = false
 	_tap_open = false
@@ -764,6 +766,9 @@ func _on_target(target: Target) -> void:
 		print("ENTRY DEBUG: restart")
 		Engine.time_scale = 1.0
 		get_tree().reload_current_scene.call_deferred()
+		return
+	if target != null and target.id == &"entry_debug_zones":   # layout chat: the zone map, on and off
+		_toggle_zones()
 		return
 	if target != null and target.id == &"entry_debug_exit":
 		if _real - _exit_armed > EXIT_WINDOW:
@@ -1139,48 +1144,60 @@ func _new_hand() -> Array:
 ## too): "Restart" plays the opening again from the start, "Exit app" closes the app.
 ## 15 cm apart, so each is easy to hit on its own.
 func _debug_buttons() -> void:
-	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var right := ahead.rotated(Vector3.UP, -deg_to_rad(38.0))
-	var at := eye.origin + right * 0.5 + Vector3.UP * 0.1
+	var head := App.head().global_transform
+	var at := EntryLayout.dev_spot(head, true)
 	var down := Vector3.DOWN * 0.075
 	var restart := _button("Restart", at - down, &"entry_debug_restart", Color(0.35, 0.35, 0.4))
 	var leave := _button("Exit app", at + down, &"entry_debug_exit", Color(0.55, 0.25, 0.25))
+	var zones := _button("Zones", at + down * 2.0, &"entry_debug_zones", Color(0.3, 0.45, 0.4), 0.14, 0.01)
 	_exit_button = leave
-	print("ENTRY DEBUG: Restart / Exit buttons ", _away(restart.global_position), " m away, up on the right, ",
+	print("ENTRY DEBUG: Restart / Exit / Zones ", _away(restart.global_position), " m away, ", EntryLayout.DEV_ANGLE, " degrees right, ",
 			snappedf(restart.global_position.distance_to(leave.global_position), 0.01), " m apart")
-	for button in [restart, leave]:
+	for button in [restart, leave, zones]:
 		button.set_meta(&"debug", true)
 	if JUMP_PANEL:
 		_dev_jumps()
 
 
-## DEV: one button per part, in a column at the left, there from the start. Pressing one in
-## the middle of setup skips the rest of setup and plays that part. 6.5 cm apart.
+## DEV: one button per part, in a column out at the left (EntryLayout.DEV_ANGLE), there from the
+## start. Pressing one in the middle of setup skips the rest of setup and plays that part. 6.5 cm apart.
 func _dev_jumps() -> void:
-	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var left := ahead.rotated(Vector3.UP, deg_to_rad(38.0))
-	var at := eye.origin + left * 0.5 + Vector3.UP * 0.15
+	var at := EntryLayout.dev_spot(App.head().global_transform, false) + Vector3.UP * EntryLayout.DEV_JUMPS_TOP
 	var words := Label3D.new()
 	words.text = "DEV · jump to"
-	words.font_size = 22
+	words.font_size = 26
 	words.pixel_size = 0.0006
+	words.outline_size = 8
 	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	add_child(words)
-	words.global_position = at + Vector3.UP * 0.06
+	words.global_position = at + Vector3.UP * 0.05
 	var names: Array = PARTS.keys()
 	for i in names.size():
 		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.055), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
 	_pop_button = _button("Pop sound: A", at + Vector3.DOWN * (names.size() * 0.055 + 0.01), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.16, 0.005)
 
 
+## DEV: shows or hides the zone map on the table (the "Zones" button, or SHOW_ZONES from the start).
+func _toggle_zones() -> void:
+	if _zones != null and is_instance_valid(_zones):
+		_zones.queue_free()
+		_zones = null
+		print("ENTRY zones: hidden")
+		return
+	if _layout == null:
+		print("ENTRY zones: nothing placed yet (after setup)")
+		return
+	_zones = EntryZoneOverlay.new()
+	add_child(_zones)
+	_zones.draw(_layout, EntryLayout.REVEAL | EntryLayout.SHELF if _made_way else EntryLayout.SETUP | EntryLayout.OPENING)
+	print("ENTRY zones: shown\n", _layout.report() if _layout.report() != "" else "no overlaps")
+
+
 # --- The shelf to the side ----------------------------------------------------
 
-## Wei's bench faces his table point from the eyes. So to put the shelf SHELF_ANGLE
-## to the right, the found table's point moves there, along the same table. Only for
-## a real table: the pretend one is always straight ahead (then the cauldron goes
-## beside the bench instead). Wei's World follows: the alchemy table is that way.
+## Wei's bench faces his table point from the eyes. So to turn the shelf the layout's angle
+## right, the found table's point moves there, along the same table. Only for a real table: the
+## pretend one is always straight ahead. Wei's World follows: the alchemy table is that way.
 func _shelf_to_the_side() -> void:
 	var table := App.reality.work_surface()
 	if not App.reality.surfaces(&"table").has(table):
@@ -1188,10 +1205,7 @@ func _shelf_to_the_side() -> void:
 		return
 	var eye := App.head().global_position
 	var reach := Vector2(table.transform.origin.x - eye.x, table.transform.origin.z - eye.z).length()
-	# Turn the shelf further right until the bench clears the cauldron (at most 75 degrees).
-	var angle := shelf_angle
-	while _on_table != null and angle < 75.0 and _clearance(_on_table, eye, angle) < CAULDRON_GAP:
-		angle += 5.0
+	var angle := _layout.shelf_angle
 	var point := eye + _ahead.rotated(Vector3.UP, -deg_to_rad(angle)) * reach
 	point.y = table.transform.origin.y
 	App.reality._surfaces.erase(table)   # TESTING: reaches into Reality's list (ask Wei for a hook)
@@ -1199,34 +1213,38 @@ func _shelf_to_the_side() -> void:
 	App.reality.add_surface(moved)
 	if _pinned != null:
 		_pinned = moved
-	print("ENTRY shelf: ", angle, " degrees right, ", snappedf(reach, 0.01), " m away",
-			"" if _on_table == null else ", %.2f m clear of the cauldron" % _clearance(_on_table, eye, angle))
+	print("ENTRY shelf: ", angle, " degrees right, ", snappedf(reach, 0.01), " m away")
 
 
-## Metres between the cauldron at [param spot] and Wei's bench if it faced
-## [param angle] degrees right (negative: they overlap). The bench's size is his.
-func _clearance(spot: Vector3, eye: Vector3, angle: float) -> float:
-	var facing := _ahead.rotated(Vector3.UP, -deg_to_rad(angle))
-	var bench := Transform3D(Basis.looking_at(facing), eye + facing * ShelfCopy.push)
-	var local := bench.affine_inverse() * spot
-	var half := (ShelfCopy.THINGS_WIDE + 0.06) * 0.5
-	var across := absf(local.x) - half - CAULDRON_WIDTH * 0.5
-	var beyond := -local.z - 0.41 - CAULDRON_WIDTH * 0.5   # past the shelf's back
-	return maxf(across, beyond)
-
-
-## The cauldron's spot on the confirmed real table: the point of the table nearest
-## the middle of the seated reach (CAULDRON_ANGLE left, CAULDRON_DISTANCE), 12 cm in
-## from its edges. Null without a real table.
+## Works out the layout (EntryLayout) from the confirmed table, the head and the reach, and
+## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
+## finds the height by depth).
 func _cauldron_on_table() -> Variant:
 	var table := App.reality.work_surface()
-	if not App.reality.surfaces(&"table").has(table):
+	var real := App.reality.surfaces(&"table").has(table)
+	_layout = _new_layout(table, real, _reach_measured)
+	_layout.plan()
+	print("ENTRY layout: ", _layout.summary())
+	var problems := _layout.report()
+	if problems != "":
+		print("ENTRY layout: ", problems.replace("\n", "; "))
+	if not real:
 		return null
-	var eye := App.head().global_position
-	var wanted := eye + _ahead.rotated(Vector3.UP, deg_to_rad(cauldron_angle)) * _cauldron_distance
-	var spot := _nearest_on(table, wanted, 0.12)
-	print("ENTRY spot: on the confirmed table, ", _away(spot), " m away (", snappedf(spot.distance_to(Vector3(wanted.x, spot.y, wanted.z)), 0.01), " m from the ideal spot)")
-	return spot
+	print("ENTRY spot: on the confirmed table, ", _away(_layout.cauldron), " m away")
+	return _layout.cauldron
+
+
+## A layout for [param table] from where the head is now, straight ahead from the seat.
+func _new_layout(table: Surface, real: bool, measured: float) -> EntryLayout:
+	var layout := EntryLayout.new()
+	var head := App.head().global_transform
+	layout.eye = head.origin
+	layout.ahead = Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
+	layout.table = table.transform
+	layout.table_size = table.size
+	layout.real_table = real
+	layout.reach = measured
+	return layout
 
 
 ## The point of [param table] nearest [param near] (seen from above), [param margin] in from its edges.
@@ -1315,11 +1333,14 @@ func _step_table() -> bool:
 func _table_panel(table: Surface, real: bool) -> void:
 	var drop := App.head().global_position.y - table.transform.origin.y
 	var comfy := drop >= 0.25 and drop <= 0.8
-	var big := table.size.x >= 0.6 and table.size.y >= 0.4
+	var layout := _new_layout(table, real, 0.0).plan()
+	var crowded := layout.overlaps().filter(func(o: Dictionary) -> bool: return o.how == "on the table").size()
+	var far := layout.out_of_reach().size()
+	var big := crowded == 0 and far == 0
 	_panel.show_step(2, SETUP_STEPS, "Find the table", "Is the outline on your table?",
 			[["Found by the headset" if real else "No table found: a pretend one", &"good" if real else &"warn"],
 			["Comfortable height (%d cm down)" % roundi(drop * 100.0) if comfy else "Looks odd: %d cm below the eyes" % roundi(drop * 100.0), &"good" if comfy else &"warn"],
-			["Big enough for everything" if big else "Small: things may be tight", &"good" if big else &"warn"]],
+			["Room for everything" if big else ("Far: hard to reach" if far > 0 else "Small: %d things overlap" % crowded), &"good" if big else &"warn"]],
 			[["Yes, that's the table", &"entry_confirm_yes", SetupPanel.GREEN], ["No, point at it", &"entry_confirm_point", SetupPanel.GREY]])
 
 
@@ -1504,29 +1525,19 @@ func _on_node_added(node: Node) -> void:
 		print("ENTRY shelf: Wei's trial has its own now")
 
 
-## Where the cauldron goes: near the middle (CAULDRON_ANGLE left, CAULDRON_DISTANCE),
-## if that keeps it clear of Wei's bench; else just left of the bench. At the real
-## table's height when depth finds a flat, level patch there (a lap doesn't count),
-## else the found table's height, else the bench's. It stays there the whole time.
+## Where the cauldron goes: the layout's spot (EntryLayout: left of the middle, in reach, clear of the
+## panel). At the real table's height when depth finds a flat, level patch there (a lap doesn't
+## count), else the found table's height, else the bench's. The layout follows its real height.
 func _cauldron_spot() -> Vector3:
 	var eye := _bench.origin
 	_left = _ahead.rotated(Vector3.UP, PI * 0.5)
+	var spot := _layout.cauldron
 	if _on_table != null:
-		var on: Vector3 = _on_table
-		var flat: Variant = _flat_at(eye, Vector3(on.x, eye.y, on.z))   # the real top's height, if depth sees it
-		if flat != null and absf((flat as Vector3).y - on.y) < 0.05:
-			on.y = (flat as Vector3).y
-		print("ENTRY spot: cauldron on the confirmed table, ", snappedf(eye.y - on.y, 0.01), " m below the eyes")
-		return on
-	var spot := eye + _ahead.rotated(Vector3.UP, deg_to_rad(cauldron_angle)) * _cauldron_distance
-	var on_bench := _bench.affine_inverse() * spot   # in the bench's frame: x across, -z ahead
-	var clear := absf(on_bench.x) - CAULDRON_WIDTH * 0.5 - _bench_half
-	if clear < CAULDRON_GAP and -on_bench.z < 0.41 + CAULDRON_WIDTH * 0.5:
-		var side := _bench_half + CAULDRON_GAP + 0.03 + CAULDRON_WIDTH * 0.5
-		spot = _bench * Vector3(-side, 0.0, -0.28)
-		print("ENTRY spot: the middle would touch the shelf; beside it instead")
-	else:
-		print("ENTRY spot: middle, ", snappedf(clear, 0.01), " m clear of the bench")
+		var flat: Variant = _flat_at(eye, Vector3(spot.x, eye.y, spot.z))   # the real top's height, if depth sees it
+		if flat != null and absf((flat as Vector3).y - spot.y) < 0.05:
+			spot.y = (flat as Vector3).y
+		print("ENTRY spot: cauldron on the confirmed table, ", snappedf(eye.y - spot.y, 0.01), " m below the eyes")
+		return spot
 	spot.y = eye.y - _bench_below
 	for attempt in 12:   # about 3 s
 		var flat: Variant = _flat_at(eye, Vector3(spot.x, eye.y, spot.z))
@@ -1727,9 +1738,10 @@ func _onion_aside() -> void:
 	await _move(_orb, _aside_spot(), 0.8)
 
 
-## Where Onion waits while the things come out: right of the cauldron, a little toward the child.
+## Where Onion waits while the gear comes out: beside the cauldron, away from the panel and the
+## landing spot (EntryLayout). After the cauldron made way, beside it there.
 func _aside_spot() -> Vector3:
-	return _mouth + Vector3.UP * (ONION_HEIGHT * 0.5 + 0.04) - _left * (CAULDRON_WIDTH * 0.5 + 0.08) + _toward_child() * 0.04
+	return _layout.onion_aside_after if _made_way else _layout.onion_aside
 
 
 ## Moves Onion smoothly to [param where].
@@ -1737,9 +1749,10 @@ func _orb_to(where: Vector3) -> void:
 	_move(_orb, where, 1.2)
 
 
-## Over the shelf's left end, between it and the cauldron: where Onion waits during Wei's World.
+## Just beyond the shelf's end on the cauldron's side, high up: where Onion waits during Wei's
+## World, never over a cubby, the things or the panel (EntryLayout.onion_rest).
 func _beside_shelf() -> Vector3:
-	return _bench * Vector3(-_bench_half + 0.02, -_bench_below + 0.3, -0.3)
+	return _layout.onion_rest
 
 
 # --- The gear and the table mechanism ---------------------------------------
@@ -1755,11 +1768,9 @@ const GEAR_OUT_SCALE := 0.4
 const GEAR_PLAY_SCALE := 0.6
 ## The table panel: width, thickness and depth, metres; the socket's radius, and how far toward
 ## the child from the panel's middle it sits.
-const PANEL := Vector3(0.30, 0.012, 0.22)
+const PANEL := Vector3(0.26, 0.012, 0.22)
 const SOCKET_RADIUS := 0.06
 const SOCKET_Z := 0.03
-## How far from the panel's middle things must stay clear (it is roughly this round).
-const PANEL_REACH := 0.17
 
 var _cog: Node3D
 
@@ -1912,46 +1923,66 @@ func _build_mechanism() -> void:
 	_mech_spin.add(_cog, 1.2)
 	_socket_at = _mechanism.to_global(Vector3(0, PANEL.y, SOCKET_Z))
 	_ripple_origin = _socket_at
-	# Where the gear lands: between the cauldron and the socket, within reach, not on the cauldron.
-	var between := _box.global_position.lerp(_socket_at, 0.45)
-	var away := Vector3(between.x - _box.global_position.x, 0.0, between.z - _box.global_position.z)
-	if away.length() < CAULDRON_WIDTH * 0.5 + 0.08:
-		between = _box.global_position + away.normalized() * (CAULDRON_WIDTH * 0.5 + 0.08)
-	_gear_rest = Vector3(between.x, _box.global_position.y, between.z)
+	# Where the gear lands: beside the cauldron, clear of it and the panel, in reach (EntryLayout).
+	_gear_rest = _layout.gear_rest
 	print("ENTRY mechanism: ", _away(spot), " m away at ", snappedf(rad_to_deg(_ahead.signed_angle_to(Vector3(spot.x - eye.x, 0.0, spot.z - eye.z).normalized(), Vector3.UP)), 1), " degrees")
 
 
-## Where the panel goes: on the table, clear of the cauldron and of the shelf's footprint
-## (the bench and the things on it), as near the middle as that allows, 35 to 45 cm out.
+## Where the panel goes in the opening (EntryLayout): on the table, the socket in reach, clear of
+## the cauldron and of where the gear lands. The layout first takes the cauldron's real height.
 func _mechanism_spot() -> Vector3:
-	var eye := App.head().global_position
-	var table := App.reality.work_surface()
-	var inverse := table.transform.affine_inverse()
-	var half := table.size * 0.5 - Vector2.ONE * 0.15
-	var best := Vector3(eye.x, _box.global_position.y, eye.z) + _ahead * 0.42
-	var best_score := -INF
-	for angle in range(-50, 55, 5):
-		for distance: float in [0.40, 0.45, 0.35]:
-			var p := Vector3(eye.x, _box.global_position.y, eye.z) + _ahead.rotated(Vector3.UP, deg_to_rad(angle)) * distance
-			var on_table := inverse * p
-			if absf(on_table.x) > half.x or absf(on_table.z) > half.y:
-				continue
-			var clear := _slot_clearance(p)
-			var score := (0.0 if clear >= 0.02 else -10.0 + clear) - absf(angle) * 0.01 - absf(distance - 0.42) * 0.5
-			if score > best_score:
-				best_score = score
-				best = p
-	return best
+	_layout.set_cauldron(_box.global_position, _rim)
+	return _layout.mechanism
 
 
-## How much room a panel at [param p] has beside the cauldron and the shelf's footprint, metres.
-func _slot_clearance(p: Vector3) -> float:
-	var to_cauldron := Vector2(p.x - _box.global_position.x, p.z - _box.global_position.z).length() - CAULDRON_WIDTH * 0.5 - PANEL_REACH
-	var local := _bench.affine_inverse() * p
-	var ahead_of_bench := -local.z
-	var dx := maxf(absf(local.x) - (ShelfCopy.THINGS_WIDE + 0.06) * 0.5, 0.0)
-	var dz := maxf(maxf(0.11 - ahead_of_bench, ahead_of_bench - 0.40), 0.0)
-	return minf(to_cauldron, Vector2(dx, dz).length() - PANEL_REACH)
+## The cauldron and the panel (with the gear in it) at their spots for the revealed room, where
+## Wei's bench will be clear of them (EntryLayout.MAKE_WAY): gliding there over [param seconds], or
+## at once (0). Onion, if waiting beside the cauldron, goes along. The ripple starts from the socket
+## where it ends up. Back to the opening's spots with [param back].
+func _make_way(seconds := 1.2, back := false) -> void:
+	if _layout == null or _made_way != back:
+		return
+	_made_way = not back
+	var pot := _layout.cauldron if back else _layout.cauldron_after
+	var plate := _layout.mechanism if back else _layout.mechanism_after
+	var yaw := _layout.mechanism_yaw if back else _layout.mechanism_yaw_after
+	pot.y = _box.global_position.y
+	plate.y = _mechanism.global_position.y
+	var lift := pot - _box.global_position
+	var slide := plate - _mechanism.global_position
+	var orb_to := _aside_spot()
+	var orb_goes := _orb.global_position.distance_to(_layout.onion_aside_after if back else _layout.onion_aside) < 0.05
+	var gear_goes := is_instance_valid(_gear) and _gear.visible and _gear.global_position.distance_to(_socket_at) < 0.02
+	if _zones != null and is_instance_valid(_zones):
+		_zones.draw(_layout, EntryLayout.REVEAL | EntryLayout.SHELF if _made_way else EntryLayout.SETUP | EntryLayout.OPENING)
+	_mouth += lift
+	_socket_at = _layout.socket if back else _layout.socket_after
+	_socket_at.y = _mechanism.global_position.y + PANEL.y
+	_ripple_origin = _socket_at
+	if lift.length() < 0.005 and slide.length() < 0.005:
+		return
+	print("ENTRY make way: the cauldron ", snappedf(lift.length() * 100.0, 1), " cm, the panel ", snappedf(slide.length() * 100.0, 1), " cm",
+			" (back to the opening)" if back else "")
+	if seconds <= 0.0:
+		_box.global_position = pot
+		_mechanism.global_position = plate
+		_mechanism.rotation.y = yaw
+		if gear_goes:
+			_gear.global_position = _socket_at
+			_gear.rotation.y = yaw
+		if orb_goes:
+			_orb.global_position = orb_to
+		return
+	var tween := _runner.create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_box, "global_position", pot, seconds)
+	tween.tween_property(_mechanism, "global_position", plate, seconds)
+	tween.tween_property(_mechanism, "rotation:y", yaw, seconds)
+	if gear_goes:
+		tween.tween_property(_gear, "global_position", _socket_at, seconds)
+		tween.tween_property(_gear, "rotation:y", yaw, seconds)
+	if orb_goes:
+		tween.tween_property(_orb, "global_position", orb_to, seconds)
+	await tween.finished
 
 
 ## The gear pops up through the brew (small, with a little overshoot), clears the rim, then
