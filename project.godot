@@ -16,6 +16,8 @@ run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 run/main_scene.recorder="res://tools/record/record.tscn"
+run/main_scene.cvlab="res://tools/cv_lab/cv_lab.tscn"
+run/main_scene.entry="res://entry/entry_test.tscn"
 
 [autoload]
 

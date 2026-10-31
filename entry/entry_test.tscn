@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://ww3w3aux7gxf"]
+
+[ext_resource type="Script" uid="uid://ct0jse80psanf" path="res://entry/entry.gd" id="1_entry"]
+[ext_resource type="PackedScene" path="res://main.tscn" id="2_main"]
+
+[node name="EntryTest" type="Node3D" unique_id=363934993]
+
+[node name="Entry" type="Node3D" parent="." unique_id=2108002014]
+script = ExtResource("1_entry")
+
+[node name="Main" parent="." unique_id=1958194457 instance=ExtResource("2_main")]

@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://dok3mubme6ima"]
+
+[ext_resource type="Script" uid="uid://be4a2oadbby6j" path="res://tools/cv_lab/cv_lab.gd" id="1_lab"]
+[ext_resource type="PackedScene" path="res://rig/rig.tscn" id="2_rig"]
+
+[node name="CvLab" type="Node3D" unique_id=1830785057]
+script = ExtResource("1_lab")
+
+[node name="Rig" parent="." unique_id=1756483773 instance=ExtResource("2_rig")]

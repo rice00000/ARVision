@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="TrialDef" format=3]
+[gd_resource type="Resource" script_class="TrialDef" format=3 uid="uid://c13q0mme27u20"]
 
-[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
-[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]
 [ext_resource type="PackedScene" path="res://trials/find/find.tscn" id="3_scene"]
 
 [sub_resource type="Resource" id="clutter"]
@@ -10,31 +10,35 @@ name = &"clutter"
 easy = 2.0
 hard = 9.0
 driven = true
+fixed = nan
 
 [sub_resource type="Resource" id="size"]
 script = ExtResource("2_axis")
 name = &"size"
 easy = 0.07
+fixed = nan
 
 [sub_resource type="Resource" id="spacing"]
 script = ExtResource("2_axis")
 name = &"spacing"
 easy = 1.8
+fixed = nan
 
 [sub_resource type="Resource" id="same_colour"]
 script = ExtResource("2_axis")
 name = &"same_colour"
-easy = 0.0
+fixed = nan
 
 [sub_resource type="Resource" id="same_shape"]
 script = ExtResource("2_axis")
 name = &"same_shape"
-easy = 0.0
+fixed = nan
 
 [sub_resource type="Resource" id="colour_gap"]
 script = ExtResource("2_axis")
 name = &"colour_gap"
 easy = 0.08
+fixed = nan
 
 [resource]
 script = ExtResource("1_def")
@@ -44,6 +48,4 @@ skill = &"objects_in_clutter"
 axes = Array[ExtResource("2_axis")]([SubResource("clutter"), SubResource("size"), SubResource("spacing"), SubResource("same_colour"), SubResource("same_shape"), SubResource("colour_gap")])
 notes = "Clutter is the driven axis. Size, spacing and colour stay fixed within a block so a failure points at clutter; task levels pin same_colour (shape only), same_shape and colour_gap (colour only). Toys sit on the real table (room scan) or a virtual patch in front."
 hint_after = 7.0
-hint_fade = 1.0
-max_hint = 2
 time_limit = 45.0
