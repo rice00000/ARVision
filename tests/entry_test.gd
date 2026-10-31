@@ -524,3 +524,15 @@ func test_the_story_sounds_play_at_their_moments() -> void:
 	expect(await until(func() -> bool: return sounds.played.has(&"reveal"), 60.0), "the reveal pad with the ripple")
 	expect_eq(sounds.played.count(&"seat"), 1, "the click plays once")
 	expect(sounds.toggle_pop() == "c", "the pop can be switched to candidate C")
+
+
+func test_the_cauldron_is_hidden_during_the_first_shelf_level() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	await _press(&"entry_part_shelf")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the first visit loads")
+	await wait(1.0)
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	var cauldron := workshop.get("_cauldron") as Node3D
+	expect(cauldron != null and not cauldron.visible, "the cauldron is out of sight for the object test")
+	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "Onion is still there")

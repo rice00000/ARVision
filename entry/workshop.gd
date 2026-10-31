@@ -23,6 +23,7 @@ var _guiding := false
 var _clock := 0.0
 var _talk_until := 0.0
 var _switches := 0
+var _cauldron: Node3D
 var _attention: Variant = null   # a Node3D or a position to look at instead of the child
 var _cheer_until := 0.0
 
@@ -39,7 +40,8 @@ func take(parts: Dictionary) -> void:
 	_halo = parts.halo
 	_rest = parts.rest
 	_onion.reparent(self)
-	(parts.cauldron as Node3D).reparent(self)
+	_cauldron = parts.cauldron as Node3D
+	_cauldron.reparent(self)
 	for key in ["mechanism", "gear"]:   # the installed mechanism stays, turning
 		var part: Node3D = parts.get(key)
 		if part != null and is_instance_valid(part):
@@ -78,7 +80,9 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 	var scene: StringName = data.get("to", &"")
 	if scene == &"find_object":
 		_become_guide()
-	elif scene != &"first_visit":
+	elif scene == &"first_visit":
+		_cauldron.visible = false   # the object test is what to look at now: the cauldron would distract
+	else:
 		queue_free()
 
 
