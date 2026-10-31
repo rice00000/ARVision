@@ -5,7 +5,10 @@ extends Node3D
 ## and up to two buttons. One panel; each step replaces what is on it. The Entry does the
 ## checking and listening; this is only the look. It stands upright, facing the head.
 ##
-## Dot colours: [constant GOOD] done, [constant WARN] worth a look, [constant WAIT] not yet.
+## Dot colours: [constant GOOD] done, [constant WARN] worth a look, [constant WAIT] not yet. Never by
+## colour alone: a done line has a tick and dims, a warning has a "!", and the first line still
+## waiting stays bright with its dot breathing, so the eye goes to what to do now. "Step 2 of 4" in
+## the bar, and one line at the foot on how to press, for a grown-up new to the headset.
 
 const SIZE := Vector2(0.46, 0.34)
 const SAGE := Color(0.62, 0.74, 0.6)
@@ -27,7 +30,12 @@ var steps := 4
 var _title: Label3D
 var _body: Label3D
 var _dots: Array[MeshInstance3D] = []
-var _checks: Array[Dictionary] = []   # {dot: MeshInstance3D, words: Label3D}
+var _checks: Array[Dictionary] = []   # {dot: MeshInstance3D, words: Label3D, sign: Label3D, state: StringName}
+var _step_words: Label3D
+var _clock := 0.0
+
+## The line at the foot of the plate.
+const HOW_TO_PRESS := "To press: touch a button with a fingertip, or point at it and pinch."
 
 
 func _ready() -> void:
@@ -35,6 +43,12 @@ func _ready() -> void:
 	_plate(Vector2(SIZE.x, 0.036), Vector3(0, SIZE.y * 0.5 - 0.018, 0.001), SAGE, 0.008)
 	var head := _label("SETUP  ·  for the grown-up", 22, Color(0.1, 0.17, 0.1))
 	head.position = Vector3(-SIZE.x * 0.5 + 0.012, SIZE.y * 0.5 - 0.018, 0.006)
+	_step_words = _label("", 22, Color(0.1, 0.17, 0.1))
+	_step_words.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_step_words.position = Vector3(SIZE.x * 0.5 - 0.016 - 6 * 0.02 + 0.005, SIZE.y * 0.5 - 0.018, 0.006)
+	var foot := _label(HOW_TO_PRESS, 20, Color(0.62, 0.66, 0.72))
+	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	foot.position = Vector3(0.0, -SIZE.y * 0.5 + 0.012, 0.006)
 	_title = _label("", 44, Color.WHITE)
 	_title.position = Vector3(-SIZE.x * 0.5 + 0.015, 0.1, 0.006)
 	_body = _label("", 28, Color(0.86, 0.89, 0.92))
@@ -75,12 +89,16 @@ func show_step(number: int, total: int, title: String, words: String, checks: Ar
 	for check in _checks:
 		(check.dot as Node).queue_free()
 		(check.words as Node).queue_free()
+		(check.sign as Node).queue_free()
 	_checks.clear()
 	_title.text = title
 	_body.text = words
+	_step_words.text = "Step %d of %d" % [number, total]
 	for i in _dots.size():
 		_dots[i].visible = i < total
-		(_dots[i].material_override as StandardMaterial3D).albedo_color = Color(0.1, 0.17, 0.1) if (total - 1 - i) < number else Color(0.62, 0.74, 0.6).darkened(0.25)
+		var nth := total - i   # the dots read left to right: step 1 is the leftmost
+		(_dots[i].material_override as StandardMaterial3D).albedo_color = Color(0.1, 0.17, 0.1) if nth <= number else Color(0.62, 0.74, 0.6).darkened(0.25)
+		_dots[i].scale = Vector3.ONE * (1.5 if nth == number else 1.0)
 	for i in checks.size():
 		var y := -0.005 - i * 0.03
 		var dot := MeshInstance3D.new()
@@ -95,14 +113,17 @@ func show_step(number: int, total: int, title: String, words: String, checks: Ar
 		add_child(dot)
 		var line := _label(str(checks[i][0]), 28, Color.WHITE)
 		line.position = Vector3(-SIZE.x * 0.5 + 0.045, y, 0.006)
-		_checks.append({dot = dot, words = line})
+		var sign := _label("", 40, Color(0.08, 0.12, 0.08))
+		sign.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sign.position = Vector3(-SIZE.x * 0.5 + 0.026, y, 0.0175)
+		_checks.append({dot = dot, words = line, sign = sign, state = &"wait"})
 		set_check(i, checks[i][1])
 	var count := button_defs.size()
 	for i in count:
 		var def: Array = button_defs[i]
 		var wide := 0.215 if count > 1 else 0.24
 		var x := (i - (count - 1) * 0.5) * 0.23
-		var button: EntryButton = make_button.call(str(def[0]), to_global(Vector3(x, -0.125, 0.012)), def[1], def[2], wide, 0.012)
+		var button: EntryButton = make_button.call(str(def[0]), to_global(Vector3(x, -0.118, 0.012)), def[1], def[2], wide, 0.012)
 		button.global_basis = global_basis   # parallel to the panel, not turned toward the head on its own
 		buttons.append(button)
 	visible = true
@@ -119,8 +140,31 @@ func set_check(index: int, state: StringName, words := "") -> void:
 		return
 	var colour := GOOD if state == &"good" else WARN if state == &"warn" else WAIT
 	((_checks[index].dot as MeshInstance3D).material_override as StandardMaterial3D).albedo_color = colour
+	_checks[index].state = state
+	(_checks[index].sign as Label3D).text = "✓" if state == &"good" else "!" if state == &"warn" else ""
 	if words != "":
 		(_checks[index].words as Label3D).text = words
+	_brighten()
+
+
+## Done lines dim; the others stay bright. The first still waiting breathes (see _process).
+func _brighten() -> void:
+	for check in _checks:
+		(check.words as Label3D).modulate = Color(0.62, 0.66, 0.7) if check.state == &"good" else Color.WHITE
+
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	_clock += delta
+	var now := true
+	for check in _checks:
+		var dot := check.dot as MeshInstance3D
+		if check.state == &"wait" and now:
+			dot.scale = Vector3.ONE * (1.0 + 0.3 * (0.5 + 0.5 * sin(_clock * 4.0)))   # what to do now
+			now = false
+		else:
+			dot.scale = Vector3.ONE
 
 
 func check_state(index: int) -> StringName:

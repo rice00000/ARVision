@@ -668,7 +668,7 @@ func _take_press(ids: Array) -> StringName:
 ## Puts everything as [param part] finds it, at once: Onion's place, the things on
 ## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
 func _set_up_for(part: StringName) -> void:
-	_make_way(0.0, part in [&"hello", &"touch", &"emerge"])   # layout chat: the cauldron and panel where this part finds them
+	_make_way(0.0, part in [&"hello", &"touch", &"emerge", &"pickup", &"place"])   # layout chat: the cauldron and panel where this part finds them
 	_cue = false
 	_tapped = false
 	_tap_open = false
@@ -1153,11 +1153,9 @@ func _new_hand() -> Array:
 ## 15 cm apart, so each is easy to hit on its own.
 func _debug_buttons() -> void:
 	var head := App.head().global_transform
-	var at := EntryLayout.dev_spot(head, true)
-	var down := Vector3.DOWN * 0.075
-	var restart := _button("Restart", at - down, &"entry_debug_restart", Color(0.35, 0.35, 0.4))
-	var leave := _button("Exit app", at + down, &"entry_debug_exit", Color(0.55, 0.25, 0.25))
-	var zones := _button("Zones", at + down * 2.0, &"entry_debug_zones", Color(0.3, 0.45, 0.4), 0.14, 0.01)
+	var restart := _button("Restart", EntryLayout.dev_right_spot(head, 0), &"entry_debug_restart", Color(0.35, 0.35, 0.4))
+	var leave := _button("Exit app", EntryLayout.dev_right_spot(head, 1), &"entry_debug_exit", Color(0.55, 0.25, 0.25))
+	var zones := _button("Zones", EntryLayout.dev_right_spot(head, 2), &"entry_debug_zones", Color(0.3, 0.45, 0.4), 0.14, 0.01)
 	_exit_button = leave
 	print("ENTRY DEBUG: Restart / Exit / Zones ", _away(restart.global_position), " m away, ", EntryLayout.DEV_ANGLE, " degrees right, ",
 			snappedf(restart.global_position.distance_to(leave.global_position), 0.01), " m apart")
@@ -1167,10 +1165,11 @@ func _debug_buttons() -> void:
 		_dev_jumps()
 
 
-## DEV: one button per part, in a column out at the left (EntryLayout.DEV_ANGLE), there from the
-## start. Pressing one in the middle of setup skips the rest of setup and plays that part. 6.5 cm apart.
+## DEV: one button per part, two columns of four out at the left (EntryLayout.DEV_ANGLE), in story
+## order, there from the start; the pop sound A/C under them. Pressing one in the middle of setup
+## skips the rest of setup and plays that part.
 func _dev_jumps() -> void:
-	var at := EntryLayout.dev_spot(App.head().global_transform, false) + Vector3.UP * EntryLayout.DEV_JUMPS_TOP
+	var head := App.head().global_transform
 	var words := Label3D.new()
 	words.text = "DEV · jump to"
 	words.font_size = 26
@@ -1178,11 +1177,11 @@ func _dev_jumps() -> void:
 	words.outline_size = 8
 	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	add_child(words)
-	words.global_position = at + Vector3.UP * 0.05
+	words.global_position = EntryLayout.dev_jump_label(head)
 	var names: Array = PARTS.keys()
 	for i in names.size():
-		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.055), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
-	_pop_button = _button("Pop sound: A", at + Vector3.DOWN * (names.size() * 0.055 + 0.01), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.16, 0.005)
+		_button(PARTS[names[i]], EntryLayout.dev_jump_spot(head, i), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), EntryLayout.DEV_JUMP_WIDE, 0.005)
+	_pop_button = _button("Pop sound: A", EntryLayout.dev_pop_spot(head), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.18, 0.005)
 
 
 ## DEV: shows or hides the zone map on the table (the "Zones" button, or SHOW_ZONES from the start).

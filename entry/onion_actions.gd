@@ -6,8 +6,9 @@ extends Node
 ## where the story put it. The Entry's _process reads [member attention], [member hop_y] and
 ## [member lean].
 
-## The marks: 0 = sage with a cream outline, 1 = cream with a sage outline. Compare in the scene.
-var mark_style := 0
+## The marks: 0 = sage with a cream outline, 1 = cream with a dark sage outline (the default: it
+## reads against a bright and a dark room). Size, height and colours: EntryLayout.MARK_*.
+var mark_style := EntryLayout.MARK_STYLE
 
 ## What Onion looks at: a Node3D, a world position, or null (the child).
 var attention: Variant = null
@@ -53,28 +54,28 @@ func mark(runner: Node, symbol: String, hold := 0.9) -> void:
 	var label := Label3D.new()
 	label.text = symbol
 	label.font = _bold()
-	label.font_size = 160
-	label.pixel_size = 0.0004
+	var distance := _holder.global_position.distance_to(App.head().global_position)
+	label.font_size = EntryLayout.MARK_FONT_SIZE
+	label.pixel_size = EntryLayout.mark_pixel_size(distance)
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	label.render_priority = 20
 	label.outline_render_priority = 19
-	label.outline_size = 40
-	var sage := Color(0.45, 0.62, 0.48)
-	var cream := Color(0.97, 0.94, 0.85)
-	label.modulate = sage if mark_style == 0 else cream
-	label.outline_modulate = cream if mark_style == 0 else sage
+	label.outline_size = roundi(EntryLayout.MARK_FONT_SIZE * EntryLayout.MARK_OUTLINE)
+	var colours := EntryLayout.mark_colours(mark_style)
+	label.modulate = colours[0]
+	label.outline_modulate = colours[1]
 	label.modulate.a = 0.0
 	label.scale = Vector3.ONE * 0.5
-	label.position = Vector3(0.0, _height * 0.95 + 0.05, 0.0)
+	label.position = Vector3(0.0, EntryLayout.mark_lift(_height, label.pixel_size), 0.0)
 	_holder.add_child(label)
 	label.add_to_group(&"entry_transient")
 	var tween := runner.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(label, "modulate:a", 1.0, 0.15)
-	tween.tween_property(label, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 1.0, EntryLayout.MARK_IN)
+	tween.tween_property(label, "scale", Vector3.ONE, EntryLayout.MARK_GROW).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.chain().tween_interval(hold)
-	tween.chain().tween_property(label, "modulate:a", 0.0, 0.35)
+	tween.chain().tween_property(label, "modulate:a", 0.0, EntryLayout.MARK_OUT)
 	tween.chain().tween_callback(label.queue_free)
 
 
