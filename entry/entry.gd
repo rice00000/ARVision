@@ -459,8 +459,7 @@ func _out() -> void:
 		_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
 	# (No look at the socket yet: the story moved that cue to placement, so the child can examine the gear first.)
 	await say("There it is! The table's missing piece.")
-	_attend(null)   # "I've been looking for that." turns back to the child
-	await say("I've been looking for that.")
+	_attend(null)   # turns back to the child (Megan cut "I've been looking for that.")
 
 
 ## 4. Asks the child to pick the gear up, with a hand that shows the pinch; ends when it is held.

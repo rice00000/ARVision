@@ -123,7 +123,7 @@ rattle builds. The cauldron rattles harder; a small brass planetary gear pops up
 hops in a low arc and grows as it lands on the table **between the cauldron and the panel**. Onion gives a small
 backward hop with a **"!"** and follows the gear's flight with its look. A shallow sage panel with a dark round
 socket and a little window lies on the table (it was there from the start).
-**Hear:** a rattle, then "There it is! The table's missing piece." / Onion looks at the socket: "I've been looking for that."
+**Hear:** a rattle, then "There it is! The table's missing piece." (then Onion turns back to you; "I've been looking for that." was cut)
 
 Judge:
 - [ ] The gear lands where you can reach it **without standing or leaning**. Distance to it: ______ cm.
