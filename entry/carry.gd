@@ -52,6 +52,9 @@ const TRACK_GRACE := 0.25
 const PRESS_GRACE := 0.25
 ## Gear and panel: a settled gear stays this far (centre to socket) from the panel, metres.
 const PANEL_CLEAR := 0.23
+## A real wrist rolls far more than a mouse ray can: the carried gear follows the hand's turn about the
+## vertical freely, but never tips more than this far (radians, about 35 degrees) from upright.
+const MAX_TILT := 0.6
 ## Radius of the socket's outline, metres.
 const HINT_RADIUS := 0.0725
 
@@ -318,9 +321,15 @@ func _follow(pinch: Transform3D, delta: float) -> void:
 		return   # a tracking glitch: stay where we are
 	var hand := Transform3D(pinch.basis.orthonormalized(), pinch.origin)
 	var want := hand * _offset
+	var wanted := want.basis.orthonormalized()
+	var tilt := wanted.y.angle_to(Vector3.UP)
+	if tilt > MAX_TILT:   # tipped too far by a rolled wrist: bring it back to the limit
+		var axis := wanted.y.cross(Vector3.UP)
+		if axis.length() > 0.0001:
+			wanted = Basis(axis.normalized(), tilt - MAX_TILT) * wanted
 	var keep := 1.0 - exp(-delta * 30.0)   # a little smoothing: tracking is jittery
 	var at := _gear.global_position.lerp(want.origin, keep)
-	var turn := _gear.global_basis.orthonormalized().get_rotation_quaternion().slerp(want.basis.get_rotation_quaternion(), keep)
+	var turn := _gear.global_basis.orthonormalized().get_rotation_quaternion().slerp(wanted.get_rotation_quaternion(), keep)
 	at.y = maxf(at.y, table_y)   # never through the table
 	_gear.global_transform = Transform3D(Basis(turn) * Basis.from_scale(_scale), at)
 

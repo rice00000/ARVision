@@ -102,10 +102,13 @@ func tap(at: Vector3) -> void:
 
 
 ## Pinches [param gear] and lifts it a little, looping until [method stop]. It only shows the
-## gesture: the real gear stays where it is.
-func pinch_lift(gear: Node3D) -> void:
+## gesture: the real gear stays where it is. With [param straight_down] the hand comes down onto the thing
+## from straight above instead of from the child's side, so it never travels toward anything (the shelf
+## reminder uses it: the hand never leans toward a cubby).
+func pinch_lift(gear: Node3D, straight_down := false) -> void:
+	var side := 0.0 if straight_down else 0.07
 	_start(Mode.PINCH_LIFT, [
-		[0.0, 0.09, 0.07, 1.0],
+		[0.0, 0.09, side, 1.0],
 		[1.1, 0.0, 0.0, 1.0],
 		[1.7, 0.0, 0.0, 0.0],
 		[2.0, 0.0, 0.0, 0.0],
@@ -114,8 +117,8 @@ func pinch_lift(gear: Node3D) -> void:
 		[4.2, 0.0, 0.0, 0.0],
 		[4.5, 0.0, 0.0, 0.0],
 		[5.0, 0.0, 0.0, 1.0],
-		[6.0, 0.09, 0.07, 1.0],
-		[6.6, 0.09, 0.07, 1.0],
+		[6.0, 0.09, side, 1.0],
+		[6.6, 0.09, side, 1.0],
 	], func() -> Vector3: return Carry.middle_of(gear) if is_instance_valid(gear) else Vector3.INF, -0.2, false, gear)
 
 

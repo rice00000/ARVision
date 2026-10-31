@@ -1240,3 +1240,477 @@ func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_fol
 	await frames(3)
 	_key(KEY_R, false)
 	expect(head.global_position.distance_to(start) < 0.01 and absf(head.rotation.y) < 0.001 and absf(head.rotation.x) < 0.001, "R puts it back, looking straight ahead")
+
+
+# --- The first visit's reminder (a hand that shows how to pick one thing up) ---------------------------------------
+
+const TIDY_DEF := preload("res://trials/tidy/tidy.tres")
+
+
+## A tidy round (Wei's trial) in a plain session; [param reminder] holds his first hint back.
+func _shelf_round(reminder: ShelfReminder = null) -> Trial:
+	var plan := plan_of(TIDY_DEF, 1, false, 0.0, null, {})
+	if reminder != null:
+		plan = reminder.prepare(plan)
+	await boot(plan)
+	App.session.run()
+	await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
+	await wait(0.6)   # the things have landed
+	if reminder != null:
+		app.add_child(reminder)
+	return App.session.trial
+
+
+func test_the_reminder_plan_holds_wei_help_back_without_touching_his_resources() -> void:
+	var original := TIDY_DEF.hint_after
+	var reminder := ShelfReminder.new()
+	var plan := plan_of(TIDY_DEF, 2, false, 0.0, null, {})
+	var copy := reminder.prepare(plan)
+	expect(is_equal_approx(copy.blocks[0].trial.hint_after, ShelfReminder.HELP_AFTER), "the copy waits %s s for the first hint" % ShelfReminder.HELP_AFTER)
+	expect(ShelfReminder.HELP_AFTER > ShelfReminder.DELAY + 10.0, "and the reminder comes well before it")
+	expect(is_equal_approx(plan.blocks[0].trial.hint_after, original) and is_equal_approx(TIDY_DEF.hint_after, original), "Wei's definition is untouched (%s s)" % original)
+	expect(copy.blocks[0].trial != TIDY_DEF and copy.blocks[0].trial.scene == TIDY_DEF.scene, "a copy of it, same trial")
+	reminder.free()
+
+
+func test_a_waiting_child_gets_the_hand_on_one_thing_before_wei_help_and_it_never_leans_toward_a_cubby() -> void:
+	var reminder := ShelfReminder.new()
+	reminder.delay = 1.5
+	reminder.help_after = 60.0   # (Wei's own hint is not the subject here)
+	var trial := await _shelf_round(reminder)
+	reminder.start()
+	await wait(0.8)
+	expect(reminder._demo == null or not reminder._demo.visible, "nothing before the delay")
+	await wait(1.5)
+	var demo: DemoHand = reminder._demo
+	expect(demo != null and demo.visible, "after the delay the hand shows")
+	expect_eq(trial.hint_level, 0, "and Wei's own hint has not come yet")
+	var eye := App.head().global_position
+	var things: Array = trial.get("_things")
+	var nearest: Target = things[0]
+	for thing: Target in things:
+		if eye.distance_squared_to(thing.global_position) < eye.distance_squared_to(nearest.global_position):
+			nearest = thing
+	var middle := nearest.global_position
+	expect(reminder._anchor.global_position.distance_to(middle) < 0.001, "it works on the thing nearest the child")
+	var key: String = (trial.get("_key") as Dictionary)[nearest]
+	var cell: int = (trial.get("_cell_key") as Array).find(key)
+	var cubby: Vector3 = trial.get("_cell_point")[cell]
+	var gap := Vector2(middle.x - cubby.x, middle.z - cubby.z).length()
+	var farthest := 0.0
+	var highest := -INF
+	var closest_to_cubby := INF
+	for i in 70:   # a full loop and a little more
+		await wait(0.1)
+		farthest = maxf(farthest, demo.global_position.distance_to(middle))
+		highest = maxf(highest, demo.global_position.y - middle.y)
+		closest_to_cubby = minf(closest_to_cubby, Vector2(demo.global_position.x - cubby.x, demo.global_position.z - cubby.z).length())
+	expect(farthest < 0.13, "never more than 13 cm from the thing (%s)" % farthest)
+	expect(highest < 0.095, "never higher than the 9 cm it comes down from (%s)" % highest)
+	expect(closest_to_cubby >= gap - 0.005, "and never closer to its cubby than the thing is: %s m vs %s m" % [closest_to_cubby, gap])
+	expect(nearest.global_position.is_equal_approx(middle), "the thing itself never moved")
+
+
+func test_the_reminder_comes_before_wei_first_hint_and_his_hint_still_comes() -> void:
+	var reminder := ShelfReminder.new()
+	reminder.delay = 1.5
+	reminder.help_after = 6.0
+	var trial := await _shelf_round(reminder)
+	reminder.start()
+	expect(await until(func() -> bool: return reminder._demo != null and reminder._demo.visible, 4.0), "the reminder shows")
+	expect_eq(trial.hint_level, 0, "and Wei's hint has not come yet when it does")
+	expect(await until(func() -> bool: return trial.hint_level >= 1, 8.0), "his own hint still comes later, for a child who goes on waiting")
+	await wait(0.6)
+	expect(not reminder._demo.visible, "and the reminder gives way to it")
+
+
+func test_the_reminder_is_skipped_for_a_child_who_already_holds_something_and_wei_help_goes_back_to_normal() -> void:
+	var reminder := ShelfReminder.new()
+	reminder.delay = 1.5
+	reminder.help_after = 30.0
+	var trial := await _shelf_round(reminder)
+	reminder.start()
+	var thing: Target = (trial.get("_things") as Array)[0]
+	var eye := App.head().global_position
+	var along := (thing.global_position - (eye + Vector3.DOWN * 0.2)).normalized()
+	input.point(&"right", thing.global_position - along * App.rig.pointer(&"right").tip_reach, thing.global_position)
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)   # the child takes one
+	await wait(2.5)
+	expect(not (trial.get("_carried") as Dictionary).is_empty(), "holding a thing")
+	expect(reminder._demo == null or not reminder._demo.visible, "no reminder for a child who already holds one")
+	expect(reminder._engaged, "the child has shown they can")
+	expect(is_equal_approx(trial.def.hint_after, TIDY_DEF.hint_after), "and Wei's help is on his own timing again (%s s)" % trial.def.hint_after)
+	input.press(&"right", &"trigger_click", false)
+
+
+func test_the_reminder_goes_when_the_child_takes_a_shape_and_when_wei_hint_begins() -> void:
+	var reminder := ShelfReminder.new()
+	reminder.delay = 1.0
+	reminder.help_after = 30.0
+	var trial := await _shelf_round(reminder)
+	reminder.start()
+	await wait(1.8)
+	var demo: DemoHand = reminder._demo
+	expect(demo != null and demo.visible, "shown")
+	Events.report(&"taken", {thing = "x", hand = &"right"})
+	await wait(0.8)
+	expect(not demo.visible and demo._mode == DemoHand.Mode.NONE, "a reported pick-up takes the hand away")
+	var other := ShelfReminder.new()
+	other.delay = 1.0
+	app.add_child(other)
+	other.start()
+	await wait(1.8)
+	expect(other._demo != null and other._demo.visible, "a second reminder shows")
+	trial.hint_level = 1   # Wei's own help has begun
+	await wait(0.8)
+	expect(not other._demo.visible, "one hint at a time: his help takes over")
+
+
+func test_a_reminder_with_no_delay_never_shows() -> void:
+	var reminder := ShelfReminder.new()
+	reminder.delay = 0.0
+	await _shelf_round(reminder)
+	reminder.start()
+	await wait(2.0)
+	expect(reminder._demo == null, "0 means never")
+
+
+# --- VR readiness: what only a headset does (a dummy OpenXR interface and fake hand joints) ---------------
+
+var _fake_hands: Dictionary = {}
+
+
+func shutdown() -> void:
+	App.xr = null   # a failed test must not leave the headset code paths on for the next one
+	for side: StringName in _fake_hands:
+		XRServer.remove_tracker(_fake_hands[side])
+	_fake_hands.clear()
+	await super.shutdown()
+
+
+func _headset_on() -> void:
+	App.xr = OpenXRInterface.new()
+
+
+func _fake_hand(side: StringName) -> XRHandTracker:
+	var tracker := XRHandTracker.new()
+	tracker.name = StringName("/user/hand_tracker/%s" % side)
+	tracker.hand = XRPositionalTracker.TRACKER_HAND_LEFT if side == &"left" else XRPositionalTracker.TRACKER_HAND_RIGHT
+	XRServer.add_tracker(tracker)
+	tracker.has_tracking_data = true
+	_fake_hands[side] = tracker
+	return tracker
+
+
+## A real-looking hand: the thumb tip and the index tip [param gap] apart (the index above, in the palm's
+## own up), their middle at [param pinch], the palm 7 cm behind it with [param palm] as its orientation.
+func _pose_hand(side: StringName, pinch: Vector3, palm := Basis.IDENTITY, gap := 0.012, valid := true) -> void:
+	var tracker: XRHandTracker = _fake_hands[side]
+	var to_rig := App.rig.global_transform.affine_inverse()
+	var flags := (XRHandTracker.HAND_JOINT_FLAG_POSITION_VALID | XRHandTracker.HAND_JOINT_FLAG_ORIENTATION_VALID) if valid else 0
+	for pair: Array in [[XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP, palm.y * gap * 0.5, Basis.IDENTITY],
+			[XRHandTracker.HAND_JOINT_THUMB_TIP, -palm.y * gap * 0.5, Basis.IDENTITY],
+			[XRHandTracker.HAND_JOINT_PALM, palm.z * 0.07, palm]]:
+		tracker.set_hand_joint_transform(pair[0], to_rig * Transform3D(pair[2], pinch + pair[1]))
+		tracker.set_hand_joint_flags(pair[0], flags)
+	await frames(2)
+
+
+func test_with_real_hand_joints_the_pinch_point_takes_the_gear_not_the_aim() -> void:
+	await _scene()
+	_headset_on()
+	_fake_hand(&"right")
+	var middle := Carry.middle_of(gear)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, middle + Vector3(0.0, 0.0, 0.05)))   # the AIM is on the gear...
+	await _pose_hand(&"right", middle + Vector3(0.3, 0.1, 0.0))                              # ...but the fingers are far away
+	await _press(true)
+	expect(not carry.held, "a pinch whose fingers are far from the gear takes nothing, wherever the hand's aim points")
+	await _press(false)
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, eye + Vector3(0.3, 0.2, 0.0)))     # now the aim is far...
+	await _pose_hand(&"right", middle + Vector3(0.04, 0.0, 0.0))                             # ...and the fingers are on it
+	await _press(true)
+	expect(carry.held, "the fingers 4 cm from its middle take it")
+	var before := gear.global_position
+	await _pose_hand(&"right", middle + Vector3(0.04, 0.0, 0.0) + Vector3(0.0, 0.1, -0.05))
+	await wait(0.4)
+	expect(gear.global_position.distance_to(before + Vector3(0.0, 0.1, -0.05)) < 0.02, "it goes with the pinch point, keeping its contact offset (%s)" % gear.global_position.distance_to(before + Vector3(0.0, 0.1, -0.05)))
+
+
+func test_a_rolled_wrist_never_tips_the_carried_gear_far_but_turning_about_the_vertical_is_followed() -> void:
+	await _scene()
+	_headset_on()
+	_fake_hand(&"right")
+	var middle := Carry.middle_of(gear)
+	await _pose_hand(&"right", middle)
+	await _press(true)
+	expect(carry.held, "held")
+	var turned := Basis(Vector3.UP, 1.2)   # the wrist turned about the vertical
+	await _pose_hand(&"right", middle, turned)
+	await wait(0.5)
+	expect(absf(angle_difference(gear.global_basis.orthonormalized().y.angle_to(Vector3.UP), 0.0)) < 0.05, "turning about the vertical keeps it upright")
+	expect(absf(angle_difference(gear.global_basis.get_euler().y, 1.2)) < 0.15, "and it turns with the hand (%s rad)" % gear.global_basis.get_euler().y)
+	var rolled := Basis(Vector3.BACK, 1.5)   # the palm rolled 86 degrees
+	await _pose_hand(&"right", middle, rolled)
+	await wait(0.5)
+	var tipped := gear.global_basis.orthonormalized().y.angle_to(Vector3.UP)
+	expect(tipped <= 0.65, "a rolled wrist tips the gear no more than about 35 degrees (0.6 rad); it tipped %s" % tipped)
+	var flipped := Basis(Vector3.BACK, 3.0)   # the palm all but upside down
+	await _pose_hand(&"right", middle, flipped)
+	await wait(0.5)
+	expect(gear.global_basis.orthonormalized().y.angle_to(Vector3.UP) <= 0.65, "and never flips over")
+
+
+func test_losing_the_hand_joints_in_a_headset_lets_the_gear_go_after_a_blink_and_a_bit() -> void:
+	await _scene()
+	_headset_on()
+	var tracker := _fake_hand(&"right")
+	var middle := Carry.middle_of(gear)
+	await _pose_hand(&"right", middle)
+	await _press(true)
+	expect(carry.held, "held")
+	await _pose_hand(&"right", middle, Basis.IDENTITY, 0.012, false)   # the joints are no longer valid: a blink
+	await wait(0.1)
+	await _pose_hand(&"right", middle)
+	await wait(0.3)
+	expect(carry.held, "a blink of 0.1 s does not drop it")
+	tracker.has_tracking_data = false   # the hand is lost
+	await wait(0.6)
+	expect(not carry.held, "lost for good: it is let go")
+	await wait(1.0)
+	expect(absf(gear.global_position.y - table_y) < 0.003, "and set down on the table")
+
+
+func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_finger_does_not() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_touch")
+	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	_headset_on()   # from here the hand is a real one
+	_fake_hand(&"right")
+	var pot: Target = entry.get("_cauldron_target")
+	var taps := record(entry._runner.cauldron_touched)
+	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.0, 0.4))   # well outside its reach
+	await wait(0.3)
+	expect(taps.is_empty(), "a hand held near does nothing")
+	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.08, 0.04))   # the index fingertip goes in
+	await frames(3)
+	expect(taps.size() >= 1 and taps.size() <= 2, "the fingertip going in taps once (%s signals)" % taps.size())
+	var after_first := taps.size()
+	await wait(0.5)
+	expect_eq(taps.size(), after_first, "and resting in there does not tap again")
+	entry.set("_tap_open", false)
+	entry.set("_cue", false)
+	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.0, 0.4))
+	await wait(0.3)
+	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.08, 0.04))
+	await frames(3)
+	expect_eq(taps.size(), after_first, "when the tap is not asked for, a fingertip in the cauldron does nothing")
+
+
+func test_in_a_headset_the_desktop_click_and_keys_stay_out_of_the_way() -> void:
+	var entry := await _opening_at_start()
+	await _press_button(&"entry_part_touch")
+	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting")
+	_headset_on()
+	var taps := record(entry._runner.cauldron_touched)
+	var target: Target = entry.get("_cauldron_target")
+	# A pinch whose ray misses the cauldron by a hand's width counts nothing in a headset (the mouse rule is desktop only).
+	var driver: DesktopDriver = entry._desktop_driver()
+	driver.depth = 0.9
+	driver._place_hand(App.rig.head.unproject_position(target.global_position))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	expect(taps.is_empty(), "the line-through-the-cauldron click rule is for a desktop mouse only")
+	var head := App.rig.head
+	var start := head.global_position
+	_key(KEY_W, true)
+	await frames(30)
+	_key(KEY_W, false)
+	expect(head.global_position.distance_to(start) < 0.001, "and W does not move a head that is the child's own")
+
+
+func test_in_the_shelf_a_real_pinch_takes_a_thing_near_the_pinch_point_and_losing_the_hand_sends_it_home() -> void:
+	await boot(plan_of(TIDY_DEF, 1, false, 0.0, null, {}))
+	App.session.run()
+	await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
+	await wait(0.6)
+	var trial: Trial = App.session.trial
+	var thing: Target = (trial.get("_things") as Array)[0]
+	_headset_on()
+	var tracker := _fake_hand(&"right")
+	await _pose_hand(&"right", thing.global_position + Vector3(0.0, 0.0, 0.3))
+	await _press(true)
+	expect((trial.get("_carried") as Dictionary).is_empty(), "a pinch 30 cm away takes nothing")
+	await _press(false)
+	await wait(0.2)
+	await _pose_hand(&"right", thing.global_position + Vector3(0.02, 0.01, 0.0))
+	await _press(true)
+	expect((trial.get("_carried") as Dictionary).get(&"right") == thing, "a pinch 2 cm from it takes it")
+	var offset := thing.global_position - (thing.global_position + Vector3(0.02, 0.01, 0.0))
+	await _pose_hand(&"right", thing.global_position + Vector3(0.0, 0.1, -0.1))
+	await wait(0.3)
+	expect(thing.global_position.distance_to(App.rig.pointer(&"right").grip().origin + offset) < 0.03, "it follows the pinch point")
+	tracker.has_tracking_data = false
+	await wait(0.8)
+	expect((trial.get("_carried") as Dictionary).is_empty(), "lost: let go")
+	expect(thing.global_position.is_equal_approx((trial.get("_home") as Dictionary)[thing]), "and sent home, unscored")
+	expect_eq(trial.tries, 0, "without counting an attempt")
+
+
+# --- Skipping Onion's lines by pressing Onion ----------------------------------------------------------------
+
+func _voice() -> Node:
+	return App.module(&"Voice")
+
+
+## Clicks (mouse hand) where [param at] is on the screen, with the hand [param depth] out.
+func _click_at(entry: Entry, at: Vector3, depth := 0.9) -> void:
+	var driver: DesktopDriver = entry._desktop_driver()
+	driver.depth = depth
+	driver._place_hand(App.rig.head.unproject_position(at))
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	input.press(&"right", &"trigger_click", false)
+	await frames(1)
+
+
+func _click_onion(entry: Entry, depth := 0.9) -> void:
+	await _click_at(entry, (entry.get("_orb") as Node3D).global_position, depth)
+
+
+## Lines as they are spoken: [text, time in ms]; and how each ended: [text, completed, time in ms].
+func _line_log() -> Array:
+	var log := []
+	Events.said.connect(func(text: String) -> void: log.append(["said", text, Time.get_ticks_msec()]))
+	_voice().line_finished.connect(func(text: String, completed: bool) -> void: log.append(["ended", text, completed, Time.get_ticks_msec()]))
+	return log
+
+
+func test_a_click_on_onion_cuts_its_line_short_and_the_story_goes_straight_to_the_next() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_hello")
+	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "Onion says its first line")
+	var before := Time.get_ticks_msec()
+	await _click_onion(entry)
+	expect(await until(func() -> bool: return log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), 1.0), "the line ends, cut short")
+	var cut: Array = log.filter(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false)[0]
+	expect(cut[3] - before < 400, "within a moment of the click (%s ms, this includes the click's own frames)" % (cut[3] - before))
+	expect(await until(func() -> bool: return log.any(func(e: Array) -> bool: return e[0] == "said" and e[1] == "I was getting things ready."), 1.0), "and the next line follows")
+	var next: Array = log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "I was getting things ready.")[0]
+	expect(next[2] - cut[3] < 200, "at once: %s ms after the cut, with no breath between" % (next[2] - cut[3]))
+	expect(not _voice().speaking() == "Oh! Hello there.", "and the cut line is not still playing")
+
+
+func test_every_line_is_still_said_once_when_the_child_skips_through_them() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_hello")
+	var spent := 0.0
+	while spent < 40.0 and not log.any(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Could you help me with something?"):
+		if _voice().speaking() != "":
+			await _click_onion(entry)
+		await wait(0.4)
+		spent += 0.4
+	var said: Array[String] = []
+	for entry_log: Array in log:
+		if entry_log[0] == "said":
+			said.append(entry_log[1])
+	var distinct := {}
+	for line in said:
+		distinct[line] = true
+	expect_eq(said.size(), distinct.size(), "no line is said twice: %s" % [said])
+	expect(said.has("Oh! Hello there.") and said.has("I'm Onion, by the way.") and said.has("Could you help me with something?"), "the lines came in order, through to the request: %s" % [said])
+
+
+func test_an_instruction_the_child_still_needs_is_never_cut_and_a_press_on_onion_is_not_a_tap() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_touch")
+	expect(await until(func() -> bool: return _voice().speaking() == "Give the cauldron a little tap.", 30.0), "the tap is asked for")
+	await _click_onion(entry)   # Onion stands beside the opening, inside the cauldron's own reach
+	await wait(0.5)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Give the cauldron a little tap." and e[2] == false), "pressing Onion does not cut the instruction")
+	expect(not entry.get("_tapped"), "and pressing Onion is not a tap on the cauldron")
+	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Give the cauldron a little tap.").size(), 1, "the instruction is said once")
+	var pot: Target = entry.get("_cauldron_target")
+	await _click_at(entry, pot.global_position + Vector3(0.0, -0.02, 0.0), 0.3)   # now the cauldron itself
+	await wait(0.3)
+	expect(entry.get("_tapped"), "a click on the cauldron is the tap")
+	expect(await until(func() -> bool: return not entry.get("_part_running"), 15.0), "and the beat goes on to its end")
+	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Give the cauldron a little tap.").size(), 1, "still said once")
+
+
+func test_the_pick_up_instruction_is_not_cut_while_the_gear_waits_to_be_taken() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_pickup")
+	expect(await until(func() -> bool: return _voice().speaking() == "Would you pick it up for me?", 30.0), "Onion asks")
+	await _click_onion(entry)
+	await wait(0.4)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Would you pick it up for me?" and e[2] == false), "the ask is not cut")
+	expect(await until(func() -> bool: return _voice().speaking() == "Pinch your fingers together, and keep them closed.", 30.0), "and the instruction that follows is said")
+	await _click_onion(entry)
+	await wait(0.4)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Pinch your fingers together, and keep them closed." and e[2] == false), "and not cut either, while nothing has been picked up")
+	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Pinch your fingers together, and keep them closed.").size(), 1, "said once")
+
+
+func test_a_press_meant_for_the_cauldron_or_one_that_just_took_something_is_never_a_skip() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_hello")
+	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "a line is being spoken")
+	var pot: Target = entry.get("_cauldron_target")
+	await _click_at(entry, pot.global_position + Vector3(0.0, -0.05, 0.0), 0.9)   # the cauldron's body, aimed through its middle
+	await wait(0.4)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), "a click aimed at the cauldron does not skip")
+	var skip: LineSkip = App.main.get_node(^"LineSkip")
+	var onion := (entry.get("_orb") as Node3D).global_position
+	var eye := App.head().global_position
+	skip.took_something()   # a press that has just taken the gear or a shape
+	Events.selected.emit(&"right", null, eye, (onion - eye).normalized())
+	await wait(0.2)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), "a press that took something is not a skip")
+	await wait(0.4)
+	Events.selected.emit(&"right", null, eye, (onion - eye).normalized())
+	expect(await until(func() -> bool: return log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), 1.0), "but a press on Onion alone is")
+
+
+func test_in_a_headset_a_fingertip_going_into_onion_cuts_its_line_once_and_a_resting_finger_does_not() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await _press_button(&"entry_part_hello")
+	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "a line is being spoken")
+	_headset_on()
+	_fake_hand(&"right")
+	var onion := (entry.get("_orb") as Node3D).global_position
+	await _pose_hand(&"right", onion + Vector3(0.0, 0.0, 0.4))   # a hand held near
+	await wait(0.4)
+	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[2] == false), "a hand held near does nothing")
+	await _pose_hand(&"right", onion + Vector3(0.0, 0.02, 0.0))   # the fingertip goes in
+	await frames(3)
+	expect(log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), "the fingertip going in cuts the line")
+	var ended := log.filter(func(e: Array) -> bool: return e[0] == "ended" and e[2] == false).size()
+	await wait(1.0)
+	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "ended" and e[2] == false).size(), ended, "and a finger that stays in does not cut the next one")
+
+
+func test_the_invitation_in_the_first_visit_is_not_cut_until_the_child_has_taken_a_shape() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	App.main.change_scene(&"first_visit")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not is_instance_valid(entry), 15.0), "in the first visit")
+	expect(await until(func() -> bool: return _voice().speaking() != "", 30.0), "Onion speaks")
+	var line: String = _voice().speaking()
+	var skip: LineSkip = App.main.get_node(^"LineSkip")
+	expect(not skip.skip(), "a skip is refused while the invitation is open (%s)" % line)
+	expect_eq(_voice().speaking(), line, "and the line goes on")
+	Events.report(&"taken", {thing = "x", hand = &"right"})   # the child takes a shape
+	await wait(0.6)
+	if _voice().speaking() != "":
+		expect(skip.skip(), "after that a line can be cut")

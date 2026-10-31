@@ -88,6 +88,22 @@ func _say(text: String) -> void:
 	_finish_at = _now() + (spoken + 0.15 if stream != null else maxf(1.0, shown))
 
 
+## The line being spoken now, or "" when none is.
+func speaking() -> String:
+	return _speaking
+
+
+## Cuts the line being spoken short (a child pressed Onion): the audio stops, the subtitle goes and
+## [signal line_finished] says (text, false). False when nothing was being spoken.
+func skip() -> bool:
+	if _speaking == "":
+		return false
+	_player.stop()
+	_label.visible = false
+	_end_line(false)
+	return true
+
+
 func _end_line(completed: bool) -> void:
 	if _speaking == "":
 		return

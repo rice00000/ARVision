@@ -894,16 +894,19 @@ func say(text: String) -> void:
 		Events.say(text)
 		await _wait(maxf(PAUSE, text.length() * 0.07 + 0.6))
 		return
-	var done := {finished = false}
-	var on_finished := func(spoken: String, _completed: bool) -> void:
+	var done := {finished = false, completed = true}
+	var on_finished := func(spoken: String, completed: bool) -> void:
 		if spoken == text:
 			done.finished = true
+			done.completed = completed
 	voice.line_finished.connect(on_finished)
 	Events.say(text)
 	var limit := _real + maxf(6.0, text.length() * 0.2)   # never stuck on a line that cannot end
 	while not done.finished and _real < limit:
 		await _runner.tick
 	voice.line_finished.disconnect(on_finished)
+	if not done.completed:
+		return   # cut short (the child pressed Onion): on to the next at once, with no breath
 	await _wait(BREATH)
 
 
@@ -1228,7 +1231,9 @@ func _poke_cauldron() -> void:
 		var was: bool = _in_cauldron.get(side, false)
 		_in_cauldron[side] = inside
 		if inside and not was and (_cue or _tap_open):
-			_on_target(_cauldron_target)
+			var ratio := (tip as Vector3).distance_to(_cauldron_target.global_position) / (CAULDRON_WIDTH * 0.6)
+			if not (is_instance_valid(_orb) and (tip as Vector3).distance_to(_orb.global_position) / LineSkip.RADIUS < ratio):   # poking Onion is no tap
+				_on_target(_cauldron_target)
 
 
 # --- TESTING: the hands' outlines --------------------------------------------
@@ -2646,6 +2651,7 @@ func _configure_interaction() -> void:
 	_carry.docked.connect(_demo.stop)
 	# The pick-up highlight goes the moment the gear is grabbed (not when the story's line ends), and on
 	# every reset (a jump button), together with the teaching hand: neither may outlive its part.
+	_configure_skip()
 	_carry.picked_up.connect(_glow_gear.bind(false))
 	_carry.was_reset.connect(func() -> void:
 		_glow_gear(false)
@@ -2661,8 +2667,14 @@ func _on_desktop_click(_hand: StringName, target: Target, origin: Vector3, direc
 		return   # a headset, or the ray hit something else, or there is no cauldron to tap
 	var line := direction.normalized()
 	var from_centre := _cauldron_target.global_position - origin
-	if from_centre.cross(line).length() <= CAULDRON_WIDTH * 0.6:   # how far the centre is from the line
+	var ratio := from_centre.cross(line).length() / (CAULDRON_WIDTH * 0.6)   # how far the centre is from the line, over its reach
+	if ratio <= 1.0 and not _onion_closer(origin, line, ratio):
 		_on_target(_cauldron_target)
+
+
+## A press aimed more closely at Onion than at the cauldron is a press on Onion (it skips a line; it is not a tap).
+func _onion_closer(origin: Vector3, line: Vector3, cauldron_ratio: float) -> bool:
+	return is_instance_valid(_orb) and (_orb.global_position - origin).cross(line).length() / LineSkip.RADIUS < cauldron_ratio
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -2697,3 +2709,69 @@ func _desktop_driver() -> DesktopDriver:
 		if child is DesktopDriver:
 			return child as DesktopDriver
 	return null
+
+
+## A press on Onion cuts its current line short (LineSkip). Instructions the child still needs are never cut:
+## the tap while it is asked for, the pick-up while the gear glows and has not been taken, the set-in while the
+## hand shows it and the gear is not in.
+func _configure_skip() -> void:
+	_orb.add_to_group(&"onion_holder")
+	var skip := App.main.get_node_or_null(^"LineSkip") as LineSkip
+	if skip == null:
+		skip = LineSkip.new()
+		skip.name = "LineSkip"
+		App.main.add_child(skip)
+	skip.guards.append(_tap_is_asked)   # (method callables: they go invalid when this scene is freed; lambdas do not)
+	skip.guards.append(_pick_up_is_asked)
+	skip.guards.append(_set_in_is_asked)
+	skip.rival_line = _rival_line
+	skip.rival_point = _rival_point
+	_carry.picked_up.connect(skip.took_something)
+	var voice := App.module(&"Voice")
+	if voice != null and voice.has_signal(&"line_finished"):
+		voice.line_finished.connect(func(_text: String, completed: bool) -> void:
+			if not completed:
+				_talk_until = _clock)   # a cut line: Onion stops "talking" with it
+
+
+func _tap_is_asked() -> bool:
+	return _cue and not _tapped
+
+
+func _pick_up_is_asked() -> bool:
+	return _gear_glowing() and not _carry.has_been_picked_up()
+
+
+func _set_in_is_asked() -> bool:
+	return _demo._mode == DemoHand.Mode.LOWER_RELEASE and not _carry.has_docked()
+
+
+func _gear_glowing() -> bool:
+	for mesh in _gear.find_children("*", "MeshInstance3D", true, false):
+		if (mesh as MeshInstance3D).material_overlay != null:
+			return true
+	return false
+
+
+## How closely a press along the line is aimed at the cauldron or the gear (distance over reach), INF if at neither.
+func _rival_line(origin: Vector3, direction: Vector3) -> float:
+	var best := INF
+	for rival: Array in _rivals():
+		best = minf(best, (rival[0] - origin).cross(direction).length() / rival[1])
+	return best
+
+
+func _rival_point(point: Vector3) -> float:
+	var best := INF
+	for rival: Array in _rivals():
+		best = minf(best, point.distance_to(rival[0]) / rival[1])
+	return best
+
+
+func _rivals() -> Array:
+	var found := []
+	if is_instance_valid(_cauldron_target):
+		found.append([_cauldron_target.global_position, CAULDRON_WIDTH * 0.6])
+	if is_instance_valid(_gear) and _gear.visible:
+		found.append([Carry.middle_of(_gear), Carry.GRAB_RADIUS])
+	return found
