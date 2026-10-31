@@ -71,6 +71,11 @@ const JUMP_PANEL := true
 ## TESTING: skip the four setup steps (the table is the one found, reach and sound are the
 ## defaults) and go straight to the Start screen. Tests turn it off ([member skip_setup]).
 const SKIP_SETUP := true
+## Megan chose pop A. Set this to show the DEV "Pop sound" button again to compare it with C.
+const POP_AUDITION := false
+## The build chat's first guess at Onion's waiting behaviour in the Tap beat (gaze to the rim and
+## back). Megan did not like it; off until the story chat decides the staging.
+const TAP_STAGING := false
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
@@ -204,6 +209,7 @@ func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.push = 0.0
+		show_sim_props(true)
 	if is_instance_valid(_beat_label):
 		_beat_label.free()
 	for node in [_orb, _box, _music]:
@@ -228,6 +234,7 @@ func run() -> void:
 		await App.reality.settled
 	if DEBUG:
 		_debug_buttons()
+	show_sim_props(false)
 	await _setup()
 	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
@@ -353,7 +360,8 @@ func _touch() -> void:
 	if not _tapped:
 		_cue = true   # the cauldron glows slowly
 		_demo.tap(_rim_point())   # shows one tap, looping until stop() (the interaction chat's)
-		_watch_for_tap()   # Onion's eyes go to the rim and back to the child while it waits
+		if TAP_STAGING:
+			_watch_for_tap()   # Onion's eyes go to the rim and back to the child while it waits
 		await say("Give the cauldron a little tap.")
 		if not _tapped:
 			await _runner.cauldron_touched
@@ -1193,7 +1201,8 @@ func _dev_jumps() -> void:
 	var names: Array = PARTS.keys()
 	for i in names.size():
 		_button(PARTS[names[i]], EntryLayout.dev_jump_spot(head, i), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), EntryLayout.DEV_JUMP_WIDE, 0.005)
-	_pop_button = _button("Pop sound: A", EntryLayout.dev_pop_spot(head), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.18, 0.005)
+	if POP_AUDITION:
+		_pop_button = _button("Pop sound: A", EntryLayout.dev_pop_spot(head), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.18, 0.005)
 
 
 ## DEV: shows or hides the zone map on the table (the "Zones" button, or SHOW_ZONES from the start).
@@ -2062,6 +2071,20 @@ func _gear_to_rest() -> void:
 ## The front of the cauldron's rim: where a tap goes.
 func _rim_point() -> Vector3:
 	return _box.global_position + Vector3.UP * _rim + _toward_child() * (CAULDRON_WIDTH * 0.35)
+
+
+## The simulated room (desktop and tests only) has loose props on its table: a cup, bottle, book
+## and apple, for Wei's find-the-object task. The opening hides them so the table is clear and
+## nothing looks like it came out of the cauldron; the first visit shows them again when it ends.
+const SIM_PROPS := ["Cup", "Bottle", "Book", "Apple"]
+
+static func show_sim_props(on: bool) -> void:
+	if App.reality == null or not is_instance_valid(App.reality):
+		return
+	for prop_name: String in SIM_PROPS:
+		var prop := App.reality.find_child(prop_name, true, false) as Node3D
+		if prop != null:
+			prop.visible = on
 
 
 ## Where Onion looks to peek into the opening from its spot at the rim: a point down in the
