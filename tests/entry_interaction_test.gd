@@ -294,6 +294,36 @@ func test_simulate_still_does_what_the_stub_did() -> void:
 	expect(gear.global_position.distance_to(socket) < 0.002, "and the gear is in")
 
 
+func test_the_reminder_comes_once_for_a_gear_nobody_touches() -> void:
+	await _scene()
+	var due := record(carry.reminder_due)
+	carry.remind_after = 1.0
+	carry.begin(gear, socket)
+	await wait(0.6)
+	expect(due.is_empty(), "not yet")
+	await wait(0.8)
+	expect_eq(due.size(), 1, "after the delay")
+	await wait(1.5)
+	expect_eq(due.size(), 1, "and only once")
+
+
+func test_no_reminder_for_a_child_who_has_picked_it_up_or_when_it_is_not_in_view() -> void:
+	await _scene()
+	var due := record(carry.reminder_due)
+	carry.remind_after = 1.0
+	carry.begin(gear, socket)
+	await _pinch_at(Carry.middle_of(gear))
+	await _press(true)
+	await wait(1.5)
+	expect(due.is_empty(), "it was picked up in time")
+	await _press(false)
+	await wait(1.0)
+	gear.visible = false
+	carry.begin(gear, socket)
+	await wait(1.5)
+	expect(due.is_empty(), "a hidden gear is not waiting")
+
+
 # --- The teaching hand ----------------------------------------------------------------
 
 func _demo() -> DemoHand:
@@ -428,3 +458,51 @@ func test_the_real_opening_configures_carry_and_the_gear_docks_in_its_socket() -
 	await until(func() -> bool: return not docked.is_empty(), 3.0)
 	expect(real_gear.global_position.distance_to(real_socket) < 0.002, "docked in the real socket")
 	expect(absf(angle_difference(real_gear.global_basis.get_euler().y, (entry.get("_mechanism") as Node3D).rotation.y)) < 0.01, "turned to the panel like the story's own dock")
+
+
+func test_the_real_opening_can_be_tried_with_the_mouse_hand_and_reminds_a_waiting_child() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = true
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	input.click(&"right", &"trigger_click")
+	await frames(3)
+	await wait(0.7)
+	await _press_button(&"entry_step_next")
+	await _press_button(&"entry_confirm_yes")
+	await _press_button(&"entry_step_alt")
+	await _press_button(&"entry_step_next")
+	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
+	var real: Carry = entry.get("_carry")
+	var real_gear: Node3D = entry.get("_gear")
+	var demo: DemoHand = entry.get("_demo")
+	var socket_at: Vector3 = entry.get("_socket_at")
+	expect(real.remind_after > 0.0, "the reminder is on")
+	entry._try_carry()   # the G key
+	expect(real_gear.visible and real.enabled, "the gear is out and Carry is on")
+	var driver: DesktopDriver = entry._desktop_driver()
+	expect(driver != null, "the mouse driver is there")
+	var camera := App.rig.head
+	real.remind_after = 0.8   # the real delay is longer; this is only to see it
+	real._idle = 0.0
+	real._reminded = false
+	await wait(1.4)
+	expect(demo.visible, "a gear nobody touches gets the teaching hand")
+	var before := real_gear.global_transform
+	driver._place_hand(camera.unproject_position(Carry.middle_of(real_gear)))   # the mouse over the gear
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)   # left mouse button down
+	await frames(2)
+	expect(real.held, "click-hold on the gear takes it")
+	await wait(0.8)
+	expect(not demo.visible, "and the teaching hand goes away")
+	driver._place_hand(camera.unproject_position(socket_at + Vector3.UP * 0.03))   # drag to the socket
+	await wait(0.5)
+	input.press(&"right", &"trigger_click", false)   # let go
+	expect(await until(func() -> bool: return real.has_docked(), 3.0), "dragged over the socket and let go: docked (gear at %s, socket %s)" % [real_gear.global_position, socket_at])
+	await wait(0.2)
+	expect((entry.get("_gear_spin") as GearSpin).running, "and it turns")
+	expect(not before.is_equal_approx(real_gear.global_transform), "it did move")

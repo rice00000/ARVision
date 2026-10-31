@@ -22,11 +22,16 @@ signal picked_up
 signal released(docked: bool)
 ## The gear is in the socket (after the auto-align and the click).
 signal docked
+## The gear has been in view for [member remind_after] seconds and the child has not touched it.
+## Once per [method begin]. The listener may show the teaching hand (it must never carry the gear).
+signal reminder_due
 
 ## The child may pick it up now (the story turns this on after asking).
 var enabled := false
 ## A hand is holding it.
 var held := false
+## Seconds the gear may wait, in view and untouched, before [signal reminder_due]; 0 = never.
+var remind_after := 0.0
 
 ## How near the pinch point must be to the gear's middle, metres ("about 9 cm").
 const GRAB_RADIUS := 0.09
@@ -78,6 +83,8 @@ var _hint: MeshInstance3D
 var _hint_material: StandardMaterial3D
 var _hint_level := 0.0
 var _clock := 0.0
+var _idle := 0.0
+var _reminded := false
 
 
 func _ready() -> void:
@@ -118,6 +125,8 @@ func begin(gear: Node3D, socket_at: Vector3) -> void:
 	_pinching.clear()
 	_press_age.clear()
 	_lost_for = 0.0
+	_idle = 0.0
+	_reminded = false
 	_make_hint()
 	enabled = true
 
@@ -203,6 +212,7 @@ func _on_button(side: StringName, action: StringName, pressed: bool) -> void:
 func _process(delta: float) -> void:
 	_clock += delta
 	_update_hint(delta)
+	_watch_for_idle(delta)
 	for side: StringName in _press_age.keys():
 		_press_age[side] += delta
 		if _press_age[side] > PRESS_GRACE:
@@ -219,6 +229,16 @@ func _process(delta: float) -> void:
 		return
 	_lost_for = 0.0
 	_follow(pointer.grip(), delta)
+
+
+## Counts the seconds the gear waits in view, untouched, and says so once.
+func _watch_for_idle(delta: float) -> void:
+	if remind_after <= 0.0 or _reminded or not enabled or _picked or _gear == null or not is_instance_valid(_gear) or not _gear.visible:
+		return
+	_idle += delta
+	if _idle >= remind_after:
+		_reminded = true
+		reminder_due.emit()
 
 
 # --- Picking up and carrying -------------------------------------------------------

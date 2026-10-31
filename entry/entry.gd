@@ -2315,7 +2315,53 @@ func _start_music() -> void:
 # --- Interaction -------------------------------------------------------------
 # What Carry needs to know about the room (the interaction chat's; Carry and DemoHand do the rest).
 
-## Tells Carry where the table is, how far the child reaches, how the panel faces, and what to keep clear.
+## How long the gear waits untouched before the teaching hand shows how to pick it up, seconds.
+const PICKUP_REMINDER_SECONDS := 14.0
+## DEBUG: this key puts the gear out on the table and turns Carry on, so a click-hold, a drag and
+## a release (the mouse hand) try the whole pick-up and set-in without the story.
+const TRY_CARRY_KEY := KEY_G
+
+## Tells Carry where the table is, how far the child reaches, how the panel faces, and what to keep
+## clear; and lets the teaching hand remind a child who has not picked the gear up. The hand only
+## ever shows the gesture: it never carries the gear anywhere.
 func _configure_interaction() -> void:
 	_carry.configure(_gear_rest.y, App.head().global_position, maxf(_cauldron_distance, 0.45) + 0.15,
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
+	_carry.remind_after = PICKUP_REMINDER_SECONDS
+	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
+	_carry.picked_up.connect(_demo.stop)
+	_carry.docked.connect(_demo.stop)
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if DEBUG and event is InputEventKey and event.pressed and not event.echo and event.keycode == TRY_CARRY_KEY:
+		_try_carry()
+
+
+## DEBUG: the gear on the table, ready to be picked up; when it docks it turns, like the story will.
+func _try_carry() -> void:
+	if _carry == null or _gear == null or _mechanism == null:
+		return   # not built yet: the setup is still on
+	_demo.stop()
+	_gear.visible = true
+	_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE
+	_gear.global_position = _gear_rest
+	_gear.rotation = Vector3.ZERO
+	_gear_spin.running = false
+	_mech_spin.running = false
+	_carry.begin(_gear, _socket_at)
+	var driver := _desktop_driver()
+	if driver != null:   # the mouse hand sits as far out as the gear, so a click on it takes it
+		driver.depth = clampf(App.head().global_position.distance_to(Carry.middle_of(_gear)) - 0.05, 0.2, 0.9)
+	_carry.docked.connect(func() -> void:
+		_gear_spin.running = true
+		_mech_spin.running = true, CONNECT_ONE_SHOT)
+	print("ENTRY try-carry: the gear is out; click-hold it, drag it to the socket, let go")
+
+
+## The mouse driver (a child of Main, not of the scene), or null in a headset.
+func _desktop_driver() -> DesktopDriver:
+	for child in App.main.get_children():
+		if child is DesktopDriver:
+			return child as DesktopDriver
+	return null
