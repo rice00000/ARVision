@@ -170,7 +170,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 
 	# Pick up, then set in: the stand-in child does each, and the gear ends turning in its socket.
 	await _press(&"entry_part_pickup")
-	expect(await _until_said(said, "There you go.", 30.0), "pickup: Onion thanks the child")
+	expect(await _until_said(said, "Quite a little thing, isn't it?", 30.0), "pickup: Onion goes on once it is held")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "pickup: the panel comes back")
 	await _press(&"entry_part_place")
 	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 30.0), "place: the gear is seated (one click)")

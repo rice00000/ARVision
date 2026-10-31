@@ -17,7 +17,7 @@ extends Node3D
 ## Seconds after a line, at least, when there is no voice to wait for.
 const PAUSE := 1.2
 ## The breath after a line the voice has finished, seconds.
-const BREATH := 0.5
+const BREATH := 0.25   # the pause after each line (was 0.5: Megan wants quicker dialogue)
 ## How high above the brew Onion stands once it has popped up and settled, metres.
 const PEEK_LIFT := 0.06
 ## Without a headset (desktop), only a click presses: moving the mouse over a button
@@ -482,7 +482,6 @@ func _pickup() -> void:
 	_actions.lean_to(_runner, 0.0, 0.4)
 	_actions.lift(_runner, 0.02, 0.6)   # a small pleased lift
 	_attend(_gear)   # follows the held gear gently (the look is smoothed, so hand tremor is ignored)
-	await say("There you go.")
 	await say("Quite a little thing, isn't it?")   # no answer expected
 	await _wait(0.4)   # shortened (Megan): straight on to setting it in
 	_attend(null)

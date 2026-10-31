@@ -13,7 +13,7 @@ const Tidy := preload("res://trials/tidy/tidy_trial.gd")
 
 ## Seconds of quiet at the very end of scene one.
 const QUIET_END := 4.0
-const BREATH := 0.5
+const BREATH := 0.25
 
 var _fits_said := false
 var _started := false      # the child picked a shape up or placed one: the invitation is over

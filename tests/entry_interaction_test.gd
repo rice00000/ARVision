@@ -999,7 +999,7 @@ func test_grabbing_the_gear_during_the_ask_takes_the_glow_and_the_hand_away_at_o
 	await _hand_pinch(Carry.middle_of(entry.get("_gear")), true)   # grabbed in the middle of the line
 	expect(await until(func() -> bool: return not _glowing(entry), 0.5), "the glow goes the moment it is grabbed")
 	expect(carry_node.held and not (entry.get("_demo") as DemoHand).visible, "held, and no hand is shown")
-	expect(await until(func() -> bool: return _line_said(said, "There you go."), 30.0), "the beat goes on to 'There you go.'")
+	expect(await until(func() -> bool: return _line_said(said, "Quite a little thing, isn't it?"), 30.0), "the beat goes on")
 	expect(not _glowing(entry), "and the glow stays off")
 	input.press(&"right", &"trigger_click", false)
 

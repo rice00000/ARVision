@@ -143,7 +143,7 @@ while the hand shows the pinch (it goes the moment you grab it). The teaching ha
 the gear and lifts it a little, looping (the real gear does not move). Pinch the real gear with thumb and finger: it follows your hand, stopped.
 If you wait about 14 seconds without touching it, the teaching hand comes back to show the pinch again.
 **Hear:** "Would you pick it up for me?" / "Pinch your fingers together, and keep them closed." / once you hold it:
-"There you go." / "Quite a little thing, isn't it?" then a quiet moment. Onion makes a small pleased lift and follows the
+"Quite a little thing, isn't it?" ("There you go." was cut) then a quiet moment. Onion makes a small pleased lift and follows the
 held gear with its look.
 
 Judge:
