@@ -94,8 +94,7 @@ cauldron's rim twice (6 s), rests (4 s), and shows it again; if you do nothing f
 slowly, then stays still. The hand comes in from the RIGHT, its fingers pointing left. A real tap with your fingertip on the
 cauldron stops the glow and the hand. Onion dips slightly (listening), turns to you for "Thank you.", then back to the
 opening and leans in.
-**Hear:** "Give the cauldron a little tap." / after your tap: "Thank you. Something's caught in there." / "That should
-loosen it."
+**Hear:** "Give the cauldron a little tap." / after your tap: "Thank you. Let's see if it comes out now."
 
 Judge:
 - [ ] The cauldron's front is reachable seated, without leaning forward. Reach to it: ______ cm.

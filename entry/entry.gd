@@ -378,12 +378,10 @@ func _touch() -> void:
 	_rattle(0.0)   # an accepted touch stops the rattle
 	_actions.lift(_runner, -0.012, 0.6)   # a small dip, as if listening
 	_attend(null)   # "Thank you." turns toward the child briefly
-	_later(1.1, func() -> void:   # "Something's caught in there." turns back, leaning toward the opening
+	_later(0.9, func() -> void:   # "...Let's see if it comes out now." turns back, leaning toward the opening
 		_attend(_peer_point())
 		_actions.lean_to(_runner, 0.35, 0.4))
-	await say("Thank you. Something's caught in there.")
-	_attend(_peer_point())   # holds the listening pose through the next line
-	await say("Let's see if it comes out now.")
+	await say("Thank you. Let's see if it comes out now.")   # shortened (Megan): one line, not two
 	_actions.lean_to(_runner, 0.0, 0.5)   # then straightens; _out drifts it aside (0.8 s) before the launch
 	_attend(null)
 
