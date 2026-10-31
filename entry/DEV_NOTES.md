@@ -133,3 +133,32 @@ API changes: Carry gained (nothing removed): `configure(floor_y, eyes, reach, ya
 * `Carry.reset()` added (forgets picked-up/docked for the jump buttons). `USE_REAL_CARRY := true`; `Entry.simulate_child` lets tests pretend the child.
 * `Sounds` (`entry/sounds.gd`): pre-rattle, pop A/C (DEV button "Pop sound"), device rattle, seat click (once, on completed seating), reveal pad faded after ~3 s. Files in `entry/assets/audio/` (kept out of the commit: they were added by the sourcing chat).
 * `Workshop.attend()` / `cheer()`; Onion stays through the first visit; it leaves with the next scene.
+
+## Interaction chat changes, round 3 (branch `entry-interaction-3`)
+* `Carry.reset()` now cancels a running align or settle and forgets everything, with no signal and no click (before, a jump button pressed while carrying left a settle tween fighting the story's own gear placement). `stop()` is unchanged (lets go and settles).
+* `Carry.begin()` called again for the SAME gear while it is held, aligning or docked forgets nothing (only `reset()` forgets); for a fresh start it works as before. New `Carry.follow(cauldron, panel)`: the settle spot and the docked gear's facing use where they stand NOW (they move at the reveal). Far throws float back more slowly (up to 1.6 s). Nonsense poses and a freed gear are ignored.
+* `DemoHand`: asking again for the gesture already showing (same gesture, same target) is a no-op, so the story's hand and the reminder never make it blink. `pinch_lift(thing)` works for any thing and stays within about 13 cm of it, never going to a place.
+* Hook in `entry.gd` (story's `_child_sets_in`, first lines): `if USE_REAL_CARRY and _carry.has_docked(): return`. Without it a child who sets the gear in while Onion is still talking leaves the story waiting for a `docked` that already happened. Also `_carry.follow(_box, _mechanism)` in `_configure_interaction()`. The reminder delay is one constant, `Entry.PICKUP_REMINDER_SECONDS` (0 = never).
+
+## PROPOSAL (not built): sharing `Carry` with Wei's tidy trial. For Megan's approval; nothing of Wei's changes before that
+**Today there are two pinch-and-carry implementations.** Wei's (`trials/tidy/tidy_trial.gd`, about 100 of its 644 lines: `_on_button`, `_take`, `_physics_process`, `_return`, `_let_go`, `_on_tracking`, `_notification`) and mine (`entry/carry.gd`).
+
+| | Wei's tidy trial | `Carry` (the gear) |
+|---|---|---|
+| Things / hands | many things, one per hand, two hands at once | one gear, either hand, the first to pinch holds it |
+| Grab | pinch within `size*0.7 + 0.02` of a thing's centre (about 4 to 8 cm), nearest wins | pinch within 9 cm of the gear's middle |
+| Follow | the thing is set to the hand's pose each physics frame, offset kept, no smoothing | the same offset, a little smoothing, never through the table |
+| Release | 0.12 s debounce, then within 5 cm of a sticker: judged (right clicks in, wrong goes home, a try is counted); else home in 0.25 s | within a generous volume of the socket: auto-aligns, one click, never judged; else floats to the nearest free table spot within reach |
+| Tracking lost / pause | the thing goes home at once | 0.25 s grace, then settled quietly |
+| Data | reports `taken` and `put` with timings; the sim reads `layout()` (`carried`) | signals only |
+
+**What sharing would look like (recommended shape, staged).** One small node, `Carrier`, that owns only the mechanics: pick-up by pinch distance, the contact offset, following, the release debounce, tracking loss and pause. Everything that differs is a callback: `grab_radius(thing)`, `on_release(thing, point)` (Wei: judge and put or return home; gear: dock or settle) and `on_lost(thing)` (Wei: home; gear: settle). `Carry` becomes a thin layer on it; the tidy trial keeps `_put`, hints, layout and scoring and gives up its ~100 mechanics lines.
+* Stage 1 (no Wei files): build `Carrier` with tests, move `Carry` onto it, same behaviour.
+* Stage 2 (needs approval, Wei's file): the tidy trial adopts it behind a flag, default OFF, so his original runs unchanged; run `tidy`, `world`, `scene` and the python sim (`tests/sim/test_tidy.py`) both ways.
+* Stage 3 (after a look by Megan and Wei): flip the default, or leave the flag.
+
+**What it would change for the child:** the same grab and release feel for the gear and for the shelf things (they learn it once; the teaching hand means the same everywhere), shelf things could not be pushed through the table, a tracking blink under 0.25 s would not send a thing home. Wei's debounce, snap, per-thing grab size and home-return stay as they are.
+
+**Risks.** (1) The tidy trial is measurement code: grab radius, smoothing or release delay change what is measured; any difference must be switchable and noted in the data's version, and compared in the sim before and after. (2) Wei's files move: a change there conflicts with whatever he edits. (3) Making one node handle many things and two hands adds complexity to the gear's now well-tested behaviour; tests must stay green on both. (4) The python sim and `layout()` read Wei's private `_carried`; they would need the same data from `Carrier`. (5) Tracking loss means different things on purpose (home vs settle): it must stay a callback. (6) About a day of work with tests; no new assets or licences.
+
+**The alternative:** leave them separate and only line up the numbers in a table (as above): no risk, two slightly different feels. **My recommendation:** Stage 1 only after the first test with a real child, since it is invisible to them and safe; Stage 2 only if testing shows the two feels confuse a child. **Decision wanted from Megan:** none yet; say "go" for Stage 1 or "leave it".
