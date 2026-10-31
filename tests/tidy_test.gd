@@ -1,5 +1,5 @@
 extends TestCase
-## Tidy up: the shelf's stickers, taking a thing on the fingertip, putting it
+## Tidy up: the shelf's stickers, pinching and carrying a thing, putting it
 ## back right and wrong, help, and the sticker kinds.
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
@@ -26,8 +26,10 @@ func _tip_to(point: Vector3, side := &"right") -> void:
 func _carry(trial: Trial, thing: Target, cell: int, side := &"right") -> void:
 	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15), side)
 	await _tip_to(thing.global_position, side)
+	input.press(side, &"trigger_click", true)
 	await _tip_to(trial.get("_cell_point")[cell], side)
-	await wait(TRIAL.HOLD + 0.2)
+	input.press(side, &"trigger_click", false)
+	await wait(TRIAL.RELEASE_DELAY + 0.2)
 
 
 func _thing(trial: Trial, key: String) -> Target:
@@ -96,18 +98,93 @@ func test_a_wrong_thing_does_not_fit_and_goes_back() -> void:
 	expect(thing.global_position.distance_to(home) < 0.01, "back on the bench")
 
 
-func test_holding_still_away_from_stickers_keeps_it_on_the_finger() -> void:
+func test_holding_still_away_from_stickers_keeps_it_in_the_hand() -> void:
 	var trial := await _start()
 	var thing: Target = trial.get("_things")[0]
 	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15))
 	await _tip_to(thing.global_position)
-	expect(trial.get("_carried").get(&"right") == thing, "it sticks to the fingertip")
+	input.press(&"right", &"trigger_click", true)
+	expect(trial.get("_carried").get(&"right") == thing, "a nearby pinch takes it")
 	var other: Target = trial.get("_things")[1]
 	await _tip_to(other.global_position)
 	expect(trial.get("_carried").get(&"right") == thing, "a hand holds one thing at a time")
 	expect(thing.global_position.distance_to(App.rig.pointer(&"right").tip()) < 0.001, "and it follows the finger")
 	await wait(1.0)
 	expect_eq(trial.tries, 0, "held still over the bench: nothing is judged")
+
+
+func test_touch_and_distant_pinches_do_not_take_a_thing() -> void:
+	var trial := await _start()
+	var thing: Target = trial.get("_things")[0]
+	await _tip_to(thing.global_position)
+	expect(trial.get("_carried").is_empty(), "touching alone does not take it")
+	await _tip_to(thing.global_position + Vector3.UP * 0.2)
+	input.click(&"right", &"trigger_click")
+	expect(trial.get("_carried").is_empty(), "pointing at it from afar does not take it")
+
+
+func test_carry_keeps_the_contact_point_and_turns_with_the_hand() -> void:
+	var trial := await _start()
+	var thing: Target = trial.get("_things")[0]
+	await _tip_to(thing.global_position + Vector3.RIGHT * 0.025)
+	var before := thing.global_transform
+	input.press(&"right", &"trigger_click", true)
+	var pointer := App.rig.pointer(&"right")
+	var offset := pointer.grip().affine_inverse() * before
+	await frames(2)
+	expect(thing.global_transform.is_equal_approx(before), "no jump at pickup")
+	var hand := App.rig.hand(&"right").global_transform
+	hand.basis = Basis(Vector3.UP, PI * 0.5) * hand.basis
+	hand.origin += Vector3.UP * 0.1
+	input.set_hand(&"right", hand)
+	await frames(2)
+	expect(thing.global_transform.is_equal_approx(pointer.grip() * offset), "position and rotation follow the same contact point")
+
+
+func test_only_releasing_at_a_sticker_places_the_thing() -> void:
+	var trial := await _start()
+	var thing: Target = trial.get("_things")[0]
+	var cell := _cell(trial, trial.get("_key")[thing])
+	await _tip_to(thing.global_position)
+	input.press(&"right", &"trigger_click", true)
+	await _tip_to(trial.get("_cell_point")[cell])
+	await wait(0.8)
+	expect(not trial.get("_placed").has(thing), "holding near its sticker never steals it out of the hand")
+	input.press(&"right", &"trigger_click", false)
+	await wait(TRIAL.RELEASE_DELAY * 0.4)
+	input.press(&"right", &"trigger_click", true)
+	await wait(TRIAL.RELEASE_DELAY + 0.1)
+	expect(trial.get("_carried").get(&"right") == thing, "a brief pinch dropout does not release it")
+	input.press(&"right", &"trigger_click", false)
+	await _tip_to(App.head().global_position + Vector3(0.0, -0.15, -0.15))
+	await wait(TRIAL.RELEASE_DELAY + 0.2)
+	expect(trial.get("_placed").has(thing), "it places where released even when the hand immediately pulls away")
+
+
+func test_release_elsewhere_tracking_loss_and_pause_return_it_unscored() -> void:
+	var trial := await _start()
+	var thing: Target = trial.get("_things")[0]
+	for reason in ["release", "tracking", "pause"]:
+		await _tip_to(thing.global_position)
+		input.press(&"right", &"trigger_click", true)
+		await _tip_to(App.head().global_position + Vector3(0.0, -0.15, -0.15))
+		match reason:
+			"release":
+				input.press(&"right", &"trigger_click", false)
+				await wait(TRIAL.RELEASE_DELAY + 0.05)
+			"tracking":
+				input.track(&"right", false)
+				await frames(2)
+				input.press(&"right", &"trigger_click", false)
+				input.track(&"right", true)
+			"pause":
+				input.menu()
+				input.press(&"right", &"trigger_click", false)
+				input.menu()
+		await wait(TRIAL.TAKE_PAUSE + 0.3)
+		expect(trial.get("_carried").is_empty(), "%s frees the hand" % reason)
+		expect(thing.global_position.is_equal_approx(trial.get("_home")[thing]), "%s returns it to the bench" % reason)
+		expect_eq(trial.tries, 0, "%s does not score an attempt" % reason)
 
 
 func test_help_wiggles_then_lights_the_right_cubby() -> void:

@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://rig/rig.gd" id="1_rig"]
 [ext_resource type="Script" path="res://rig/pointer.gd" id="2_pointer"]
+[ext_resource type="Script" path="res://rig/tracked_hand.gd" id="3_hand"]
 
 [node name="Rig" type="XROrigin3D"]
 process_mode = 3
@@ -28,3 +29,15 @@ script = ExtResource("2_pointer")
 
 [node name="Menu" type="XRController3D" parent="."]
 tracker = &"/user/fbhandaim/left"
+
+[node name="LeftJoints" type="XRNode3D" parent="."]
+tracker = &"/user/hand_tracker/left"
+show_when_tracked = true
+script = ExtResource("3_hand")
+side = &"left"
+
+[node name="RightJoints" type="XRNode3D" parent="."]
+tracker = &"/user/hand_tracker/right"
+show_when_tracked = true
+script = ExtResource("3_hand")
+side = &"right"

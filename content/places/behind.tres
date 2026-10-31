@@ -9,5 +9,5 @@ script = ExtResource("1_place")
 title = "Spell wall"
 where = "behind"
 turn_to = "Something new is behind you! Turn around."
-arrive = "A spell wall! Touch a number to pick a level."
+arrive = "A spell wall! Touch a button to play. The glowing one is new."
 tasks = Array[ExtResource("3_task")]([ExtResource("2_break_wall")])

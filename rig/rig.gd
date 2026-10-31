@@ -12,6 +12,8 @@ extends XROrigin3D
 @onready var left: XRController3D = $LeftHand
 @onready var right: XRController3D = $RightHand
 @onready var menu: XRController3D = $Menu
+@onready var _left_joints: TrackedHand = $LeftJoints
+@onready var _right_joints: TrackedHand = $RightJoints
 
 
 func _ready() -> void:
@@ -27,3 +29,7 @@ func hand(side: StringName) -> XRController3D:
 
 func pointer(side: StringName) -> Pointer:
 	return hand(side).get_node(^"Pointer")
+
+
+func tracked_hand(side: StringName) -> TrackedHand:
+	return _left_joints if side == &"left" else _right_joints

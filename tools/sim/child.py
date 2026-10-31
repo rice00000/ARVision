@@ -179,10 +179,10 @@ class Child:
             cell = self.policy.rng.choice(others)
         self.actor.wait(self.policy.perception.search * len(cells))
         if thing["carried"]:
-            self.actor.put(thing["carried"], tuple(cell["position"]), layout["hold"])
+            self.actor.put(thing["carried"], tuple(cell["position"]), layout["release_delay"])
             return
         side = side or ("left" if self.actor.body.local(tuple(thing["centre"]))[0] < 0 else "right")
-        self.actor.carry(side, tuple(thing["centre"]), thing["size"] * 0.7, tuple(cell["position"]), layout["hold"])
+        self.actor.carry(side, tuple(thing["centre"]), thing["size"] * 0.7, tuple(cell["position"]), layout["release_delay"])
 
     @staticmethod
     def next_thing(layout):

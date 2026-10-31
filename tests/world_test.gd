@@ -106,6 +106,21 @@ func test_a_locked_level_says_so_and_an_open_one_plays_at_its_level() -> void:
 	expect_eq(started[0][1].view.title, "Black and white", "still in black and white")
 
 
+func test_a_fingertip_near_a_button_hears_what_it_is() -> void:
+	await boot()
+	var said := record(Events.said)
+	App.world.run()
+	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "facing the table: the menu")
+	for case in [["task_tidy_shelf_1", "Level 1. A new one!"], ["task_tidy_shelf_2", "Level 2. Still locked."]]:
+		var button := _button(case[0])
+		var front := button.global_basis.z
+		input.point(&"right", button.global_position + front * (0.05 + 0.04), button.global_position) # fingertip 4 cm out
+		await frames(3)
+		expect_eq(said.back()[0], case[1], "read out")
+		expect((button.get_node(^"Look") as Node3D).position.z > 0.0, "lifted toward the hand")
+	expect(App.world.menu != null and not App.session.running, "hovering chooses nothing")
+
+
 func test_something_new_behind_turning_around_opens_its_menu() -> void:
 	await boot()
 	App.world.done = {&"tidy_shelf": [0]}

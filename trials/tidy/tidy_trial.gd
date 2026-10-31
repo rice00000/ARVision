@@ -1,8 +1,8 @@
 extends Trial
 ## Tidy up: the grey spell knocked the alchemist's things off the shelf. Every
 ## cubby shows what belongs in it on a sticker: a black shadow, a black outline,
-## a shadow of its size, or a shadow in its colour. The child touches a thing (it
-## sticks to the fingertip) and holds it still at a sticker. The right thing
+## a shadow of its size, or a shadow in its colour. The child pinches a thing,
+## carries it to a sticker and lets go. The right thing
 ## clicks in; a wrong one does not fit and goes back to the bench. The round is
 ## done when everything is back. Trains matching shape, size and colour, and
 ## placing by sight (vision for action).
@@ -54,9 +54,10 @@ const PLINTH := 0.015
 const THINGS_NEAR := 0.16
 const THINGS_FAR := 0.27
 const THINGS_WIDE := 0.48
-## A held thing within SNAP of where it would hang on a sticker, still for HOLD seconds, is put there.
+## A thing released within SNAP of a sticker is put there.
 const SNAP := 0.05
-const HOLD := 0.4
+## Ignore brief pinch dropouts while the hand moves.
+const RELEASE_DELAY := 0.12
 ## After putting a thing, that hand takes nothing for this long: it passes over the others on the way back.
 const TAKE_PAUSE := 0.6
 ## How much wider the outline sticker's edge is than the thing, times its size.
@@ -91,10 +92,11 @@ var _size: Dictionary[Target, float] = {}
 var _home: Dictionary[Target, Vector3] = {}
 ## Thing -> its cubby, once it is in.
 var _placed: Dictionary[Target, int] = {}
-## Hand -> the thing on its fingertip.
+## Hand -> its thing and the thing's transform relative to the pinch at pickup.
 var _carried: Dictionary[StringName, Target] = {}
-## Hand -> [cubby it is held at (-1 none), seconds there].
-var _hover: Dictionary[StringName, Array] = {}
+var _grip_offset: Dictionary[StringName, Transform3D] = {}
+## Hand -> when a released pinch becomes a deliberate let-go.
+var _release_at: Dictionary[StringName, float] = {}
 ## Hand -> [method Trial.seconds] from which it may take a thing again.
 var _free_at: Dictionary[StringName, float] = {}
 var _puts: Array[Dictionary] = []
@@ -180,40 +182,88 @@ func _looks(count: int, size: float) -> Array[Dictionary]:
 	return looks
 
 
-func _on_touched(hand: StringName, target: Target) -> void:
-	_take(hand, target)
-
-
-func _on_selected(hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
-	_take(hand, target) # with the ray on, a thing pointed at flies to the fingertip
-
-
-## [param hand] takes [param thing] onto its fingertip, if both are free.
-func _take(hand: StringName, thing: Target) -> void:
-	if not _key.has(thing) or _placed.has(thing) or _carried.has(hand) or thing in _carried.values() \
-			or seconds() < _free_at.get(hand, 0.0):
+func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
+	if action != &"trigger_click":
 		return
+	if not pressed:
+		if _carried.has(hand):
+			_carried[hand].global_transform = App.rig.pointer(hand).grip() * _grip_offset[hand]
+			_release_at[hand] = seconds() + RELEASE_DELAY
+		return
+	_release_at.erase(hand)
+	if _carried.has(hand) or seconds() < _free_at.get(hand, 0.0):
+		return
+	var pointer := App.rig.pointer(hand)
+	if not pointer.tracked():
+		return
+	var pinch := pointer.grip().origin
+	var nearest: Target
+	for thing in _things:
+		if _placed.has(thing) or thing in _carried.values():
+			continue
+		if pinch.distance_to(thing.global_position) > _size[thing] * 0.7 + 0.02:
+			continue
+		if nearest == null or pinch.distance_to(thing.global_position) < pinch.distance_to(nearest.global_position):
+			nearest = thing
+	if nearest:
+		_take(hand, nearest)
+
+
+## Keep the contact point: a thing never jumps to the centre of the hand.
+func _take(hand: StringName, thing: Target) -> void:
 	if _moves.has(thing):
 		_moves[thing].kill()
+		_moves.erase(thing)
 	if _hopping == thing:
 		_hop.kill()
 		_hopping = null
 	_carried[hand] = thing
+	_grip_offset[hand] = App.rig.pointer(hand).grip().affine_inverse() * thing.global_transform
 	Events.report(&"taken", {thing = _key[thing], hand = hand})
 
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	if not is_running():
 		return
 	for hand: StringName in _carried.keys():
 		var thing := _carried[hand]
 		var pointer := App.rig.pointer(hand)
-		thing.global_position = pointer.tip()
-		var cell := _cell_at(thing.global_position)
-		var held: Array = _hover.get(hand, [-1, 0.0])
-		_hover[hand] = [cell, held[1] + delta if held[0] == cell else 0.0]
-		if cell >= 0 and _hover[hand][1] >= HOLD and pointer.resting():
-			_put(hand, cell)
+		if not pointer.tracked():
+			_return(hand)
+			continue
+		if not _release_at.has(hand):
+			thing.global_transform = pointer.grip() * _grip_offset[hand]
+		if seconds() >= _release_at.get(hand, INF):
+			var cell := _cell_at(thing.global_position)
+			if cell >= 0:
+				_put(hand, cell)
+			else:
+				_return(hand)
+
+
+func _on_tracking(hand: StringName, tracked: bool) -> void:
+	if not tracked and _carried.has(hand):
+		_return(hand)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED:
+		for hand: StringName in _carried.keys():
+			_return(hand)
+
+
+## Away from a sticker, on tracking loss or pause: put it back without scoring.
+func _return(hand: StringName) -> void:
+	var thing := _carried[hand]
+	_let_go(hand)
+	_move(thing, _home[thing], 0.25)
+
+
+func _let_go(hand: StringName) -> void:
+	_carried.erase(hand)
+	_grip_offset.erase(hand)
+	_release_at.erase(hand)
+	_free_at[hand] = seconds() + TAKE_PAUSE
 
 
 ## The free cubby with a sticker nearest [param point], within [constant SNAP]; -1 for none.
@@ -230,9 +280,7 @@ func _cell_at(point: Vector3) -> int:
 ## [param hand] lets go of its thing at [param cell]: it clicks in, or it does not fit and goes back.
 func _put(hand: StringName, cell: int) -> void:
 	var thing: Target = _carried[hand]
-	_carried.erase(hand)
-	_hover.erase(hand)
-	_free_at[hand] = seconds() + TAKE_PAUSE
+	_let_go(hand)
 	var right := _cell_key[cell] == _key[thing]
 	pick(_cell_key[cell], _key[thing])
 	_puts.append({thing = _key[thing], slot = _cell_key[cell], correct = right, seconds = snappedf(seconds(), 0.01)})
@@ -271,7 +319,7 @@ func _hint(level: int) -> void:
 	judge(&"hint", _cell_point[_cell_of(_focus())])
 
 
-## The thing help is about: one on a fingertip, else the first not yet in.
+## The thing help is about: one in a hand, else the first not yet in.
 func _focus() -> Target:
 	if not _carried.is_empty():
 		return _carried.values()[0]
@@ -333,7 +381,8 @@ func _unhint() -> void:
 func _teardown() -> void:
 	_unhint()
 	_carried.clear()
-	_hover.clear()
+	_grip_offset.clear()
+	_release_at.clear()
 
 
 func focus_point() -> Vector3:
@@ -351,7 +400,7 @@ func layout() -> Dictionary:
 	for cell in _cell_key.size():
 		cells.append({id = "cell_%d" % cell, key = _cell_key[cell], position = _cell_point[cell], filled = _filled[cell],
 			card = _frame * _card_at[cell].origin})
-	return {match = _match, outline = _outline, things = things, cells = cells, snap = SNAP, hold = HOLD}
+	return {match = _match, outline = _outline, things = things, cells = cells, snap = SNAP, release_delay = RELEASE_DELAY}
 
 
 func _clear() -> void:
@@ -364,7 +413,8 @@ func _clear() -> void:
 	_home.clear()
 	_placed.clear()
 	_carried.clear()
-	_hover.clear()
+	_grip_offset.clear()
+	_release_at.clear()
 	_free_at.clear()
 	_moves.clear()
 	_puts.clear()
@@ -382,7 +432,7 @@ func _move(thing: Target, to: Vector3, seconds: float) -> Tween:
 	if _moves.has(thing):
 		_moves[thing].kill()
 	var tween := create_tween()
-	tween.tween_property(thing, ^"global_position", to, seconds)
+	tween.tween_property(thing, ^"global_transform", Transform3D(_frame.basis, to), seconds)
 	tween.finished.connect(func() -> void: _moves.erase(thing))
 	_moves[thing] = tween
 	return tween
