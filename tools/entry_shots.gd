@@ -1,9 +1,11 @@
 extends Node
-## Pictures of the entry's setup panel, a ray on Start and the ripple, on the simulated room
+## Pictures of the entry's four setup steps and the "All set" screen on the simulated room
 ## (no headset), to build/entry_shots/. Software rendering is fine:
 ##   xvfb-run -a godot --rendering-driver opengl3 --xr-mode off --path . res://tools/entry_shots.tscn -- --profile=test_capture
 
 var _out := ProjectSettings.globalize_path("res://build/entry_shots")
+var _entry: Entry
+
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -15,40 +17,47 @@ func _ready() -> void:
 	app.get_node(^"Entry").autostart = false
 	add_child(app)
 	await get_tree().process_frame
-	var entry: Entry = app.get_node(^"Entry")
-	entry.run()
-	await _until(func() -> bool: return entry.find_child("entry_confirm_yes", true, false) != null)
-	await get_tree().create_timer(0.6).timeout
-	await _save("1_table_check")
-	entry._confirm_pressed.emit(&"entry_confirm_yes")
-	await _until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null)
-	await get_tree().create_timer(1.0).timeout
-	await _save("2_setup_panel")
-	# a ray on Start: it should light up
-	var start := entry.find_child("entry_part_all", true, false) as Target
-	var eye := App.head().global_position
-	var at := start.global_position
-	App.sim_input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
-	await get_tree().create_timer(0.8).timeout
-	await _save("3_ray_on_start")
-	# The mouse's hand, as the desktop driver places it: on the line of sight through the cursor.
-	for child in app.get_children():
-		if child is DesktopDriver:
-			(child as DesktopDriver)._place_hand(Vector2(640, 316))
-	await get_tree().create_timer(0.8).timeout
-	await _save("3b_desktop_mouse_on_start")
-	entry._part_pressed.emit(&"ripple")
-	await get_tree().create_timer(3.0).timeout
-	await _save("4_ripple_mid")
-	await get_tree().create_timer(7.0).timeout
-	await _save("5_ripple_done")
+	_entry = app.get_node(^"Entry")
+	_entry.run()
+	await _until(func() -> bool: return _entry.find_child("entry_step_next", true, false) != null)
+	await _pause(0.8)
+	await _save("1_hands")
+	Events.button.emit(&"right", &"trigger_click", true)   # a pinch
+	await _pause(0.8)
+	await _save("1b_hands_done")
+	await _press(&"entry_step_next")
+	await _until(func() -> bool: return _entry.find_child("entry_confirm_yes", true, false) != null)
+	await _pause(0.8)
+	await _save("2_table")
+	await _press(&"entry_confirm_yes")
+	await _until(func() -> bool: return _entry.find_child("entry_step_alt", true, false) != null)
+	await _pause(0.8)
+	await _save("3_reach")
+	await _press(&"entry_step_alt")
+	await _pause(1.4)
+	await _save("4_sound_and_room")
+	await _press(&"entry_step_next")
+	await _until(func() -> bool: return _entry.find_child("entry_part_all", true, false) != null)
+	await _pause(0.8)
+	await _save("5_all_set")
 	get_tree().quit()
+
+
+func _press(id: StringName) -> void:
+	_entry._on_target(_entry.find_child(String(id), true, false) as Target)
+	await _pause(0.8)
+
+
+func _pause(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
 
 func _until(cond: Callable) -> void:
 	var n := 0
-	while not cond.call() and n < 600:
+	while not cond.call() and n < 900:
 		await get_tree().process_frame
 		n += 1
+
 
 func _save(name: String) -> void:
 	await RenderingServer.frame_post_draw

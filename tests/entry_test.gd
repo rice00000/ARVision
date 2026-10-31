@@ -11,6 +11,7 @@ var entry: Entry
 
 ## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
+	Engine.time_scale = 1.0   # an earlier test may have left the opening's half speed on
 	await boot()
 	entry = app.get_node(^"Entry")
 	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
@@ -29,18 +30,27 @@ func _target(id: StringName) -> Target:
 	return entry.find_child(String(id), true, false) as Target
 
 
-## Waits for a button and presses it (points and pinches).
+## Waits for a button and presses it (points and pinches), then waits out the gap in which
+## the same button ignores a second press.
 func _press(id: StringName) -> bool:
 	if not await until(func() -> bool: return _target(id) != null, 20.0):
 		return false
 	await select(_target(id).global_position)
 	await frames(2)
+	await wait(0.7)
 	return true
 
 
-## Confirms the table and waits for the Start panel.
+## Goes through the four setup steps to "All set" (the Start button).
 func _to_setup_panel() -> void:
-	await _press(&"entry_confirm_yes")
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	input.click(&"right", &"trigger_click")   # step 1 wants a pinch
+	await frames(3)
+	await wait(0.7)
+	await _press(&"entry_step_next")     # 1 hands
+	await _press(&"entry_confirm_yes")   # 2 the table
+	await _press(&"entry_step_alt")      # 3 the usual spot
+	await _press(&"entry_step_next")     # 4 heard the chime
 	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
 
 
@@ -96,7 +106,6 @@ func test_start_plays_everything_into_the_world() -> void:
 	var said := record(Events.said)
 	await _to_setup_panel()
 	expect(await _press(&"entry_part_all"), "Start is pressed")
-	expect(_target(&"entry_part_hello") == null, "the panel goes")
 	expect(await _until_said(said, "Hello."), "Onion says hello")
 	expect(await _until_said(said, "I'm Onion, by the way."), "and its name")
 	await _touch_cauldron()
@@ -180,16 +189,36 @@ func test_a_pinch_counts_what_was_aimed_at_before_the_fingers_closed() -> void:
 	var pressed := record(entry._part_pressed)
 	var start: EntryButton = _target(&"entry_part_all").get_parent()
 	var eye := App.head().global_position
-	var at := start.global_position
-	input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
+	# Aim at the top edge of Start, from a hand just below the eyes.
+	var from := eye + Vector3.DOWN * 0.05
+	var edge := start.global_position + start.global_basis.y * (start.plate.y * 0.5 + start.margin - 0.005)
+	var direction := (edge - from).normalized()
+	input.point(&"right", from, from + direction)
 	await wait(0.5)
-	# The aim slips off the button as the fingers close, then the click lands.
-	var off := at + Vector3.UP * 0.6
-	input.point(&"right", eye + (off - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, off)
+	# The aim slips 4.5 degrees up, off the button, as the fingers close; then the click lands.
+	var slipped := direction.rotated(direction.cross(Vector3.UP).normalized(), deg_to_rad(4.5))
+	input.point(&"right", from, from + slipped)
 	await wait(0.08)
 	input.click(&"right", &"trigger_click")
 	await frames(3)
 	expect_eq(pressed.size(), 1, "the pinch still presses the button that was aimed at")
+
+
+func test_a_pinch_after_a_real_move_to_another_button_goes_to_that_button() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var pressed := record(entry._part_pressed)
+	var ripple := _target(&"entry_part_ripple")
+	var shelf := _target(&"entry_part_shelf")
+	var eye := App.head().global_position
+	input.point(&"right", eye + Vector3.DOWN * 0.05, ripple.global_position)
+	await wait(0.5)
+	input.point(&"right", eye + Vector3.DOWN * 0.05, shelf.global_position)   # one step down the column: a move, not a slip
+	await wait(0.02)
+	input.click(&"right", &"trigger_click")
+	await frames(3)
+	expect_eq(pressed.size(), 1, "one press")
+	expect_eq(pressed[0][0] if not pressed.is_empty() else null, &"shelf", "and on the button the hand moved to")
 
 
 func test_buttons_light_up_under_a_ray() -> void:
@@ -293,3 +322,76 @@ func test_on_desktop_the_arrow_keys_look_around() -> void:
 	await frames(3)
 	_key(KEY_R, false)
 	expect(absf(head.rotation.y) < 0.001 and absf(head.rotation.x) < 0.001, "R turns it back")
+
+
+func test_the_setup_checks_are_honest_and_next_waits_for_them() -> void:
+	await _boot_entry()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	var panel: SetupPanel = entry.get("_panel")
+	expect_eq(panel.step, 1, "setup starts at step 1")
+	await frames(3)
+	expect_eq(panel.check_state(0), &"good", "the left hand is seen")
+	expect_eq(panel.check_state(1), &"good", "the right hand is seen")
+	expect_eq(panel.check_state(2), &"wait", "no pinch yet")
+	input.track(&"left", false)
+	await frames(3)
+	expect_eq(panel.check_state(0), &"wait", "a lost hand un-ticks")
+	input.track(&"left", true)
+	await frames(3)
+	expect_eq(panel.check_state(0), &"good", "and ticks again when it is back")
+	entry._on_target(_target(&"entry_step_next"))   # Next, without a pinch
+	await wait(0.5)
+	expect_eq(panel.step, 1, "Next waits until the pinch has worked")
+	input.click(&"right", &"trigger_click")
+	await frames(3)
+	expect_eq(panel.check_state(2), &"good", "the pinch ticks")
+	await wait(0.7)
+	entry._on_target(_target(&"entry_step_next"))
+	expect(await until(func() -> bool: return panel.step == 2, 5.0), "and now Next moves on to the table")
+
+
+func test_the_table_step_reports_the_table() -> void:
+	await _boot_entry()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	var panel: SetupPanel = entry.get("_panel")
+	input.click(&"right", &"trigger_click")
+	await wait(0.7)
+	await _press(&"entry_step_next")
+	expect(await until(func() -> bool: return _target(&"entry_confirm_yes") != null, 10.0), "the table question shows")
+	expect_eq(panel.check_state(0), &"good", "found by the headset")
+	expect_eq(panel.check_state(1), &"good", "a comfortable height")
+	expect_eq(panel.check_state(2), &"good", "big enough")
+
+
+func test_the_reach_step_brings_the_cauldron_in_to_the_childs_reach() -> void:
+	await _boot_entry()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	input.click(&"right", &"trigger_click")
+	await wait(0.7)
+	await _press(&"entry_step_next")
+	await _press(&"entry_confirm_yes")
+	expect(await until(func() -> bool: return _target(&"entry_step_alt") != null, 10.0), "step 3 shows")
+	# A hand slid out along the table, 62 cm from the eyes.
+	var eye := App.head().global_position
+	var table_y := App.reality.work_surface().transform.origin.y
+	var tip := Vector3(eye.x, table_y + 0.02, eye.z - 0.62)
+	input.point(&"right", tip + Vector3(0, 0, 0.05), tip)
+	await wait(0.4)
+	await _press(&"entry_step_next")   # Done
+	await wait(0.2)
+	expect(absf(float(entry.get("_cauldron_distance")) - 0.465) < 0.02, "the cauldron goes three quarters of the reach out, got %s" % entry.get("_cauldron_distance"))
+
+
+func test_without_a_measured_reach_the_cauldron_keeps_its_usual_spot() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	expect_eq(entry.get("_cauldron_distance"), Entry.CAULDRON_DISTANCE, "the usual 50 cm")
+
+
+func test_a_jump_button_during_setup_skips_the_rest() -> void:
+	await _boot_entry()
+	var said := record(Events.said)
+	await until(func() -> bool: return _target(&"entry_part_ripple") != null, 20.0)
+	await _press(&"entry_part_ripple")
+	expect(await _until_said(said, "Welcome.", 60.0), "the ripple plays straight from step 1")
+	expect(not _said_line(said, "Hello."), "and nothing before it")

@@ -48,7 +48,7 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 	add_child(_face)
 	_words = Label3D.new()
 	_words.text = text
-	_words.font_size = 28 if plate.x > 0.15 else 24
+	_words.font_size = 26 if plate.x > 0.15 else 24
 	_words.pixel_size = 0.0006
 	_words.position = Vector3(0, 0, 0.007)
 	_face.add_child(_words)
@@ -91,6 +91,11 @@ func text() -> String:
 ## A ray or fingertip is on the button now.
 func set_hot(on: bool) -> void:
 	_hot = on
+
+
+## Changes the plate's colour.
+func set_colour(colour: Color) -> void:
+	_colour = colour
 
 
 ## The press: the plate dips back a little.

@@ -53,7 +53,7 @@ const RIPPLE_SECONDS := 5.0
 const DEBUG := true
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
-const TEST_SPEED := 0.5
+const TEST_SPEED := 1.0
 ## Draw each hand's pointing ray (Wei's pointer casts it but only draws it on the
 ## desktop). Only while pointing is on (his [method Pointer.ray_on]).
 const SHOW_RAYS := true
@@ -67,6 +67,11 @@ const SHOW_HANDS := true
 const JUMP_PANEL := true
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Touch", emerge = "Emerge", ripple = "Ripple", shelf = "Shelf"}
+## Setup has four steps: hands, table, reach, sound and room.
+const SETUP_STEPS := 4
+## TESTING: a screen "pass the headset to the child" before the reach step, which measures
+## whoever wears the headset then. Off: the same person does all four steps.
+const HANDOFF_BEFORE_REACH := false
 
 var _table: Surface
 var _box := Node3D.new()            # the cauldron on the table
@@ -109,6 +114,8 @@ var _halo: StandardMaterial3D
 # Pressing: pokes, pinches, hover (the code is under "Pressing" below).
 ## How far back a pinch looks for what was aimed at, seconds: the aim shifts as the fingers close.
 const PINCH_LOOKBACK := 0.15
+## ...but only when the ray has moved less than this since, radians (5 degrees): a slip, not a move.
+const PINCH_DRIFT := 0.087
 ## A button ignores a second press this soon after the first, seconds (a poke and a pinch together).
 const PRESS_GAP := 0.6
 ## The ray stays drawn this long after the hand's aim is lost, seconds, so a brief drop doesn't blink it.
@@ -125,6 +132,12 @@ var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's
 var _ray_seen: Dictionary = {}      # side -> _real when the aim pose was last there
 var _hand_state: Dictionary = {}    # side -> last logged "aim ... joints ..." text
 var _hand_logged: Dictionary = {}   # side -> _real of that log line
+var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
+var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
+var _early_part: StringName = &""   # a jump button pressed during setup: skip the rest, play this
+var _show_hands_now := false        # the hands step shows the outlines even with SHOW_HANDS off
+var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
+var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
 var _exit_button: EntryButton
 var _exit_armed := -100.0           # _real when "Exit app" was first pressed; a second press within EXIT_WINDOW quits
 
@@ -163,7 +176,7 @@ func run() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
-	Events.selected.connect(func(hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(_pinched(hand, target)))
+	Events.selected.connect(func(hand: StringName, target: Target, _o: Vector3, direction: Vector3) -> void: _on_target(_pinched(hand, target, direction)))
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
@@ -173,8 +186,7 @@ func run() -> void:
 		await App.reality.settled
 	if DEBUG:
 		_debug_buttons()
-	if CONFIRM_TABLE:
-		await _confirm_table()
+	await _setup()
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
 	_on_table = _cauldron_on_table()
 	_shelf_to_the_side()
@@ -258,39 +270,205 @@ func _to_shelf() -> void:
 	App.world.run()
 
 
+# --- Setup: four steps, for the grown-up -------------------------------------
+
+## The pre-game setup: hands, table, reach, sound and room, one after another on the setup
+## panel. Each step returns true when a jump button was pressed (the rest is skipped).
+## Ends with the panel hidden; [method _choose_part] then shows "All set".
+func _setup() -> void:
+	_panel = SetupPanel.new()
+	add_child(_panel)
+	_panel.make_button = _button
+	_panel.place(App.head().global_transform)
+	var skipped := await _step_hands()
+	if not skipped and CONFIRM_TABLE:
+		skipped = await _step_table()
+	if not skipped:
+		skipped = await _step_reach()
+	if not skipped:
+		skipped = await _step_sound_and_room()
+	_panel.hide_all()
+	print("ENTRY setup: ", "skipped by a jump button" if skipped else "all four steps done")
+
+
+## Step 1: both hands seen and a pinch. The outlines show for this step.
+func _step_hands() -> bool:
+	_presses.clear()
+	_beat("setup 1: the hands")
+	_show_hands_now = true
+	_panel.show_step(1, SETUP_STEPS, "Check the hands", "Hold both hands up where the headset can see them. Then pinch thumb and finger.",
+			[["Left hand seen", &"wait"], ["Right hand seen", &"wait"], ["Pinch works", &"wait"]],
+			[["Next", &"entry_step_next", SetupPanel.GREY]])
+	var seen := {pinch = false}
+	var on_button := func(_side: StringName, action: StringName, down: bool) -> void:
+		if action == &"trigger_click" and down:
+			seen.pinch = true
+	Events.button.connect(on_button)
+	var skipped := false
+	while true:
+		var left := _hand_seen(&"left")
+		var right := _hand_seen(&"right")
+		_panel.set_check(0, &"good" if left else &"wait")
+		_panel.set_check(1, &"good" if right else &"wait")
+		_panel.set_check(2, &"good" if seen.pinch else &"wait")
+		var ready: bool = left and right and seen.pinch
+		_panel.set_button_colour(&"entry_step_next", SetupPanel.GREEN if ready else SetupPanel.GREY)
+		var pressed := _take_press([&"entry_step_next"])
+		if pressed == &"skip":
+			skipped = true
+			break
+		if pressed == &"entry_step_next" and ready:
+			break
+		await get_tree().process_frame
+	Events.button.disconnect(on_button)
+	_show_hands_now = false
+	return skipped
+
+
+## Whether the game counts [param side]'s hand as tracked (what its touches need).
+func _hand_seen(side: StringName) -> bool:
+	return App.rig.pointer(side).tracked()
+
+
+## Step 3: how far the child reaches. A hand rests on the table and slides out as far as is
+## easy; the farthest it gets (near table height) sets how far away the cauldron goes: three
+## quarters of it, between 35 and 60 cm. "Use usual spot" keeps the usual 50 cm.
+func _step_reach() -> bool:
+	_presses.clear()
+	if HANDOFF_BEFORE_REACH:
+		_panel.show_step(3, SETUP_STEPS, "Pass the headset", "Hand the headset to the child. Next they find how far they reach.",
+				[], [["Ready", &"entry_step_next", SetupPanel.GREEN]])
+		var handed := &""
+		while handed == &"":
+			handed = _take_press([&"entry_step_next"])
+			if handed == &"":
+				await get_tree().process_frame
+		if handed == &"skip":
+			return true
+		_presses.clear()
+	_beat("setup 3: the reach")
+	var table := App.reality.work_surface()
+	_reach_seen = 0.0
+	_panel.show_step(3, SETUP_STEPS, "Find the reach", "Sitting comfortably, rest a hand on the table and slide it out as far as feels easy. Then press Done.",
+			[["Reach not measured yet", &"wait"]],
+			[["Done", &"entry_step_next", SetupPanel.GREY], ["Use usual spot", &"entry_step_alt", SetupPanel.GREY]])
+	var used := false
+	while true:
+		var eye := App.head().global_position
+		for side: StringName in [&"left", &"right"]:
+			var tip: Variant = _fingertip(side)
+			if tip != null and absf((tip as Vector3).y - table.transform.origin.y) < 0.1:
+				var far := Vector2((tip as Vector3).x - eye.x, (tip as Vector3).z - eye.z).length()
+				if far <= 1.0:
+					_reach_seen = maxf(_reach_seen, far)
+		var measured := _reach_seen > 0.0
+		_panel.set_check(0, &"good" if measured else &"wait",
+				"Reach: %d cm from the eyes" % roundi(_reach_seen * 100.0) if measured else "Reach not measured yet")
+		_panel.set_button_colour(&"entry_step_next", SetupPanel.GREEN if measured else SetupPanel.GREY)
+		var pressed := _take_press([&"entry_step_next", &"entry_step_alt"])
+		if pressed == &"skip":
+			return true
+		if pressed == &"entry_step_next" and measured:
+			used = true
+			break
+		if pressed == &"entry_step_alt":
+			break
+		await get_tree().process_frame
+	_cauldron_distance = clampf(_reach_seen * 0.75, 0.35, 0.6) if used else CAULDRON_DISTANCE
+	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ", snappedf(_cauldron_distance, 0.01), " m out")
+	return false
+
+
+## Step 4: a soft chime (the same sound as a touch) and the room scan, shown honestly:
+## how much of the fan of depth rays finds a real surface. It re-scans while you look around.
+func _step_sound_and_room() -> bool:
+	_presses.clear()
+	_beat("setup 4: sound and room")
+	_panel.show_step(4, SETUP_STEPS, "Sound and room", "Listen for a soft chime. Did you hear it?",
+			[["Room scan", &"wait"], ["Sound", &"wait"]],
+			[["Yes, I heard it", &"entry_step_next", SetupPanel.GREEN], ["Play again", &"entry_step_alt", SetupPanel.GREY]])
+	await _wait(0.5)
+	_chime()
+	var next_scan := 0.0
+	while true:
+		if _real >= next_scan:
+			next_scan = _real + 0.6
+			_room_check()
+		var pressed := _take_press([&"entry_step_next", &"entry_step_alt"])
+		if pressed == &"skip":
+			return true
+		if pressed == &"entry_step_alt":
+			_chime()
+		elif pressed == &"entry_step_next":
+			_panel.set_check(1, &"good", "Sound: heard")
+			break
+		await get_tree().process_frame
+	return false
+
+
+## The room scan line: good when half the rays or more find something real.
+func _room_check() -> void:
+	var share := _scan_room().size() / float(GLINT_ROWS * GLINT_COLUMNS)
+	if share >= 0.5:
+		_panel.set_check(0, &"good", "Room scan: good (%d%% seen)" % roundi(share * 100.0))
+	elif share >= 0.25:
+		_panel.set_check(0, &"warn", "Room scan: patchy. Look around slowly")
+	else:
+		_panel.set_check(0, &"warn", "Room scan: little seen. Look around")
+
+
+## A soft chime half a metre ahead (Wei's touch feedback: a sound and a small mark).
+func _chime() -> void:
+	var head := App.head().global_transform
+	var ahead := Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
+	Events.feedback.emit(&"hint", head.origin + ahead * 0.5 + Vector3.DOWN * 0.2)
+
+
 # --- TESTING: Start, and jumping to one part ----------------------------------
 
-## Shows Start (green) and, with JUMP_PANEL, one button per part; waits for one.
-## Returns the part, or &"all" for Start.
+## The last screen of setup: "All set" with Start. Waits for Start (or a jump button, which
+## is always there at the left). Returns the part, or &"all" for Start.
 func _choose_part() -> StringName:
-	_beat("setup: press Start" + (" or jump to a part" if JUMP_PANEL else ""))
-	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var side := ahead.rotated(Vector3.UP, -PI * 0.5)   # to the right
-	var middle := eye.origin + ahead * 0.5 + Vector3.UP * 0.08
-	var buttons: Array[Node3D] = [_button("Start", middle, &"entry_part_all", Color(0.25, 0.65, 0.35))]
-	if JUMP_PANEL:
-		var words := Label3D.new()
-		words.text = "or jump to:"
-		words.font_size = 24
-		words.pixel_size = 0.0006
-		words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		add_child(words)
-		words.global_position = middle + Vector3.DOWN * 0.065
-		buttons.append(words)
-		# Two rows (3 + 2) under Start, 13 cm across, 8.5 cm down (clear of the beat label below).
-		var names: Array = PARTS.keys()
-		for i in names.size():
-			var row := i / 3
-			var count := 3 if row == 0 else names.size() - 3
-			var across := ((i % 3) - (count - 1) * 0.5) * 0.13
-			var at := middle + side * across + Vector3.DOWN * (0.12 + row * 0.085)
-			buttons.append(_button(PARTS[names[i]], at, StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.01))
-	var part: StringName = await _part_pressed
-	for button in buttons:
-		button.queue_free()
+	if _early_part != &"":
+		var early := _early_part
+		_early_part = &""
+		print("ENTRY setup: jumped to ", early, " from an earlier step")
+		return early
+	_beat("setup done: press Start" + (" or jump to a part" if JUMP_PANEL else ""))
+	_panel.show_step(SETUP_STEPS, SETUP_STEPS, "All set", "Hand the headset to the child. Press Start when they are ready.",
+			[], [["Start", &"entry_part_all", SetupPanel.GREEN]])
+	_presses.clear()
+	var part := &""
+	while part == &"":
+		await get_tree().process_frame
+		part = _take_part()
+	_panel.hide_all()
 	print("ENTRY setup: ", "Start" if part == &"all" else "jump to " + part)
 	return part
+
+
+## The part named by the last jump or Start press, or &"".
+func _take_part() -> StringName:
+	var found := &""
+	for id in _presses:
+		if String(id).begins_with("entry_part_"):
+			found = StringName(String(id).trim_prefix("entry_part_"))
+	_presses.clear()
+	return found
+
+
+## The first of [param ids] pressed since last asked, or &"". A jump button counts as
+## &"skip": the rest of setup is skipped and that part is remembered for later.
+func _take_press(ids: Array) -> StringName:
+	var result := &""
+	for id in _presses:
+		if String(id).begins_with("entry_part_"):
+			_early_part = StringName(String(id).trim_prefix("entry_part_"))
+			result = &"skip"
+		elif id in ids and result == &"":
+			result = id
+	_presses.clear()
+	return result
 
 
 ## Puts everything as [param part] finds it, at once: Onion's place, the things on
@@ -356,6 +534,7 @@ func _on_target(target: Target) -> void:
 		if _real - float(_pressed_at.get(target.id, -100.0)) < PRESS_GAP:
 			return
 		_pressed_at[target.id] = _real
+		_presses.append(target.id)
 		if target.get_parent() is EntryButton:
 			(target.get_parent() as EntryButton).flash()
 	if target != null and target.id == &"entry_debug_restart":
@@ -376,6 +555,9 @@ func _on_target(target: Target) -> void:
 	if target != null and String(target.id).begins_with("entry_part_"):
 		Events.feedback.emit(&"hint", target.global_position)
 		_part_pressed.emit(StringName(String(target.id).trim_prefix("entry_part_")))
+		return
+	if target != null and String(target.id).begins_with("entry_step"):
+		Events.feedback.emit(&"hint", target.global_position)
 		return
 	if target != null and String(target.id).begins_with("entry_confirm"):
 		Events.feedback.emit(&"hint", target.global_position)
@@ -567,7 +749,7 @@ func _log_aim() -> void:
 	for side: StringName in [&"left", &"right"]:
 		var log: Array = _aim_log.get_or_add(side, [])
 		var pointer := App.rig.pointer(side)
-		log.append([_real, pointer.aimed])
+		log.append([_real, pointer.aimed, -pointer.global_basis.z])
 		while not log.is_empty() and _real - float(log[0][0]) > 0.4:
 			log.pop_front()
 
@@ -575,13 +757,15 @@ func _log_aim() -> void:
 ## A pinch moves the aim a little as the fingers close. So a press counts what the ray
 ## pointed at PINCH_LOOKBACK seconds before the click, when that was a Target; else what
 ## it hits at the click.
-func _pinched(side: StringName, at_click: Target) -> Target:
+func _pinched(side: StringName, at_click: Target, direction: Vector3) -> Target:
 	var log: Array = _aim_log.get(side, [])
 	var then: Variant = null
+	var then_direction := Vector3.ZERO
 	for sample: Array in log:
 		if float(sample[0]) <= _real - PINCH_LOOKBACK:
 			then = sample[1]
-	if then != null and is_instance_valid(then):
+			then_direction = sample[2]
+	if then != null and is_instance_valid(then) and then_direction.angle_to(direction) <= PINCH_DRIFT:
 		return then as Target
 	return at_click
 
@@ -740,6 +924,27 @@ func _debug_buttons() -> void:
 			snappedf(restart.global_position.distance_to(leave.global_position), 0.01), " m apart")
 	for button in [restart, leave]:
 		button.set_meta(&"debug", true)
+	if JUMP_PANEL:
+		_dev_jumps()
+
+
+## DEV: one button per part, in a column at the left, there from the start. Pressing one in
+## the middle of setup skips the rest of setup and plays that part. 6.5 cm apart.
+func _dev_jumps() -> void:
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	var left := ahead.rotated(Vector3.UP, deg_to_rad(38.0))
+	var at := eye.origin + left * 0.5 + Vector3.UP * 0.1
+	var words := Label3D.new()
+	words.text = "DEV · jump to"
+	words.font_size = 22
+	words.pixel_size = 0.0006
+	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(words)
+	words.global_position = at + Vector3.UP * 0.06
+	var names: Array = PARTS.keys()
+	for i in names.size():
+		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.065), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
 
 
 # --- The shelf to the side ----------------------------------------------------
@@ -789,7 +994,7 @@ func _cauldron_on_table() -> Variant:
 	if not App.reality.surfaces(&"table").has(table):
 		return null
 	var eye := App.head().global_position
-	var wanted := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * CAULDRON_DISTANCE
+	var wanted := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * _cauldron_distance
 	var spot := _nearest_on(table, wanted, 0.12)
 	print("ENTRY spot: on the confirmed table, ", _away(spot), " m away (", snappedf(spot.distance_to(Vector3(wanted.x, spot.y, wanted.z)), 0.01), " m from the ideal spot)")
 	return spot
@@ -816,40 +1021,56 @@ var _aim_dot: MeshInstance3D
 var _aim_material: StandardMaterial3D
 var _aim_hit: Dictionary = {}       # the last flat tabletop the ray found: {position, normal}
 var _pinned: Surface                # TESTING: the table chosen here; kept over others later
-func _confirm_table() -> void:
+func _step_table() -> bool:
+	_presses.clear()
 	_beat("TEST: is this the table?")
 	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var panel_at := eye.origin + ahead * 0.45 + Vector3.UP * 0.05
-	var side := ahead.rotated(Vector3.UP, PI * 0.5)
 	var table := App.reality.work_surface()
 	var real := App.reality.surfaces(&"table").has(table)
 	var outline := _outline(table, real)
 	print("ENTRY table: ", "found" if real else "NONE found: a virtual patch", " at ", snappedf(eye.origin.y - table.transform.origin.y, 0.01),
 			" m below the eyes, ", _away(table.transform.origin), " m away, size ", table.size)
-	var yes := _button("Yes, that's the table", panel_at + side * 0.13, &"entry_confirm_yes")
-	var point := _button("No: point at it", panel_at - side * 0.13, &"entry_confirm_point")
-	var pressed: StringName = await _confirm_pressed
-	yes.queue_free()
-	point.queue_free()
+	_table_panel(table, real)
+	var pressed := &""
+	while pressed == &"":
+		pressed = _take_press([&"entry_confirm_yes", &"entry_confirm_point"])
+		if pressed == &"":
+			await get_tree().process_frame
+	outline.queue_free()
+	if pressed == &"skip":
+		return true
 	if pressed == &"entry_confirm_yes":
-		outline.queue_free()
 		if real:
 			_pinned = table
 		print("ENTRY table: confirmed")
-		return
-	outline.queue_free()
+		return false
+	_panel.show_step(2, SETUP_STEPS, "Point at the table", "Point at the tabletop: the dot turns green. Then pinch.", [], [])
 	_beat("TEST: aim at the tabletop (green dot) and pinch")
 	_start_aiming()
+	var picked := {done = false, origin = Vector3.ZERO, direction = Vector3.ZERO}
+	var on_selected := func(_side: StringName, _target: Target, origin: Vector3, direction: Vector3) -> void:
+		picked.origin = origin
+		picked.direction = direction
+		picked.done = true
+	Events.selected.connect(on_selected)
+	var skipped := false
 	while true:
-		var aimed: Array = await Events.selected
-		_aim_at(aimed[2], aimed[3])   # the pinch's own ray
-		if not _aim_hit.is_empty():
+		await get_tree().process_frame
+		if _take_press([]) == &"skip":
+			skipped = true
 			break
-		_beat("TEST: not a flat tabletop there; aim at the table (green dot)")
-		print("ENTRY table: pinched off the tabletop")
+		if picked.done:
+			picked.done = false
+			_aim_at(picked.origin, picked.direction)   # the pinch's own ray
+			if not _aim_hit.is_empty():
+				break
+			_panel.set_body("Not a flat tabletop there. Point at the table (green dot), then pinch.")
+			print("ENTRY table: pinched off the tabletop")
+	Events.selected.disconnect(on_selected)
 	_aiming = false
 	_aim_dot.queue_free()
+	if skipped:
+		return true
 	var at: Vector3 = _aim_hit.position
 	var facing := Vector3(at.x - eye.origin.x, 0.0, at.z - eye.origin.z).normalized()
 	_pinned = Surface.new(&"table", Transform3D(Basis.looking_at(facing), at), Vector2(0.8, 0.5))
@@ -858,6 +1079,19 @@ func _confirm_table() -> void:
 	var shown := _outline(_pinned, true)
 	await _wait(1.2)
 	shown.queue_free()
+	return false
+
+
+## Step 2 on the panel: the outline question, and three honest checks on the table found.
+func _table_panel(table: Surface, real: bool) -> void:
+	var drop := App.head().global_position.y - table.transform.origin.y
+	var comfy := drop >= 0.25 and drop <= 0.8
+	var big := table.size.x >= 0.6 and table.size.y >= 0.4
+	_panel.show_step(2, SETUP_STEPS, "Find the table", "Is the outline on your table?",
+			[["Found by the headset" if real else "No table found: a pretend one", &"good" if real else &"warn"],
+			["Comfortable height (%d cm down)" % roundi(drop * 100.0) if comfy else "Looks odd: %d cm below the eyes" % roundi(drop * 100.0), &"good" if comfy else &"warn"],
+			["Big enough for everything" if big else "Small: things may be tight", &"good" if big else &"warn"]],
+			[["Yes, that's the table", &"entry_confirm_yes", SetupPanel.GREEN], ["No, point at it", &"entry_confirm_point", SetupPanel.GREY]])
 
 
 ## TESTING ONLY: the chosen table replaces any other tables (Wei's depth finder can
@@ -948,7 +1182,7 @@ func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.
 	button.setup(text, id, colour, Vector2(wide, 0.06 if wide > 0.15 else 0.05), margin)
 	button.global_position = at
 	button.born = _real
-	button.look_at(App.head().global_position, Vector3.UP)
+	button.look_at(Vector3(App.head().global_position.x, at.y, App.head().global_position.z), Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)   # its face to the child
 	_buttons.append(button)
 	return button
@@ -1055,7 +1289,7 @@ func _cauldron_spot() -> Vector3:
 			on.y = (flat as Vector3).y
 		print("ENTRY spot: cauldron on the confirmed table, ", snappedf(eye.y - on.y, 0.01), " m below the eyes")
 		return on
-	var spot := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * CAULDRON_DISTANCE
+	var spot := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * _cauldron_distance
 	var on_bench := _bench.affine_inverse() * spot   # in the bench's frame: x across, -z ahead
 	var clear := absf(on_bench.x) - CAULDRON_WIDTH * 0.5 - _bench_half
 	if clear < CAULDRON_GAP and -on_bench.z < 0.41 + CAULDRON_WIDTH * 0.5:
@@ -1205,7 +1439,7 @@ func _process(delta: float) -> void:
 		_poke_cauldron()
 	if SHOW_RAYS:
 		_draw_rays()
-	if SHOW_HANDS:
+	if SHOW_HANDS or _show_hands_now:
 		_draw_hands()
 	if _aiming:
 		_aim()
@@ -1400,6 +1634,13 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 const GLINT_ROWS := 7
 const GLINT_COLUMNS := 15
 func _sample_room() -> void:
+	_surface_points.append_array(_scan_room())
+	print("ENTRY ripple: ", _surface_points.size(), " real surface points of ", GLINT_ROWS * GLINT_COLUMNS, " rays")
+
+
+## The real surfaces the fan of depth rays hits now: [{position, normal}, ...].
+func _scan_room() -> Array[Dictionary]:
+	var points: Array[Dictionary] = []
 	var eye := App.head().global_transform
 	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	for row in GLINT_ROWS:
@@ -1410,8 +1651,8 @@ func _sample_room() -> void:
 			ray = ray.rotated(ray.cross(Vector3.UP).normalized(), -deg_to_rad(down))
 			var found: Dictionary = App.reality.hit(eye.origin, ray)
 			if not found.is_empty() and (found.position as Vector3).distance_to(eye.origin) < 3.0:
-				_surface_points.append({position = found.position, normal = found.normal})
-	print("ENTRY ripple: ", _surface_points.size(), " real surface points of ", GLINT_ROWS * GLINT_COLUMNS, " rays")
+				points.append({position = found.position, normal = found.normal})
+	return points
 
 
 ## A faint, soft disc of light lying on a real surface, fading out.
