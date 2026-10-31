@@ -47,6 +47,8 @@ func run() -> void:
 	if start_with == &"motion":
 		start_with = &""
 		Tidy.onion_voice = false
+		Tidy.seed_next = 0   # meant for the shelf level this jump skipped: not for "More shapes" later
+		Tidy.things_arrive = true
 		await get_tree().create_timer(0.5, false).timeout
 		await (get_node(^"../Motion") as MotionVisit).run_motion()
 		return
@@ -113,6 +115,7 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 func _exit_tree() -> void:
 	Tidy.onion_voice = false
 	Tidy.push = 0.0   # the opening's shelf distance ends with the first visit
+	Tidy.fixed_frame_on = false   # and so does the opening's planned bench
 	Entry.show_sim_props(true)
 
 

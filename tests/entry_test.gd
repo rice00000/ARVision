@@ -19,8 +19,10 @@ func _boot_entry() -> void:
 	await boot(null, &"intro")
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
-	entry.skip_setup = false   # the tests go through the four steps
+	entry.skip_setup = false
+	entry.plan_at_start = false   # the tests go through the four steps
 	entry.simulate_child = true   # a pretend child picks the gear up and sets it in
 	entry.run()
 
@@ -513,6 +515,7 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 func shutdown() -> void:
 	await super.shutdown()
 	Tidy.push = 0.0
+	Tidy.fixed_frame_on = false
 	Tidy.onion_voice = false
 	Motion.onion_voice = false
 	Engine.time_scale = 1.0
@@ -605,3 +608,21 @@ func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_
 	expect(not (workshop.get("_onion") as Node3D).visible, "Onion ducked inside")
 	expect(visit.find_child("visit_end_session", true, false) != null, "the end-session control is shown")
 	expect(not Motion.onion_voice, "Wei's lines are back afterwards")
+
+
+func test_the_room_is_planned_when_start_is_pressed_from_where_the_child_sits() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = true
+	entry.simulate_child = true
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
+	expect(entry.get("_layout") == null, "nothing is planned before Start (the headset may still be going on)")
+	App.rig.head.rotation.y = 0.3   # the child sits a little turned
+	await frames(2)
+	await _press(&"entry_part_all")
+	expect(await until(func() -> bool: return entry.get("_layout") != null, 20.0), "Start plans the room")
+	var planned: Transform3D = entry.get("_plan_head")
+	expect(absf(planned.basis.get_euler().y - 0.3) < 0.05, "from the head as it is when Start is pressed")
+	expect(Tidy.fixed_frame_on, "and Wei's shelf will stand where the plan put the bench")

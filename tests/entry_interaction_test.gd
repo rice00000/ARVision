@@ -784,6 +784,7 @@ func test_the_real_opening_configures_carry_and_the_gear_docks_in_its_socket() -
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
@@ -830,6 +831,7 @@ func test_the_real_opening_can_be_tried_with_the_mouse_hand_and_reminds_a_waitin
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
@@ -879,6 +881,7 @@ func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
@@ -920,6 +923,7 @@ func _opening_at_start() -> Entry:
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.poke_in_sim = false   # a desktop: only a click presses
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_part_touch") != null, 30.0)

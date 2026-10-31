@@ -154,6 +154,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.poke_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
@@ -197,6 +198,7 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.poke_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
@@ -238,6 +240,7 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.poke_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
@@ -263,6 +266,7 @@ func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does
 	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var path := String(Main.SCENES[&"first_visit"].path)

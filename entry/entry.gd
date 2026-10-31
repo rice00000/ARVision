@@ -172,6 +172,11 @@ var shelf_push := SHELF_PUSH
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
 var skip_setup := SKIP_SETUP
+## Plan the room when Start (or a jump) is pressed: the child is seated then. Tests that look at the room
+## before pressing anything turn it off.
+var plan_at_start := true
+var _plan_head := Transform3D.IDENTITY   # the head pose the room was planned from (at Start)
+var _planned := false
 var _sounds: Sounds
 var _pop_button: EntryButton   # DEV: switches Onion's pop between candidates A and C
 var _actions: OnionActions          # where Onion looks, its hop and lean, the ? and ! marks
@@ -229,6 +234,7 @@ func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.push = 0.0
+		ShelfCopy.fixed_frame_on = false
 		show_sim_props(true)
 	if is_instance_valid(_beat_label):
 		_beat_label.free()
@@ -257,20 +263,20 @@ func run() -> void:
 	if DEBUG:
 		_debug_buttons()
 	show_sim_props(false)
+	_ask_for_room_scan()
 	await _setup()
 	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
-	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
-	_on_table = await _cauldron_on_table()
-	_shelf_to_the_side()
-	_table = App.reality.work_surface()
-	# One cauldron, one Onion, one shelf, one workshop for every part.
-	_build_shelf()
-	_build_cauldron(await _cauldron_spot())
-	_build_mechanism()
-	_build_gear()
-	_build_onion()
-	_build_workshop()
-	_preload_first_visit()
+	# The room is planned from where the child sits when Start (or a jump) is pressed, not from the
+	# headset's pose in the first seconds after launch (the adult putting it on): headset run, Oct 31.
+	if plan_at_start:
+		var first := _pending
+		_pending = &""
+		if first == &"":
+			first = await _choose_part()
+		await _plan_and_build()
+		_pending = first
+	else:   # (tests that inspect the room before Start)
+		await _plan_and_build()
 
 	# Nothing plays until the adult presses Start (or a part to jump to). A jump button also
 	# cuts in on a part that is still playing, and a jump skips the story's own pauses.
@@ -305,6 +311,71 @@ func run() -> void:
 			await _to_shelf(false)
 			return
 		print("ENTRY jump: ", part, " done")
+
+
+## Plans the room once, from ONE head pose taken now, and builds the cauldron, Onion, the shelf and the
+## workshop for every part. The table is then pinned, so nothing found later moves the plan.
+func _plan_and_build() -> void:
+	_plan_head = App.head().global_transform
+	_planned = true
+	_ahead = Vector3(-_plan_head.basis.z.x, 0.0, -_plan_head.basis.z.z).normalized()
+	_on_table = await _cauldron_on_table()
+	_shelf_to_the_side()
+	_table = App.reality.work_surface()
+	_pin_table()
+	# Wei's shelf (here and in the first visit) stands where the plan put the bench, not where the head is.
+	ShelfCopy.fixed_frame_on = true
+	ShelfCopy.fixed_frame = _layout.bench
+	ShelfCopy.fixed_below = _layout.bench_below
+	_build_shelf()
+	_build_cauldron(await _cauldron_spot())
+	_build_mechanism()
+	_build_gear()
+	_build_onion()
+	_build_workshop()
+	_preload_first_visit()
+	_placement_summary()
+
+
+## The head pose the room was planned from (live before the plan).
+func _head() -> Transform3D:
+	return _plan_head if _planned else App.head().global_transform
+
+
+## Locks the table the plan used (a real one, or the pretend patch frozen where it is now), and stops
+## Reality asking for hands on the table: a table found later must not move the shelf.
+func _pin_table() -> void:
+	if _pinned == null:
+		var table := App.reality.work_surface()
+		if not App.reality.surfaces(&"table").has(table):   # the pretend patch: freeze it as a table
+			table = Surface.new(&"table", table.transform, table.size)
+		_pinned = table
+	_keep_pinned()
+	if &"_hands_asked" in App.reality:
+		App.reality._hands_asked = false
+
+
+## The Quest's room scan (Space Setup) needs this permission at run time.
+func _ask_for_room_scan() -> void:
+	if OS.get_name() == "Android":
+		OS.request_permission("com.oculus.permission.USE_SCENE")
+
+
+## One line that says where everything was placed from, for headset runs (adb logcat | grep ENTRY).
+func _placement_summary() -> void:
+	var table := App.reality.work_surface()
+	var real := App.reality.surfaces(&"table").has(table)
+	var eye := _plan_head.origin
+	var to_table := table.transform.origin - eye
+	var table_yaw := rad_to_deg(Vector2(_ahead.x, _ahead.z).angle_to(Vector2(to_table.x, to_table.z)))
+	var axis := rad_to_deg(Vector2(_ahead.x, _ahead.z).angle_to(Vector2(table.transform.basis.x.x, table.transform.basis.x.z)))
+	var source := "pinned table" if real else "pretend patch"
+	var line := "PLACEMENT: %s %s m below the eyes, %s m away at %d deg, size %s, table edge %d deg off the view; eye height %s m; reach %s" % [
+		source, snappedf(eye.y - table.transform.origin.y, 0.01), snappedf(Vector2(to_table.x, to_table.z).length(), 0.01),
+		roundi(table_yaw), table.size, roundi(fposmod(axis + 45.0, 90.0) - 45.0), snappedf(eye.y, 0.01), snappedf(_layout.reach_used(), 0.01)]
+	print("ENTRY ", line)
+	if DEBUG:
+		_beat(line)
 
 
 ## Plays [param part] on [param runner]; it never gets to the end if the runner is freed.
@@ -1382,7 +1453,7 @@ func _shelf_to_the_side() -> void:
 	if not App.reality.surfaces(&"table").has(table):
 		print("ENTRY shelf: no real table, so it stays straight ahead")
 		return
-	var eye := App.head().global_position
+	var eye := _head().origin
 	var reach := Vector2(table.transform.origin.x - eye.x, table.transform.origin.z - eye.z).length()
 	var angle := _layout.shelf_angle
 	var point := eye + _ahead.rotated(Vector3.UP, -deg_to_rad(angle)) * reach
@@ -1426,7 +1497,7 @@ func _cauldron_on_table() -> Variant:
 ## A layout for [param table] from where the head is now, straight ahead from the seat.
 func _new_layout(table: Surface, real: bool, measured: float) -> EntryLayout:
 	var layout := EntryLayout.new()
-	var head := App.head().global_transform
+	var head := _head()
 	layout.eye = head.origin
 	layout.ahead = Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
 	layout.table = table.transform
@@ -2117,7 +2188,7 @@ func _build_mechanism() -> void:
 	add_child(_mechanism)
 	var spot := _mechanism_spot()
 	_mechanism.global_position = spot
-	var eye := App.head().global_position
+	var eye := _head().origin
 	_mechanism.rotation.y = atan2(eye.x - spot.x, eye.z - spot.z)   # its front (+z) to the child
 	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
 	var dark := _lit(Color(0.07, 0.08, 0.09))
@@ -2698,7 +2769,7 @@ const TRY_CARRY_KEY := KEY_G
 ## clear; and lets the teaching hand remind a child who has not picked the gear up. The hand only
 ## ever shows the gesture: it never carries the gear anywhere.
 func _configure_interaction() -> void:
-	_carry.configure(_gear_rest.y, App.head().global_position, maxf(_cauldron_distance, 0.45) + 0.15,
+	_carry.configure(_gear_rest.y, _head().origin, maxf(_cauldron_distance, 0.45) + 0.15,
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
 	_carry.follow(_box, _mechanism)   # they move at the reveal
 	Events.selected.connect(_on_desktop_click)
