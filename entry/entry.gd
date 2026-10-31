@@ -415,10 +415,11 @@ func _later(seconds: float, what: Callable) -> void:
 		what.call()
 
 
-## Beside the mouth, on the side away from the demonstration hand's body.
+## Beside the mouth, on the side away from the demonstration hand's body: the layout's offset
+## (EntryLayout.onion_mouth_offset: the story chat's 7 cm to the child's left, moved only if the
+## hand's measured sweep would touch Onion).
 func _beside_mouth() -> Vector3:
-	var side := _toward_child().rotated(Vector3.UP, -0.85)
-	return _peek_spot() + side * 0.13 + Vector3.UP * 0.04   # up and to the side: clear of the cauldron
+	return _peek_spot() + _layout.onion_mouth_offset + Vector3.UP * 0.04   # up and to the side (Megan): clear of the cauldron
 
 
 ## 3. Onion clears the opening; a heavier rattle; the gear pops up, Onion hops back with a "!"
@@ -501,7 +502,7 @@ func _place() -> void:
 	await say("Ah. There we go.")
 	# Onion rises and turns to the room.
 	_attend(_ahead * 1.5 + App.head().global_position)
-	await _move(_orb, _aside_spot() + Vector3.UP * 0.1, 1.0)
+	await _move(_orb, _lifted_spot(), 1.0)
 
 
 ## 6. The reveal: a gentle ripple from the socket shows the nearby workshop and shelf; Onion has
@@ -785,7 +786,7 @@ func _set_up_for(part: StringName) -> void:
 			_orb.global_position = _aside_spot()
 			_gear_to_rest()
 		&"reveal", &"shelf":
-			_orb.global_position = _aside_spot() + Vector3.UP * 0.1
+			_orb.global_position = _lifted_spot()
 			_dock_at_once()
 	if part == &"shelf":
 		for detail in _details:
@@ -1837,6 +1838,11 @@ func _aside_spot() -> Vector3:
 	return _layout.onion_aside_after if _made_way else _layout.onion_aside
 
 
+## Where Onion rises to after the seating, and waits for the reveal: above the aside spot (EntryLayout).
+func _lifted_spot() -> Vector3:
+	return _layout.onion_lifted_after if _made_way else _layout.onion_lifted
+
+
 ## Moves Onion smoothly to [param where].
 func _orb_to(where: Vector3) -> void:
 	_move(_orb, where, 1.2)
@@ -2043,8 +2049,13 @@ func _make_way(seconds := 1.2, back := false) -> void:
 	plate.y = _mechanism.global_position.y
 	var lift := pot - _box.global_position
 	var slide := plate - _mechanism.global_position
-	var orb_to := _aside_spot()
-	var orb_goes := _orb.global_position.distance_to(_layout.onion_aside_after if back else _layout.onion_aside) < 0.05
+	var from_aside := _layout.onion_aside_after if back else _layout.onion_aside
+	var from_lifted := _layout.onion_lifted_after if back else _layout.onion_lifted
+	# Onion goes along with the cauldron if it waits at its aside spot or at the lifted one (after the
+	# seating), to the same kind of spot for the new places.
+	var lifted := _orb.global_position.distance_to(from_lifted) < 0.05
+	var orb_goes := lifted or _orb.global_position.distance_to(from_aside) < 0.05
+	var orb_to := _lifted_spot() if lifted else _aside_spot()
 	var gear_goes := is_instance_valid(_gear) and _gear.visible and _gear.global_position.distance_to(_socket_at) < 0.02
 	if _zones != null and is_instance_valid(_zones):
 		_zones.draw(_layout, EntryLayout.REVEAL | EntryLayout.SHELF if _made_way else EntryLayout.SETUP | EntryLayout.OPENING)
