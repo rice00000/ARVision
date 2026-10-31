@@ -11,6 +11,9 @@ const Tidy := preload("res://trials/tidy/tidy_trial.gd")
 
 @export var plan: SessionPlan
 
+## DEV jump: &"motion" starts straight at the motion route (the shelf level is skipped). Single use.
+static var start_with: StringName = &""
+
 ## Seconds of quiet at the very end of scene one.
 const QUIET_END := 4.0
 const BREATH := 0.25
@@ -41,6 +44,13 @@ func run() -> void:
 	App.reality.apply_view(App.session.base_view)
 	if not App.reality.is_settled:
 		await App.reality.settled
+	if start_with == &"motion":
+		start_with = &""
+		Tidy.onion_voice = false
+		await get_tree().create_timer(0.5, false).timeout
+		await (get_node(^"../Motion") as MotionVisit).run_motion()
+		return
+	SceneMarker.show_text("Shelf")
 	_play()   # not awaited: Onion speaks while the first round sets up
 	for _frame in 30:
 		await get_tree().process_frame
@@ -87,6 +97,9 @@ func _closing() -> void:
 	await get_tree().create_timer(QUIET_END, false).timeout
 	Tidy.onion_voice = false
 	Events.report(&"first_visit_done")
+	var motion := get_node_or_null(^"../Motion") as MotionVisit
+	if motion != null:
+		motion.run_after_shelf()   # "There's more to sort..." and the motion route (it runs on its own)
 
 
 func _on_reported(what: StringName, data: Dictionary) -> void:

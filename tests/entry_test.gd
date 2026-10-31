@@ -6,6 +6,7 @@ extends TestCase
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
+const Motion := preload("res://trials/motion/motion_trial.gd")
 const ADVENTURE := preload("res://content/adventure.tres")
 
 var entry: Entry
@@ -513,6 +514,7 @@ func shutdown() -> void:
 	await super.shutdown()
 	Tidy.push = 0.0
 	Tidy.onion_voice = false
+	Motion.onion_voice = false
 	Engine.time_scale = 1.0
 
 
@@ -560,3 +562,39 @@ func test_the_first_visit_does_not_claim_success_after_a_time_out() -> void:
 	Engine.time_scale = 1.0
 	expect(not _said_line(said, "There. Everything's found its place."), "no claim that everything is in place")
 	expect(_said_line(said, "Thank you for helping."), "a neutral thank-you")
+
+
+func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await _press(&"entry_part_motion")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
+	expect(await _until_said(said, "Watch what happens when they move together.", 30.0), "Onion introduces the demonstration")
+	expect(await _until_said(said, "Your turn.", 30.0), "then the child's turn")
+	expect(await until(func() -> bool: return App.session.trial != null, 30.0), "Wei's motion round runs")
+	expect(Motion.onion_voice, "with Wei's own lines switched off")
+	await wait(1.0)
+	expect(not _said_line(said, "Which way do the dots go? Sweep your hand that way, then hold still."), "his round line is not said")
+	var visit := App.main.get_node(^"FirstVisit/Motion") as MotionVisit
+	expect(absf(visit._coherence_at(visit.level_for(0.5)) - 0.5) < 0.01, "the DEV coherence control finds the level for 50 %")
+
+
+func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_success_is_marked_once() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await _press(&"entry_part_motion")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
+	var visit := App.main.get_node(^"FirstVisit/Motion") as MotionVisit
+	visit.set("_in_motion", true)
+	Engine.time_scale = 4.0
+	Events.trial_ended.emit(&"motion", true, {})
+	Events.trial_ended.emit(&"motion", true, {})
+	expect(await _until_said(said, "There! You did that.", 40.0), "the first success gets its lines")
+	await wait(3.0)
+	expect(said.filter(func(a: Array) -> bool: return a[0] == "There! You did that.").size() == 1, "once")
+	await visit._ending()
+	Engine.time_scale = 1.0
+	expect(_said_line(said, "Thank you for trying that with me."), "the approved ending")
+	expect(not Motion.onion_voice, "Wei's lines are back afterwards")

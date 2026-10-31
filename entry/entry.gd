@@ -84,7 +84,7 @@ const TAP_STAGING := false
 const FIRST_THINGS := true
 const FIRST_THINGS_RISE := 0.04
 ## The parts, in order: button id suffix -> label.
-const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
+const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", motion = "Motion", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
 ## picking the gear up and setting it in.
 const USE_REAL_CARRY := true
@@ -242,6 +242,7 @@ func run() -> void:
 	_runner = PartRunner.new()
 	add_child(_runner)
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
+	SceneMarker.show_text("Opening")
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
@@ -284,6 +285,10 @@ func run() -> void:
 		var fast := part != &"all"
 		_set_up_for(&"hello" if part == &"all" else part)
 		if part == &"shelf":
+			await _to_shelf(true)
+			return
+		if part == &"motion":   # DEV: straight to the motion route (in the first visit's scene)
+			FirstVisit.start_with = &"motion"
 			await _to_shelf(true)
 			return
 		if part == &"dots":
