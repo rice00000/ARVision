@@ -50,6 +50,12 @@ static var seed_next := 0
 ## The NEXT round's things are simply there at their places (they were already shown), not dropping in; clears
 ## itself after one round. True: they drop in with a bounce, as always.
 static var things_arrive := true
+## While set, the bench stands exactly here (frame at the eyes' height, facing the shelf) and its top
+## [member fixed_below] under it, instead of following the live head: the opening plans the room once
+## and its shelf and the first visit's shelf must stand in the same place. Default off: unchanged.
+static var fixed_frame_on := false
+static var fixed_frame := Transform3D.IDENTITY
+static var fixed_below := 0.42
 
 ## The bench, metres from the eyes: the shelf's front; the bench top below the
 ## eyes, the work surface's height kept within this range.
@@ -540,6 +546,9 @@ func _build_shelf() -> void:
 	var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
 	_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
 	_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST) # just above a real table
+	if fixed_frame_on:
+		_frame = fixed_frame
+		_below = fixed_below
 	_shelf = Node3D.new()
 	_shelf.name = "Shelf"
 	add_child(_shelf)

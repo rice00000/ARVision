@@ -566,3 +566,11 @@ table top, facing the child; beyond the table's far edge nothing is in the way, 
 `onion_without_shelf(n)`: Onion beside the row's left end, low (5 to 16 cm up), out of the dots' view by 4 degrees. Tested on
 short and long tables and three reaches. Wei's own shelf-level choice is not on the table in this route: the organizer's
 scene decides which targets (the shelf levels and "motion") fill the row.
+
+## Organizer, after the first headset run (Oct 31, ~11:30): placement fixes
+* The room is planned when Start (or a jump) is pressed, from ONE head pose (`Entry._plan_head`, `_head()`), not ~4 s after launch. `plan_at_start` (default true; tests that inspect the room before pressing set it false).
+* Wei's shelf stands where the plan put the bench, in the opening AND the first visit: `tidy_trial.gd` gained `static fixed_frame_on / fixed_frame / fixed_below` (default off: unchanged). Set from `_layout.bench` / `bench_below`; cleared when the first visit ends (or the opening ends without handing over).
+* The table is pinned at the plan (`_pin_table`: a real table, or the pretend patch frozen as a table); Reality's hands-flat prompt is switched off then.
+* `com.oculus.permission.USE_SCENE`: added to the Quest 3 preset's custom permissions and requested at run time (`_ask_for_room_scan`).
+* One `ENTRY PLACEMENT:` line in the Output (and on the DEV beat label): table source, drop below the eyes, distance and angle, size, the table edge's angle to the view, eye height, reach. Headset: `adb logcat | grep ENTRY`.
+* The DEV Motion jump no longer leaves `seed_next` / `things_arrive` set for a later "More shapes".
