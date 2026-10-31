@@ -74,7 +74,9 @@ const JUMP_PANEL := true
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
 ## picking the gear up and setting it in.
-const USE_REAL_CARRY := false
+const USE_REAL_CARRY := true
+## Tests set this: a pretend child picks the gear up and sets it in (a headset has no tests).
+var simulate_child := false
 ## Setup has four steps: hands, table, reach, sound and room.
 const SETUP_STEPS := 4
 ## TESTING: a screen "pass the headset to the child" before the reach step, which measures
@@ -2026,9 +2028,17 @@ func _child_picks_up() -> void:
 		_carry.picked_up.connect(func() -> void:
 			if is_instance_valid(runner):
 				runner.picked_up.emit(), CONNECT_ONE_SHOT)
+		if simulate_child:
+			_pretend_pick_up(runner)
 	else:
 		_stand_in_pickup(runner)
 	await runner.picked_up
+
+
+func _pretend_pick_up(runner: PartRunner) -> void:
+	await runner.wait(0.5)
+	if is_instance_valid(runner):
+		_carry.picked_up.emit()
 
 
 func _stand_in_pickup(runner: PartRunner) -> void:
@@ -2040,9 +2050,13 @@ func _stand_in_pickup(runner: PartRunner) -> void:
 func _child_sets_in() -> void:
 	var runner := _runner
 	if USE_REAL_CARRY:
+		if not _carry.held:   # a jump straight to Set in: the child has to pick it up as well
+			_carry.begin(_gear, _socket_at)
 		_carry.docked.connect(func() -> void:
 			if is_instance_valid(runner):
 				runner.docked.emit(), CONNECT_ONE_SHOT)
+		if simulate_child:
+			_carry.simulate(0.3)
 	else:
 		_stand_in_set_in(runner)
 	await runner.docked
