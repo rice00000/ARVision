@@ -173,7 +173,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	expect(await _until_said(said, "There you go.", 30.0), "pickup: Onion thanks the child")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "pickup: the panel comes back")
 	await _press(&"entry_part_place")
-	expect(await _until_said(said, "Ah. There we go.", 30.0), "place: Onion says it is in")
+	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 30.0), "place: the gear is seated (one click)")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "place: the panel comes back")
 	expect(_docked(), "place: the gear is in its socket, turning")
 

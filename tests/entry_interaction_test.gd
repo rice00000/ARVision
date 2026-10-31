@@ -1083,7 +1083,7 @@ func test_a_child_who_sets_the_gear_in_while_onion_talks_is_not_asked_to() -> vo
 	run_place.call()
 	expect(await until(func() -> bool: return done.place, 20.0), "the set-in beat does not wait for a gear that was already set in")
 	expect(not _line_said(said, "Set it in here, then open your fingers."), "and does not ask for it")
-	expect(_line_said(said, "Ah. There we go."), "but still says its line")
+	expect((entry.get("_sounds") as Sounds).played.has(&"seat"), "but still finishes the seating (the click)")
 	expect(not (entry.get("_demo") as DemoHand).visible and not _glowing(entry), "no hand, no glow")
 	expect(real_gear.global_position.distance_to(socket_at) < 0.01, "the gear is in the socket")
 
@@ -1103,12 +1103,12 @@ func test_tracking_lost_while_carrying_in_the_set_in_beat_sets_it_down_and_the_b
 	await wait(2.0)
 	expect(not carry_node.held, "let go when the hand is lost")
 	expect(absf(real_gear.global_position.y - rest.y) < 0.004, "set down on the table")
-	expect(not _line_said(said, "Ah. There we go."), "the beat keeps waiting: nothing was set in")
+	expect(not (entry.get("_sounds") as Sounds).played.has(&"seat"), "the beat keeps waiting: nothing was set in")
 	input.track(&"right", true)
 	await frames(3)
 	await _take_real_gear(entry, entry.get("_socket_at") + Vector3(0.02, 0.02, 0.0))
 	input.press(&"right", &"trigger_click", false)
-	expect(await until(func() -> bool: return _line_said(said, "Ah. There we go."), 25.0), "and when the child sets it in, the beat finishes")
+	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 25.0), "and when the child sets it in, the beat finishes")
 
 
 func _panel_gap(entry: Entry, spot: Vector3) -> float:

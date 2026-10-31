@@ -165,7 +165,7 @@ leans a little and looks down at it. The teaching hand lowers over the socket an
 out and in between rounds); its body lies to your right, Onion is on the left or behind. Bring the
 gear over the socket and let go: it aligns itself, clicks, and the gears and the panel's little cog start turning.
 Onion rises slightly (about 2 cm and then up to the lifted spot), looks at the mechanism, and turns to the room. Let go anywhere else: the gear floats down onto the table within reach, no fuss.
-**Hear:** "Set it in here, then open your fingers." / a click, once / "Ah. There we go."
+**Hear:** "Set it in here, then open your fingers." / a click, once (no line after it: "Ah. There we go." was cut)
 ⚠ No lead-in line before the instruction (not approved yet).
 Note: when you jump straight to "Set in" without holding the gear, after about 14 s the hand goes back to showing the
 pinch on the gear; that is the reminder, not a bug.

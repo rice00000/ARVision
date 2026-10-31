@@ -531,8 +531,8 @@ func _place() -> void:
 	_dock_at_once()   # settled, upright, and now turning
 	_actions.lean_to(_runner, 0.0, 0.4)
 	_actions.lift(_runner, 0.02, 0.6)   # lifts slightly
-	_attend(_mechanism)   # and looks at the connected mechanism
-	await say("Ah. There we go.")
+	_attend(_mechanism)   # and looks at the connected mechanism (no line: Megan cut "Ah. There we go.")
+	await _wait(1.2)
 	# Onion rises and turns to the room.
 	_attend(_ahead * 1.5 + App.head().global_position)
 	await _move(_orb, _lifted_spot(), 1.0)

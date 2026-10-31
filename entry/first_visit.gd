@@ -51,27 +51,28 @@ func run() -> void:
 	if _onion != null and things != Vector3.INF:
 		_onion.attend(things)
 		_onion.float_to(_onion.onion_position().lerp(Vector3(things.x, _onion.onion_position().y, things.z), 0.3), 1.0)
-	await _line("Oh! I'd nearly forgotten about these.")
-	await _line("They've come quite a long way.")
+	if not _started:
+		await say("Oh! I'd nearly forgotten about these.")
+	if not _started:
+		await say("They've come quite a long way.")
 	if _onion != null and things != Vector3.INF:
 		_onion.attend(_shelf_spot)   # looks across the shapes, then toward the shelf
-	await _line("The house is very good at bringing things here.")
-	await _line("But finding their place is usually my job.")
+	if not _started:
+		await say("The house is very good at bringing things here.")
+	if not _started:
+		await say("But finding their place is usually my job.")
 	if _onion != null:
 		_onion.attend(null)   # turns toward the child
-	await _line("You could join me, if you like.")
+	if not _started:
+		await say("You could join me, if you like.")
 	if _onion != null and _shelf_spot != Vector3.INF:
 		_onion.attend(_shelf_spot)   # looks toward the shelf
-	await _line("The shapes on the shelf show where things go.")
-	await _line("Pick whichever one you'd like to start with.")
+	if not _started:
+		await say("The shapes on the shelf show where things go.")
+	if not _started:
+		await say("Pick whichever one you'd like to start with.")
 	if _onion != null:
 		_onion.attend(null)
-
-
-## Says [param text] unless the child has already started (picked a shape up or placed one).
-func _line(text: String) -> void:
-	if not _started:
-		await say(text)
 
 
 func _play() -> void:
