@@ -153,6 +153,53 @@ class Zone:
 		return Vector2(-sin(a), -cos(a))
 
 
+# --- Onion's ? and ! marks (entry/onion_actions.gd reads these) --------------------------
+
+## How tall the mark looks from the child's eyes, degrees (whatever Onion's distance): about 6
+## degrees is a 5-6 cm glyph at 0.5 m, big enough for a child who sees poorly, small beside Onion.
+const MARK_DEGREES := 6.0
+## The gap between the top of Onion and the bottom of the mark, metres.
+const MARK_ABOVE := 0.035
+## The glyph's height on screen as a share of font_size * pixel_size (the bold fallback font).
+const MARK_GLYPH := 0.72
+const MARK_FONT_SIZE := 160
+## Outline width as a share of the font size: thick enough to separate it from any room.
+const MARK_OUTLINE := 0.22
+## Colours. Style 0 (the story's first option): sage with a cream outline: only 2.7:1 between
+## them, and a cream outline vanishes against a white wall. Style 1 (default): cream with a DARK
+## sage outline: 7.7:1 between them, about 7:1 against a white wall and 9:1 against a dark room.
+const MARK_SAGE := Color(0.45, 0.62, 0.48)
+const MARK_CREAM := Color(0.97, 0.94, 0.85)
+const MARK_DARK_SAGE := Color(0.2, 0.32, 0.22)
+const MARK_STYLE := 1
+## Seconds: fade in, grow (with a little overshoot), stay, fade out. Brief, no flashing.
+const MARK_IN := 0.15
+const MARK_GROW := 0.22
+const MARK_STAY := 0.9
+const MARK_OUT := 0.35
+
+
+## The mark's pixel size for Onion [param distance] metres from the eyes, so it looks MARK_DEGREES tall.
+static func mark_pixel_size(distance: float) -> float:
+	var tall := 2.0 * distance * tan(deg_to_rad(MARK_DEGREES) * 0.5)
+	return tall / (MARK_FONT_SIZE * MARK_GLYPH)
+
+
+## How far above Onion's middle the mark's middle goes, for Onion [param onion_height] tall.
+static func mark_lift(onion_height: float, pixel_size: float) -> float:
+	return onion_height * 0.5 + MARK_ABOVE + MARK_FONT_SIZE * pixel_size * MARK_GLYPH * 0.5
+
+
+## Fill and outline for [param style] (0 or 1).
+static func mark_colours(style: int) -> Array[Color]:
+	var colours: Array[Color] = []
+	if style == 0:
+		colours.append_array([MARK_SAGE, MARK_CREAM])
+	else:
+		colours.append_array([MARK_CREAM, MARK_DARK_SAGE])
+	return colours
+
+
 # --- Inputs -------------------------------------------------------------------
 
 ## The eyes at the start (after setup), and straight ahead from the seat, flat.
@@ -237,12 +284,38 @@ func plan() -> EntryLayout:
 	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
 	push = shelf_push(reach)
 	cauldron_distance = cauldron_out(reach)
-	cauldron = _cauldron_spot()
-	shelf_angle = _shelf_angle()
+	# Two tries for the cauldron: three quarters of the reach out, or just beyond it (its near rim
+	# still in reach for the tap) so the gear can land in front of it on a shallow strip of table.
+	var best := {}
+	var best_score := -INF
+	for out: float in [cauldron_distance, reach_used() + 0.07]:
+		cauldron = _cauldron_spot(out)
+		shelf_angle = _shelf_angle()
+		bench = bench_frame(shelf_angle)
+		_place_mechanism()
+		_finish()
+		var score := _problems()
+		if score > best_score + 0.5:
+			best_score = score
+			best = {cauldron = cauldron, angle = shelf_angle, mechanism = mechanism}
+	cauldron = best.cauldron
+	shelf_angle = best.angle
 	bench = bench_frame(shelf_angle)
-	_place_mechanism()
+	mechanism = best.mechanism
 	_finish()
 	return self
+
+
+## Minus how bad the plan is: overlaps, things out of view or out of reach (0: none).
+func _problems() -> float:
+	var bad := 0.0
+	for o in overlaps():
+		bad += 10.0 + (o.amount * 100.0 if o.how == "on the table" else o.amount)
+	for o in out_of_view():
+		bad += 5.0 + o.degrees
+	for o in out_of_reach():
+		bad += 5.0 + o.metres * 100.0
+	return -bad
 
 
 ## The cauldron's real height: the top at [param spot] (from depth) and its rim [param height]
@@ -348,8 +421,8 @@ func _on_the_table(z: Zone) -> bool:
 
 ## The cauldron: CAULDRON_ANGLE left, [member cauldron_distance] out, on the table and
 ## [constant TABLE_MARGIN] in from its edges (the pretend table too).
-func _cauldron_spot() -> Vector3:
-	var spot := _on_table(eye + toward(-CAULDRON_ANGLE) * cauldron_distance, TABLE_MARGIN)
+func _cauldron_spot(out := cauldron_distance) -> Vector3:
+	var spot := _on_table(eye + toward(-CAULDRON_ANGLE) * out, TABLE_MARGIN)
 	spot.y = table_y()
 	return spot
 
@@ -467,25 +540,34 @@ func _clear_spot(from: Vector3, z: Zone, others: Array) -> Vector3:
 	return best
 
 
-## Where the gear lands: round the cauldron, clear of it and of the panel, in reach, on the table,
-## the nearest such spot to the panel (the carry).
+## Where the gear lands: on the table, in view and in reach, clear of the cauldron and the panel;
+## near the socket (a short carry) and not far from the cauldron (it arcs out of it).
 func _gear_rest_for(panel: Vector3, steps := 16) -> Vector3:
 	var plate := _rect(&"plate", panel, _panel_half(), _facing(panel), 0.0)
 	var pot := _circle(&"pot", cauldron, CAULDRON_WIDTH * 0.5, 0.0)
-	var around := CAULDRON_WIDTH * 0.5 + GAP + GEAR_RADIUS + FINGERS
-	var best := cauldron + (Vector3(eye.x, cauldron.y, eye.z) - cauldron).normalized() * around
+	var landing := _circle(&"landing", cauldron, GEAR_RADIUS + FINGERS, 0.0)
+	var hands := reach_used()
+	var best := cauldron
 	var best_score := -INF
-	for step in steps:   # round the cauldron, then a little farther out
-		for farther: float in [0.0, 0.04, 0.08]:
-			var dir := Vector3(sin(step * TAU / steps), 0.0, cos(step * TAU / steps))
-			var spot := cauldron + dir * (around + farther)
-			var landing := _circle(&"landing", spot, GEAR_RADIUS + FINGERS, 0.0)
+	var plate_socket := _socket_of(panel, _facing(panel))
+	var spread := 100.0 / steps
+	for i in steps + 1:
+		var angle := -50.0 + i * spread
+		for distance: float in [0.26, 0.31, 0.36, 0.41, 0.46, 0.51, 0.56, 0.61]:
+			var spot := eye + toward(angle) * distance
+			spot.y = cauldron.y
+			landing.centre = spot
 			var clear := minf(gap(landing, plate), gap(landing, pot))
-			var score := (0.0 if clear >= GAP else -10.0 + clear) - Vector2(spot.x - panel.x, spot.z - panel.z).length()
-			if away(spot) > reach_used() - 0.03:
-				score -= 5.0 + away(spot)
+			var score := (0.0 if clear >= GAP else -10.0 + clear)
 			if not _inside_table(spot, GEAR_RADIUS):
-				score -= 5.0
+				score -= 20.0
+			var side := absf(angle) + rad_to_deg(atan2(GEAR_RADIUS + FINGERS, distance)) - VIEW_WIDE * 0.5
+			if side > 0.0:
+				score -= 5.0 + side
+			if distance > hands - 0.03:
+				score -= 5.0 + (distance - hands) * 20.0
+			score -= Vector2(spot.x - plate_socket.x, spot.z - plate_socket.z).length()
+			score -= maxf(Vector2(spot.x - cauldron.x, spot.z - cauldron.z).length() - 0.3, 0.0) * 2.0
 			if score > best_score:
 				best_score = score
 				best = spot
@@ -573,7 +655,7 @@ func _zones() -> Array[Zone]:
 	hands.radius = reach_used()
 	hands.yaw = atan2(-ahead.x, -ahead.z)
 	hands.spread = deg_to_rad(HANDS_SIDE)
-	hands.height = HANDS_HIGH
+	hands.height = minf(HANDS_HIGH, eye.y - table_y() - 0.12)   # never up to the eyes at a high table
 	hands.phases = OPENING | after
 	hands.user = "the child's hands at work"
 	all.append(hands)
@@ -584,22 +666,24 @@ func _zones() -> Array[Zone]:
 	return all
 
 
-## The DEV columns: {name, at (middle), size (wide, high)}. The jump column on the left, Restart,
-## Exit and Zones on the right: out beyond the 110-degree view the child plays in (the grown-up turns
-## the head to them), above the table and the hands, still in reach.
+## The DEV columns: {name, at (middle), size (wide, high)}. The jumps (two columns of four, the pop
+## sound under them) on the left; Restart, Exit and Zones on the right: out beyond the 110-degree view
+## the child plays in (the grown-up turns the head to them), above the table and the hands, in reach.
 func dev_columns() -> Array[Dictionary]:
 	var head := Transform3D(Basis.looking_at(ahead), eye)
 	var jumps := dev_spot(head, false)
 	var right := dev_spot(head, true)
-	return [{name = &"dev_jumps", at = jumps + Vector3.UP * 0.02, size = Vector2(0.13, 0.36)},
+	return [{name = &"dev_jumps", at = jumps + Vector3.UP * 0.01, size = Vector2(DEV_JUMP_WIDE * 2.0 + 0.03, 0.36)},
 			{name = &"dev_restart_exit", at = right + Vector3.DOWN * 0.04, size = Vector2(0.24, 0.29)}]
 
 
 ## Degrees each side of straight ahead the DEV columns stand, how far out, and their middle above
-## the eyes. The jump column's first button is DEV_JUMPS_TOP above its middle (the rest 6.5 cm apart below).
-const DEV_ANGLE := 60.0
-const DEV_LIFT := 0.08
-const DEV_JUMPS_TOP := 0.13
+## the eyes. The jump buttons: DEV_JUMP_WIDE wide, DEV_JUMP_ROW apart, four to a column.
+const DEV_ANGLE := 63.0
+const DEV_LIFT := 0.1
+const DEV_JUMP_WIDE := 0.11
+const DEV_JUMP_ROW := 0.055
+const DEV_JUMP_ROWS := 4
 
 
 ## The middle of a DEV column for [param head] (as at the start): the right one (Restart, Exit,
@@ -607,6 +691,38 @@ const DEV_JUMPS_TOP := 0.13
 static func dev_spot(head: Transform3D, right: bool) -> Vector3:
 	var flat := Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
 	return head.origin + flat.rotated(Vector3.UP, deg_to_rad(-DEV_ANGLE if right else DEV_ANGLE)) * DEV_DISTANCE + Vector3.UP * DEV_LIFT
+
+
+## Where jump button [param i] goes: two columns of DEV_JUMP_ROWS, in story order down the left
+## column, then down the right one.
+static func dev_jump_spot(head: Transform3D, i: int) -> Vector3:
+	var middle := dev_spot(head, false)
+	var across := _across(head, middle)
+	var column := i / DEV_JUMP_ROWS
+	var row := i % DEV_JUMP_ROWS
+	return middle + across * (column - 0.5) * (DEV_JUMP_WIDE + 0.012) + Vector3.UP * (0.11 - row * DEV_JUMP_ROW)
+
+
+## The "DEV · jump to" words, over the jump columns.
+static func dev_jump_label(head: Transform3D) -> Vector3:
+	return dev_spot(head, false) + Vector3.UP * 0.165
+
+
+## The pop sound A/C button, under the jump columns.
+static func dev_pop_spot(head: Transform3D) -> Vector3:
+	return dev_spot(head, false) + Vector3.UP * (0.11 - DEV_JUMP_ROWS * DEV_JUMP_ROW - 0.012)
+
+
+## Restart, Exit, Zones: one under the other on the right; Restart and Exit 15 cm apart, so a stray
+## press meant for one never lands on the other.
+static func dev_right_spot(head: Transform3D, i: int) -> Vector3:
+	return dev_spot(head, true) + Vector3.UP * [0.075, -0.075, -0.16][i]
+
+
+## Across, to the head's right, for something at [param at] facing the head.
+static func _across(head: Transform3D, at: Vector3) -> Vector3:
+	var to := Vector3(at.x - head.origin.x, 0.0, at.z - head.origin.z).normalized()
+	return to.cross(Vector3.UP).normalized()
 
 
 ## The setup panel stands [constant SETUP_DISTANCE] ahead of [param head], this much above the eyes:
@@ -668,6 +784,12 @@ func zone(name: StringName) -> Zone:
 ## The gap between two footprints seen from above, metres; negative: they overlap by that much
 ## (the narrower side of the shared part). Heights are not looked at here.
 static func gap(a: Zone, b: Zone) -> float:
+	if a.shape == &"circle" and b.shape == &"circle":
+		return Vector2(a.centre.x - b.centre.x, a.centre.z - b.centre.z).length() - a.radius - b.radius
+	if a.shape == &"circle" and b.shape == &"rect":
+		return _circle_rect(a, b)
+	if a.shape == &"rect" and b.shape == &"circle":
+		return _circle_rect(b, a)
 	var pa := a.outline()
 	var pb := b.outline()
 	var shared := Geometry2D.intersect_polygons(pa, pb)
@@ -693,6 +815,16 @@ static func gap(a: Zone, b: Zone) -> float:
 			var p := Geometry2D.get_closest_points_between_segments(pa[i], pa[(i + 1) % pa.size()], pb[j], pb[(j + 1) % pb.size()])
 			nearest = minf(nearest, p[0].distance_to(p[1]))
 	return nearest
+
+
+## Circle [param c] and turned rectangle [param r]: their gap, or minus how deep they overlap.
+static func _circle_rect(c: Zone, r: Zone) -> float:
+	var d := Vector2(c.centre.x - r.centre.x, c.centre.z - r.centre.z)
+	var local := Vector2(d.x * cos(r.yaw) - d.y * sin(r.yaw), d.x * sin(r.yaw) + d.y * cos(r.yaw))
+	var out := Vector2(absf(local.x) - r.half.x, absf(local.y) - r.half.y)
+	if out.x > 0.0 or out.y > 0.0:
+		return out.max(Vector2.ZERO).length() - c.radius
+	return maxf(out.x, out.y) - c.radius   # the middle is inside: how far in, plus the radius
 
 
 ## Seen from [param from], the box of directions [param zone] covers: Rect2(degrees right, degrees up).
