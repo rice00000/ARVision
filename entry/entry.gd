@@ -438,7 +438,7 @@ func _out() -> void:
 	_attend(_gear)   # the settled gear
 	if USE_REAL_CARRY:
 		_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
-	_later(1.3, func() -> void: _attend(_socket_at))   # "The table's missing piece.": once, slowly, to the socket
+	# (No look at the socket yet: the story moved that cue to placement, so the child can examine the gear first.)
 	await say("There it is! The table's missing piece.")
 	_attend(null)   # "I've been looking for that." turns back to the child
 	await say("I've been looking for that.")

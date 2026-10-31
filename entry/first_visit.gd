@@ -16,6 +16,9 @@ const QUIET_END := 4.0
 const BREATH := 0.5
 
 var _fits_said := false
+var _speaking := false     # one line at a time: a later line waits, it never cuts an earlier one off
+var _rounds_won := 0
+var _rounds_ended := 0
 var _onion: Workshop
 var _shelf_spot := Vector3.INF
 
@@ -24,6 +27,10 @@ func run() -> void:
 	Tidy.onion_voice = true
 	_onion = App.main.get_node_or_null(^"Workshop") as Workshop
 	Events.reported.connect(_on_reported)
+	Events.trial_ended.connect(func(_skill: StringName, success: bool, _data: Dictionary) -> void:
+		_rounds_ended += 1
+		if success:
+			_rounds_won += 1)
 	App.reality.apply_view(App.session.base_view)
 	if not App.reality.is_settled:
 		await App.reality.settled
@@ -33,8 +40,12 @@ func run() -> void:
 		if App.session.trial is Node3D:
 			_shelf_spot = (App.session.trial as Node3D).global_position
 			break
-	await say("The shapes on the shelf show where things go.")
-	await say("Can you find a place for one of these?")
+	# The child may place a thing while Onion is still explaining: the action counts, and an
+	# instruction it has made obsolete is skipped.
+	if not _fits_said:
+		await say("The shapes on the shelf show where things go.")
+	if not _fits_said:
+		await say("Can you find a place for one of these?")
 
 
 func _play() -> void:
@@ -48,7 +59,10 @@ func _closing() -> void:
 	await get_tree().create_timer(1.0, false).timeout
 	if _onion != null:
 		_onion.attend(null)
-	await say("There. Everything's found its place.")
+	# Only a level the child actually finished gets "Everything's found its place." After a time-out
+	# or an abandoned round Onion just thanks the child (no claim of success).
+	if _rounds_ended > 0 and _rounds_won == _rounds_ended:
+		await say("There. Everything's found its place.")
 	await say("Thank you for helping.")
 	if _onion != null:
 		_onion.cheer()
@@ -71,6 +85,14 @@ func _exit_tree() -> void:
 
 ## Speaks [param text] (baked audio + subtitle) and waits for the voice to finish it, then a breath.
 func say(text: String) -> void:
+	while _speaking:
+		await get_tree().process_frame
+	_speaking = true
+	await _say(text)
+	_speaking = false
+
+
+func _say(text: String) -> void:
 	var voice := App.module(&"Voice")
 	if voice == null or not voice.has_signal(&"line_finished"):
 		Events.say(text)

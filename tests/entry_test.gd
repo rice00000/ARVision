@@ -491,6 +491,8 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(Tidy.onion_voice, "Wei's own spoken lines are switched off while Onion leads")
 	await wait(1.0)
 	var visit := App.main.get_node(^"FirstVisit/Visit") as FirstVisit
+	visit.set("_rounds_ended", 2)
+	visit.set("_rounds_won", 2)   # the level was finished
 	Engine.time_scale = 4.0
 	await visit._closing()
 	Engine.time_scale = 1.0
@@ -536,3 +538,19 @@ func test_the_cauldron_is_hidden_during_the_first_shelf_level() -> void:
 	var cauldron := workshop.get("_cauldron") as Node3D
 	expect(cauldron != null and not cauldron.visible, "the cauldron is out of sight for the object test")
 	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "Onion is still there")
+
+
+func test_the_first_visit_does_not_claim_success_after_a_time_out() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await _press(&"entry_part_shelf")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the first visit loads")
+	var visit := App.main.get_node(^"FirstVisit/Visit") as FirstVisit
+	visit.set("_rounds_ended", 2)
+	visit.set("_rounds_won", 1)   # one round timed out
+	Engine.time_scale = 4.0
+	await visit._closing()
+	Engine.time_scale = 1.0
+	expect(not _said_line(said, "There. Everything's found its place."), "no claim that everything is in place")
+	expect(_said_line(said, "Thank you for helping."), "a neutral thank-you")
