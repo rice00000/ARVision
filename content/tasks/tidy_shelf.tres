@@ -88,7 +88,24 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_5")])
 
+[sub_resource type="Resource" id="tidy_6"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.34
+pins = Dictionary[StringName, float]({&"clutter": 8.0})
+intro = "What a mess! Your things are mixed up with sticks and scraps. Find each thing in the mess and put it on its shadow."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="level_6"]
+script = ExtResource("2_plan")
+title = "Tidy the shelf, level 6"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("tidy_6")])
+
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2"), SubResource("level_3"), SubResource("level_4"), SubResource("level_5")])
+levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2"), SubResource("level_3"), SubResource("level_4"), SubResource("level_5"), SubResource("level_6")])

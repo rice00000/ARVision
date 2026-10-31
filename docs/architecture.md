@@ -34,6 +34,8 @@ Session ─ waits for App.reality.settled (the table is known, or the search gav
 
 Without a plan the [World](world.md) chooses: it plays one `Task` level (a plan) at a time with `Session.play(plan)`.
 
+`Main` keeps the rig, Reality and modules, and loads one `scenes/*.tscn`: Intro (Entry + Session), Find the object or Global motion (World + Session). The facilitator's Scenes tab calls `Main.change_scene`: pause, fade, save, free the old scene and stage, reset the view, load, fade in. `Events.scene_changing` clears module output. Save switches rebuild the current scene, including Intro.
+
 ## Modules
 
 Children of `Main/Modules`; delete a node to unplug it. A trial that needs one lists it in `TrialDef.requires` and the session skips its blocks.
@@ -43,7 +45,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
 - **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
-- **Facilitator:** in-headset panel, pauses play. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
+- **Facilitator:** in-headset panel, pauses play. Scenes tab: all three scenes, current one disabled. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
 
 ## Not verified on a headset yet
 

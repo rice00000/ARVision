@@ -16,7 +16,10 @@ extends Trial
 ## Axes: things (how many fell, driven; six shapes bring look-alikes: an egg
 ## beside the ball, a drum beside the block), size (metres), match (0 shape,
 ## 1 size: one shape in different sizes, 2 colour: one shape in different colours,
-## coloured stickers), outline (1: the stickers show only the edge).
+## coloured stickers), outline (1: the stickers show only the edge), clutter
+## (how many junk bits lie jumbled among the things: sticks, coins, scraps that
+## fit no sticker and cannot be picked; any clutter also scatters the things at
+## random over the bench, so the child must pick them out of the mess).
 ## Hints: 1 the thing hops and its sticker wiggles, 2 its cubby shines and the
 ## guide says so. Help stays on for the things after it, until the round is done.
 
@@ -62,6 +65,11 @@ const RELEASE_DELAY := 0.12
 const TAKE_PAUSE := 0.6
 ## How much wider the outline sticker's edge is than the thing, times its size.
 const OUTLINE := 0.2
+## Where things and junk may lie on a cluttered bench (ahead of the eyes), and
+## how far apart their centres stay.
+const MESSY_NEAR := 0.13
+const MESSY_FAR := 0.29
+const MESSY_GAP := 0.05
 
 const WOOD := Color(0.55, 0.36, 0.2)
 const CARD := Color(0.93, 0.91, 0.86)
@@ -104,6 +112,7 @@ var _moves: Dictionary[Target, Tween] = {}
 var _hop: Tween
 var _hopping: Target
 var _wiggle: Tween
+var _junk: Array[Node3D] = []
 
 
 func _setup(round_condition: TrialCondition) -> void:
@@ -122,7 +131,10 @@ func _setup(round_condition: TrialCondition) -> void:
 		_cell_key[cell] = looks[i].key
 		_cell_point[cell] = _frame * (_card_at[cell] * Vector3(0.0, 0.0, _extent(looks[i].shape, looks[i].size).z * 0.5 + 0.004))
 		_sticker(cell, looks[i])
-	var spots := _spots(looks.size())
+	var clutter := roundi(round_condition.value(&"clutter", 0.0))
+	var spots := _spots(looks.size()) if clutter == 0 else _messy_spots(looks.size() + clutter)
+	for i in clutter:
+		_add_junk(spots[looks.size() + i])
 	for i in looks.size():
 		var thing := _make_thing(looks[i], "thing_%d_%s" % [i, looks[i].key])
 		add_child(thing)
@@ -152,6 +164,54 @@ func _spots(count: int) -> Array[Vector3]:
 		spots.append(_frame * Vector3(x, -_below, -z))
 	spots.shuffle()
 	return spots
+
+
+## [param count] random spots over the bench, [constant MESSY_GAP] apart where they fit.
+func _messy_spots(count: int) -> Array[Vector3]:
+	var local: Array[Vector3] = []
+	for i in count:
+		var best := Vector3.ZERO
+		for attempt in 30:
+			best = Vector3(_rng.randf_range(-THINGS_WIDE * 0.5, THINGS_WIDE * 0.5), -_below, -_rng.randf_range(MESSY_NEAR, MESSY_FAR))
+			if local.all(func(other: Vector3) -> bool: return other.distance_to(best) >= MESSY_GAP):
+				break
+		local.append(best)
+	var spots: Array[Vector3] = []
+	for spot in local:
+		spots.append(_frame * spot)
+	return spots
+
+
+## One bit of junk lying at [param at]: a stick, a coin or a scrap, any colour, turned any way.
+func _add_junk(at: Vector3) -> void:
+	var mesh := MeshInstance3D.new()
+	match _rng.randi_range(0, 2):
+		0:
+			var stick := CylinderMesh.new()
+			stick.top_radius = 0.006
+			stick.bottom_radius = 0.006
+			stick.height = _rng.randf_range(0.07, 0.12)
+			mesh.mesh = stick
+			mesh.rotation = Vector3(PI / 2.0, 0.0, 0.0)
+		1:
+			var coin := CylinderMesh.new()
+			coin.top_radius = _rng.randf_range(0.018, 0.03)
+			coin.bottom_radius = coin.top_radius
+			coin.height = 0.008
+			mesh.mesh = coin
+		_:
+			var scrap := BoxMesh.new()
+			scrap.size = Vector3(_rng.randf_range(0.03, 0.06), 0.01, _rng.randf_range(0.02, 0.04))
+			mesh.mesh = scrap
+	var material := StandardMaterial3D.new()
+	material.albedo_color = COLOURS[_rng.randi_range(0, COLOURS.size() - 1)].lerp(WOOD, _rng.randf_range(0.0, 0.5))
+	mesh.material_override = material
+	var holder := Node3D.new()
+	holder.name = "Junk_%d" % _junk.size()
+	holder.add_child(mesh)
+	add_child(holder)
+	holder.global_transform = Transform3D(_frame.basis.rotated(_frame.basis.y, _rng.randf() * TAU), at + _frame.basis.y * 0.006)
+	_junk.append(holder)
 
 
 ## What fell this round: {key, shape, size, colour}, at most one per sticker the shelf can show.
@@ -408,6 +468,9 @@ func _clear() -> void:
 	for thing in _things:
 		thing.queue_free()
 	_things.clear()
+	for junk in _junk:
+		junk.queue_free()
+	_junk.clear()
 	_key.clear()
 	_size.clear()
 	_home.clear()

@@ -22,16 +22,13 @@ func expect_eq(actual: Variant, expected: Variant, what: String) -> void:
 	expect(actual == expected, "%s: expected %s, got %s" % [what, expected, actual])
 
 
-## Starts main.tscn with [param plan] (none: the World's adventure). None of
-## Session, World and Entry starts by itself: call App.session.run() or App.world.run().
-func boot(plan: SessionPlan = null) -> void:
+## Starts a scene without autoplay: call App.session.run(), App.world.run()
+## or the Intro's Entry.run(). A plan overrides the scene's adventure.
+func boot(plan: SessionPlan = null, scene := &"find_object") -> void:
 	app = load("res://main.tscn").instantiate()
-	var session: Session = app.get_node(^"Session")
-	session.autostart = false
-	(app.get_node(^"World") as World).autostart = false
-	(app.get_node(^"Entry") as Entry).autostart = false
-	if plan:
-		session.plan = plan
+	app.autostart = false
+	app.initial_scene = String(scene)
+	app.plan = plan
 	add_child(app)
 	input = App.sim_input
 	await frames(2)

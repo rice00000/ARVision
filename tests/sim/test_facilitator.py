@@ -172,7 +172,7 @@ class Panel(SimCase):
         sim = self.start(None, profile="test_sim_saves")
         actor = Actor(sim)
         menu = self.menu(sim)
-        actor.touch("right", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_1")["position"]), radius=0.01)
+        actor.touch("left", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_1")["position"]), radius=0.01)
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         self.menu(sim)
@@ -191,7 +191,7 @@ class Panel(SimCase):
         self.assertEqual((observation["profile"], observation["paused"], observation["facilitator"]["open"]),
                          ("test_sim_saves_s1", False, False), "plays the new save at once")
         self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({}, "Normal"), "from the start")
-        self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, False, False, False, False])
+        self.assertEqual([b["current"] for b in self.menu(sim)["buttons"]], [True] + [False] * 5)
 
         self.facilitator.open()
         self.facilitator.press("fac_saves")
@@ -203,7 +203,7 @@ class Panel(SimCase):
         observation = sim.observe()
         self.assertEqual(observation["profile"], "test_sim_saves")
         self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({"tidy_shelf": [0]}, "Normal"), "where it was left")
-        self.assertEqual([b["open"] for b in self.menu(sim)["buttons"]], [True, True, False, False, False])
+        self.assertEqual([b["current"] for b in self.menu(sim)["buttons"]], [False, True] + [False] * 4)
 
         self.facilitator.open()
         self.facilitator.press("fac_saves")

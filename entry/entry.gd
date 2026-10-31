@@ -11,15 +11,14 @@ extends Node3D
 ## the child activates it (now: touch it), the workshop's real assets.
 ## Only the sample lines are spoken. Every say("...") literal is baked by Wei's
 ## speech baker, so new lines go in only once the interaction is chosen.
-## A node in main.tscn before World: plays when there is no session plan.
+## The Intro scene (scenes/intro.tscn): Main starts it with [method run] when there is no
+## session plan, and it ends by switching to the Find the object scene (the World).
 
 ## Seconds after a line, at least.
 const PAUSE := 1.2
 ## Without a headset (desktop), only a click presses: moving the mouse over a button
 ## doesn't. Tests turn this on to drive the hands by fingertip.
 @export var poke_in_sim := false
-## Play when the app starts without a session plan. Tests switch it off and call [method run].
-@export var autostart := true
 
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
@@ -163,12 +162,15 @@ class ShelfCopy extends "res://trials/tidy/tidy_trial.gd":
 		return _shelf
 
 
-func _ready() -> void:
-	if autostart and App.session.plan == null:
-		print("ENTRY 1: ready, pausing World")
-		# Wei's World starts by itself unless told to wait (it is readied after this node).
-		(get_node(^"../World") as World).autostart = false
-		run.call_deferred()
+func _exit_tree() -> void:
+	# This opening owns what it hung on the persistent head (the beat label) and whatever
+	# it made but never added; the rest goes with the scene.
+	Engine.time_scale = 1.0
+	if is_instance_valid(_beat_label):
+		_beat_label.free()
+	for node in [_orb, _box, _music]:
+		if is_instance_valid(node) and node.get_parent() == null:
+			node.free()
 
 
 ## Plays the arrival, then starts the World.
@@ -267,7 +269,7 @@ func _to_shelf() -> void:
 	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_beat("done: Wei's World")
-	App.world.run()
+	App.main.change_scene.call_deferred(&"find_object")   # Wei's scene with the World and the shelf
 
 
 # --- Setup: four steps, for the grown-up -------------------------------------
@@ -511,6 +513,9 @@ func _show_detail(detail: Node3D, shown: bool) -> void:
 ## While the guide shows the way, Onion is there (with its arrow); after, Onion goes
 ## back beside the shelf.
 func _become_guide() -> void:
+	if App.world == null:
+		print("ENTRY Onion is not the guide: the World is a separate scene now (see the review)")
+		return
 	for child in App.world.get_children():
 		if child is Guide:
 			_guide = child
@@ -525,10 +530,12 @@ func say(text: String) -> void:
 
 
 func _wait(seconds: float) -> void:
-	await get_tree().create_timer(seconds).timeout
+	await get_tree().create_timer(seconds, false).timeout
 
 
 func _on_target(target: Target) -> void:
+	if get_tree().paused:
+		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
 		# One press, whether it came as a poke, a pinch or both.
 		if _real - float(_pressed_at.get(target.id, -100.0)) < PRESS_GAP:

@@ -9,15 +9,13 @@ extends Node
 ## solved round alone says little. Each block shows the real world through its
 ## [View]. The facilitator steers it through the public methods.
 ##
-## With a plan (main.tscn's, or from the command line) it runs that plan and
+## With a plan (Main's, or from the command line) it runs that plan and
 ## offers to play it again. Without one, the World chooses tasks and plays each
 ## with [method play].
 ##
 ##   godot --path . -- --plan=res://content/sessions/demo.tres
 
 @export var plan: SessionPlan
-## Start once the app is up, when there is a plan. Tests switch it off and call [method run].
-@export var autostart := true
 ## How the real world looks in blocks without their own [member Block.view].
 var base_view := View.new()
 
@@ -35,11 +33,6 @@ var _skip := false
 
 func _ready() -> void:
 	App.session = self
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--plan="):
-			plan = load(arg.trim_prefix("--plan="))
-	if autostart and plan:
-		run.call_deferred()
 
 
 ## Plays [member plan], then offers to play it again.

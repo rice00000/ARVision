@@ -38,6 +38,15 @@ func test_named_things_are_baked_in_their_lines() -> void:
 	_baked("That's the %s. Find the %s!" % ["teddy bear", labels[0]])
 
 
+func test_every_level_button_is_read_out() -> void:
+	for file in DirAccess.get_files_at("res://content/tasks"):
+		if file.ends_with(".tres"):
+			var task: Task = load("res://content/tasks/" + file)
+			for level in task.levels.size():
+				_baked("Level %d. A new one!" % (level + 1))
+				_baked("Level %d. Done!" % (level + 1))
+
+
 func test_voice_plays_the_line_and_cuts_off_the_last() -> void:
 	await boot(plan_of(load("res://trials/find/find.tres"), 1))
 	var player: AudioStreamPlayer = App.module(&"Voice").get("_player")

@@ -34,6 +34,9 @@ func _ready() -> void:
 	App.rig.add_child(_label)
 	add_child(_player)
 	Events.said.connect(_say)
+	Events.scene_changing.connect(func() -> void:
+		_player.stop()
+		_label.visible = false)
 
 
 func _process(_delta: float) -> void:

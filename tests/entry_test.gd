@@ -5,6 +5,7 @@ extends TestCase
 ## coming out, the ripple, and Wei's shelf with Onion as the guide.
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
+const ADVENTURE := preload("res://content/adventure.tres")
 
 var entry: Entry
 
@@ -12,8 +13,9 @@ var entry: Entry
 ## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
 	Engine.time_scale = 1.0   # an earlier test may have left the opening's half speed on
-	await boot()
-	entry = app.get_node(^"Entry")
+	await boot(null, &"intro")
+	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
+	entry = app.get_node(^"Intro/Entry")
 	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
 	entry.run()
 
@@ -70,21 +72,22 @@ func _shown(entry_details: Array) -> int:
 	return entry_details.filter(func(d: Node3D) -> bool: return is_instance_valid(d) and d.visible).size()
 
 
-func test_a_launch_holds_the_world_and_a_plan_skips_the_opening() -> void:
+func test_a_launch_plays_the_opening_before_the_world_and_a_plan_skips_it() -> void:
 	var said := record(Events.said)
 	app = load("res://main.tscn").instantiate()
 	add_child(app)
 	input = App.sim_input
 	await frames(2)
-	expect(not App.world.autostart, "the opening holds the World back")
+	expect(App.world == null, "the World is not loaded during the opening")
+	expect_eq(App.main.current_scene, &"intro", "the opening is its own scene")
 	await shutdown()
 	app = load("res://main.tscn").instantiate()
-	(app.get_node(^"Session") as Session).plan = plan_of(TIDY, 1)
+	app.plan = plan_of(TIDY, 1)
 	add_child(app)
 	input = App.sim_input
 	await wait(3.0)
 	expect(not _said_line(said, "Hello."), "no opening before a planned session")
-	expect((app.get_node(^"Entry") as Entry).get("_onion") == null, "and nothing of it is built")
+	expect(app.find_child("Entry", true, false) == null, "and the opening is not loaded")
 
 
 func test_setup_is_quiet_and_waits_for_start() -> void:
@@ -112,9 +115,8 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await until(func() -> bool: return (entry.get("_pieces") as Array).size() == 3, 30.0), "three things come out")
 	expect(await _until_said(said, "Welcome.", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
-	var greeting := App.world.adventure.greeting
-	expect(await _until_said(said, greeting, 60.0), "Wei's World starts")
-	expect(entry.get("_guide") != null, "with Onion as its guide")
+	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "Wei's World starts")
+	expect_eq(App.main.current_scene, &"find_object", "in its own scene")
 
 
 func test_jumping_to_each_part_plays_only_that_part() -> void:
@@ -158,8 +160,8 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 
 	# Shelf: straight into Wei's World.
 	await _press(&"entry_part_shelf")
-	expect(await _until_said(said, App.world.adventure.greeting, 60.0), "shelf: Wei's World starts")
-	expect(entry.get("_guide") != null, "shelf: with Onion as its guide")
+	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "shelf: Wei's World starts")
+	expect_eq(App.main.current_scene, &"find_object", "shelf: in its own scene")
 
 
 ## Puts the right fingertip at [param point] (button space), the hand behind it pointing into the plate.

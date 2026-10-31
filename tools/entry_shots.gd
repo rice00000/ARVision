@@ -12,12 +12,10 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 800)
 	Profile.wipe()
 	var app: Node3D = load("res://main.tscn").instantiate()
-	app.get_node(^"Session").autostart = false
-	app.get_node(^"World").autostart = false
-	app.get_node(^"Entry").autostart = false
+	app.autostart = false
 	add_child(app)
 	await get_tree().process_frame
-	_entry = app.get_node(^"Entry")
+	_entry = app.get_node(^"Intro/Entry")
 	_entry.run()
 	await _until(func() -> bool: return _entry.find_child("entry_step_next", true, false) != null)
 	await _pause(0.8)

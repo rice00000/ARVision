@@ -3,10 +3,9 @@
 [ext_resource type="Script" path="res://world/adventure.gd" id="1_adventure"]
 [ext_resource type="Script" path="res://world/place.gd" id="2_place"]
 [ext_resource type="Resource" path="res://content/places/table.tres" id="3_table"]
-[ext_resource type="Resource" path="res://content/places/behind.tres" id="8_behind"]
 
 [resource]
 script = ExtResource("1_adventure")
 greeting = "Welcome, young alchemist! Your workshop needs tidying. Put each thing back where it belongs."
 level_done = "Well done, alchemist!"
-places = Array[ExtResource("2_place")]([ExtResource("3_table"), ExtResource("8_behind")])
+places = Array[ExtResource("2_place")]([ExtResource("3_table")])

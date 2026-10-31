@@ -9,6 +9,7 @@ static func everything(clock: float, seq: int) -> Dictionary:
 	var facilitator := App.module(&"Facilitator")
 	return Log.plain({
 		t = clock, seq = seq, paused = App.get_tree().paused, profile = Profile.id,
+		scene = App.main.current_scene, switching = App.main.switching,
 		profile_dir = ProjectSettings.globalize_path(Profile.path()),
 		log_path = ProjectSettings.globalize_path(Log.file_path) if not Log.file_path.is_empty() else "",
 		modules = App.get_tree().get_nodes_in_group(Module.GROUP).map(func(node: Node) -> String: return node.name),
@@ -81,7 +82,7 @@ static func levels() -> Dictionary:
 	var plans: Array[SessionPlan] = []
 	if App.session.plan:
 		plans.append(App.session.plan)
-	else:
+	elif App.world:
 		for place in App.world.adventure.places:
 			for task in place.tasks:
 				plans.append_array(task.levels)
@@ -95,6 +96,8 @@ static func levels() -> Dictionary:
 ## The adventure: progress, the guide and the open task menu with its buttons.
 static func world() -> Dictionary:
 	var world := App.world
+	if world == null:
+		return {}
 	var guide: Node3D = world.get("_guide")
 	var result := {done = world.done, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
 		menu = null}
@@ -103,7 +106,7 @@ static func world() -> Dictionary:
 		for button: Target in world.menu.find_children("task_*", "Target", false, false):
 			var entry: Array = world.menu.get("_buttons")[button]
 			buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
-				open = world.can_play(entry[0], entry[1]), done = world.is_done(entry[0], entry[1])})
+				current = entry[1] == world.current(entry[0]), done = world.is_done(entry[0], entry[1])})
 		result.menu = {open = world.menu.get("_open"), buttons = buttons}
 	return result
 

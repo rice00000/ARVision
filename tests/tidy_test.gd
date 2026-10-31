@@ -231,3 +231,13 @@ func test_sizes_colours_and_outlines() -> void:
 	sticker = (trial.get("_stickers") as Array).filter(func(node: Node3D) -> bool: return node != null)[0]
 	expect(sticker.get_child_count() >= 2, "an outline: the edge in ink, the inside in card")
 	expect(sticker.get_child(0).scale.x > sticker.get_child(1).scale.x, "the ink a little bigger")
+
+
+func test_clutter_scatters_junk_that_fits_no_sticker_among_the_things() -> void:
+	var trial := await _start(1, 0.0, {&"clutter": 8.0})
+	var junk: Array = trial.get("_junk")
+	expect_eq(junk.size(), 8, "eight bits of junk")
+	expect_eq(trial.get("_things").size(), 3, "the things are still there")
+	var thing: Target = trial.get("_things")[0]
+	await _carry(trial, thing, _cell(trial, trial.get("_key")[thing]))
+	expect(trial.get("_placed").has(thing), "a thing in the mess still goes home")
