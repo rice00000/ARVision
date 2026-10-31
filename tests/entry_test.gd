@@ -1,18 +1,19 @@
 extends TestCase
-## Megan's entry scene (entry/entry_test.tscn): the cauldron on the real table,
-## touching it, finding the piece again (wrong pick, help, right pick), and the
-## World waiting until the child chooses to begin.
+## Megan's opening (Entry in main.tscn): it plays before the World unless a
+## session plan is given; the cauldron on the real table, touching it, finding
+## the piece again (wrong pick, help, right pick), and the World waiting until
+## the child chooses to begin.
 
-var entry: Node3D
+const TIDY := preload("res://trials/tidy/tidy.tres")
+
+var entry: Entry
 
 
-## Starts entry_test.tscn: the entry scene over a fresh main.tscn.
+## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
-	app = load("res://entry/entry_test.tscn").instantiate()
-	add_child(app)
+	await boot()
 	entry = app.get_node(^"Entry")
-	input = App.sim_input
-	await frames(2)
+	entry.run()
 
 
 func _said_line(said: Array, text: String) -> bool:
@@ -45,10 +46,34 @@ func _touch_cauldron(said: Array) -> void:
 	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15)) # hand back
 
 
+## Launches main.tscn as the game does, with only the session's autostart set by [param plan].
+func _launch(plan: SessionPlan) -> void:
+	app = load("res://main.tscn").instantiate()
+	(app.get_node(^"Session") as Session).plan = plan
+	add_child(app)
+	input = App.sim_input
+	await frames(2)
+
+
+func test_a_launch_plays_the_opening_before_the_world() -> void:
+	var said := record(Events.said)
+	await _launch(null)
+	expect(not App.world.autostart, "the opening holds the World back")
+	expect(await _until_said(said, "Oh. You can see me?"), "the opening plays")
+	expect(not _said_line(said, App.world.adventure.greeting), "and the World has not started")
+
+
+func test_a_session_plan_skips_the_opening() -> void:
+	var said := record(Events.said)
+	await _launch(plan_of(TIDY, 1))
+	await wait(4.0)
+	expect(not _said_line(said, "Oh. You can see me?"), "no opening before a planned session")
+	expect((app.get_node(^"Entry") as Entry).get("_found").is_empty(), "and nothing of it is built")
+
+
 func test_the_cauldron_stands_on_the_table_and_waits_for_a_touch() -> void:
 	await _boot_entry()
 	var said := record(Events.said)
-	expect(not App.world.autostart, "the entry holds the World back")
 	expect(await _until_said(said, "Could you give me a hand? Touch the cauldron."), "the guide asks for a touch")
 	var cauldron: Node3D = entry.get("_box")
 	var table := App.reality.work_surface()

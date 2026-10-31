@@ -1,11 +1,16 @@
+class_name Entry
 extends Node3D
-## Entry scene: "Something Was Left Here" (story: claude/BUILD_STATE.md, story chat).
-## Plays before Wei's World, then starts it. Beats are written in this file.
+## Entry: "Something Was Left Here" (story: claude/BUILD_STATE.md, story chat).
+## A node in main.tscn before World: plays when there is no session plan, then
+## starts the World. Beats are written in this file.
 ## Every spoken line is a literal inside say("..."), so Wei's speech baker finds it
 ## (content/voice/speech.tts lists "entry" in say_sources).
 
 ## Seconds between lines.
 const PAUSE := 3.0
+## Play when the app starts without a session plan. Tests switch it off and call [method run].
+@export var autostart := true
+
 ## The cauldron (story chat's asset, CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
 const CAULDRON_WIDTH := 0.22
@@ -29,6 +34,7 @@ var _found: Array[Node3D] = []      # the objects that tumble out
 var _cabinet := Node3D.new()        # stand-in for the cabinet beside the chair
 var _seal := MeshInstance3D.new()   # the sealed patch on the wall behind
 var _beat_label := Label3D.new()    # DEBUG: which beat is playing, in view
+
 ## While > -1, the child is looking for the object with this index.
 var _wanted := -1
 ## DEBUG: show the beat in the headset and in Output.
@@ -43,17 +49,18 @@ signal _piece_picked(index: int)
 
 
 func _ready() -> void:
-	print("ENTRY 1: ready, pausing World")
-	# Wei's World starts by itself unless told to wait.
-	var world := get_node("../Main/World")
-	world.autostart = false
+	if autostart and App.session.plan == null:
+		print("ENTRY 1: ready, pausing World")
+		# Wei's World starts by itself unless told to wait (it is readied after this node).
+		(get_node(^"../World") as World).autostart = false
+		run.call_deferred()   # run the opening once everything is set up
+
+
+## Plays the opening, then starts the World.
+func run() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_target(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(target))
 	Events.help_requested.connect(_on_help)
-	_play.call_deferred()   # run the opening once everything is set up
-
-
-func _play() -> void:
 	# Wait until the headset has found the real table.
 	if not App.reality.is_settled:
 		await App.reality.settled

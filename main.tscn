@@ -20,6 +20,7 @@
 [ext_resource type="Script" path="res://reality/view.gd" id="17_view"]
 [ext_resource type="Script" path="res://modules/magic/magic.gd" id="19_magic"]
 [ext_resource type="Script" path="res://modules/picks/picks.gd" id="20_picks"]
+[ext_resource type="Script" path="res://entry/entry.gd" id="21_entry"]
 
 [sub_resource type="Environment" id="environment"]
 background_mode = 1
@@ -67,6 +68,9 @@ script = ExtResource("20_picks")
 
 [node name="Session" type="Node" parent="."]
 script = ExtResource("8_session")
+
+[node name="Entry" type="Node3D" parent="."]
+script = ExtResource("21_entry")
 
 [node name="World" type="Node" parent="."]
 script = ExtResource("9_world")
