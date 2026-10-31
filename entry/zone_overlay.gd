@@ -4,7 +4,7 @@ extends Node3D
 ## with its name, so the layout can be seen in the headset or a picture. Red: overlapping another
 ## zone that is there at the same time. Toggled by the "Zones" dev button.
 ##
-## Colours: things the child uses sage-blue; things moved aside for the revealed room violet; the
+## Colours: Onion's spots cyan; the teaching hand's sweep orange; things the child uses sage-blue; things moved aside for the revealed room violet; the
 ## hands' room a faint yellow; panels for the grown-up (setup, dev) grey; an overlap red.
 
 const THING := Color(0.35, 0.7, 0.95, 0.4)
@@ -12,6 +12,8 @@ const MOVED := Color(0.65, 0.45, 0.95, 0.4)
 const HANDS := Color(1.0, 0.9, 0.35, 0.14)
 const PANEL := Color(0.75, 0.75, 0.78, 0.35)
 const OVERLAP := Color(1.0, 0.2, 0.2, 0.6)
+const TEACH := Color(1.0, 0.65, 0.3, 0.3)   # the teaching hand's sweep
+const ONION := Color(0.3, 0.9, 0.95, 0.3)   # where Onion stands
 
 
 ## Draws the zones of [param layout] that are there in any of [param phases] (EntryLayout.SETUP...).
@@ -26,6 +28,8 @@ func draw(layout: EntryLayout, phases: int) -> void:
 		if z.phases & phases == 0:
 			continue
 		var colour := HANDS if z.kind == EntryLayout.Kind.AREA else PANEL if z.kind == EntryLayout.Kind.PANEL \
+				else TEACH if z.kind == EntryLayout.Kind.HAND \
+				else ONION if String(z.name).begins_with("onion") \
 				else MOVED if String(z.name).ends_with("_after") else THING
 		if z.name in clashing:
 			colour = OVERLAP

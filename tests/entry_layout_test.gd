@@ -55,6 +55,28 @@ func test_a_table_too_small_for_everything_is_reported() -> void:
 	expect(layout.report() != "", "a 0.8 x 0.5 m desk has no room for the bench beside the cauldron and the panel")
 
 
+func test_onion_stays_clear_of_the_teaching_hand_the_socket_the_panel_and_the_landing_spot() -> void:
+	var layout := _layout(Vector2(1.2, 0.7), 0.3, 0.5, 0.0)
+	for name: StringName in [&"onion_mouth", &"onion_aside", &"onion_lifted", &"onion_lifted_after", &"hand_tap", &"hand_pinch", &"hand_place", &"socket"]:
+		expect(layout.zone(name) != null, "the zone map has %s" % name)
+	expect(layout.report() == "", "and nothing overlaps: %s" % layout.report())
+	var body := layout._circle(&"b", layout.onion_mouth, EntryLayout.ONION_BODY, 0.0)
+	expect(EntryLayout.gap(body, layout.zone(&"hand_tap")) >= EntryLayout.HAND_CLEAR - 0.001, "Onion beside the mouth is a hand-breadth clear of the tap")
+	expect(layout.onion_mouth_offset.length() > 0.065 and layout.onion_mouth_offset.length() < 0.075, "at about the story's 7 cm from the mouth")
+
+
+func test_the_checker_catches_onion_on_the_hands_path() -> void:
+	var layout := _layout(Vector2(1.2, 0.7), 0.3, 0.5, 0.0)
+	var onion := layout.zone(&"onion_mouth")
+	var hand := layout.zone(&"hand_tap")
+	onion.centre = Vector3(hand.centre.x, onion.centre.y, hand.centre.z)   # Onion in the middle of the hand's sweep
+	expect(not layout.overlaps().filter(func(o: Dictionary) -> bool: return o.a == &"hand_tap" and o.b == &"onion_mouth").is_empty(), "Onion on the tap hand's sweep is reported")
+	var aside := layout.zone(&"onion_aside")
+	var landing := layout.zone(&"gear_landing")
+	aside.centre = Vector3(landing.centre.x, landing.centre.y, landing.centre.z)   # and down at the gear's height
+	expect(not layout.overlaps().filter(func(o: Dictionary) -> bool: return o.b == &"onion_aside" or o.a == &"onion_aside").is_empty(), "and Onion on the gear's landing spot")
+
+
 func test_a_table_out_of_reach_is_reported() -> void:
 	var layout := _layout(Vector2(1.2, 0.7), 0.4, 0.5, 0.5)
 	expect(not layout.out_of_reach().is_empty(), "a table starting 40 cm out for a 50 cm reach: the socket is out of reach, and it says so")

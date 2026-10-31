@@ -291,3 +291,98 @@ in a jump test).
 `test_the_opening_puts_things_where_the_map_says...` checks every DEV button is in reach and none overlaps another.
 
 Tests: 73 of the opening's (entry*) pass on this branch.
+
+## Layout chat (C), round 4 (Oct 31): `entry-layout-4`
+
+**Onion's spots in the zone map** (`EntryLayout`; zones `onion_mouth`, `onion_aside`, `onion_lifted`, `onion_aside_after`,
+`onion_lifted_after`, and the teaching hand's sweeps `hand_tap`, `hand_pinch`, `hand_place`, plus a `socket` ring zone):
+* The hand's sweep is MEASURED, not guessed: in the scene, over a whole loop of each gesture, from the real hand's
+  skeleton (bone positions), relative to the point it works on (rim point, gear middle, socket), at `DemoHand.HAND_SCALE`
+  0.6 (it scales with that constant): the tap reaches 0..14 cm to the child's right, 10 cm toward them and 3 cm away, up to
+  23 cm high; the pinch 1 cm left to 17 cm right, 8 cm toward and 9 cm away; the lowering 1..15 cm right, 7 cm toward, 9 cm
+  away. The index fingertip is the anchor, so the hand's body always lies to the child's RIGHT. 1.2 cm of flesh is added.
+* Onion's body (6.3 x 6.7 cm, 11 cm tall, measured) must keep 1 cm from that box (`HAND_CLEAR`) while the gesture shows.
+  Result on every table 1.0 x 0.7 m and larger, near edge 30-40 cm out, eyes 45-55 cm above, reach 0 / 50 / 60 / 72 cm (42
+  cases, in `tests/entry_layout_test.gd`): no overlap of Onion with the hand, the socket ring, the panel, the gear's landing
+  spot, the bench, shelf or things. Beside the mouth Onion is 7 cm out (the story chat's offset kept: 3.5 cm to the left, 6 cm
+  toward the child) and 1.3 cm clear of the tap hand. `Entry._beside_mouth()` now reads `EntryLayout.onion_mouth_offset` (same
+  value on the usual tables; the layout would move it if a table ever made the hand touch Onion).
+* **Fixed: Onion did not follow the cauldron at the reveal.** After the seating Onion rises to `aside + 10 cm`, but
+  `_make_way()` only took Onion along if it was AT the aside spot (within 5 cm), so Onion stayed hovering over the old place
+  while the cauldron glided aside. `_make_way()` now takes it along from either spot; the lifted spots are
+  `EntryLayout.onion_lifted` (opening) and `onion_lifted_after` (after the cauldron moved), read by the new `Entry._lifted_spot()`
+  (used after the seating and by the `reveal`/`shelf` jumps).
+* **To decide (story chat / Megan): Set in is not "beside the socket".** `_place()` sends Onion to `_aside_spot()`: beside the
+  CAULDRON, the side away from the panel and the gear's landing spot, about 45 cm from the socket on the usual table (see
+  `build/round4/hand_place_1.png`). The brief says beside the socket. A spot there would have to be BEHIND the panel (the
+  landing spot is on the cauldron side and the teaching hand's body on the right), about 17 cm beyond its far edge, 10 cm up;
+  from a seat it would look just above the socket. It is not built: it also makes the reveal glide Onion some 40 cm. One line
+  to try it: a `onion_by_socket` spot in the layout and `_move(_orb, _beside_socket(), 0.8)` in `_place()`.
+* DEV columns now 70 degrees out (63 before): with Onion lifted in view at about 45 degrees the old 63 overlapped a corner
+  of the jump column by up to 3 degrees. Still 50 cm from the eyes, in a seated grown-up's reach.
+* `POP_AUDITION := false` hides the pop button; the jump column is then two columns of four with room under it. Checked:
+  every jump button, Dots included, and Zones / Restart / Exit are in reach (<65 cm) and none overlaps another
+  (`test_the_opening_puts_things_where_the_map_says...`).
+* Pictures (`tools/round4_shots.gd`, `-- --profile=test_capture` for the hands, `--part=visit` for the first visit):
+  `build/round4/hand_tap_*.png`, `hand_pinch_*.png`, `hand_place_*.png`; none shows Onion touching the hand.
+
+**First visit, seated** (`build/round4/visit_*`, Onion at rest beside the shelf, cauldron hidden): Onion stays clear of the
+shelf and of its first row (it floats just left of the shelf's top corner, never in front of a cubby), and the cauldron is
+gone, so the bench has the table's middle. The subtitle at Wei's `above_gaze` 25 / `above_horizon` 20 still lies across the
+shelf's top row while the child looks at the things; at 36 / 12 it is above the whole shelf, and above Onion when the child
+looks at it. Still only a PROPOSAL for Wei's `Voice`. One thing seen: the moved-aside panel (turning, still there) is
+partly hidden behind the shelf and a thing from a seat; it is only looked at, not used.
+
+### PROPOSAL (not built): a ripple that travels ALONG the room and its things
+
+Today (`Entry._ripple()`): three flat rings (torus, 4 mm over the table's height) leave the socket and grow to about 1.7 m
+in 5 s (ease-out), a second apart; `_spread()` shows each workshop detail when the ring reaches it, and puts a faint 12 cm
+soft disc ("glint") on each of up to 105 depth-ray hits (the sim finds about 75 of them; the headset only what the depth
+sees, about 100 degrees ahead). The reveal pad plays 3 s; `_ripple()` returns after about 7 s, then Onion says "I've been
+looking forward to showing you this." The rings are flat discs in the air at table height, so they pass THROUGH the
+cauldron and the panel and over the table's edge as if the table were not there.
+
+What "along the objects" needs: the front must be a function of the distance from the socket measured over the surfaces
+(`distance(p, socket) <= r(t)`), drawn ON those surfaces. Everything below keeps the ring's timing (r(t) = 1.7 m x
+(1 - (1 - t/4.5 s)^2), band 8-10 cm wide with smooth edges), alpha at most 0.3-0.35, nothing that flashes or moves the
+view, and ends by 5.5 s, so the line can start at 6 s (1 s earlier than now) or stay at 7 s.
+
+**Cheap version (about a day; no new assets; GPU cost negligible).**
+1. One small spatial shader, `entry/ripple_front.gdshader` (about 40 lines): uniforms `origin`, `radius`, `band`, `tint`; the
+   fragment's world position gives `d = distance(world_pos.xz, origin.xz)`; alpha = smoothstep band around `radius`, additive
+   tint, unshaded. Put it as `material_overlay` on the meshes of the things the child sees (the cauldron `_box`, the panel
+   `_mechanism`, the gear, Wei's shelf and bench as they grow in): the front visibly climbs over each object as it passes.
+   The gear glow already uses `material_overlay`, so this is a known path. In the SIMULATED room the same overlay goes on the
+   room's visible meshes (table top, sideboard, chair, walls: `living_room.tscn` is ordinary scenery), so the sim shows
+   the front running over the table and up the walls instead of only rings.
+2. The table: replace the flat torus by one quad exactly the table's size and pose (`App.reality.work_surface()`: found
+   table in the headset, the sim's table in the sim), same shader, discarded outside the rectangle: the ring is cut off by
+   the table's edge instead of hanging in the air. A thin lit strip along each table edge fades in where the front touches
+   it, so the front seems to run along the edge.
+3. Real objects (headset): keep the depth glints, but make each an elongated soft streak across the front (along its
+   tangent) and time it to the front exactly (it is already). No new data.
+Risks: low. Needs a headset look for band width and brightness against a bright table (cream tint on a dark wood table can
+vanish; use a warm gold at alpha 0.3).
+
+**Better version (2-3 days incl. headset tuning; about 0.1-0.2 ms GPU).**
+1. Headset: draw the same shader on the Scene API anchors (`reality/scene_anchor.gd`: the room's planes and volumes the
+   child scanned: floor, walls, ceiling, table, furniture), depth-tested against themselves, so the front runs over the
+   floor, up the walls and across the table and furniture in their real places. The passthrough video cannot be recoloured; it is
+   the virtual anchor meshes that glow, so it only works where the child's room scan exists. Without a scan: the cheap version.
+2. Dense depth sparkle: take ONE snapshot of the live depth points (`DepthGrid`, `read_once()` at the start of the reveal;
+   a few thousand points within 3 m), put them in a MultiMesh of soft quads (one draw call) with the same front shader; each
+   point flares for about 1 s as the front passes. The room "draws itself in points of light" along its real surfaces and
+   objects (a cup, a laptop, the child's own arms are in the depth too, so mask what is within 25 cm of the eyes). In the
+   sim use a fan of about 1000 `Reality.hit()` rays (about 1 ms) instead of the 105.
+3. Table edge and legs: outline from the table `Surface` (finder size and pose) as a line mesh lit only up to the front.
+4. Onion looks along with it: the story chat's `_attend()` already follows one revealed feature; a moving look-at point on the front
+   (the nearest lit point) would read as Onion watching the ripple travel.
+Risks: scene anchors missing or noisy rooms (needs the fallback), depth noise creating flicker (smooth with a 0.3 s fade in
+and out per point, never faster), perceived brightness on a bright wall (cap total lit area; test with the brightest room).
+Rule for both: no step in screen brightness larger than 10% in 100 ms, nothing inside 25 cm of the eyes, no change to the
+camera, the voice timing or the reveal pad.
+
+
+
+Tests (round 4): all 206 pass on `entry-layout-4` (the base's 203 plus 3 new layout tests: Onion clear of the hand, the socket,
+the panel and the landing spot on 42 table/reach cases; the checker catches Onion on the hand's path; the zone map has the new spots).

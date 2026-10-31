@@ -1,0 +1,116 @@
+extends Node
+## Layout chat, round 3: the teaching hand at three sizes over its targets (how much of each it
+## covers from a seated child's eyes), and the subtitle in the first visit at Wei's setting and the
+## proposed one. Pictures to build/round3/. Not part of the game.
+##   xvfb-run -a -s "-screen 0 1280x800x24" godot --rendering-driver opengl3 --xr-mode off --path . res://tools/round4_shots.tscn -- --profile=test_capture
+
+
+var _out := ProjectSettings.globalize_path("res://build/round4")
+var _entry: Entry
+
+
+func _ready() -> void:
+	DirAccess.make_dir_recursive_absolute(_out)
+	get_window().size = Vector2i(1280, 800)
+	Profile.wipe()
+	var app: Node3D = load("res://main.tscn").instantiate()
+	app.autostart = false
+	add_child(app)
+	await get_tree().process_frame
+	(App.rig.head as Camera3D).fov = 80.0
+	_entry = app.get_node(^"Intro/Entry")
+	_entry.run()
+	app.autostart = true
+	await _until(func() -> bool: return _entry.find_child("entry_part_touch", true, false) != null)
+	await _pause(0.5)
+	var args := OS.get_cmdline_user_args()
+	if "--part=visit" in args:
+		await _visit()
+	else:
+		await _hands("--zones" in args)
+	get_tree().quit()
+
+
+## Onion beside the hand: each gesture, a few frames across its loop.
+func _hands(zones: bool) -> void:
+	var layout: EntryLayout = _entry.get("_layout")
+	print("R4 layout ", layout.summary())
+	print("R4 report ", layout.report().replace("\n", "; ") if layout.report() != "" else "no problems")
+	var plan := {
+		touch = [func() -> Vector3: return _entry.call("_rim_point"), 3.0, "tap"],
+		pickup = [func() -> Vector3: return Carry.middle_of(_entry.get("_gear")), 5.0, "pinch"],
+		place = [func() -> Vector3: return _entry.get("_socket_at"), 2.4, "place"],
+	}
+	for part: String in plan:
+		_press(StringName("entry_part_" + part))
+		_look_at(plan[part][0].call())
+		await _pause(plan[part][1])
+		if zones and part == "touch":
+			_entry._toggle_zones()
+			await _pause(0.2)
+		for k in 3:
+			_look_at(plan[part][0].call())
+			await _pause(0.45)
+			await _save("hand_%s_%d%s" % [plan[part][2], k, "_zones" if zones and part == "touch" else ""])
+		if zones and part == "touch":
+			_entry._toggle_zones()
+
+
+## The first visit seated: Onion at rest beside the shelf, the cauldron hidden, the subtitle at today's
+## setting and the proposed one, looking at the things, the shelf's first row and Onion.
+func _visit() -> void:
+	_press(&"entry_part_shelf")
+	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 900)
+	await _pause(3.5)
+	var voice := App.module(&"Voice")
+	var trial := App.session.trial as Node3D
+	var things: Array = trial.get("_things") if trial != null else []
+	var middle := Vector3.ZERO
+	for thing: Node3D in things:
+		middle += thing.global_position
+	middle /= maxf(things.size(), 1)
+	var shelf := trial.get("_shelf") as Node3D
+	var onion: Node3D = App.main.get_node(^"Workshop").get("_onion")
+	var layout: EntryLayout = _entry.get("_layout") if is_instance_valid(_entry) else null
+	for setting: Array in [[25.0, 20.0, "now"], [36.0, 12.0, "proposed"]]:
+		voice.above_gaze = setting[0]
+		voice.above_horizon = setting[1]
+		var spots := {things = middle, row1 = shelf.global_position + Vector3.UP * 0.1, onion = onion.global_position}
+		for look: String in spots:
+			_look_at(spots[look])
+			Events.say("Can you find a place for one of these?")
+			await _pause(0.5)
+			await _save("visit_%s_%s" % [setting[2], look])
+	get_tree().quit()
+
+
+func _look_at(at: Vector3) -> void:
+	var d := at - App.head().global_position
+	var flat := Vector2(d.x, d.z).length()
+	App.rig.head.rotation = Vector3(atan2(d.y, flat), atan2(-d.x, -d.z), 0.0)
+
+
+func _press(id: StringName) -> void:
+	var target := _entry.find_child(String(id), true, false) as Target
+	if target != null:
+		_entry._on_target(target)
+
+
+func _pause(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+
+func _until(cond: Callable, frames := 900) -> void:
+	var n := 0
+	while not cond.call() and n < frames:
+		await get_tree().process_frame
+		n += 1
+
+
+func _save(name: String, look := Vector3.INF) -> void:
+	if look != Vector3.INF:
+		App.rig.head.rotation = look
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(_out.path_join(name + ".png"))
+	print("SHOT ", name)

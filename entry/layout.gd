@@ -33,11 +33,16 @@ const HANDS_HIGH := 0.3
 
 const CAULDRON_WIDTH := 0.22
 const CAULDRON_RIM := 0.12
-## Onion's size with its halo, metres across.
+## Onion's size with its halo, metres across, and its body alone (measured: 6.3 x 6.7 cm, 11 cm tall,
+## plus 2 mm), which is what the teaching hand must stay clear of.
 const ONION := 0.13
+const ONION_BODY := 0.036
+const ONION_HEIGHT := 0.11
 ## The table panel (width, thickness, depth) and the room a hand needs over the socket.
 const PANEL := Vector3(0.272, 0.012, 0.232)   # entry.gd PANEL (0.26 x 0.22) and its 6 mm brass rim
 const SOCKET_Z := 0.03
+## The socket's hole (entry.gd SOCKET_RADIUS), metres; the brass ring is 8 mm wider.
+const SOCKET_RADIUS := 0.06
 const HAND_ROOM := 0.15
 ## The gear at playing size (radius) where it lands, plus room for the fingers around it.
 const GEAR_RADIUS := 0.0525
@@ -88,10 +93,36 @@ const OPENING := 2
 const REVEAL := 4
 const SHELF := 8
 const ALWAYS := 15
+## Parts of the opening where one teaching-hand gesture shows (with Onion at a known spot):
+## the tap (Tap), the pinch (Pick up), the lowering over the socket (Set in).
+const TAP := 16
+const PICKUP := 32
+const SETIN := 64
+const GESTURES := TAP | PICKUP | SETIN
+
+## The teaching hand's reach (entry/demo_hand.gd), MEASURED in the scene at DemoHand.HAND_SCALE 0.6 from
+## the skeleton's bones over a whole loop, relative to the point it works on (the rim point, the gear's
+## middle, the socket): to the child's RIGHT, AWAY from the child, and UP, metres (low, high). The
+## index fingertip is the anchor, so the hand's body lies to the child's right and a little toward
+## them. The hand scales with DemoHand.HAND_SCALE (taken here about the anchor). FINGER is added
+## all round for the flesh around the bones; HAND_CLEAR is the least gap Onion keeps from it.
+const HAND_TAP := {right = Vector2(0.0, 0.136), away = Vector2(-0.104, 0.028), up = Vector2(0.012, 0.234)}
+const HAND_PINCH := {right = Vector2(-0.013, 0.171), away = Vector2(-0.08, 0.088), up = Vector2(-0.026, 0.128)}
+const HAND_PLACE := {right = Vector2(-0.01, 0.147), away = Vector2(-0.073, 0.088), up = Vector2(-0.028, 0.178)}
+const HAND_MEASURED_AT := 0.6
+const FINGER := 0.012
+const HAND_CLEAR := 0.01
+## Onion's offset beside the mouth (a tap's wait), metres flat from the mouth's middle: it was 7 cm to
+## the child's left and a little toward them (the story chat's); the layout keeps it unless the
+## hand would touch it.
+const BESIDE_MOUTH := 0.07
+const BESIDE_MOUTH_TURN := -0.85
+const PEEK_UP := 0.06
+const LIFT_UP := 0.1
 
 ## A thing on the table must not overlap another; a panel (for the grown-up) must not overlap
 ## anything in view nor the hands' room; an area (the hands' room) only counts against panels.
-enum Kind { THING, PANEL, AREA }
+enum Kind { THING, PANEL, AREA, HAND }
 
 
 class Zone:
@@ -239,6 +270,13 @@ var mechanism_after := Vector3.ZERO
 var mechanism_yaw_after := 0.0
 var socket_after := Vector3.ZERO
 var onion_aside_after := Vector3.ZERO
+## Where Onion waits beside the mouth during the tap (offset from the mouth's middle, flat, then the
+## spot itself at its height), and the lifted spots: Onion's set-in spot raised, in the opening and
+## after the reveal.
+var onion_mouth_offset := Vector3.ZERO
+var onion_mouth := Vector3.ZERO
+var onion_lifted := Vector3.ZERO
+var onion_lifted_after := Vector3.ZERO
 ## Onion in the shelf scene, beyond the shelf's end on the cauldron's side.
 var onion_rest := Vector3.ZERO
 var zones: Array[Zone] = []
@@ -355,6 +393,10 @@ func _finish() -> void:
 	mechanism_yaw_after = _facing(mechanism_after)
 	socket_after = _socket_of(mechanism_after, mechanism_yaw_after)
 	onion_aside_after = _onion_aside(cauldron_after, mechanism_after)
+	onion_lifted = onion_aside + Vector3.UP * LIFT_UP
+	onion_lifted_after = onion_aside_after + Vector3.UP * LIFT_UP
+	onion_mouth_offset = _onion_mouth_offset()
+	onion_mouth = _mouth_point() + Vector3.UP * PEEK_UP + onion_mouth_offset
 	onion_rest = _onion_rest()
 	zones = _zones()
 
@@ -627,6 +669,56 @@ func _onion_aside(pot: Vector3, panel: Vector3) -> Vector3:
 	return best
 
 
+## The middle of the cauldron's opening (the brew), 1.3 cm below the rim (measured).
+func _mouth_point() -> Vector3:
+	return cauldron + Vector3.UP * (rim - 0.013)
+
+
+## The front of the cauldron's rim, where a tap goes (as Entry._rim_point).
+func rim_point() -> Vector3:
+	var to_child := Vector3(eye.x - cauldron.x, 0.0, eye.z - cauldron.z).normalized()
+	return cauldron + Vector3.UP * rim + to_child * (CAULDRON_WIDTH * 0.35)
+
+
+## The teaching hand's zone for [param gesture] (&"tap", &"pinch", &"place") working at [param anchor]:
+## the box its bones sweep (EntryLayout.HAND_*) plus the flesh, turned as the child sees it from the
+## eyes, its heights above the anchor. [param phase] when it shows.
+func hand_zone(gesture: StringName, anchor: Vector3) -> Zone:
+	var reach: Dictionary = {tap = HAND_TAP, pinch = HAND_PINCH, place = HAND_PLACE}[gesture]
+	var k: float = DemoHand.HAND_SCALE / HAND_MEASURED_AT
+	var right: Vector2 = (reach.right as Vector2) * k
+	var along: Vector2 = (reach.away as Vector2) * k   # away from the child
+	var up: Vector2 = (reach.up as Vector2) * k
+	var yaw := _facing(anchor)
+	var middle := Vector3(anchor.x, 0.0, anchor.z) + Basis(Vector3.UP, yaw) * Vector3((right.x + right.y) * 0.5, 0.0, -(along.x + along.y) * 0.5)
+	middle.y = anchor.y + up.x
+	var phase: int = {tap = TAP, pinch = PICKUP, place = SETIN}[gesture]
+	var z := _rect(StringName("hand_" + String(gesture)), middle, Vector2((right.y - right.x) * 0.5 + FINGER, (along.y - along.x) * 0.5 + FINGER), yaw, up.y - up.x, OPENING | phase, "the teaching hand's sweep: Onion stays clear")
+	z.kind = Kind.HAND
+	return z
+
+
+## Onion beside the mouth during the tap: the story chat's offset (BESIDE_MOUTH to the child's left,
+## a little toward them) unless the hand would come within HAND_CLEAR of Onion's body; then the
+## nearest clear spot round the mouth.
+func _onion_mouth_offset() -> Vector3:
+	var to_child := Vector3(eye.x - cauldron.x, 0.0, eye.z - cauldron.z).normalized()
+	var wanted := to_child.rotated(Vector3.UP, BESIDE_MOUTH_TURN) * BESIDE_MOUTH
+	var hand := hand_zone(&"tap", rim_point())
+	var best := wanted
+	var best_score := -INF
+	for step in 25:   # step 0: as wanted
+		for r: float in [BESIDE_MOUTH, BESIDE_MOUTH + 0.01, BESIDE_MOUTH + 0.02, BESIDE_MOUTH - 0.01]:
+			var off := wanted if step == 0 and r == BESIDE_MOUTH else to_child.rotated(Vector3.UP, (step - 1) * TAU / 24.0) * r
+			var body := _circle(&"body", cauldron + off, ONION_BODY, 0.0)
+			var clear := gap(body, hand) - HAND_CLEAR
+			var score := (0.0 if clear >= 0.0 else -10.0 + clear) - (off - wanted).length() * 5.0
+			if score > best_score:
+				best_score = score
+				best = off
+	return best
+
+
 ## Onion in the shelf scene: just beyond the shelf's end on the cauldron's side, high up beside the
 ## shelf, as far back as the shelf: never over a cubby, the things or the panel. If that is taken,
 ## up over the cauldron.
@@ -666,10 +758,31 @@ func _zones() -> Array[Zone]:
 		moved.keeps = LOOKED_GAP
 		all.append(moved)
 	all.append(_circle(&"gear_landing", gear_rest, GEAR_RADIUS + FINGERS, HAND_ROOM, OPENING, "the gear lands; the child picks it up"))
-	var a_phases := OPENING if not onion_aside_after.is_equal_approx(onion_aside) else OPENING | REVEAL
-	all.append(_circle(&"onion_aside", onion_aside - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, a_phases, "Onion waits while the gear comes out"))
-	if not onion_aside_after.is_equal_approx(onion_aside):
+	var ring := _circle(&"socket", socket, SOCKET_RADIUS + 0.008, 0.012, m_phases, "the socket's brass ring")
+	ring.may_overlap = [&"panel"]
+	all.append(ring)
+	if mechanism_moves():
+		var ring_after := _circle(&"socket_after", socket_after, SOCKET_RADIUS + 0.008, 0.012, after, "the socket's brass ring, moved")
+		ring_after.may_overlap = [&"panel_after"]
+		ring_after.keeps = LOOKED_GAP
+		all.append(ring_after)
+	var moves := not onion_aside_after.is_equal_approx(onion_aside)
+	var a_phases := (OPENING | PICKUP | SETIN) if moves else (OPENING | PICKUP | SETIN | REVEAL)
+	all.append(_circle(&"onion_aside", onion_aside - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, a_phases, "Onion waits while the gear comes out, and while the child picks it up and sets it in"))
+	var lifted := _circle(&"onion_lifted", onion_lifted - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, OPENING, "Onion rises after the seating")
+	lifted.may_overlap = [&"onion_aside"]
+	all.append(lifted)
+	if moves:
 		all.append(_circle(&"onion_aside_after", onion_aside_after - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, REVEAL, "Onion while the room is revealed"))
+	var lifted_after := _circle(&"onion_lifted_after", onion_lifted_after - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, REVEAL, "Onion lifted, turned to the revealed room")
+	lifted_after.may_overlap = [&"onion_aside_after", &"onion_aside"]
+	all.append(lifted_after)
+	var beside := _circle(&"onion_mouth", onion_mouth - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, OPENING | TAP, "Onion beside the mouth while the tap is shown")
+	beside.may_overlap = [&"cauldron"]
+	all.append(beside)
+	all.append(hand_zone(&"tap", rim_point()))
+	all.append(hand_zone(&"pinch", gear_rest + Vector3.UP * 0.0235))
+	all.append(hand_zone(&"place", socket + Vector3.UP * 0.014))
 	all.append(_circle(&"onion_rest", onion_rest - Vector3.UP * ONION * 0.5, ONION * 0.5, ONION, SHELF, "Onion waits in the shelf scene"))
 	all.append(_bench_zone())
 	all.append(_shelf_zone())
@@ -708,7 +821,7 @@ func dev_columns() -> Array[Dictionary]:
 
 ## Degrees each side of straight ahead the DEV columns stand, how far out, and their middle above
 ## the eyes. The jump buttons: DEV_JUMP_WIDE wide, DEV_JUMP_ROW apart, four to a column.
-const DEV_ANGLE := 63.0
+const DEV_ANGLE := 70.0
 const DEV_LIFT := 0.1
 const DEV_JUMP_WIDE := 0.11
 const DEV_JUMP_ROW := 0.055
@@ -882,6 +995,20 @@ func overlaps() -> Array[Dictionary]:
 			var a := zones[i]
 			var b := zones[j]
 			if a.phases & b.phases == 0 or b.name in a.may_overlap or a.name in b.may_overlap:
+				continue
+			if String(a.name).begins_with("onion") and String(b.name).begins_with("onion"):
+				continue   # Onion stands in one place at a time
+			if a.kind == Kind.HAND or b.kind == Kind.HAND:
+				var h := a if a.kind == Kind.HAND else b
+				var o := b if a.kind == Kind.HAND else a
+				if h.phases & o.phases & GESTURES == 0 or not String(o.name).begins_with("onion"):
+					continue   # the hand meets only Onion, and only while that gesture shows
+				if minf(h.top(), o.centre.y + ONION) <= maxf(h.centre.y, o.centre.y):
+					continue   # Onion's body passes over or under it
+				var body := _circle(o.name, o.centre, ONION_BODY, ONION)
+				var clear := gap(body, h)
+				if clear < HAND_CLEAR:
+					found.append({a = h.name, b = o.name, how = "on the table", amount = HAND_CLEAR - clear})
 				continue
 			if a.kind == Kind.AREA and b.kind == Kind.AREA:
 				continue
