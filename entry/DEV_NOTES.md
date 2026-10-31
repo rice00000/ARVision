@@ -541,3 +541,10 @@ across and 39 degrees up and down, seen from the near face.
 
 Tests: `entry_layout_test` has four new ones (the numbers against `motion.tres`; the dots on all 42 tables; the subtitle;
 the coherence mapping and the marker). The pinning buttons are not tested with hands (needs the headset).
+
+**Choice panel (follow-up, shelf gone).** Megan: the shelf is gone at the choice. `EntryMotionLayout.choice_spot(i, n)`: a row of
+15 cm targets, 18 cm apart, centred straight ahead on the table, a little nearer than the reach (at most 55 cm), 3 cm above the
+table top, facing the child; beyond the table's far edge nothing is in the way, so the dots' entrance stays clear.
+`onion_without_shelf(n)`: Onion beside the row's left end, low (5 to 16 cm up), out of the dots' view by 4 degrees. Tested on
+short and long tables and three reaches. Wei's own shelf-level choice is not on the table in this route: the organizer's
+scene decides which targets (the shelf levels and "motion") fill the row.

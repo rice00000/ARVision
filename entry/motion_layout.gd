@@ -180,6 +180,41 @@ func subtitle_gap(elevation := SUBTITLE_ELEVATION) -> float:
 	return view_gap(at, 0.08)
 
 
+# --- The choice (the shelf is gone by then) ------------------------------------------------
+
+const CHOICE_WIDE := 0.15
+const CHOICE_APART := 0.18
+const CHOICE_LIFT := 0.03
+
+## Where choice target [param i] of [param n] stands: a row on the table straight ahead, comfortably inside the reach
+## (a little nearer than the reach), lying just above the table top, facing the child. Clear of the dots' entrance
+## (which is beyond the far edge) by construction.
+func choice_spot(i: int, n: int) -> Vector3:
+	var flat := Vector3(layout.ahead.x, 0.0, layout.ahead.z).normalized()
+	var across := flat.cross(Vector3.UP)
+	var out := minf(layout.reach_used() - 0.08, 0.55)
+	var at := layout.eye + flat * out + across * (i - (n - 1) * 0.5) * CHOICE_APART
+	at.y = layout.table_y() + CHOICE_LIFT
+	return at
+
+
+## Onion while the choice is open and the dots play, with no shelf: beside the row, a little up, out of the dots' view.
+func onion_without_shelf(n: int) -> Dictionary:
+	var flat := Vector3(layout.ahead.x, 0.0, layout.ahead.z).normalized()
+	var across := flat.cross(Vector3.UP)
+	var last := choice_spot(0, n)
+	var best := {at = last, gap = -INF}
+	for out: float in [0.16, 0.2, 0.26, 0.32]:
+		for up: float in [0.16, 0.1, 0.05]:
+			var at := last - across * out + Vector3.UP * up
+			var gap := view_gap(at, EntryLayout.ONION * 0.5)
+			if absf(_yaw_of(at)) <= ONION_MOST_SIDEWAYS and gap > best.gap:
+				best = {at = at, gap = gap}
+			if gap >= ONION_VIEW_GAP and absf(_yaw_of(at)) <= ONION_MOST_SIDEWAYS:
+				return {at = at, gap = gap}
+	return best
+
+
 # --- The DEV marker and the coherence control -------------------------------------------
 
 ## Where the scene marker (a Label3D) stands for [param head]: head-locked, top left, off the middle of the view.

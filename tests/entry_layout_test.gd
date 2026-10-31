@@ -350,3 +350,20 @@ func test_the_motion_dev_marker_and_coherence_control_build_and_pin_like_the_fac
 	expect(absf(dev.coherence() - 15.0) < 0.5, "the 15 preset")
 	dev.queue_free()
 	session.queue_free()
+
+
+func test_the_choice_row_is_on_the_table_in_reach_and_onion_stays_out_of_the_dots() -> void:
+	for size: Vector2 in [Vector2(1.0, 0.7), Vector2(1.6, 0.9)]:
+		for reach: float in [0.0, 0.5, 0.72]:
+			var layout := _layout(size, 0.3, 0.5, reach)
+			var motion := EntryMotionLayout.new(layout)
+			for n in [2, 3]:
+				for i in n:
+					var spot := motion.choice_spot(i, n)
+					var label := "table %s reach %d, target %d of %d" % [size, roundi(reach * 100), i + 1, n]
+					expect(layout.away(spot) <= layout.reach_used(), "%s: within reach (%d cm)" % [label, roundi(layout.away(spot) * 100)])
+					expect(layout.on_table(spot), "%s: on the table" % label) if layout.has_method("on_table") else null
+					if i > 0:
+						expect(spot.distance_to(motion.choice_spot(i - 1, n)) >= EntryMotionLayout.CHOICE_WIDE, "%s: does not touch its neighbour" % label)
+				var onion := motion.onion_without_shelf(n)
+				expect(onion.gap >= EntryMotionLayout.ONION_VIEW_GAP, "table %s reach %d: Onion is out of the dots' view (%d degrees)" % [size, roundi(reach * 100), roundi(onion.gap)])
