@@ -241,6 +241,60 @@ Notes:
 
 ---
 
+## 9. Hands in detail (pinch, tap, carry, tracking loss): what a headset does that a mouse does not
+
+Everything the mouse does the same way is tested without a headset; these are the parts that differ with real hands
+(and cannot be checked without one). Do them seated, once with each hand, and note counts rather than feelings where
+you can. The code paths are `Carry` (the gear), Wei's tidy trial (the shapes), `Entry._poke_cauldron` (the tap).
+
+**Pinch (the gear).** The pinch point is the middle of the thumb tip and the index tip; the gear is taken when that
+point is within about 9 cm of the gear's middle (pinch its shaft, its rim or its base: all count). A pinch that closes
+just before the hand arrives still counts for a quarter of a second.
+- [ ] Pinch the gear 10 times. It was taken ______ of 10. (A miss: how far off was the pinch point? ______ cm)
+- [ ] It is held while the pinch is closed and drops within a blink (about 0.1 s) of opening your fingers. Dropped on
+      its own while pinching: never / ______ times.
+- [ ] Turn your wrist about the vertical (like turning a key): the gear turns with it, staying upright.
+- [ ] Roll your wrist (palm to face, then palm down): the gear tips along but never more than about 35 degrees, and never
+      flips over.
+- [ ] The gear stays in your fingers where you grabbed it (it does not jump to the middle of your hand).
+- [ ] **Left hand:** with the palm toward your face, a pinch may be the headset's own menu gesture (it opens the
+      grown-up panel). Does grabbing the gear with the LEFT hand ever open the panel? yes / no. (If yes, say which palm
+      direction.) Right hand: same question.
+- [ ] Both hands pinching the gear at once: the first one holds it, the other does not steal it.
+
+**Tap by fingertip (the cauldron).** In the Tap beat the index fingertip going into a ball about 13 cm round the
+cauldron's middle counts once (it covers the pot and a little more); a finger that stays in does not tap again; a hand
+held outside does nothing; before the beat asks for it nothing counts. A pinch aimed at the cauldron from afar counts as well.
+- [ ] A tap with the fingertip counted at the first try ______ of 5 times.
+- [ ] A hand that only passes by (reaching toward the table, resting beside the pot) does not tap: false taps ______.
+- [ ] Tapping with the far hand or from a distance by pinch also works. yes / no.
+
+**Tracking lost (the gear).** Cover your hand with the other, or pull it out of view, while carrying.
+- [ ] A dropout shorter than a quarter of a second is ignored (the gear stays in the hand): yes / no.
+- [ ] Longer: the gear is set down on the table, upright, within your reach, in about a second. It never lands in the
+      cauldron or on the panel (where you let go over the panel's edge, it goes to the near side).
+- [ ] When the hand is back, a new pinch picks it up again.
+- [ ] Letting go over the socket (about 12 cm sideways) docks it: one click; further away it floats down to the table.
+- [ ] Opening the grown-up panel (left palm up pinch) while carrying lets go of the gear cleanly.
+
+**The shapes in the first visit (Wei's carry).** A pinch within about 6 cm of a shape takes it (a bit more for big
+ones); two hands carry two shapes; letting go at a cubby clicks it in (right) or sends it back (wrong); letting go
+elsewhere, losing the hand or a pause sends it home, never counted as a try.
+- [ ] Pinch 10 shapes. Taken ______ of 10. Taken by accident (hand only passing) ______.
+- [ ] **The reminder:** after Onion's last line ("Pick whichever one you'd like to start with.") do nothing for about
+      12 seconds. A see-through hand comes straight down on ONE shape (the nearest to you), pinches it, lifts it a few
+      centimetres and puts it down, over and over, without leaning toward the shelf. It goes the moment you take any
+      shape. It never shows a cubby. Came after about ______ s. Chose a shape nearest to me: yes / no.
+- [ ] Wei's own help (the right sticker wiggles) did NOT come before the reminder. It should come about 40 s after the
+      round starts if you are still doing nothing; after you have taken a shape it goes back to his normal 10 s.
+
+**Desktop only (ignore in the headset):** the G key, the mouse click on the cauldron, W/A/S/D/Q/E and the arrow keys
+(the headset moves and turns with your head).
+
+Notes:
+
+---
+
 ## At the end
 
 - [ ] Total time seated: ______ min. Any neck strain from looking down? yes / no

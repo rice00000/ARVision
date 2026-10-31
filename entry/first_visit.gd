@@ -22,6 +22,7 @@ var _rounds_won := 0
 var _rounds_ended := 0
 var _onion: Workshop
 var _shelf_spot := Vector3.INF
+var _reminder: ShelfReminder   # a hand that shows how to pick a shape up, if the child waits (interaction chat)
 
 
 func run() -> void:
@@ -32,6 +33,11 @@ func run() -> void:
 		_rounds_ended += 1
 		if success:
 			_rounds_won += 1)
+	_reminder = ShelfReminder.new()
+	add_child(_reminder)
+	var skip := App.main.get_node_or_null(^"LineSkip") as LineSkip
+	if skip != null:   # the invitation is an instruction until the child has taken a shape
+		skip.guards.append(_invitation_open)
 	App.reality.apply_view(App.session.base_view)
 	if not App.reality.is_settled:
 		await App.reality.settled
@@ -53,10 +59,15 @@ func run() -> void:
 		await say("Pick whichever one you'd like to start with.")
 	if _onion != null:
 		_onion.attend(null)
+	_reminder.start()   # the invitation is done: if the child waits, the hand shows how to pick one up
+
+
+func _invitation_open() -> bool:
+	return not _started
 
 
 func _play() -> void:
-	await App.session.play(plan)
+	await App.session.play(_reminder.prepare(plan))   # Wei's first hint is held back so the reminder comes first
 	await _closing()
 
 
@@ -107,10 +118,11 @@ func _say(text: String) -> void:
 		Events.say(text)
 		await get_tree().create_timer(maxf(1.5, text.length() * 0.07 + 0.6), false).timeout
 		return
-	var done := {finished = false}
-	var on_finished := func(spoken: String, _completed: bool) -> void:
+	var done := {finished = false, completed = true}
+	var on_finished := func(spoken: String, completed: bool) -> void:
 		if spoken == text:
 			done.finished = true
+			done.completed = completed
 	voice.line_finished.connect(on_finished)
 	Events.say(text)
 	var waited := 0.0
@@ -119,4 +131,6 @@ func _say(text: String) -> void:
 		await get_tree().process_frame
 		waited += get_process_delta_time()
 	voice.line_finished.disconnect(on_finished)
+	if not done.completed:
+		return   # cut short (the child pressed Onion): on at once, with no breath
 	await get_tree().create_timer(BREATH, false).timeout
