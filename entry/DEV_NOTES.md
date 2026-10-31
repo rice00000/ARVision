@@ -481,3 +481,33 @@ the plan takes a second. `trials/tidy/tidy_trial.gd`: the two single-use flags o
 **1. The first-visit reminder is built** (`entry/shelf_reminder.gd`, from the proposal; Wei's files and resources are untouched: no flag was needed in `tidy_trial.gd`). `first_visit.gd` (story chat's file; four small edits): it makes a `ShelfReminder`, plays `_reminder.prepare(plan)` instead of `plan`, and calls `_reminder.start()` when Onion's last line is done. `ShelfReminder.DELAY` (12 s after that line; 0 = never) and `HELP_AFTER` (40 s: Wei's first hint, which wiggles the right sticker, is held back by a COPY of the plan's trial definition; his `tidy.tres` stays 10 s). The hand (`DemoHand.pinch_lift(thing, true)`, new optional `straight_down`) pinches the thing nearest the child's eyes (from Wei's public `layout()`, not his hint order), lifts it 5 cm at most and never leans toward anything. It is skipped or stops when anything is carried, after any `taken` / `put` report (then the copy goes back to Wei's own 10 s timing, so a child who is stuck AFTER starting gets his normal help), or once his hint has begun.
 **2. VR readiness** (checklist: section 9 of `entry/HEADSET_TEST.md`). Tests now run the headset code paths with a dummy OpenXR interface and fake hand joints (`App.xr`, `XRHandTracker`): the pinch point (middle of thumb and index tip) takes the gear, not the hand's aim; the gear follows the pinch point and the wrist's turn about the vertical, and never tips more than 0.6 rad from upright however the wrist rolls (new `Carry.MAX_TILT`; a mouse ray cannot roll, a real wrist can); a 0.1 s joint dropout is ignored and a lost hand lets go; the fingertip poke taps the cauldron once and only in the Tap beat; Wei's carry takes a thing near the pinch point and sends it home on tracking loss; the desktop click rule and the head keys do nothing in a headset. Found nothing else that only works with the mouse. Left to the headset (HEADSET_TEST section 9): how reliably real pinches register, and whether a LEFT-hand pinch with the palm to the face opens the grown-up panel (Meta's menu gesture).
 **4. Skipping Onion's lines** (`entry/line_skip.gd`, a node under Main like `DesktopKeys`). A deliberate press on Onion (a click on desktop; a pinch aimed at it or a fingertip going in, in a headset) cuts the line it is speaking; `Voice` gets `speaking()` and `skip()` (modules/voice/voice.gd, two small additions: the audio stops, the subtitle goes, `line_finished(text, false)`), and `Entry.say()` / `FirstVisit._say()` return at once for a cut line (no breath). It cuts the CURRENT line only. Never skipped: the instruction the child still needs (guards: the tap while asked and not done; the pick-up while the gear glows and is not taken; the set-in while the hand shows it and the gear is not in; the first visit's invitation until a shape is taken). A press on a Target, or one that just took the gear or a shape, is never a skip; where Onion and the cauldron or gear are both in reach the press goes to whichever it is aimed at more closely, and a press on Onion is no longer a tap on the cauldron either (Onion stands inside the cauldron's tap sphere during the Tap beat). Hooks in `entry.gd`: `_configure_skip()` in my region, `_onion_closer()` in `_on_desktop_click`, the same check in `_poke_cauldron`, and the cut-line test in `say()`. Onion stops "talking" in the opening on a cut; the workshop's own talking animation (first visit) runs out its time (a small thing for the story chat).
+## Round 6 (chat C): no plate, the socket track, the invitation, VR readiness, the handover freeze
+
+**1. No plate.** The socket is a flat recessed ring at table height (rim disc, deeper step, brass lip) with the cog on the
+table beside it; nothing stands up. `PANEL`/`SOCKET_Z` changed (footprint is ring + cog, `SOCKET_RADIUS` 6 cm). The outline
+(Carry's hint) and the ripple origin stay at the socket. The cauldron never moves any more (`_make_way` only slides the
+socket). **Socket stays put in 8 of 42 tables** (16 of 42 before the invitation zones and the no-cauldron-glide rule were
+added; 6 of 42 in round 5). It stays where the table is long/deep with a long reach (e.g. 72 cm: `--reach=0.72`); the rest
+use the track. Wei's bench with its things is 54 cm wide, so the cauldron, socket and bench do not fit side by side in a
+110 degree view within a 60 cm reach.
+
+**1b. Track.** Where the socket must move, `_socket_track()` (entry.gd, about 70 lines, well under an hour) draws a 3.6 cm
+groove with lips from the socket to its new place (grows over 0.7 s), plays `device_rattle` quietly, rides the socket, cog and
+lifted Onion along it linearly (0.3 m/s), then fades the groove (0.8 s) before the ripple. No words. Jumps (DEV buttons) move
+instantly. `reveal` jumps now start at the opening spots (`_set_up_for`).
+
+**2. Invitation.** Onion's 30 % lean was aimed at the world origin; it now aims at the real things on the bench
+(`EntryLayout.things_centre()`, zones `onion_reveal`/`onion_invite`, `invite_fraction`). The plan checks it against shelf,
+things and bench in 3D; `_onion_rest()` searches for a clear spot.
+
+**3. VR readiness of the DEV panels.** `DEV_LIFT` 0, panel tilted 70 degrees out, buttons 15 cm apart, all inside the
+measured reach. Proposal only: hide the DEV panels at Start so the child never sees them. The subtitle proposal
+(`Voice.above_gaze` 25 -> 36, `above_horizon` 20 -> 12, Wei's file) is unchanged.
+
+**5. Handover freeze (intro -> first_visit).** Measured headless: the dominant cost was `load("first_visit.tscn")` at the
+switch, 56 ms and a 68 ms long frame. `Entry._preload_first_visit()` (called after `_build_workshop()`) starts
+`ResourceLoader.load_threaded_request`; after: 0.018 ms and no long frame. Software render: 344 ms vs a steady 250 ms
+frame; shader compile is not measurable headless. If the freeze persists on the headset, the proper adoption version (or no
+scene switch) is still available.
+
+Tests: 225 pass on `entry-layout-6` (the base's 222 plus mine; `entry_test` waits for the socket to settle after a jump to the ripple).

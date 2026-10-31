@@ -39,8 +39,10 @@ const ONION := 0.13
 const ONION_BODY := 0.036
 const ONION_HEIGHT := 0.11
 ## The table panel (width, thickness, depth) and the room a hand needs over the socket.
-const PANEL := Vector3(0.272, 0.012, 0.232)   # entry.gd PANEL (0.26 x 0.22) and its 6 mm brass rim
-const SOCKET_Z := 0.03
+## The socket's footprint (entry.gd PANEL): no plate any more (round 6), a recessed ring (r 6.8 cm) with the little cog
+## turning just behind it: 14.4 x 18.8 cm, flat (2 mm). The node's middle is between them; the socket is SOCKET_Z toward the child.
+const PANEL := Vector3(0.144, 0.002, 0.188)
+const SOCKET_Z := 0.026
 ## The socket's hole (entry.gd SOCKET_RADIUS), metres; the brass ring is 8 mm wider.
 const SOCKET_RADIUS := 0.06
 const HAND_ROOM := 0.15
@@ -120,6 +122,10 @@ const HAND_PLACE := {right = Vector2(-0.01, 0.147), away = Vector2(-0.073, 0.088
 const HAND_MEASURED_AT := 0.6
 const FINGER := 0.012
 const HAND_CLEAR := 0.01
+## During the invitation in the reveal Onion floats this share of the way toward the shapes (the middle of the things
+## on the bench) and back; the layout shortens it if the full share would put Onion in the shelf's, the things' or
+## the bench's way.
+const INVITE_FRACTION := 0.3
 ## Onion's offset beside the mouth (a tap's wait), metres flat from the mouth's middle: it was 7 cm to
 ## the child's left and a little toward them (the story chat's); the layout keeps it unless the
 ## hand would touch it.
@@ -326,6 +332,11 @@ var onion_lifted_after := Vector3.ZERO
 ## panel, when the panel glides at the reveal), and the lifted spots above it.
 var onion_socket := Vector3.ZERO
 var onion_socket_after := Vector3.ZERO
+## The reveal: where Onion drifts to after "Welcome" (beside the cauldron's place, lifted), where it floats toward
+## the shapes for the invitation, and the share of the way that is (INVITE_FRACTION, or less if that is in the way).
+var onion_reveal := Vector3.ZERO
+var onion_invite := Vector3.ZERO
+var invite_fraction := INVITE_FRACTION
 ## Onion in the shelf scene, beyond the shelf's end on the cauldron's side.
 var onion_rest := Vector3.ZERO
 var zones: Array[Zone] = []
@@ -451,8 +462,9 @@ var _mech_score := 0.0
 
 ## The shelf may turn this many degrees to the right of straight ahead (Wei's table point moves there), and
 ## the cauldron may stand this many degrees to the left (the usual CAULDRON_ANGLE first).
-## How much farther than the easy reach the socket may be (a stretch, once, to set the gear in).
-static var socket_stretch := 0.0
+## How much farther than the EASY reach the socket may be (5 cm: the measured reach is what feels easy, not the
+## limit; the gear is set in once).
+static var socket_stretch := 0.05
 const SHELF_ANGLES := [0.0, 10.0, 20.0, 30.0]
 const CAULDRON_BEARINGS := [30.0, 0.0, -20.0, 50.0]
 
@@ -489,9 +501,7 @@ func _finish() -> void:
 	onion_aside = _onion_aside(cauldron, mechanism)
 	cauldron_after = cauldron
 	mechanism_after = mechanism
-	if make_way:
-		if not _clear_of_bench(_circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, rim), LOOKED_GAP):
-			cauldron_after = _clear_spot(cauldron, _circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, rim), [])
+	if make_way:   # the cauldron never moves (it sinks away); only the socket slides, on its own track (Entry._make_way)
 		var plate := _rect(&"probe", mechanism, _panel_half(), mechanism_yaw, HAND_ROOM)
 		var pot := _circle(&"pot", cauldron_after, CAULDRON_WIDTH * 0.5, rim)
 		if not _clear_of_bench(plate, LOOKED_GAP) or gap(plate, pot) < LOOKED_GAP:
@@ -503,6 +513,8 @@ func _finish() -> void:
 	onion_aside_after = _onion_aside(cauldron_after, mechanism_after)
 	onion_socket = _onion_beside_socket(mechanism, mechanism_yaw, socket)
 	onion_socket_after = _onion_beside_socket(mechanism_after, mechanism_yaw_after, socket_after)
+	onion_reveal = onion_aside_after + Vector3.UP * LIFT_UP
+	_plan_invitation()
 	onion_lifted = onion_socket + Vector3.UP * LIFT_UP
 	onion_lifted_after = onion_socket_after + Vector3.UP * LIFT_UP
 	onion_mouth_offset = _onion_mouth_offset()
@@ -821,6 +833,37 @@ func _onion_aside(pot: Vector3, panel: Vector3) -> Vector3:
 	return best
 
 
+## The middle of the things on the bench, at table height: where Onion looks and floats toward in the reveal.
+func things_centre() -> Vector3:
+	var middle := bench * Vector3(0, -bench_below, -(THINGS_NEAR + THINGS_FAR) * 0.5)
+	return middle
+
+
+## Onion's float toward the shapes: as far as INVITE_FRACTION of the way from [member onion_reveal] to the things'
+## middle, but never closer than its body and halo allow to the bench, shelf and things (as 3D volumes).
+func _plan_invitation() -> void:
+	var target := things_centre()
+	var goal := Vector3(target.x, onion_reveal.y, target.z)
+	var things := _things_zone()
+	things.height = 0.1   # the things themselves (not the hands' room above them: no hands are at work in the reveal)
+	var others: Array[Zone] = [_bench_zone(), _shelf_zone(), things]
+	invite_fraction = INVITE_FRACTION
+	while invite_fraction > 0.0:
+		var spot := onion_reveal.lerp(goal, invite_fraction)
+		var body := _onion(&"probe", spot, REVEAL, "")
+		var clear := true
+		for other in others:
+			# along the whole float, not just where it ends
+			for k in 5:
+				body.centre = onion_reveal.lerp(spot, k / 4.0) - Vector3.UP * ONION_HEIGHT * 0.5
+				if volume_gap(body, other) < minf(other.keeps, GAP) + body.space:
+					clear = false
+		if clear:
+			break
+		invite_fraction = maxf(invite_fraction - 0.05, 0.0)
+	onion_invite = onion_reveal.lerp(goal, invite_fraction)
+
+
 ## The middle of the cauldron's opening (the brew), 1.3 cm below the rim (measured).
 func _mouth_point() -> Vector3:
 	return cauldron + Vector3.UP * (rim - 0.013)
@@ -914,13 +957,19 @@ func _onion_beside_socket(plate: Vector3, yaw: float, at: Vector3) -> Vector3:
 ## up over the cauldron.
 func _onion_rest() -> Vector3:
 	var side := -1.0 if on_bench(cauldron_after).x < 0.0 else 1.0
-	var x := side * (SHELF_HALF + ONION * 0.5 + GAP + 0.04)
-	var spot := bench * Vector3(x, -bench_below + SHELF_HIGH * 0.85, -(SHELF_NEAR + SHELF_FAR) * 0.5)
-	var me := _circle(&"me", spot, ONION * 0.5, 0.0)
-	var pot := _circle(&"pot", cauldron_after, CAULDRON_WIDTH * 0.5, 0.0)
-	var plate := _rect(&"plate", mechanism_after, _panel_half(), mechanism_yaw_after, 0.0)
-	if gap(me, pot) < GAP or gap(me, plate) < GAP:
-		spot = Vector3(cauldron_after.x, cauldron_after.y + rim + ONION * 0.5 + 0.12, cauldron_after.z)
+	var others: Array[Zone] = [_bench_zone(), _shelf_zone(), _things_zone()]
+	var spot := bench * Vector3(side * (SHELF_HALF + ONION * 0.5 + GAP + 0.04), -bench_below + SHELF_HIGH * 0.85, -(SHELF_NEAR + SHELF_FAR) * 0.5)
+	for out: float in [0.04, 0.08, 0.12, 0.16]:   # a little farther along, and higher, until it is clear in 3D
+		for high: float in [0.85, 1.0, 1.15]:
+			var candidate := bench * Vector3(side * (SHELF_HALF + ONION * 0.5 + GAP + out), -bench_below + SHELF_HIGH * high, -(SHELF_NEAR + SHELF_FAR) * 0.5)
+			var body := _onion(&"me", candidate, SHELF, "")
+			var free := true
+			for other in others:
+				if volume_gap(body, other) < other.keeps + body.space:
+					free = false
+			if free:
+				return candidate
+			spot = candidate
 	return spot
 
 
@@ -963,6 +1012,8 @@ func _zones() -> Array[Zone]:
 	all.append(_onion(&"onion_socket", onion_socket, OPENING | SETIN, "Onion beside the socket while the child sets the gear in"))
 	all.append(_onion(&"onion_lifted", onion_lifted, OPENING, "Onion rises after the seating"))
 	all.append(_onion(&"onion_lifted_after", onion_lifted_after, REVEAL, "Onion lifted, turned to the revealed room"))
+	all.append(_onion(&"onion_reveal", onion_reveal, REVEAL, "Onion drifts here after the ripple and \"Welcome\""))
+	all.append(_onion(&"onion_invite", onion_invite, REVEAL, "Onion floats toward the shapes for the invitation"))
 	var beside := _onion(&"onion_mouth", onion_mouth, OPENING | TAP, "Onion beside the mouth while the tap is shown")
 	beside.may_overlap = [&"cauldron"]
 	all.append(beside)
@@ -1011,7 +1062,7 @@ func dev_columns() -> Array[Dictionary]:
 ## Degrees each side of straight ahead the DEV columns stand, how far out, and their middle above
 ## the eyes. The jump buttons: DEV_JUMP_WIDE wide, DEV_JUMP_ROW apart, four to a column.
 const DEV_ANGLE := 70.0
-const DEV_LIFT := 0.1
+const DEV_LIFT := 0.0
 const DEV_JUMP_WIDE := 0.11
 const DEV_JUMP_ROW := 0.055
 const DEV_JUMP_ROWS := 4

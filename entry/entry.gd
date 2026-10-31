@@ -118,7 +118,7 @@ var _demo: DemoHand                 # the teaching hand (interaction chat)
 var _gear_height := 0.08            # unscaled, metres
 var _gear_rest := Vector3.ZERO      # where it lands after coming out of the cauldron
 var _mechanism: Node3D              # the table panel with the socket
-var _mech_spin: GearSpin            # the little cog in the panel's window
+var _mech_spin: GearSpin            # the little cog beside the socket
 var _socket_at := Vector3.ZERO      # the middle of the socket, world
 var _ripple_origin := Vector3.ZERO  # where the ripple starts: the socket
 var _details: Array[Node3D] = []    # the workshop, shown as the ripple reaches each
@@ -269,6 +269,7 @@ func run() -> void:
 	_build_gear()
 	_build_onion()
 	_build_workshop()
+	_preload_first_visit()
 
 	# Nothing plays until the adult presses Start (or a part to jump to). A jump button also
 	# cuts in on a part that is still playing, and a jump skips the story's own pauses.
@@ -566,10 +567,12 @@ func _reveal(fast := false) -> void:
 		await _wait(3.0)   # a quiet pause
 	# The shapes arrived with the shelf (the ripple showed them): Onion notices them and floats
 	# closer, explains, and invites the child (story chat's approved replacement; Megan: in the reveal).
-	var things := _shelf.global_position + Vector3.DOWN * 0.25 if _shelf != null else _ahead + App.head().global_position
+	# (layout chat: toward the MIDDLE OF THE THINGS on the bench, as far as EntryLayout.invite_fraction says: 30%, or less
+	# where that would put Onion in the shelf's, the things' or the bench's way. It used the shelf node's own origin.)
+	var things := _layout.things_centre()
 	_attend(things)
 	_actions.lean_to(_runner, 0.2, 0.8)
-	_move(_orb, _orb.global_position.lerp(Vector3(things.x, _orb.global_position.y, things.z), 0.3), 1.0)
+	_move(_orb, _layout.onion_invite if _orb.global_position.distance_to(_layout.onion_reveal) < 0.06 else _orb.global_position.lerp(Vector3(things.x, _orb.global_position.y, things.z), _layout.invite_fraction), 1.0)
 	await say("Oh! I'd nearly forgotten about these.")
 	await say("They've come quite a long way.")
 	_actions.lean_to(_runner, 0.0, 0.6)
@@ -822,7 +825,7 @@ func _take_press(ids: Array) -> StringName:
 ## Puts everything as [param part] finds it, at once: Onion's place, the things on
 ## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
 func _set_up_for(part: StringName) -> void:
-	_make_way(0.0, part in [&"hello", &"touch", &"emerge", &"pickup", &"place"])   # layout chat: the cauldron and panel where this part finds them
+	_make_way(0.0, part in [&"hello", &"touch", &"emerge", &"pickup", &"place", &"reveal"])   # layout chat: the cauldron and panel where this part finds them
 	_cue = false
 	_tapped = false
 	_tap_open = false
@@ -1698,6 +1701,16 @@ func _build_shelf() -> void:
 	print("ENTRY shelf: bench top ", snappedf(_shelf.top_below(), 0.01), " m below the eyes")
 
 
+## The first visit's scene is loaded in the background from the moment the opening is built (a threaded request:
+## the engine keeps the result), so the switch at the end of the reveal finds it ready: `load()` of it used to
+## cost 56 ms in one frame (a visible freeze in the headset).
+func _preload_first_visit() -> void:
+	var path := String(Main.SCENES[&"first_visit"].path)
+	if ResourceLoader.has_cached(path):
+		return
+	ResourceLoader.load_threaded_request(path, "", true)
+
+
 ## The first round's things, made now by Wei's own code with a fixed seed (the first visit's trial then makes
 ## the SAME ones from the same seed: [method _to_shelf]), hidden like the shelf until the ripple reaches each.
 ## So the ripple reveals the shelf and its things together and nothing is swapped when the shelf level starts.
@@ -1981,9 +1994,17 @@ const GEAR_OUT_SCALE := 0.4
 const GEAR_PLAY_SCALE := 0.6
 ## The table panel: width, thickness and depth, metres; the socket's radius, and how far toward
 ## the child from the panel's middle it sits.
-const PANEL := Vector3(0.26, 0.012, 0.22)
+const PANEL := Vector3(0.144, 0.002, 0.188)
 const SOCKET_RADIUS := 0.06
-const SOCKET_Z := 0.03
+## The socket's track where the table moves it at the reveal: groove width, seconds to draw it, the carriage's pace
+## (m/s, steady) and how long the groove takes to fade after.
+const TRACK_WIDTH := 0.036
+const TRACK_GROW := 0.7
+const TRACK_SPEED := 0.3
+const TRACK_FADE := 0.8
+const SOCKET_Z := 0.026
+## Where the little cog turns, behind the socket (the panel node's own z, metres).
+const COG_Z := -0.074
 
 var _cog: Node3D
 
@@ -2093,43 +2114,44 @@ func _build_mechanism() -> void:
 	var eye := App.head().global_position
 	_mechanism.rotation.y = atan2(eye.x - spot.x, eye.z - spot.z)   # its front (+z) to the child
 	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
-	var sage := _lit(Color(0.36, 0.46, 0.39))
 	var dark := _lit(Color(0.07, 0.08, 0.09))
-	_mechanism.add_child(_slab(Vector3(PANEL.x + 0.012, 0.006, PANEL.z + 0.012), Vector3(0, 0.003, 0), brass))
-	_mechanism.add_child(_slab(Vector3(PANEL.x, 0.006, PANEL.z), Vector3(0, 0.009, 0), sage))
-	var well := MeshInstance3D.new()
-	var disc := CylinderMesh.new()
-	disc.top_radius = SOCKET_RADIUS
-	disc.bottom_radius = SOCKET_RADIUS
-	disc.height = 0.002
-	disc.material = dark
-	well.mesh = disc
-	well.position = Vector3(0, PANEL.y + 0.0005, SOCKET_Z)
-	_mechanism.add_child(well)
-	var ring := MeshInstance3D.new()
+	var deep := _lit(Color(0.02, 0.025, 0.03))
+	# No plate (Megan): the socket is an INDENT in the table. Nothing stands up: a dark disc at table height
+	# with a darker step inside it (it reads as recessed), a thin brass lip round it, and the little cog
+	# turning on a flat dark disc just behind it. The whole footprint is the ring and the cog (PANEL).
+	var rim := _disc(SOCKET_RADIUS + 0.008, 0.001, 0.0006, dark)
+	rim.position.z = SOCKET_Z
+	_mechanism.add_child(rim)
+	var step := _disc(SOCKET_RADIUS - 0.006, 0.001, 0.0013, deep)
+	step.position.z = SOCKET_Z
+	_mechanism.add_child(step)
+	var lip := MeshInstance3D.new()
 	var torus := TorusMesh.new()
-	torus.inner_radius = SOCKET_RADIUS
+	torus.inner_radius = SOCKET_RADIUS + 0.004
 	torus.outer_radius = SOCKET_RADIUS + 0.008
 	torus.material = brass
-	ring.mesh = torus
-	ring.position = Vector3(0, PANEL.y + 0.0015, SOCKET_Z)
-	_mechanism.add_child(ring)
-	_mechanism.add_child(_slab(Vector3(0.20, 0.003, 0.04), Vector3(0, PANEL.y + 0.0005, -0.085), dark))   # the window
+	lip.mesh = torus
+	lip.scale = Vector3(1.0, 0.12, 1.0)
+	lip.position = Vector3(0, 0.0012, SOCKET_Z)
+	_mechanism.add_child(lip)
+	var window := _disc(0.026, 0.001, 0.0006, dark)   # the cog's flat dark place behind the ring
+	window.position.z = COG_Z
+	_mechanism.add_child(window)
 	_cog = Node3D.new()
-	_cog.position = Vector3(0, PANEL.y + 0.004, -0.085)
+	_cog.position = Vector3(0, 0.003, COG_Z)
 	_mechanism.add_child(_cog)
 	var hub := MeshInstance3D.new()
 	var hub_mesh := CylinderMesh.new()
-	hub_mesh.top_radius = 0.011
-	hub_mesh.bottom_radius = 0.011
-	hub_mesh.height = 0.004
+	hub_mesh.top_radius = 0.009
+	hub_mesh.bottom_radius = 0.009
+	hub_mesh.height = 0.003
 	hub_mesh.material = brass
 	hub.mesh = hub_mesh
 	_cog.add_child(hub)
 	for i in 8:
 		var arm := Node3D.new()
 		arm.rotation.y = i * TAU / 8.0
-		arm.add_child(_slab(Vector3(0.005, 0.004, 0.006), Vector3(0.0125, 0, 0), brass))
+		arm.add_child(_slab(Vector3(0.004, 0.003, 0.005), Vector3(0.0105, 0, 0), brass))
 		_cog.add_child(arm)
 	_mech_spin = GearSpin.new()
 	_mechanism.add_child(_mech_spin)
@@ -2156,33 +2178,28 @@ func _make_way(seconds := 1.2, back := false) -> void:
 	if _layout == null or _made_way != back:
 		return
 	_made_way = not back
-	var pot := _layout.cauldron if back else _layout.cauldron_after
 	var plate := _layout.mechanism if back else _layout.mechanism_after
 	var yaw := _layout.mechanism_yaw if back else _layout.mechanism_yaw_after
-	pot.y = _box.global_position.y
 	plate.y = _mechanism.global_position.y
-	var lift := pot - _box.global_position
+	var old_socket := _mechanism.to_global(Vector3(0, PANEL.y, SOCKET_Z))
 	var slide := plate - _mechanism.global_position
 	var from_aside := _layout.onion_aside_after if back else _layout.onion_aside
 	var from_lifted := _layout.onion_lifted_after if back else _layout.onion_lifted
-	# Onion goes along with the cauldron if it waits at its aside spot or at the lifted one (after the
-	# seating), to the same kind of spot for the new places.
+	# Onion goes along with the socket if it waits at its aside spot or at the lifted one (after the
+	# seating), to the same kind of spot for the new place.
 	var lifted := _orb.global_position.distance_to(from_lifted) < 0.05
 	var orb_goes := lifted or _orb.global_position.distance_to(from_aside) < 0.05
 	var orb_to := _lifted_spot() if lifted else _aside_spot()
 	var gear_goes := is_instance_valid(_gear) and _gear.visible and _gear.global_position.distance_to(_socket_at) < 0.02
 	if _zones != null and is_instance_valid(_zones):
 		_zones.draw(_layout, EntryLayout.REVEAL | EntryLayout.SHELF if _made_way else EntryLayout.SETUP | EntryLayout.OPENING)
-	_mouth += lift
 	_socket_at = _layout.socket if back else _layout.socket_after
 	_socket_at.y = _mechanism.global_position.y + PANEL.y
 	_ripple_origin = _socket_at
-	if lift.length() < 0.005 and slide.length() < 0.005:
-		return
-	print("ENTRY make way: the cauldron ", snappedf(lift.length() * 100.0, 1), " cm, the panel ", snappedf(slide.length() * 100.0, 1), " cm",
-			" (back to the opening)" if back else "")
+	if slide.length() < 0.005:
+		return   # the socket stays where it is (the layout found it a place that stays through the reveal)
+	print("ENTRY make way: the socket slides ", snappedf(slide.length() * 100.0, 1), " cm", " (back to the opening)" if back else "")
 	if seconds <= 0.0:
-		_box.global_position = pot
 		_mechanism.global_position = plate
 		_mechanism.rotation.y = yaw
 		if gear_goes:
@@ -2191,16 +2208,54 @@ func _make_way(seconds := 1.2, back := false) -> void:
 		if orb_goes:
 			_orb.global_position = orb_to
 		return
-	var tween := _runner.create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_box, "global_position", pot, seconds)
-	tween.tween_property(_mechanism, "global_position", plate, seconds)
-	tween.tween_property(_mechanism, "rotation:y", yaw, seconds)
+	await _socket_track(old_socket, plate, yaw, gear_goes, orb_goes, orb_to)
+
+
+## The table moves the socket itself (no unexplained glide): a narrow groove grows along the table from the
+## socket to its new place, drawn like the socket's own ring, then the socket, with the turning gear in it, rides
+## along it like a small carriage at a steady pace with the device's quiet rattle, and the groove fades behind it.
+## [param new_origin] / [param yaw]: where the panel node ends. No words.
+func _socket_track(from: Vector3, new_origin: Vector3, yaw: float, gear_goes: bool, orb_goes: bool, orb_to: Vector3) -> void:
+	var to := _socket_at
+	var along := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	var length := along.length()
+	var table_y := from.y - PANEL.y
+	var pivot := Node3D.new()
+	pivot.name = "SocketTrack"
+	add_child(pivot)
+	pivot.add_to_group(&"entry_transient")
+	pivot.global_position = Vector3(from.x, table_y + 0.0012, from.z)
+	pivot.look_at(pivot.global_position + along, Vector3.UP)
+	var groove := _lit(Color(0.03, 0.035, 0.04), 0.0)
+	var lip := _lit(Color(0.72, 0.55, 0.25), 0.4)
+	for material: StandardMaterial3D in [groove, lip]:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pivot.add_child(_slab(Vector3(TRACK_WIDTH, 0.0008, length), Vector3(0, 0, -length * 0.5), groove))
+	for side: float in [-1.0, 1.0]:
+		pivot.add_child(_slab(Vector3(0.003, 0.0012, length), Vector3(side * (TRACK_WIDTH * 0.5 + 0.0015), 0, -length * 0.5), lip))
+	pivot.scale = Vector3(1.0, 1.0, 0.02)
+	var grow := _runner.create_tween()
+	grow.tween_property(pivot, "scale:z", 1.0, TRACK_GROW).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await grow.finished
+	_sounds.play(&"device_rattle", from)   # the carriage's quiet mechanical sound
+	var seconds := length / TRACK_SPEED
+	var start_yaw := _mechanism.rotation.y
+	var carriage := _runner.create_tween().set_parallel()
+	carriage.tween_property(_mechanism, "global_position", new_origin, seconds)   # steady: linear
+	carriage.tween_method(func(k: float) -> void: _mechanism.rotation.y = lerp_angle(start_yaw, yaw, k), 0.0, 1.0, seconds)
 	if gear_goes:
-		tween.tween_property(_gear, "global_position", _socket_at, seconds)
-		tween.tween_property(_gear, "rotation:y", yaw, seconds)
+		var gear_yaw := _gear.rotation.y
+		carriage.tween_property(_gear, "global_position", to, seconds)
+		carriage.tween_method(func(k: float) -> void: _gear.rotation.y = lerp_angle(gear_yaw, yaw, k), 0.0, 1.0, seconds)
 	if orb_goes:
-		tween.tween_property(_orb, "global_position", orb_to, seconds)
-	await tween.finished
+		carriage.tween_property(_orb, "global_position", orb_to, seconds)
+	await carriage.finished
+	await _wait(0.2)
+	var fade := _runner.create_tween().set_parallel()
+	for material: StandardMaterial3D in [groove, lip]:
+		fade.tween_property(material, "albedo_color:a", 0.0, TRACK_FADE)
+	await fade.finished
+	pivot.queue_free()
 
 
 ## The gear pops up through the brew (small, with a little overshoot), clears the rim, then

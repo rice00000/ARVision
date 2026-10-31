@@ -4,8 +4,17 @@ For Megan, in the Quest 3, seated at a real table, the way a child would sit. On
 what you should **see** and **hear** (the lines are the story's own words, as the build speaks them now), what to
 **judge or measure**, and a box to tick. Mark anything odd in "Notes"; a phone photo of the room helps.
 
-**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 5), with `entry-layout-5` on top if it is merged.
+**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 5), with `entry-layout-6` on top if it is merged.
 **Not built yet** is marked ⚠ so you don't test what isn't there.
+
+What changed in round 6: there is NO plate any more. The socket is a flat recessed ring in the table top (a dark rim, a
+deeper step, a thin brass lip), with the turning cog on the table beside it; nothing stands up from the table. Where the
+socket has to move to make room at the reveal (Output says `[panel glides...]`), a narrow groove is drawn from the socket
+to its new place, the socket with its cog rides along it at a steady pace with a quiet device rattle, and the groove fades
+(no words). Onion's lean toward the shapes in the invitation now aims at the real things on the bench (it used to aim at
+the middle of the room). The first-visit scene is loaded in the background during the reveal, so the handover to the first
+visit should not hitch. Lines cut by the organizer ("Ah. There we go.", "There you go.", "I've been looking for that.",
+the doorway of light) are gone from the sheet below.
 
 What changed in round 5: the PANEL and the GEAR do not move at the reveal where the table allows it (long reach: the
 shelf then stands up to 30 degrees to the side and the cauldron on a far side; the Output line says `[panel stays put]` or
@@ -124,11 +133,14 @@ hops in a low arc and grows as it lands on the table **between the cauldron and 
 backward hop with a **"!"** and follows the gear's flight with its look. A shallow sage panel with a dark round
 socket and a little window lies on the table (it was there from the start).
 **Hear:** a rattle, then "There it is! The table's missing piece." (then Onion turns back to you; "I've been looking for that." was cut)
+backward hop with a **"!"** and follows the gear's flight with its look. A flat dark ring (the socket) is sunk into the table
+with a small turning cog beside it (they were there from the start). Nothing stands up from the table.
+**Hear:** a rattle, then "There it is! The table's missing piece." / Onion looks at the socket.
 
 Judge:
 - [ ] The gear lands where you can reach it **without standing or leaning**. Distance to it: ______ cm.
 - [ ] Its hop does not pass over the panel. (On a very shallow table it may; the log then says "it hops over the panel".)
-- [ ] The panel lies flat ON the table; the socket is easy to see. Socket distance: ______ cm.
+- [ ] The socket ring lies flat IN the table (no plate, nothing raised); the ring and the cog are easy to see. Socket distance: ______ cm.
 - [ ] Nothing overlaps: cauldron, gear, panel, Onion each have space (press "Zones": no red).
 - [ ] The "!" is readable and brief.
 
@@ -144,6 +156,7 @@ the gear and lifts it a little, looping (the real gear does not move). Pinch the
 If you wait about 14 seconds without touching it, the teaching hand comes back to show the pinch again.
 **Hear:** "Would you pick it up for me?" / "Pinch your fingers together, and keep them closed." / once you hold it:
 "Quite a little thing, isn't it?" ("There you go." was cut) then a quiet moment. Onion makes a small pleased lift and follows the
+"Quite a little thing, isn't it?" then a quiet moment. Onion makes a small pleased lift and follows the
 held gear with its look.
 
 Judge:
@@ -184,9 +197,10 @@ Notes:
 
 ## 7. Reveal (DEV "Reveal")
 
-**See:** if the Output line said `[panel stays put]`, NOTHING moves (panel, gear, turning cog stay where they are); if it
-said `[panel glides at the reveal...]` the cauldron and the panel (still turning) glide aside, about a second, and Onion
-(lifted) glides along. If the cauldron would stand in the shelf's way it sinks as the ripple STARTS; otherwise right after
+**See:** if the Output line said `[panel stays put]`, NOTHING moves (socket, gear, cog stay where they are); if it
+said `[panel glides at the reveal...]` a groove draws itself from the socket to its new spot, the socket with the turning
+cog rides along it like a small carriage (steady speed, a quiet rattle), Onion (lifted) goes with it, and the groove fades
+before the ripple. The cauldron does not move. If the cauldron would stand in the shelf's way it sinks as the ripple STARTS; otherwise right after
 it. Onion straightens and turns to look at the shelf as it grows in. A soft ring of light
 spreads from the socket across the table and the room; faint glints on real surfaces; a wooden bench and a shelf with
 six cubbies grow in, in front of you a little to the right (up to 30 degrees on a long reach), **together with Wei's first
@@ -197,9 +211,17 @@ then at things scattered by the shelf, leans in and hops.
 to you and holds a welcoming pose) / a pause of about 3 s / Onion looks down at the things and leans in /
 "Oh!" / "Things come through, but they don't always land in the right place." / "Would you help me put them where they belong?"
 ⚠ The workshop is placeholders (the shelf is Wei's; the doorway of light is a stand-in). No reveal music yet.
+round of things**, which grow in and settle the last few cm onto the bench as the ring reaches each one. Onion looks around,
+then leans about a third of the way toward the shapes on the shelf (it must not touch the shelf, the things or the bench)
+and hops.
+**Hear:** a soft magical pad (fades after about 3 s); "I've been looking forward to showing you this." (Onion turns back
+to you and holds a welcoming pose) / a short pause / the invitation lines, in the reveal after "Welcome to the workshop." and the pause.
+⚠ The workshop is placeholders (the shelf is Wei's). No reveal music yet.
 
 Judge:
-- [ ] The glide aside (if it happens) reads as "making room", not as a glitch. If the panel stayed put: nothing looked
+- [ ] The groove and the carriage (if it happens) read as "the table is making room", not as a glitch; the rattle is quiet.
+- [ ] Onion's lean toward the shapes stays clear of the shelf, the things and the bench.
+- [ ] The reveal hands over to the first visit with no freeze (no stall, no judder): yes / no. If the panel stayed put: nothing looked
       odd about the shelf standing off to the side (you turned your head to it: ______ degrees).
 - [ ] The cauldron and the shelf never visibly overlap while the ripple passes.
 - [ ] The things arrive WITH the shelf, softly (no pop, no drop with a bounce).
@@ -223,7 +245,7 @@ The things you saw arrive with the shelf are still exactly where they were (noth
 cards in the cubbies show their shapes. Onion waits beside the shelf's end, up high. Put a thing into the cubby with its
 shape: it clicks in; a wrong one goes back. At the end Onion looks across the shelf, speaks, and does a little cheer;
 then quiet.
-**Hear:** "The shapes on the shelf show where things go." / "Can you find a place for one of these?" / at the first
+**Hear:** "The shapes on the shelf show where things go." / "Pick whichever one you'd like to start with." / at the first
 right one only: "It fits. Let's find places for the others." / at the end: "There. Everything's found its place." /
 "Thank you for helping."
 
