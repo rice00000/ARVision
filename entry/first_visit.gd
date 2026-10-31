@@ -16,6 +16,7 @@ const QUIET_END := 4.0
 const BREATH := 0.5
 
 var _fits_said := false
+var _started := false      # the child picked a shape up or placed one: the invitation is over
 var _speaking := false     # one line at a time: a later line waits, it never cuts an earlier one off
 var _rounds_won := 0
 var _rounds_ended := 0
@@ -40,26 +41,37 @@ func run() -> void:
 		if App.session.trial is Node3D:
 			_shelf_spot = (App.session.trial as Node3D).global_position
 			break
-	# The first things have just dropped in beside the shelf: Onion notices them (the reveal's
-	# last beat, moved here so they are really there). A short wait lets them land first.
+	# The shapes have just arrived beside the shelf. Onion notices them and floats closer, then
+	# explains the house brings things and placing them is its job, and invites the child
+	# (story chat's approved replacement, SCENE_ONE_CURRENT_BUILD_BRIEF.md). Picking a shape up is
+	# acceptance: from then on the remaining invitation lines are skipped, so nothing holds the
+	# child up; "It fits..." still comes at the first correct placement.
 	await get_tree().create_timer(0.9, false).timeout
+	var things := _shelf_spot + Vector3.DOWN * 0.25 if _shelf_spot != Vector3.INF else Vector3.INF
+	if _onion != null and things != Vector3.INF:
+		_onion.attend(things)
+		_onion.float_to(_onion.onion_position().lerp(Vector3(things.x, _onion.onion_position().y, things.z), 0.3), 1.0)
+	await _line("Oh! I'd nearly forgotten about these.")
+	await _line("They've come quite a long way.")
+	if _onion != null and things != Vector3.INF:
+		_onion.attend(_shelf_spot)   # looks across the shapes, then toward the shelf
+	await _line("The house is very good at bringing things here.")
+	await _line("But finding their place is usually my job.")
+	if _onion != null:
+		_onion.attend(null)   # turns toward the child
+	await _line("You could join me, if you like.")
 	if _onion != null and _shelf_spot != Vector3.INF:
-		_onion.attend(_shelf_spot + Vector3.DOWN * 0.25)   # turns down toward them
-	await get_tree().create_timer(0.8, false).timeout
-	if not _fits_said:
-		await say("Oh!")
+		_onion.attend(_shelf_spot)   # looks toward the shelf
+	await _line("The shapes on the shelf show where things go.")
+	await _line("Pick whichever one you'd like to start with.")
 	if _onion != null:
 		_onion.attend(null)
-	if not _fits_said:
-		await say("Things come through, but they don't always land in the right place.")
-	if not _fits_said:
-		await say("Would you help me put them where they belong?")
-	# The child may place a thing while Onion is still explaining: the action counts, and an
-	# instruction it has made obsolete is skipped.
-	if not _fits_said:
-		await say("The shapes on the shelf show where things go.")
-	if not _fits_said:
-		await say("Can you find a place for one of these?")
+
+
+## Says [param text] unless the child has already started (picked a shape up or placed one).
+func _line(text: String) -> void:
+	if not _started:
+		await say(text)
 
 
 func _play() -> void:
@@ -86,6 +98,8 @@ func _closing() -> void:
 
 
 func _on_reported(what: StringName, data: Dictionary) -> void:
+	if what == &"taken" or what == &"put":
+		_started = true
 	if what == &"put" and data.get("correct", false) and not _fits_said:
 		_fits_said = true
 		await say("It fits. Let's find places for the others.")   # the first placement only

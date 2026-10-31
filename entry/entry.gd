@@ -533,12 +533,16 @@ func _reveal(fast := false) -> void:
 	var hits := RIPPLE_SECONDS * asin(clampf(to_pot / reach, 0.0, 1.0)) * 2.0 / PI   # the ring's ease is a sine
 	_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
 	await _ripple()
-	_attend(null)   # "I've been looking forward..." turns back to the child and holds a welcoming pose
+	_attend(null)   # turns toward the child
 	await say("I've been looking forward to showing you this.")
+	# Onion rises slightly, takes in the room, then drifts aside (story chat, approved replacement).
+	_attend(_ahead * 1.5 + App.head().global_position + Vector3.UP * 0.2)
+	await _move(_orb, _orb.global_position + Vector3.UP * 0.04, 0.8)
+	_move(_orb, _aside_spot() + Vector3.UP * 0.1, 1.2)
+	_attend(null)
+	await say("Welcome to the workshop.")
 	if not fast:
-		await _wait(3.0)   # time to enjoy the room first: quiet floating, no scanning
-	# Then the first things drop in (Wei's shelf level, in the first visit) and Onion notices them
-	# there: "Oh!" ... is the first visit's (entry/first_visit.gd), so it never points at nothing.
+		await _wait(3.0)   # a quiet pause; the shapes arrive and Onion notices them in the first visit
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.

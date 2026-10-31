@@ -63,6 +63,16 @@ func attend(what: Variant) -> void:
 	_attention = what
 
 
+## Onion floats to [param where] over [param seconds].
+func float_to(where: Vector3, seconds := 1.0) -> void:
+	create_tween().tween_property(_onion, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
+
+
+## Where Onion is now.
+func onion_position() -> Vector3:
+	return _onion.global_position
+
+
 ## A small satisfied bob.
 func cheer() -> void:
 	_cheer_until = _clock + 1.2

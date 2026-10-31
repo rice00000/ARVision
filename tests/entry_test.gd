@@ -126,7 +126,7 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
 	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
-	expect(await _until_said(said, "Would you help me put them where they belong?", 60.0), "the things drop in, then Onion notices them")
+	expect(await _until_said(said, "Pick whichever one you'd like to start with.", 60.0), "the things drop in, then Onion notices them")
 	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "Onion leads the first shelf level")
 	expect_eq(App.main.current_scene, &"first_visit", "in its own scene")
 	expect(not _said_line(said, ADVENTURE.greeting), "without Wei's welcome stacked on top")
