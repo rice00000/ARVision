@@ -1,5 +1,5 @@
 {
-  "fingerprint": "3de0f264bf2765cfa2ca0779240f4de801b3a98f295271009ea7264e3d7dfab8",
+  "fingerprint": "1d1770e36e63ae3c8b0ba8d6fe7d8f0e286294a930bb758bbc79318dbf9b4d65",
   "clips": {
     "1": "res://content/voice/generated/d21947acd5d6b2ca25830ae4.ogg",
     "2": "res://content/voice/generated/9f8d4810ad1c015832841c6e.ogg",
@@ -142,7 +142,6 @@
     "spoon": "res://content/voice/generated/680046c3cff941b0b880856e.ogg",
     "sports ball": "res://content/voice/generated/247dbb15c83dfedd528bd794.ogg",
     "spotlight": "res://content/voice/generated/2a4f679864bf72d36c3ad527.ogg",
-    "still locked": "res://content/voice/generated/70efeb4db3360530ba380bcd.ogg",
     "stop sign": "res://content/voice/generated/67a61043c3bf555074f79024.ogg",
     "suitcase": "res://content/voice/generated/c50ae7afb604f34be27e0aad.ogg",
     "surfboard": "res://content/voice/generated/9fa033b23a61dc02de7ba2f4.ogg",
@@ -150,7 +149,6 @@
     "teddy bear": "res://content/voice/generated/1701796cae46e9e47a3c3997.ogg",
     "tennis racket": "res://content/voice/generated/348dceb25afc626f633f81ab.ogg",
     "that one is like the others find the different one": "res://content/voice/generated/c735508e3171c8b6f724571a.ogg",
-    "that one is still locked": "res://content/voice/generated/c468eb1fb8db9649ffc1e34e.ogg",
     "that's not its colour look again": "res://content/voice/generated/5d31a67b09f902419a2e2630.ogg",
     "that's not its shape look again": "res://content/voice/generated/db53cfda9ee5e10b6e9de13e.ogg",
     "that's not its size look again": "res://content/voice/generated/207131abe05e258cf3f3c289.ogg",
@@ -169,6 +167,7 @@
     "tidy the shelf level 3": "res://content/voice/generated/7228868a1fd03766b3a0df5c.ogg",
     "tidy the shelf level 4": "res://content/voice/generated/f6d2415c696de9e05ba6dafa.ogg",
     "tidy the shelf level 5": "res://content/voice/generated/2db906c4f9f2f718adb747ef.ogg",
+    "tidy the shelf level 6": "res://content/voice/generated/548a7916c4c9f7fba0dc878e.ogg",
     "tie": "res://content/voice/generated/3b9eafd9967a627802acf648.ogg",
     "to play again touch the yellow ball": "res://content/voice/generated/01281041d517e0692002a2d4.ogg",
     "toaster": "res://content/voice/generated/2501c2c938b91584e2938b39.ogg",
@@ -187,6 +186,7 @@
     "welcome young alchemist your workshop needs tidying put each thing back where it belongs": "res://content/voice/generated/90730f6b9fc67a80c17e9935.ogg",
     "well done alchemist": "res://content/voice/generated/2bebc7bb312a5bdc5c25f6f8.ogg",
     "well that's somewhere to start": "res://content/voice/generated/c3b61a5694fc6afd273c69d5.ogg",
+    "what a mess your things are mixed up with sticks and scraps find each thing in the mess and put it on its shadow": "res://content/voice/generated/c513877cc4ccc6c683558655.ogg",
     "which way do the dots go sweep your hand that way then hold still": "res://content/voice/generated/2d52fee6f2eff13c19567f56.ogg",
     "wine glass": "res://content/voice/generated/367dfca240146b40902ff2be.ogg",
     "with a different colour": "res://content/voice/generated/9d4f32533ed828f2b4208404.ogg",

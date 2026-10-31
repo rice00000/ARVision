@@ -22,7 +22,10 @@ class Adventure(SimCase):
         self.fail(f"no open menu at {place}: {sim.observe()['world']}")
 
     def press(self, sim, actor, button_id):
-        actor.touch("right", tuple(self.button(sim, button_id)["position"]), radius=0.01)  # poke the middle
+        buttons = sim.observe()["world"]["menu"]["buttons"]
+        row = [b for b in buttons if b["id"].rsplit("_", 1)[0] == button_id.rsplit("_", 1)[0]]
+        side = "left" if row.index(self.button(sim, button_id)) < len(row) / 2 else "right"  # the near hand: no brushing past others
+        actor.touch(side, tuple(self.button(sim, button_id)["position"]), radius=0.01)  # poke the middle
 
     def last_said(self, sim):
         return sim.events("said")[-1]["text"]
@@ -50,10 +53,8 @@ class Adventure(SimCase):
         actor.swivel(-40)  # turns the chair to the table
         world = self.menu_at(sim, "Alchemy table", timeout=5)
         self.assertFalse(world["guide"]["visible"])
-        self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
-                         [(f"task_tidy_shelf_{n}", n == 1) for n in range(1, 6)], "the table's own list")
-        self.press(sim, actor, "task_tidy_shelf_2")
-        self.assertIn("still locked", self.last_said(sim))
+        self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
+                         [(f"task_tidy_shelf_{n}", n == 1) for n in range(1, 7)], "the table's own list")
         self.press(sim, actor, "task_tidy_shelf_1")
         self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1})
         Child(sim, seed=3).play()
@@ -71,14 +72,14 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Alchemy table")
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "motion lives in another scene")
-        self.assertEqual([b["open"] for b in world["menu"]["buttons"]], [True, True, False, False, False],
-                         "level 2 opened here too")
+        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 4,
+                         "level 2 lights up")
 
         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
         self.switch_scene(sim, "global_motion")
         world = self.menu_at(sim, "Spell wall", timeout=15)
         self.assertFalse(world["guide"]["visible"], "nothing new left elsewhere: the guide rests")
-        self.assertEqual([(b["id"], b["open"]) for b in world["menu"]["buttons"]],
+        self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
                          [("task_break_wall_1", True), ("task_break_wall_2", False)], "the wall's own list")
         self.press(sim, actor, "task_break_wall_1")
         Child(sim, seed=4).play()

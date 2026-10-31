@@ -106,7 +106,7 @@ static func world() -> Dictionary:
 		for button: Target in world.menu.find_children("task_*", "Target", false, false):
 			var entry: Array = world.menu.get("_buttons")[button]
 			buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
-				open = world.can_play(entry[0], entry[1]), done = world.is_done(entry[0], entry[1])})
+				current = entry[1] == world.current(entry[0]), done = world.is_done(entry[0], entry[1])})
 		result.menu = {open = world.menu.get("_open"), buttons = buttons}
 	return result
 

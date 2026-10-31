@@ -4,9 +4,8 @@ extends Node3D
 ## task its title, and under it one big button per level. It leans back like a
 ## console on the table, so reaching a near row never brushes a far one. Touch a button, or point
 ## and pinch. Three kinds of button, never told apart by colour alone:
-## the next level to play is bigger, yellow, and breathes inside a glow; a done
-## level is blue and carries a gold medal; a locked one is grey, sunk back, shows
-## a dash, and only says it is locked. A fingertip coming close lifts a button
+## the current level (first not done) is bigger, yellow, and breathes inside a glow; a done
+## level is blue and carries a gold medal; any other is blue. Every level is open. A fingertip coming close lifts a button
 ## toward it and the guide reads it out ("Level 2. A new one!"), so a child who
 ## cannot read the numbers yet still knows what is under the hand.
 ## Drawn over everything, so nothing virtual or simulated hides part of it (on a
@@ -100,9 +99,7 @@ func _hover(button: Target) -> void:
 	_lift(button, true)
 	var task: Task = _buttons[button][0]
 	var level: int = _buttons[button][1]
-	if not _world.can_play(task, level):
-		Events.say("Level %d. Still locked." % (level + 1))
-	elif _world.is_done(task, level):
+	if _world.is_done(task, level):
 		Events.say("Level %d. Done!" % (level + 1))
 	else:
 		Events.say("Level %d. A new one!" % (level + 1))
@@ -140,10 +137,6 @@ func _press(target: Target) -> void:
 		_lift(target, true)
 	var task: Task = _buttons[target][0]
 	var level: int = _buttons[target][1]
-	if not _world.can_play(task, level):
-		Events.feedback.emit(&"bad", target.global_position)
-		Events.say("That one is still locked.")
-		return
 	_open = false
 	Events.feedback.emit(&"good", target.global_position)
 	chosen.emit([task, level])
@@ -171,7 +164,6 @@ func _build() -> void:
 		var y := top - ROW * (row * 2 + 1)
 		var title := _label(task.title, 44)
 		title.position = Vector3(0.0, y, 0.0)
-		title.modulate = Color.WHITE if _world.is_unlocked(task) else Color(0.6, 0.6, 0.6)
 		add_child(title)
 		for level in task.levels.size():
 			var button := _button(task, level)
@@ -180,9 +172,8 @@ func _build() -> void:
 
 
 func _button(task: Task, level: int) -> Target:
-	var open := _world.can_play(task, level)
 	var done := _world.is_done(task, level)
-	var next := open and not done
+	var next := level == _world.current(task)
 	var size := BUTTON * (NEXT_SIZE if next else 1.0)
 	var button := Target.new()
 	button.id = StringName("task_%s_%d" % [task.id, level + 1])
@@ -197,10 +188,8 @@ func _button(task: Task, level: int) -> Target:
 	button.add_child(look)
 	var face := MeshInstance3D.new()
 	face.mesh = BoxMesh.new()
-	(face.mesh as BoxMesh).size = Vector3(size, size, 0.012 if open else 0.004)
-	var colour := Color(1.0, 0.78, 0.2) if next else Color(0.3, 0.45, 0.85) if open else Color(0.25, 0.25, 0.27)
-	(face.mesh as BoxMesh).material = _flat(colour, 2)
-	face.position.z = 0.0 if open else -0.01
+	(face.mesh as BoxMesh).size = Vector3(size, size, 0.012)
+	(face.mesh as BoxMesh).material = _flat(Color(1.0, 0.78, 0.2) if next else Color(0.3, 0.45, 0.85), 2)
 	look.add_child(face)
 	if next:
 		var glow := MeshInstance3D.new()
@@ -209,7 +198,7 @@ func _button(task: Task, level: int) -> Target:
 		glow.material_override = _flat(Color(1.0, 0.92, 0.55), 1)
 		look.add_child(glow)
 		_breathing.append_array([face, glow])
-	var label := _label(str(level + 1) if open else "-", 84 if next else 72)
+	var label := _label(str(level + 1), 84 if next else 72)
 	label.position.z = 0.008
 	if next: # dark on yellow
 		label.modulate = Color(0.1, 0.1, 0.15)

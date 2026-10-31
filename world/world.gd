@@ -83,21 +83,20 @@ func is_done(task: Task, level := -1) -> bool:
 	return not levels.is_empty() if level < 0 else level in levels
 
 
-## Every task it needs is done, at any level.
-func is_unlocked(task: Task) -> bool:
-	return task.requires.all(func(needed: Task) -> bool: return is_done(needed))
+## The first level of [param task] not done yet (0 = level 1), -1 when all are.
+## Every level is open; this is just the one the menu lights up.
+func current(task: Task) -> int:
+	for level in task.levels.size():
+		if not is_done(task, level):
+			return level
+	return -1
 
 
-## [param level] (0 = level 1) can be chosen: the task is unlocked and the level before is done.
-func can_play(task: Task, level: int) -> bool:
-	return is_unlocked(task) and (level == 0 or is_done(task, level - 1))
-
-
-## A level at [param where] can be chosen and has not been seen on a menu yet.
+## A level at [param where] has not been seen on a menu yet.
 func has_new(where: Place) -> bool:
 	for task in where.tasks:
 		for level in task.levels.size():
-			if can_play(task, level) and not key(task, level) in seen:
+			if not key(task, level) in seen:
 				return true
 	return false
 
@@ -172,7 +171,7 @@ func _choose() -> Array:
 	menu.chosen.connect(_picked.emit)
 	for task in place.tasks:
 		for level in task.levels.size():
-			if can_play(task, level) and not key(task, level) in seen:
+			if not key(task, level) in seen:
 				seen.append(key(task, level))
 	Save.request()
 	var elsewhere := _new_elsewhere()
