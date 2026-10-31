@@ -21,10 +21,14 @@ func _ready() -> void:
 	await _save("1_popping")
 	await get_tree().create_timer(1.1).timeout
 	await _save("2_arcing")
-	await get_tree().create_timer(1.6).timeout
+	await _save("2b_after")
+	await get_tree().create_timer(0.6).timeout
 	await _save("3_landed")
 	await get_tree().create_timer(2.6).timeout
 	await _save("4_docked")
+	entry._actions.mark(entry._runner, "!")
+	await get_tree().create_timer(0.5).timeout
+	await _save("5_mark")
 	get_tree().quit()
 
 func _until(c: Callable) -> void:

@@ -94,7 +94,7 @@ func test_a_launch_plays_the_opening_before_the_world_and_a_plan_skips_it() -> v
 	add_child(app)
 	input = App.sim_input
 	await wait(3.0)
-	expect(not _said_line(said, "Hello."), "no opening before a planned session")
+	expect(not _said_line(said, "Oh! Hello there."), "no opening before a planned session")
 	expect(app.find_child("Entry", true, false) == null, "and the opening is not loaded")
 
 
@@ -117,11 +117,11 @@ func test_start_plays_everything_into_the_world() -> void:
 	var said := record(Events.said)
 	await _to_setup_panel()
 	expect(await _press(&"entry_part_all"), "Start is pressed")
-	expect(await _until_said(said, "Hello."), "Onion says hello")
+	expect(await _until_said(said, "Oh! Hello there."), "Onion says hello")
 	expect(await _until_said(said, "I'm Onion, by the way."), "and its name")
 	await _touch_cauldron()
 	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
-	expect(await _until_said(said, "Welcome.", 60.0), "the ripple, then welcome")
+	expect(await _until_said(said, "Would you help me put them where they belong?", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
 	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "Wei's World starts")
 	expect_eq(App.main.current_scene, &"find_object", "in its own scene")
@@ -134,12 +134,12 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	var orb: Node3D = entry.get("_orb")
 
 	# Ripple first: the things are already on the table, Onion aside, workshop hidden.
-	await _press(&"entry_part_ripple")
+	await _press(&"entry_part_reveal")
 	await frames(2)
 	expect(_docked(), "ripple: the gear is already in its socket")
-	expect(orb.global_position.distance_to(entry.call("_aside_spot")) < 0.01, "ripple: Onion is already aside")
-	expect(await _until_said(said, "Welcome.", 60.0), "ripple: plays and says welcome")
-	expect(not _said_line(said, "Hello."), "ripple: no hello")
+	expect(orb.global_position.distance_to(entry.call("_aside_spot")) < 0.15, "ripple: Onion is already aside")
+	expect(await _until_said(said, "Would you help me put them where they belong?", 60.0), "ripple: plays and says welcome")
+	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "ripple: the panel comes back")
 	var details := _shown(entry.get("_details"))
 	expect(details > 0, "ripple: the workshop was revealed")
@@ -161,7 +161,16 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	# Emerge: Onion moves aside, the gear comes out and (for now) sets itself in, then back to the panel.
 	await _press(&"entry_part_emerge")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "emerge: the panel comes back")
-	expect(_docked(), "emerge: the gear is in its socket, turning")
+	expect((entry.get("_gear") as Node3D).visible and not _docked(), "emerge: the gear is out on the table, waiting to be picked up")
+
+	# Pick up, then set in: the stand-in child does each, and the gear ends turning in its socket.
+	await _press(&"entry_part_pickup")
+	expect(await _until_said(said, "There you go.", 30.0), "pickup: Onion thanks the child")
+	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "pickup: the panel comes back")
+	await _press(&"entry_part_place")
+	expect(await _until_said(said, "Ah. There we go.", 30.0), "place: Onion says it is in")
+	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "place: the panel comes back")
+	expect(_docked(), "place: the gear is in its socket, turning")
 
 	# Still one of each.
 	expect_eq(entry.find_children("*", "Target", true, false).filter(func(t: Target) -> bool: return t.id == &"entry_cauldron").size(), 1, "one cauldron")
@@ -218,7 +227,7 @@ func test_a_pinch_after_a_real_move_to_another_button_goes_to_that_button() -> v
 	await _boot_entry()
 	await _to_setup_panel()
 	var pressed := record(entry._part_pressed)
-	var ripple := _target(&"entry_part_ripple")
+	var ripple := _target(&"entry_part_reveal")
 	var shelf := _target(&"entry_part_shelf")
 	var eye := App.head().global_position
 	input.point(&"right", eye + Vector3.DOWN * 0.05, ripple.global_position)
@@ -403,10 +412,10 @@ func test_without_a_measured_reach_the_cauldron_keeps_its_usual_spot() -> void:
 func test_a_jump_button_during_setup_skips_the_rest() -> void:
 	await _boot_entry()
 	var said := record(Events.said)
-	await until(func() -> bool: return _target(&"entry_part_ripple") != null, 20.0)
-	await _press(&"entry_part_ripple")
-	expect(await _until_said(said, "Welcome.", 60.0), "the ripple plays straight from step 1")
-	expect(not _said_line(said, "Hello."), "and nothing before it")
+	await until(func() -> bool: return _target(&"entry_part_reveal") != null, 20.0)
+	await _press(&"entry_part_reveal")
+	expect(await _until_said(said, "Would you help me put them where they belong?", 60.0), "the ripple plays straight from step 1")
+	expect(not _said_line(said, "Oh! Hello there."), "and nothing before it")
 
 
 func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> void:
@@ -452,10 +461,10 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	await _press(&"entry_part_touch")   # waits for a tap that never comes
 	await wait(1.0)
 	expect(entry.get("_cue"), "the touch part is waiting for the tap")
-	await _press(&"entry_part_ripple")   # cuts in
-	expect(await _until_said(said, "Welcome.", 30.0), "the ripple plays at once")
+	await _press(&"entry_part_reveal")   # cuts in
+	expect(await _until_said(said, "Would you help me put them where they belong?", 30.0), "the ripple plays at once")
 	expect(not entry.get("_cue"), "and the touch part is gone")
-	expect(not _said_line(said, "Hello."), "without the earlier parts")
+	expect(not _said_line(said, "Oh! Hello there."), "without the earlier parts")
 	# Back at the panel, wait for a part again and cut straight into the shelf scene.
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "the panel comes back")
 	await _press(&"entry_part_touch")

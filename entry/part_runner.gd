@@ -9,6 +9,9 @@ extends Node
 signal tick
 ## The child touched the cauldron while it was asking for it.
 signal cauldron_touched
+## The child picked the gear up / set it into the socket (forwarded from the Carry, or the stand-in).
+signal picked_up
+signal docked
 
 
 func _process(_delta: float) -> void:
