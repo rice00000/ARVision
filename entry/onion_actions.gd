@@ -43,9 +43,21 @@ func hop(runner: Node) -> void:
 	tween.tween_property(self, "hop_y", 0.0, 0.24).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
 
+## Tilts to [param value] radians over [param seconds] (negative: backward).
+func lean_to(runner: Node, value: float, seconds := 0.35) -> void:
+	runner.create_tween().tween_property(self, "lean", value, seconds).set_trans(Tween.TRANS_SINE)
+
+
+## A small rise and settle by [param height] metres (a pleased lift, or a downward dip when negative).
+func lift(runner: Node, height: float, seconds := 0.5) -> void:
+	var tween := runner.create_tween()
+	tween.tween_property(self, "hop_y", height, seconds * 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "hop_y", 0.0, seconds * 0.6).set_trans(Tween.TRANS_SINE)
+
+
 ## Leans in toward what it looks at ([param on]) or stands straight again.
-func lean_in(runner: Node, on: bool) -> void:
-	runner.create_tween().tween_property(self, "lean", 0.35 if on else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+func lean_in(runner: Node, on: bool, seconds := 0.35) -> void:
+	runner.create_tween().tween_property(self, "lean", 0.35 if on else 0.0, seconds).set_trans(Tween.TRANS_SINE)
 
 
 ## A ? or ! above Onion for about a second: it grows in with a little overshoot, stays, fades.
