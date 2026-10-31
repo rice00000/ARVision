@@ -55,3 +55,27 @@ func test_voice_plays_the_line_and_cuts_off_the_last() -> void:
 	expect(player.stream.get_length() > 0.5, "with real audio")
 	Events.say("Look around the room.")
 	expect(player.playing and player.stream is AudioStreamOggVorbis, "a newer line replaces it")
+
+
+func test_the_voice_says_when_a_line_ends_and_whether_it_was_cut_off() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	var voice := App.module(&"Voice")
+	var ended := record(voice.line_finished)
+	Events.say("Look around the room.")
+	expect(await until(func() -> bool: return ended.size() == 1, 15.0), "a line that plays out says so")
+	expect(ended[0][0] == "Look around the room." and ended[0][1] == true, "with its text, completed")
+	Events.say("Find the ball!")
+	Events.say("Look around the room.")
+	expect(ended.size() >= 2 and ended[1][0] == "Find the ball!" and ended[1][1] == false, "a newer line cuts it off: not completed")
+	expect(await until(func() -> bool: return ended.size() == 3, 15.0), "and the newer one ends too")
+
+
+func test_a_line_with_no_baked_clip_does_not_crash_the_voice_and_still_ends() -> void:
+	await boot(plan_of(load("res://trials/find/find.tres"), 1))
+	var voice := App.module(&"Voice")
+	var ended := record(voice.line_finished)
+	Events.say("Zzzz a line nobody ever baked.")
+	expect(await until(func() -> bool: return ended.size() == 1, 15.0), "it ends after its subtitle time")
+	expect(ended[0][1] == true, "completed")
+	Events.say("Look around the room.")
+	expect(await until(func() -> bool: return ended.size() == 2, 15.0), "and the voice still works afterwards")

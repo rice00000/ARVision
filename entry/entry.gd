@@ -14,8 +14,10 @@ extends Node3D
 ## The Intro scene (scenes/intro.tscn): Main starts it with [method run] when there is no
 ## session plan, and it ends by switching to the Find the object scene (the World).
 
-## Seconds after a line, at least.
+## Seconds after a line, at least, when there is no voice to wait for.
 const PAUSE := 1.2
+## The breath after a line the voice has finished, seconds.
+const BREATH := 0.5
 ## Without a headset (desktop), only a click presses: moving the mouse over a button
 ## doesn't. Tests turn this on to drive the hands by fingertip.
 @export var poke_in_sim := false
@@ -98,8 +100,6 @@ var _bench_below := 0.35            # its top, metres below that frame
 var _bench_half := 0.27             # its half width, metres
 var _ahead := Vector3.FORWARD       # straight ahead from the seat, flat (at the start)
 var _on_table: Variant = null       # where the cauldron goes on the confirmed table, or null (no real table)
-var _guide: Guide                   # Wei's "this way" guide, once Onion is its body
-var _guiding := false               # the guide was showing the way last frame
 
 ## Sent when the child touches (or points at and pinches) the cauldron.
 signal _cauldron_touched
@@ -264,10 +264,9 @@ func _reveal() -> void:
 func _to_shelf() -> void:
 	_beat("5: to the shelf")
 	await _tidy_away()   # clears the table for the shelf
-	_orb_to(_beside_shelf())
-	_become_guide()
 	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
+	_hand_over()
 	_beat("done: Wei's World")
 	App.main.change_scene.call_deferred(&"find_object")   # Wei's scene with the World and the shelf
 
@@ -509,24 +508,39 @@ func _show_detail(detail: Node3D, shown: bool) -> void:
 	detail.scale = detail.get_meta(&"size", Vector3.ONE) if shown else Vector3.ONE * 0.001
 
 
-## Onion becomes the body of Wei's "this way" guide: one guide all the way through.
-## While the guide shows the way, Onion is there (with its arrow); after, Onion goes
-## back beside the shelf.
-func _become_guide() -> void:
-	if App.world == null:
-		print("ENTRY Onion is not the guide: the World is a separate scene now (see the review)")
-		return
-	for child in App.world.get_children():
-		if child is Guide:
-			_guide = child
-			_guide.body = _orb
-	print("ENTRY Onion is the guide: ", _guide != null)
+## Leaves Onion and the cauldron standing for the next scene: a [Workshop] under Main takes
+## them (and the piano, which fades out), glides Onion beside the shelf, and in Find the
+## object makes Onion the body of the World's "this way" guide.
+func _hand_over() -> void:
+	var workshop := Workshop.new()
+	App.main.add_child(workshop)
+	workshop.take({onion = _orb, model = _onion, face = _face, rest_y = _onion_rest_y, glow = _glow,
+			halo = _halo, cauldron = _box, rest = _beside_shelf(), music = _music})
+	if is_instance_valid(_cauldron_target):
+		_cauldron_target.queue_free()   # nothing to touch there any more
+	_onion = null   # this opening's Onion code stops; the workshop looks after it
 
 
-## Speaks [param text] (baked audio + subtitle) and waits about as long as it lasts.
+## Speaks [param text] (baked audio + subtitle) and waits for the voice to finish it, then a
+## short breath. Without a voice module, or if it never says so, it waits about as long as
+## the line should take.
 func say(text: String) -> void:
+	var voice := App.module(&"Voice")
+	if voice == null or not voice.has_signal(&"line_finished"):
+		Events.say(text)
+		await _wait(maxf(PAUSE, text.length() * 0.07 + 0.6))
+		return
+	var done := {finished = false}
+	var on_finished := func(spoken: String, _completed: bool) -> void:
+		if spoken == text:
+			done.finished = true
+	voice.line_finished.connect(on_finished)
 	Events.say(text)
-	await _wait(maxf(PAUSE, text.length() * 0.07 + 0.6))
+	var limit := _real + maxf(6.0, text.length() * 0.2)   # never stuck on a line that cannot end
+	while not done.finished and _real < limit:
+		await get_tree().process_frame
+	voice.line_finished.disconnect(on_finished)
+	await _wait(BREATH)
 
 
 func _wait(seconds: float) -> void:
@@ -1456,10 +1470,6 @@ func _process(delta: float) -> void:
 		mote.global_position = home + Vector3(sin(_clock * 0.3 + i), sin(_clock * 0.4 + i * 1.7) * 0.6, cos(_clock * 0.25 + i * 0.9)) * 0.03
 	if _onion == null or App.rig == null:
 		return
-	if _guide:
-		if _guiding and not _guide.visible:
-			_orb_to(_beside_shelf())   # the child found the place
-		_guiding = _guide.visible
 	var talking := _clock < _talk_until
 	var bob := sin(_clock * 7.0) * 0.006 if talking else sin(_clock * 1.5) * 0.002   # idle: a slow float
 	_onion.position.y = lerpf(_onion.position.y, _onion_rest_y + bob, minf(1.0, delta * 10.0))

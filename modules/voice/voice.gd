@@ -3,6 +3,9 @@ extends Module
 ## ahead of time (docs/baked-speech.md). A newer line cuts off the one playing.
 ## Unplugged, the guide is silent.
 ##
+## [signal line_finished] says when a line ends, so a story can wait for the real end of
+## the voice instead of guessing how long it takes.
+##
 ## The subtitle never covers the work: it floats ahead at [member above_horizon]
 ## degrees over the horizon, above the motion cloud, and when the child looks
 ## down at the table it stays [member above_gaze] degrees over the gaze, above
@@ -14,9 +17,16 @@ extends Module
 @export var above_gaze := 25.0
 @export var distance := 0.75
 
+## A line ended: its [param text], and whether it played to the end ([param completed]); false
+## when a newer line or a scene change cut it off. A line with no baked clip ends after
+## the time its subtitle shows.
+signal line_finished(text: String, completed: bool)
+
 var _label := Label3D.new()
 var _player := AudioStreamPlayer.new()
 var _hide_at := 0.0
+var _speaking := ""
+var _finish_at := 0.0
 
 
 func _ready() -> void:
@@ -34,12 +44,16 @@ func _ready() -> void:
 	App.rig.add_child(_label)
 	add_child(_player)
 	Events.said.connect(_say)
+	_player.finished.connect(func() -> void: _end_line(true))
 	Events.scene_changing.connect(func() -> void:
 		_player.stop()
-		_label.visible = false)
+		_label.visible = false
+		_end_line(false))
 
 
 func _process(_delta: float) -> void:
+	if _speaking != "" and _now() >= _finish_at:
+		_end_line(true)   # also covers a player that never reports the end (no sound device)
 	if _label.visible and _now() >= _hide_at:
 		_label.visible = false
 	if _label.visible:
@@ -56,12 +70,30 @@ func _place() -> void:
 
 
 func _say(text: String) -> void:
+	_end_line(false)   # a newer line cuts off the one playing
 	_label.text = text
 	_label.visible = true
 	_place()
-	_player.stream = BakedSpeech.stream(text)
-	_player.play()
-	_hide_at = _now() + maxf(2.0, maxf(text.length() * seconds_per_char, _player.stream.get_length()))
+	var stream := BakedSpeech.stream(text)
+	_player.stream = stream
+	var spoken := 0.0
+	if stream != null:
+		_player.play()
+		spoken = stream.get_length()
+	else:
+		push_warning("Voice: no baked clip for \"%s\" (open the project in the editor to bake it)" % text)
+	var shown := text.length() * seconds_per_char
+	_hide_at = _now() + maxf(2.0, maxf(shown, spoken))
+	_speaking = text
+	_finish_at = _now() + (spoken + 0.15 if stream != null else maxf(1.0, shown))
+
+
+func _end_line(completed: bool) -> void:
+	if _speaking == "":
+		return
+	var text := _speaking
+	_speaking = ""
+	line_finished.emit(text, completed)
 
 
 func _now() -> float:

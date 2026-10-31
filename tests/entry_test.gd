@@ -397,3 +397,23 @@ func test_a_jump_button_during_setup_skips_the_rest() -> void:
 	await _press(&"entry_part_ripple")
 	expect(await _until_said(said, "Welcome.", 60.0), "the ripple plays straight from step 1")
 	expect(not _said_line(said, "Hello."), "and nothing before it")
+
+
+func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	await _press(&"entry_part_shelf")
+	expect(await until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 30.0), "the shelf scene loads")
+	await wait(1.5)
+	var workshop := App.main.get_node_or_null(^"Workshop") as Workshop
+	expect(workshop != null, "the workshop is still there")
+	if workshop == null:
+		return
+	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "with Onion (and its light)")
+	expect(workshop.get_children().filter(func(n: Node) -> bool: return n is Node3D and n.find_children("*", "Target", true, false).is_empty() == false).is_empty(), "the cauldron cannot be touched any more")
+	var guides := App.world.get_children().filter(func(n: Node) -> bool: return n is Guide)
+	expect_eq(guides.size(), 1, "the World has its guide")
+	expect(guides[0].body != null, "and Onion is its body")
+	await App.main.change_scene(&"global_motion")
+	await wait(0.5)
+	expect(not is_instance_valid(workshop), "the workshop goes when the child leaves that scene")
