@@ -42,7 +42,10 @@ const VERTICAL := 0.77
 ## tracking drops a pinch as the hand moves. A step too long for a hand in one
 ## tick is tracking finding the hand again, never a sweep, and a pause drops one
 ## in progress.
-@export var sweep_speed := 0.3
+## Lowered from 0.3 to 0.2 with Megan's OK (Oct 31): a seated child's slow, careful sweep peaks near 0.35 m/s
+## and any tracking jitter took it under 0.3 (by simulation, see entry/DEV_NOTES.md); a resting or slowly
+## drifting hand still makes no sweep at 0.2, and Wei's 0.15 m/s "creep" test still holds.
+@export var sweep_speed := 0.2
 @export var sweep_distance := 0.12
 @export var sweep_return := 0.06
 @export var sweep_stop_seconds := 0.4
