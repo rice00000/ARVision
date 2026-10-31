@@ -95,6 +95,8 @@ var _clock := 0.0
 var _onion_rest_y := 0.0            # Onion's height in its holder when still
 var _gear: Node3D                   # the planetary gear: origin at the middle of its base
 var _gear_spin: GearSpin
+var _carry: Carry                   # the child picks up the gear and sets it in (interaction chat)
+var _demo: DemoHand                 # the teaching hand (interaction chat)
 var _gear_height := 0.08            # unscaled, metres
 var _gear_rest := Vector3.ZERO      # where it lands after coming out of the cauldron
 var _mechanism: Node3D              # the table panel with the socket
@@ -1635,6 +1637,12 @@ func _build_gear() -> void:
 		_gear_spin.read(player.get_node(player.root_node), player.get_animation(player.get_animation_list()[0]))
 		player.queue_free()   # the clip does not loop; the parts are turned directly
 	_gear.visible = false
+	_carry = Carry.new()
+	_carry.name = "Carry"
+	add_child(_carry)
+	_demo = DemoHand.new()
+	_demo.name = "DemoHand"
+	add_child(_demo)
 	print("ENTRY gear: ", snappedf(box.size.x, 0.001), " m wide, ", snappedf(_gear_height, 0.001), " m high at full size, ", "real" if player != null else "stand-in")
 
 
