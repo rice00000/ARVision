@@ -505,3 +505,21 @@ func shutdown() -> void:
 	Tidy.push = 0.0
 	Tidy.onion_voice = false
 	Engine.time_scale = 1.0
+
+
+func test_the_story_sounds_play_at_their_moments() -> void:
+	await _boot_entry()
+	var said := record(Events.said)
+	await _to_setup_panel()
+	var sounds := entry.get("_sounds") as Sounds
+	await _press(&"entry_part_all")
+	expect(await _until_said(said, "Could you help me with something?", 60.0), "the opening plays")
+	expect(sounds.played.has(&"pre_rattle"), "the soft rattle plays before Onion appears")
+	expect(sounds.played.has(&"pop_a"), "and Onion's pop (candidate A)")
+	await _touch_cauldron()
+	expect(await until(func() -> bool: return sounds.played.has(&"device_rattle"), 30.0), "the heavier rattle precedes the device")
+	expect(not sounds.played.has(&"seat"), "no seating click before the gear is set in")
+	expect(await until(func() -> bool: return sounds.played.has(&"seat"), 60.0), "one click when it is seated")
+	expect(await until(func() -> bool: return sounds.played.has(&"reveal"), 60.0), "the reveal pad with the ripple")
+	expect_eq(sounds.played.count(&"seat"), 1, "the click plays once")
+	expect(sounds.toggle_pop() == "c", "the pop can be switched to candidate C")

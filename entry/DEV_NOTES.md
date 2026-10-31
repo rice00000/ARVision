@@ -127,3 +127,9 @@ API changes: Carry gained (nothing removed): `configure(floor_y, eyes, reach, ya
   look, R resets; `Entry.poke_in_sim` (tests set it) lets a fingertip press things in the sim.
 * Be short with Megan: she is often tired, a visual learner, and wants pictures and plain words. Never make her wait on a
   long silent step: say what you are doing and roughly how long.
+
+## Story chat changes after the merge (Oct 31)
+* `first_visit` scene (`scenes/first_visit.tscn`, `entry/first_visit.gd`, plan `entry/first_visit_plan.tres`): the opening hands over to it instead of Wei's World; Wei's `Session.play` runs his level-1 plan unchanged. Edits to Wei's files: one scene line + one branch in `main.gd`; `static var onion_voice` and three `if not onion_voice:` guards in `tidy_trial.gd` (silences his instruction, "It fits!" and "All tidy!" only while Onion leads; wrong-match and hint lines stay).
+* `Carry.reset()` added (forgets picked-up/docked for the jump buttons). `USE_REAL_CARRY := true`; `Entry.simulate_child` lets tests pretend the child.
+* `Sounds` (`entry/sounds.gd`): pre-rattle, pop A/C (DEV button "Pop sound"), device rattle, seat click (once, on completed seating), reveal pad faded after ~3 s. Files in `entry/assets/audio/` (kept out of the commit: they were added by the sourcing chat).
+* `Workshop.attend()` / `cheer()`; Onion stays through the first visit; it leaves with the next scene.

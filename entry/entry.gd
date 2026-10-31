@@ -160,6 +160,8 @@ var shelf_push := SHELF_PUSH
 var cauldron_angle := CAULDRON_ANGLE
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
+var _sounds: Sounds
+var _pop_button: EntryButton   # DEV: switches Onion's pop between candidates A and C
 var _actions: OnionActions          # where Onion looks, its hop and lean, the ? and ! marks
 var _tapped := false               # the child has tapped the cauldron (it counts from when Onion is up)
 var _tap_open := false             # a tap on the cauldron counts now, even before it is asked for
@@ -310,6 +312,7 @@ func _hello(fast := false) -> void:
 	if not fast:
 		await _wait(2.0)   # nothing rushes the child
 	_rattle(0.012)   # a soft rattle: something moves about in there
+	_sounds.play(&"pre_rattle", _box.global_position)
 	await _wait(0.6 if fast else 1.6)
 	await _pop()
 	_rattle(0.006)   # fainter, until the child taps the cauldron
@@ -358,6 +361,7 @@ func _out() -> void:
 	_beat("3: the gear comes out")
 	await _onion_aside()
 	_rattle(0.03)   # the device's rattle: heavier than Onion's, still playful
+	_sounds.play(&"device_rattle", _box.global_position)
 	await _wait(0.9)
 	_rattle(0.0)
 	await _emerge_gear()
@@ -399,6 +403,7 @@ func _place() -> void:
 	await say("Set it in here, then open your fingers.")
 	await _child_sets_in()
 	_demo.stop()
+	_sounds.play(&"seat", _socket_at)   # once, on the completed seating
 	_dock_at_once()   # settled, upright, and now turning
 	_attend(null)
 	await say("Ah. There we go.")
@@ -750,6 +755,11 @@ func _on_target(target: Target) -> void:
 		_presses.append(target.id)
 		if target.get_parent() is EntryButton:
 			(target.get_parent() as EntryButton).flash()
+	if target != null and target.id == &"entry_pop_toggle":
+		var pick := _sounds.toggle_pop()
+		_pop_button.set_text("Pop sound: " + pick.to_upper())
+		_sounds.play_pop(_peek_spot())   # hear it right away
+		return
 	if target != null and target.id == &"entry_debug_restart":
 		print("ENTRY DEBUG: restart")
 		Engine.time_scale = 1.0
@@ -1162,6 +1172,7 @@ func _dev_jumps() -> void:
 	var names: Array = PARTS.keys()
 	for i in names.size():
 		_button(PARTS[names[i]], at + Vector3.DOWN * (i * 0.055), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), 0.11, 0.005)
+	_pop_button = _button("Pop sound: A", at + Vector3.DOWN * (names.size() * 0.055 + 0.01), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.16, 0.005)
 
 
 # --- The shelf to the side ----------------------------------------------------
@@ -1600,6 +1611,9 @@ func _build_onion() -> void:
 	# Normal (mixed) blending: over passthrough, an added glow can vanish.
 	var tint := _body_colour()
 	tint.a = 0.22
+	_sounds = Sounds.new()
+	_sounds.name = "Sounds"
+	add_child(_sounds)
 	_actions = OnionActions.new()
 	_actions.name = "OnionActions"
 	add_child(_actions)
@@ -2020,6 +2034,7 @@ func _knock() -> void:
 
 ## Onion pops up out of the cauldron: a rounded rise with a small overshoot, then settles.
 func _pop() -> void:
+	_sounds.play_pop(_peek_spot())
 	var tween := _runner.create_tween()
 	tween.tween_property(_orb, "global_position", _peek_spot() + Vector3.UP * 0.01, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_orb, "global_position", _peek_spot(), 0.2).set_trans(Tween.TRANS_SINE)
@@ -2109,6 +2124,7 @@ func _lit(colour: Color, metallic := 0.0) -> StandardMaterial3D:
 ## surface (depth) a faint glint shows on it: the ripple travels over the real room.
 ## No flash, no camera movement.
 func _ripple() -> void:
+	_sounds.play(&"reveal", _ripple_origin)
 	_surface_points.clear()
 	_sample_room()
 	var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)
