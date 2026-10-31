@@ -49,7 +49,7 @@ func lean_in(runner: Node, on: bool) -> void:
 
 ## A ? or ! above Onion for about a second: it grows in with a little overshoot, stays, fades.
 ## Bold, solid, no flashing, not a target; it supplements the movement and the words.
-func mark(runner: Node, symbol: String) -> void:
+func mark(runner: Node, symbol: String, hold := 0.9) -> void:
 	var label := Label3D.new()
 	label.text = symbol
 	label.font = _bold()
@@ -73,7 +73,7 @@ func mark(runner: Node, symbol: String) -> void:
 	tween.set_parallel(true)
 	tween.tween_property(label, "modulate:a", 1.0, 0.15)
 	tween.tween_property(label, "scale", Vector3.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.chain().tween_interval(0.9)
+	tween.chain().tween_interval(hold)
 	tween.chain().tween_property(label, "modulate:a", 0.0, 0.35)
 	tween.chain().tween_callback(label.queue_free)
 

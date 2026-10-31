@@ -420,6 +420,7 @@ func test_the_real_opening_configures_carry_and_the_gear_docks_in_its_socket() -
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
@@ -465,6 +466,7 @@ func test_the_real_opening_can_be_tried_with_the_mouse_hand_and_reminds_a_waitin
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.skip_setup = false
 	entry.poke_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)

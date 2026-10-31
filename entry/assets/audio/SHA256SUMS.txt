@@ -1,0 +1,6 @@
+32d3531ff34e57cb96ed514f1e22e54c344aff2645f9a1bf4830256948bce2e0  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/device-rattle-preview.mp3
+bfaa9e5826c0a369808d4541b36c44829c69b85eb9560231b47e8c0bcf73de27  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/device-seat-click-preview.mp3
+33e60bf9c9b0b6982a5534044a268a879bc717c7bd85fecb4189a23bdbbdc08b  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/onion-pop-a.mp3
+277831f72b3546e76d66f39f546d4aaa57ad189e737264a6261053dca4b3e1f4  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/onion-pop-c.mp3
+9005ab9b064603ad01dd5766b683613a6644c947f3bae65c58829843a3ab9b4b  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/onion-pre-rattle-preview.mp3
+24b8e7cb72e09fd7246f2d5ae1b29296495fd31a7a1fffb29bf5e86b11459a50  /Users/meganharvey/quest-cv/ARVision/entry/assets/audio/workshop-reveal.mp3

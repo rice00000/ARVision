@@ -66,6 +66,9 @@ const SHOW_HANDS := true
 ## TESTING: in setup, beside Start, buttons that play one part on its own (set up
 ## as that part needs it), then come back. Start plays everything, into Wei's World.
 const JUMP_PANEL := true
+## TESTING: skip the four setup steps (the table is the one found, reach and sound are the
+## defaults) and go straight to the Start screen. Tests turn it off ([member skip_setup]).
+const SKIP_SETUP := true
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", dots = "Dots"}
 ## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
@@ -154,6 +157,7 @@ var _show_hands_now := false        # the hands step shows the outlines even wit
 var shelf_push := SHELF_PUSH
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
+var skip_setup := SKIP_SETUP
 var _sounds: Sounds
 var _pop_button: EntryButton   # DEV: switches Onion's pop between candidates A and C
 var _actions: OnionActions          # where Onion looks, its hop and lean, the ? and ! marks
@@ -326,7 +330,7 @@ func _hello(fast := false) -> void:
 	_attend(_mouth)   # turns to the cauldron, glances back
 	await _wait(0.5)
 	_attend(null)
-	_actions.mark(_runner, "?")
+	_actions.mark(_runner, "?", 2.4)
 	await say("Could you help me with something?")
 
 
@@ -460,6 +464,10 @@ func _setup() -> void:
 	add_child(_panel)
 	_panel.make_button = _button
 	_panel.place(App.head().global_transform)
+	if skip_setup:
+		_panel.hide_all()
+		print("ENTRY setup: skipped (SKIP_SETUP)")
+		return
 	var skipped := await _step_hands()
 	if not skipped and CONFIRM_TABLE:
 		skipped = await _step_table()
@@ -2057,6 +2065,7 @@ func _rattle(amount: float) -> void:
 
 ## One metallic knock from inside: the cauldron jolts once.
 func _knock() -> void:
+	_sounds.play(&"knock", _box.global_position)
 	var tween := _runner.create_tween()
 	tween.tween_property(self, "_rattle_amp", 0.06, 0.07)
 	tween.tween_property(self, "_rattle_amp", 0.006, 0.3).set_trans(Tween.TRANS_SINE)

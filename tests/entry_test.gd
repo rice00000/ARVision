@@ -19,6 +19,7 @@ func _boot_entry() -> void:
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
 	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
+	entry.skip_setup = false   # the tests go through the four steps
 	entry.simulate_child = true   # a pretend child picks the gear up and sets it in
 	entry.run()
 

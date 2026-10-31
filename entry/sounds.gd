@@ -18,6 +18,10 @@ const FILES := {
 }
 ## Loudness of each, in dB: all well under the speech. (The pops are matched by ear in the headset.)
 const LEVEL := {pre_rattle = -14.0, device_rattle = -10.0, seat = -8.0, pop_a = -12.0, pop_c = -12.0, reveal = -16.0}
+## A sound that has no file of its own yet borrows another's: the knock is the seating click, lower.
+const BORROWS := {knock = {file = &"seat", pitch = 0.5, db = -6.0}}
+## Seconds of lead-in to skip, so the sound lands when the thing happens (pop C has ~0.8 s before its pop).
+const START := {pop_c = 0.8}
 ## The reveal pad is 5 s long; this fades it out after about this long.
 const REVEAL_SECONDS := 3.0
 
@@ -43,17 +47,19 @@ func toggle_pop() -> String:
 ## Plays [param key] at [param where] (world position).
 func play(key: StringName, where: Vector3) -> void:
 	played.append(key)
-	var stream: AudioStream = _streams.get(key)
+	var borrowed: Dictionary = BORROWS.get(key, {})
+	var stream: AudioStream = _streams.get(borrowed.get("file", key))
 	if stream == null:
 		return
 	var player := AudioStreamPlayer3D.new()
 	player.stream = stream
-	player.volume_db = LEVEL.get(key, -12.0)
+	player.volume_db = borrowed.get("db", LEVEL.get(key, -12.0))
+	player.pitch_scale = borrowed.get("pitch", 1.0)
 	player.unit_size = 3.0
 	add_child(player)
 	player.global_position = where
 	player.finished.connect(player.queue_free)
-	player.play()
+	player.play(START.get(key, 0.0))
 	if key == &"reveal":   # a shorter bloom: fade the 5 s file out
 		var fade := create_tween()
 		fade.tween_interval(REVEAL_SECONDS)
