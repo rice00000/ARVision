@@ -124,7 +124,7 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await _until_said(said, "I'm Onion, by the way."), "and its name")
 	await _touch_cauldron()
 	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
-	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "the ripple, then welcome")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
 	expect(await _until_said(said, "Pick whichever one you'd like to start with.", 60.0), "the things drop in, then Onion notices them")
 	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "Onion leads the first shelf level")
@@ -143,7 +143,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	await frames(2)
 	expect(_docked(), "ripple: the gear is already in its socket")
 	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "ripple: Onion is already up beside the socket (the lifted spot)")
-	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "ripple: plays and says welcome")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "ripple: plays and says welcome")
 	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "ripple: the panel comes back")
 	var details := _shown(entry.get("_details"))
@@ -419,7 +419,7 @@ func test_a_jump_button_during_setup_skips_the_rest() -> void:
 	var said := record(Events.said)
 	await until(func() -> bool: return _target(&"entry_part_reveal") != null, 20.0)
 	await _press(&"entry_part_reveal")
-	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "the ripple plays straight from step 1")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "the ripple plays straight from step 1")
 	expect(not _said_line(said, "Oh! Hello there."), "and nothing before it")
 
 
@@ -469,7 +469,7 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	await wait(1.0)
 	expect(entry.get("_cue"), "the touch part is waiting for the tap")
 	await _press(&"entry_part_reveal")   # cuts in
-	expect(await _until_said(said, "I've been looking forward to showing you this.", 30.0), "the ripple plays at once")
+	expect(await _until_said(said, "Welcome to the workshop.", 30.0), "the ripple plays at once")
 	expect(not entry.get("_cue"), "and the touch part is gone")
 	expect(not _said_line(said, "Oh! Hello there."), "without the earlier parts")
 	# Back at the panel, wait for a part again and cut straight into the shelf scene.

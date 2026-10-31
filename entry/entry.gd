@@ -555,7 +555,7 @@ func _reveal(fast := false) -> void:
 		_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
 	await _ripple()
 	_attend(null)   # turns toward the child
-	await say("I've been looking forward to showing you this.")
+	await _wait(0.6)   # ("I've been looking forward to showing you this." was cut: Megan)
 	# Onion rises slightly, takes in the room, then drifts aside (story chat, approved replacement).
 	_attend(_ahead * 1.5 + App.head().global_position + Vector3.UP * 0.2)
 	await _move(_orb, _orb.global_position + Vector3.UP * 0.04, 0.8)

@@ -193,7 +193,7 @@ six cubbies grow in, in front of you a little to the right (up to 30 degrees on 
 round of things**, which grow in and settle the last few cm onto the bench as the ring reaches each one, and a soft doorway
 of light further off. Onion looks around,
 then at things scattered by the shelf, leans in and hops.
-**Hear:** a soft magical pad (fades after about 3 s); "I've been looking forward to showing you this." (Onion turns back
+**Hear:** a soft magical pad (fades after about 3 s); (no line: "I've been looking forward to showing you this." was cut) (Onion turns back
 to you and holds a welcoming pose) / a pause of about 3 s / Onion looks down at the things and leans in /
 "Oh!" / "Things come through, but they don't always land in the right place." / "Would you help me put them where they belong?"
 ⚠ The workshop is placeholders (the shelf is Wei's; the doorway of light is a stand-in). No reveal music yet.
