@@ -15,6 +15,9 @@ extends Node3D
 
 ## Seconds after a line, at least.
 const PAUSE := 1.2
+## Without a headset (desktop), only a click presses: moving the mouse over a button
+## doesn't. Tests turn this on to drive the hands by fingertip.
+@export var poke_in_sim := false
 ## Play when the app starts without a session plan. Tests switch it off and call [method run].
 @export var autostart := true
 
@@ -157,7 +160,9 @@ func _ready() -> void:
 
 ## Plays the arrival, then starts the World.
 func run() -> void:
-	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_target(target))
+	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
+		if _hand_pokes():
+			_on_target(target))
 	Events.selected.connect(func(hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_target(_pinched(hand, target)))
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
@@ -417,7 +422,7 @@ func _draw_rays() -> void:
 		var beam: MeshInstance3D = _rays[side][0]
 		var dot: MeshInstance3D = _rays[side][1]
 		var light: StandardMaterial3D = _rays[side][2]
-		var on := pointer != null and pointer.ray_on() and _aim_there(side, pointer)
+		var on := pointer != null and pointer.ray_on() and _aim_there(side, pointer) and (App.xr != null or side == &"right")
 		beam.visible = on
 		dot.visible = on
 		if not on:
@@ -432,6 +437,13 @@ func _draw_rays() -> void:
 			var found: Dictionary = App.reality.hit(from, direction) if App.reality else {}
 			if not found.is_empty():
 				length = minf(2.0, from.distance_to(found.position))
+		if App.xr == null:
+			# Desktop: the hand is on the line of sight through the cursor, so its ray would be seen
+			# end-on, as a dot. Draw it from the lower right of the view to where it lands instead.
+			var landed := from + direction * length
+			from = App.head().global_transform * Vector3(0.22, -0.3, -0.2)
+			length = from.distance_to(landed)
+			direction = (landed - from) / maxf(length, 0.001)
 		light.albedo_color = Color(0.45, 0.75, 1.0, 0.75) if target else Color(1.0, 1.0, 1.0, 0.3)
 		var x := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
 		beam.global_transform = Transform3D(Basis(x, direction * length, x.cross(direction)), from + direction * length * 0.5)
@@ -456,6 +468,7 @@ func _aim_there(side: StringName, pointer: Pointer) -> bool:
 
 func _new_ray() -> Array:
 	var light := _material(Color(1, 1, 1, 0.3), true)
+	light.no_depth_test = App.xr == null   # desktop: the ray and its dot show over buttons
 	var beam := MeshInstance3D.new()
 	var line := CylinderMesh.new()
 	line.top_radius = 0.0015
@@ -501,9 +514,16 @@ func _pinched(side: StringName, at_click: Target) -> Target:
 	return at_click
 
 
+## Whether touching counts: on a headset always; on desktop only when [member poke_in_sim].
+func _hand_pokes() -> bool:
+	return App.xr != null or poke_in_sim
+
+
 ## The index fingertip (world), or null. Only the index tip has to be tracked: the game's
 ## own check also wants the thumb and the palm, and drops the whole hand without them.
 func _fingertip(side: StringName) -> Variant:
+	if not _hand_pokes():
+		return null
 	if App.xr != null:
 		var joints := App.rig.tracked_hand(side).joints()
 		if joints == null or not joints.has_tracking_data:

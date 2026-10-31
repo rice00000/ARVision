@@ -31,6 +31,12 @@ func _ready() -> void:
 	App.sim_input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
 	await get_tree().create_timer(0.8).timeout
 	await _save("3_ray_on_start")
+	# The mouse's hand, as the desktop driver places it: on the line of sight through the cursor.
+	for child in app.get_children():
+		if child is DesktopDriver:
+			(child as DesktopDriver)._place_hand(Vector2(640, 316))
+	await get_tree().create_timer(0.8).timeout
+	await _save("3b_desktop_mouse_on_start")
 	entry._part_pressed.emit(&"ripple")
 	await get_tree().create_timer(3.0).timeout
 	await _save("4_ripple_mid")

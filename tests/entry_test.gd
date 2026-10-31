@@ -13,6 +13,7 @@ var entry: Entry
 func _boot_entry() -> void:
 	await boot()
 	entry = app.get_node(^"Entry")
+	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
 	entry.run()
 
 
@@ -216,3 +217,19 @@ func test_exit_needs_two_presses_so_a_stray_pinch_cannot_close_the_app() -> void
 	expect_eq(exit_button.text(), "Press again to exit", "it asks for a second press")
 	await wait(3.5)
 	expect_eq(exit_button.text(), "Exit app", "and goes back if none comes")
+
+
+func test_on_desktop_only_a_click_presses_not_moving_over_a_button() -> void:
+	await _boot_entry()
+	entry.poke_in_sim = false
+	await _to_setup_panel()
+	var pressed := record(entry._part_pressed)
+	var start: EntryButton = _target(&"entry_part_all").get_parent()
+	await wait(1.0)
+	await _poke_at(start, Vector3(0.0, 0.0, 0.15))
+	await _poke_at(start, Vector3(0.0, 0.0, -0.01))
+	await wait(0.3)
+	expect_eq(pressed.size(), 0, "a fingertip going through the button does not press it on desktop")
+	await select(start.global_position)
+	await frames(2)
+	expect_eq(pressed.size(), 1, "but a click does")
