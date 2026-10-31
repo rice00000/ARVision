@@ -13,6 +13,7 @@ var entry: Entry
 ## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
 	Engine.time_scale = 1.0   # an earlier test may have left the opening's half speed on
+	load("res://trials/tidy/tidy_trial.gd").push = 0.0   # the opening sets it; each test starts from the original
 	await boot(null, &"intro")
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
@@ -417,3 +418,19 @@ func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> 
 	await App.main.change_scene(&"global_motion")
 	await wait(0.5)
 	expect(not is_instance_valid(workshop), "the workshop goes when the child leaves that scene")
+
+
+func test_the_shelf_stands_back_along_the_table_not_in_front_of_the_player() -> void:
+	await _boot_entry()
+	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
+	await _to_setup_panel()
+	var tidy_trial = load("res://trials/tidy/tidy_trial.gd")
+	expect_eq(tidy_trial.push, Entry.SHELF_PUSH, "the opening sets how far back the shelf stands")
+	var eye := App.head().global_position
+	var bench: Transform3D = entry.get("_bench")
+	var away := Vector2(bench.origin.x - eye.x, bench.origin.z - eye.z).length()
+	expect(absf(away - Entry.SHELF_PUSH) < 0.01, "the whole play set is that far along the table from the eyes, got %s" % away)
+	var cauldron: Node3D = entry.get("_box")
+	var shelf_frame: Transform3D = bench
+	var local := shelf_frame.affine_inverse() * cauldron.global_position
+	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0, "the cauldron does not stand inside the shelf's footprint")

@@ -37,12 +37,15 @@ const MUSIC_DB := -12.0
 ## DEMO: the child stays seated. Everything to reach or look at closely sits inside
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.
 const PLAY_RADIUS := 0.75
+## The shelf and the things to tidy stand this much farther along the table than Wei's
+## original, metres, so they are not right in front of the player. See TidyTrial.push.
+const SHELF_PUSH := 0.22
 ## The cauldron stands near the middle, a little left, this far from the eyes. TO TEST: reach.
 const CAULDRON_DISTANCE := 0.5
-const CAULDRON_ANGLE := 12.0
+const CAULDRON_ANGLE := 30.0
 ## Wei's shelf stands to the right, this many degrees off straight ahead: in view, clear
 ## of the cauldron. (It goes where his code's table point is, so that point is moved.)
-const SHELF_ANGLE := 45.0
+const SHELF_ANGLE := 0.0
 ## Gap the cauldron keeps from the bench, metres; if it can't, it goes beside the bench.
 const CAULDRON_GAP := 0.02
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
@@ -135,6 +138,11 @@ var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
 var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
 var _early_part: StringName = &""   # a jump button pressed during setup: skip the rest, play this
 var _show_hands_now := false        # the hands step shows the outlines even with SHOW_HANDS off
+## Where things stand, degrees off straight ahead (shelf: to the right, cauldron: to the left).
+## Variables so a picture or a test can try another layout; the constants are the defaults.
+var shelf_angle := SHELF_ANGLE
+var shelf_push := SHELF_PUSH
+var cauldron_angle := CAULDRON_ANGLE
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
 var _exit_button: EntryButton
@@ -175,6 +183,7 @@ func _exit_tree() -> void:
 
 ## Plays the arrival, then starts the World.
 func run() -> void:
+	ShelfCopy.push = shelf_push
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _hand_pokes():
 			_on_target(target))
@@ -982,7 +991,7 @@ func _shelf_to_the_side() -> void:
 	var eye := App.head().global_position
 	var reach := Vector2(table.transform.origin.x - eye.x, table.transform.origin.z - eye.z).length()
 	# Turn the shelf further right until the bench clears the cauldron (at most 75 degrees).
-	var angle := SHELF_ANGLE
+	var angle := shelf_angle
 	while _on_table != null and angle < 75.0 and _clearance(_on_table, eye, angle) < CAULDRON_GAP:
 		angle += 5.0
 	var point := eye + _ahead.rotated(Vector3.UP, -deg_to_rad(angle)) * reach
@@ -999,7 +1008,8 @@ func _shelf_to_the_side() -> void:
 ## Metres between the cauldron at [param spot] and Wei's bench if it faced
 ## [param angle] degrees right (negative: they overlap). The bench's size is his.
 func _clearance(spot: Vector3, eye: Vector3, angle: float) -> float:
-	var bench := Transform3D(Basis.looking_at(_ahead.rotated(Vector3.UP, -deg_to_rad(angle))), eye)
+	var facing := _ahead.rotated(Vector3.UP, -deg_to_rad(angle))
+	var bench := Transform3D(Basis.looking_at(facing), eye + facing * ShelfCopy.push)
 	var local := bench.affine_inverse() * spot
 	var half := (ShelfCopy.THINGS_WIDE + 0.06) * 0.5
 	var across := absf(local.x) - half - CAULDRON_WIDTH * 0.5
@@ -1015,7 +1025,7 @@ func _cauldron_on_table() -> Variant:
 	if not App.reality.surfaces(&"table").has(table):
 		return null
 	var eye := App.head().global_position
-	var wanted := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * _cauldron_distance
+	var wanted := eye + _ahead.rotated(Vector3.UP, deg_to_rad(cauldron_angle)) * _cauldron_distance
 	var spot := _nearest_on(table, wanted, 0.12)
 	print("ENTRY spot: on the confirmed table, ", _away(spot), " m away (", snappedf(spot.distance_to(Vector3(wanted.x, spot.y, wanted.z)), 0.01), " m from the ideal spot)")
 	return spot
@@ -1310,7 +1320,7 @@ func _cauldron_spot() -> Vector3:
 			on.y = (flat as Vector3).y
 		print("ENTRY spot: cauldron on the confirmed table, ", snappedf(eye.y - on.y, 0.01), " m below the eyes")
 		return on
-	var spot := eye + _ahead.rotated(Vector3.UP, deg_to_rad(CAULDRON_ANGLE)) * _cauldron_distance
+	var spot := eye + _ahead.rotated(Vector3.UP, deg_to_rad(cauldron_angle)) * _cauldron_distance
 	var on_bench := _bench.affine_inverse() * spot   # in the bench's frame: x across, -z ahead
 	var clear := absf(on_bench.x) - CAULDRON_WIDTH * 0.5 - _bench_half
 	if clear < CAULDRON_GAP and -on_bench.z < 0.41 + CAULDRON_WIDTH * 0.5:

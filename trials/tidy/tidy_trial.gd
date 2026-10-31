@@ -36,6 +36,12 @@ const COLOUR_NAMES: Array[String] = ["red", "blue", "yellow", "green", "purple",
 const SIZES: Array[float] = [0.55, 0.69, 0.86, 1.08, 1.35]
 const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 
+## How far farther along the table the whole play set (shelf, things, mess) stands than
+## its own distances below say, metres: they are measured from the eyes, which puts it right
+## in front of the player. 0 is Wei's original. The opening sets it, and it stays for the
+## shelf scene, so the opening's shelf and the real one stand in the same place.
+static var push := 0.0
+
 ## The bench, metres from the eyes: the shelf's front; the bench top below the
 ## eyes, the work surface's height kept within this range.
 const SHELF_AHEAD := 0.31
@@ -507,7 +513,8 @@ func _move(thing: Target, to: Vector3, seconds: float) -> Tween:
 func _build_shelf() -> void:
 	var eye := App.head().global_position
 	var toward := App.reality.work_surface().transform.origin - eye
-	_frame = Transform3D(Basis.looking_at(Vector3(toward.x, 0.0, toward.z).normalized()), eye)
+	var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
+	_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
 	_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST) # just above a real table
 	_shelf = Node3D.new()
 	_shelf.name = "Shelf"
