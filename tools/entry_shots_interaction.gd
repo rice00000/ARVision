@@ -29,19 +29,18 @@ func _ready() -> void:
 	(entry.get("_gear_spin") as GearSpin).running = false
 	await get_tree().create_timer(0.5).timeout
 	await _save("0_gear_waiting")
-	demo.tap((entry.get("_box") as Node3D).global_position + Vector3.UP * (entry.get("_rim") as float))
+	var rim: Vector3 = (entry.get("_box") as Node3D).global_position + Vector3.UP * (entry.get("_rim") as float)
+	# The hand frozen at exact moments of each gesture (its loop time), seen from the seat and from the side.
+	demo.tap(rim)
+	await _phases(demo, "tap", rim, [0.0, 0.9, 1.05, 1.6])
+	demo.stop()
 	await get_tree().create_timer(1.0).timeout
-	await _save("1_demo_tap")
 	demo.pinch_lift(gear)
-	await get_tree().create_timer(1.9).timeout
-	await _save("2_demo_pinch")
-	await get_tree().create_timer(1.1).timeout
-	await _save("3_demo_lift")
-	demo.lower_release(socket)
+	await _phases(demo, "pinch_lift", Carry.middle_of(gear), [0.0, 1.1, 1.7, 2.9])
+	demo.stop()
 	await get_tree().create_timer(1.0).timeout
-	await _save("4_demo_over_socket")
-	await get_tree().create_timer(1.4).timeout
-	await _save("5_demo_opens")
+	demo.lower_release(socket)
+	await _phases(demo, "lower_release", socket + Vector3.UP * 0.026, [0.0, 1.3, 2.4])
 	demo.stop()
 	await get_tree().create_timer(1.0).timeout
 	carry.begin(gear, socket)
@@ -59,6 +58,29 @@ func _ready() -> void:
 	await get_tree().create_timer(0.8).timeout
 	await _save("8_docked")
 	get_tree().quit()
+
+## [param times] of the loop of the gesture [param demo] is showing: it is held at each one and photographed
+## from the child's seat and from the hand's own side, 30 cm away.
+func _phases(demo: DemoHand, name: String, anchor: Vector3, times: Array) -> void:
+	demo.set_process(false)
+	demo._fade = 1.0
+	var side := Camera3D.new()
+	add_child(side)
+	var seat := App.rig.head
+	for time: float in times:
+		demo._t = time
+		demo._pose(time)
+		await get_tree().process_frame
+		await _save("hand_%s_%.2f_seated" % [name, time])
+		side.global_position = demo.global_position + demo.global_basis.x * 0.30 + Vector3.UP * 0.03   # from the hand's own side
+		side.look_at(demo.global_position)
+		side.current = true
+		await get_tree().process_frame
+		await _save("hand_%s_%.2f_side" % [name, time])
+		seat.make_current()
+	side.queue_free()
+	demo.set_process(true)
+
 
 func _until(c: Callable) -> void:
 	var n := 0
