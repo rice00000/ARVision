@@ -5,6 +5,9 @@ extends Node
 ## virtual things it is in front of.
 
 const Reveal := preload("res://rig/hand_reveal.gdshader")
+## The reveal's second pass comes after every menu and subtitle (those are drawn
+## over everything at lower priorities), and before the scene fade (127).
+const OVER_MENUS := 126
 const INDEX := XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP
 const THUMB := XRHandTracker.HAND_JOINT_THUMB_TIP
 const PALM := XRHandTracker.HAND_JOINT_PALM
@@ -17,22 +20,34 @@ func joints() -> XRHandTracker:
 
 
 ## Passthrough only: the headset's mesh of this hand, posed by its joints and
-## drawn with [constant Reveal], so the real hand is not covered by virtual
-## things behind it.
+## drawn with [method reveal_material], so the real hand is not covered by
+## virtual things behind it, nor by menus.
 func reveal_real_hand() -> void:
 	var follow := XRNode3D.new()
 	follow.name = "%sRealHand" % side.capitalize()
 	follow.tracker = _tracker()
 	var mesh := OpenXRFbHandTrackingMesh.new()
 	mesh.hand = 0 if side == &"left" else 1
-	var material := ShaderMaterial.new()
-	material.shader = Reveal
-	mesh.material = material
+	mesh.material = reveal_material()
 	var modifier := XRHandModifier3D.new()
 	modifier.hand_tracker = _tracker()
 	mesh.add_child(modifier)
 	follow.add_child(mesh)
 	get_parent().add_child(follow)
+
+
+## [constant Reveal] twice. First it clears the world behind the hand and
+## writes the hand's depth, so later virtual things behind it stay hidden.
+## Then, after the menus, it clears them too; its depth test still keeps any
+## virtual thing in front of the hand. Menus never depth test, so they never
+## flicker or get cut by depth.
+static func reveal_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = Reveal
+	material.next_pass = ShaderMaterial.new()
+	material.next_pass.shader = Reveal
+	material.next_pass.render_priority = OVER_MENUS
+	return material
 
 
 func _tracker() -> StringName:

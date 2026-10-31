@@ -1,11 +1,12 @@
 {
-  "fingerprint": "1d1770e36e63ae3c8b0ba8d6fe7d8f0e286294a930bb758bbc79318dbf9b4d65",
+  "fingerprint": "9e418961a0b00296ef100ce305c320878fafb118bd8c0b0a3635fae3582e2809",
   "clips": {
     "1": "res://content/voice/generated/d21947acd5d6b2ca25830ae4.ogg",
     "2": "res://content/voice/generated/9f8d4810ad1c015832841c6e.ogg",
     "3": "res://content/voice/generated/3f7d47dfaf567a14700de60a.ogg",
     "4": "res://content/voice/generated/760e6e63b816ffc06c1580dd.ogg",
     "5": "res://content/voice/generated/b9e3cc188352bc0187f3b996.ogg",
+    "6": "res://content/voice/generated/d6f042153102cde8a1cef047.ogg",
     "a new one": "res://content/voice/generated/876e33ec7c5a1f5d4532cbc2.ogg",
     "a spell wall touch a button to play the glowing one is new": "res://content/voice/generated/3ce540bbaba536fb05f230db.ogg",
     "airplane": "res://content/voice/generated/763c71463ad193ae8a01191c.ogg",

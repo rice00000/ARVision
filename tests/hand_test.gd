@@ -65,4 +65,5 @@ func test_the_real_hand_is_revealed_by_the_headsets_hand_mesh() -> void:
 		var mesh := follow.get_child(0) as OpenXRFbHandTrackingMesh
 		expect_eq(mesh.hand, 0 if side == &"left" else 1, "%s mesh is that hand's" % side)
 		expect_eq((mesh.material as ShaderMaterial).shader, TrackedHand.Reveal, "%s reveals the passthrough" % side)
+		expect_eq(mesh.material.next_pass.render_priority, TrackedHand.OVER_MENUS, "%s again after the menus" % side)
 		expect_eq((mesh.get_child(0) as XRHandModifier3D).hand_tracker, tracker, "%s posed by its joints" % side)
