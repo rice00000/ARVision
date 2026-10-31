@@ -476,3 +476,34 @@ Tests (round 5): all 211 pass on `entry-layout-5` (the base's 207 plus 4 new lay
 `entry_test.gd`: Onion is now up beside the socket, not at the aside spot, after a jump to the ripple; the cauldron may stand in
 the bench's way when the panel is fixed because it sinks as the ripple starts); my layout test waits for "All set" now that
 the plan takes a second. `trials/tidy/tidy_trial.gd`: the two single-use flags only (see 3).
+
+## Round 6 (chat C): no plate, the socket track, the invitation, VR readiness, the handover freeze
+
+**1. No plate.** The socket is a flat recessed ring at table height (rim disc, deeper step, brass lip) with the cog on the
+table beside it; nothing stands up. `PANEL`/`SOCKET_Z` changed (footprint is ring + cog, `SOCKET_RADIUS` 6 cm). The outline
+(Carry's hint) and the ripple origin stay at the socket. The cauldron never moves any more (`_make_way` only slides the
+socket). **Socket stays put in 8 of 42 tables** (16 of 42 before the invitation zones and the no-cauldron-glide rule were
+added; 6 of 42 in round 5). It stays where the table is long/deep with a long reach (e.g. 72 cm: `--reach=0.72`); the rest
+use the track. Wei's bench with its things is 54 cm wide, so the cauldron, socket and bench do not fit side by side in a
+110 degree view within a 60 cm reach.
+
+**1b. Track.** Where the socket must move, `_socket_track()` (entry.gd, about 70 lines, well under an hour) draws a 3.6 cm
+groove with lips from the socket to its new place (grows over 0.7 s), plays `device_rattle` quietly, rides the socket, cog and
+lifted Onion along it linearly (0.3 m/s), then fades the groove (0.8 s) before the ripple. No words. Jumps (DEV buttons) move
+instantly. `reveal` jumps now start at the opening spots (`_set_up_for`).
+
+**2. Invitation.** Onion's 30 % lean was aimed at the world origin; it now aims at the real things on the bench
+(`EntryLayout.things_centre()`, zones `onion_reveal`/`onion_invite`, `invite_fraction`). The plan checks it against shelf,
+things and bench in 3D; `_onion_rest()` searches for a clear spot.
+
+**3. VR readiness of the DEV panels.** `DEV_LIFT` 0, panel tilted 70 degrees out, buttons 15 cm apart, all inside the
+measured reach. Proposal only: hide the DEV panels at Start so the child never sees them. The subtitle proposal
+(`Voice.above_gaze` 25 -> 36, `above_horizon` 20 -> 12, Wei's file) is unchanged.
+
+**5. Handover freeze (intro -> first_visit).** Measured headless: the dominant cost was `load("first_visit.tscn")` at the
+switch, 56 ms and a 68 ms long frame. `Entry._preload_first_visit()` (called after `_build_workshop()`) starts
+`ResourceLoader.load_threaded_request`; after: 0.018 ms and no long frame. Software render: 344 ms vs a steady 250 ms
+frame; shader compile is not measurable headless. If the freeze persists on the headset, the proper adoption version (or no
+scene switch) is still available.
+
+Tests: 225 pass on `entry-layout-6` (the base's 222 plus mine; `entry_test` waits for the socket to settle after a jump to the ripple).

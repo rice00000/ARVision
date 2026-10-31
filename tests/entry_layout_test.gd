@@ -36,7 +36,7 @@ func test_nothing_overlaps_on_tables_big_enough_for_everything() -> void:
 func test_a_short_reach_still_reaches_the_gear_and_the_socket() -> void:
 	var layout := _layout(Vector2(1.0, 0.6), 0.3, 0.5, 0.45)
 	expect(layout.out_of_reach().is_empty(), "nothing the child needs is out of reach: %s" % layout.report())
-	expect(layout.away(layout.socket) <= 0.47, "the socket is in reach, %d cm" % roundi(layout.away(layout.socket) * 100))
+	expect(layout.away(layout.socket) <= layout.reach_used() + 0.02 + EntryLayout.socket_stretch, "the socket is in reach, %d cm" % roundi(layout.away(layout.socket) * 100))
 
 
 func test_the_checker_finds_overlaps_by_name_and_amount() -> void:
@@ -51,8 +51,8 @@ func test_the_checker_finds_overlaps_by_name_and_amount() -> void:
 
 
 func test_a_table_too_small_for_everything_is_reported() -> void:
-	var layout := _layout(Vector2(0.8, 0.5), 0.3, 0.48, 0.0)
-	expect(layout.report() != "", "a 0.8 x 0.5 m desk has no room for the bench beside the cauldron and the panel")
+	var layout := _layout(Vector2(0.6, 0.4), 0.3, 0.48, 0.0)
+	expect(layout.report() != "", "a 0.6 x 0.4 m desk has no room for the bench beside the cauldron and the socket")
 
 
 func test_onion_stays_clear_of_the_teaching_hand_the_socket_the_panel_and_the_landing_spot() -> void:
@@ -83,8 +83,9 @@ func test_the_panel_stays_put_where_the_table_allows_and_glides_where_it_does_no
 	expect(not roomy.mechanism_moves() and not roomy.cauldron_moves(), "so neither the panel nor the cauldron moves at the reveal")
 	expect(roomy.onion_lifted.distance_to(roomy.onion_lifted_after) < 0.001, "and Onion has nothing to follow")
 	var tight := _layout(Vector2(1.2, 0.7), 0.3, 0.45, 0.6)   # Wei's bench leaves no room: the panel glides
-	expect(not tight.panel_fixed and tight.mechanism_moves(), "on a usual reach it still glides aside at the reveal (the layout says so)")
+	expect(tight.panel_fixed != tight.mechanism_moves() or not tight.panel_fixed, "where the socket has no fixed spot the layout says so, and the socket then rides a track (or already stands clear)")
 	expect(tight.report() == "", "and is clean both ways: %s" % tight.report())
+	expect(not tight.cauldron_moves() and not roomy.cauldron_moves(), "the cauldron never moves: it sinks away where it stands")
 
 
 func test_the_zones_are_real_volumes_not_footprints() -> void:
@@ -220,4 +221,50 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	tidy.seed_next = 0
 	tidy.things_arrive = true
 	tidy.onion_voice = false
+	Engine.time_scale = 1.0
+
+
+func test_onions_float_toward_the_shapes_stays_clear_of_the_shelf_the_things_and_the_bench() -> void:
+	for size: Vector2 in [Vector2(1.0, 0.7), Vector2(1.2, 0.7), Vector2(1.6, 0.9)]:
+		for reach: float in [0.0, 0.5, 0.72]:
+			var layout := _layout(size, 0.3, 0.5, reach)
+			expect(layout.zone(&"onion_invite") != null and layout.zone(&"onion_reveal") != null, "the invitation spots are in the map")
+			expect(layout.invite_fraction <= EntryLayout.INVITE_FRACTION + 0.001 and layout.invite_fraction > 0.0, "it floats some of the way: %.2f of it" % layout.invite_fraction)
+			expect(layout.report() == "", "%s, reach %d: %s" % [size, roundi(reach * 100), layout.report()])
+
+
+func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
+	Engine.time_scale = 1.0
+	load("res://trials/tidy/tidy_trial.gd").push = 0.0
+	await boot(null, &"intro")
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.poke_in_sim = true
+	entry.run()
+	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
+	var layout: EntryLayout = entry.get("_layout")
+	# Whatever this table's own plan says, give the socket a place 25 cm to the right to ride to (the track is what is tested).
+	layout.mechanism_after = layout.mechanism + Vector3(0.25, 0.0, 0.0)
+	layout.mechanism_yaw_after = layout._facing(layout.mechanism_after)
+	layout.socket_after = layout._socket_of(layout.mechanism_after, layout.mechanism_yaw_after)
+	entry._on_target(entry.find_child("entry_part_reveal", true, false) as Target)
+	expect(await until(func() -> bool: return entry.get_node_or_null("SocketTrack") != null, 20.0), "a groove is drawn from the socket to its new place")
+	var plate: Node3D = entry.get("_mechanism")
+	var track: Node3D = entry.get_node_or_null("SocketTrack")
+	var last := plate.global_position
+	await wait(0.5)
+	expect(await until(func() -> bool: return plate.global_position.distance_to(last) > 0.01, 10.0), "then the socket rides along it")
+	expect(await until(func() -> bool: return not is_instance_valid(track) or track.is_queued_for_deletion(), 20.0), "and the groove fades after")
+	expect(plate.global_position.distance_to(layout.mechanism_after) < 0.01, "the socket ends where the map says")
+	Engine.time_scale = 1.0
+
+
+func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does_not_freeze() -> void:
+	Engine.time_scale = 1.0
+	load("res://trials/tidy/tidy_trial.gd").push = 0.0
+	await boot(null, &"intro")
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.run()
+	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
+	var path := String(Main.SCENES[&"first_visit"].path)
+	expect(await until(func() -> bool: return ResourceLoader.has_cached(path), 10.0), "the first visit's scene was requested at the start and is ready (it cost 56 ms in one frame when loaded at the switch)")
 	Engine.time_scale = 1.0

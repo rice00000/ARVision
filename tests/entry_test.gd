@@ -141,7 +141,8 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	# Ripple first: the things are already on the table, Onion aside, workshop hidden.
 	await _press(&"entry_part_reveal")
 	await frames(2)
-	expect(_docked(), "ripple: the gear is already in its socket")
+	# (where the table is narrow the socket rides its drawn track at the start of the reveal; wait it out)
+	expect(await until(func() -> bool: return _docked(), 20.0), "ripple: the gear is already in its socket")
 	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "ripple: Onion is already up beside the socket (the lifted spot)")
 	expect(await _until_said(said, "I've been looking forward to showing you this.", 60.0), "ripple: plays and says welcome")
 	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")

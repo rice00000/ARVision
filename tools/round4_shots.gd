@@ -90,6 +90,7 @@ func _hands(zones: bool) -> void:
 ## The first visit seated: Onion at rest beside the shelf, the cauldron hidden, the subtitle at today's
 ## setting and the proposed one, looking at the things, the shelf's first row and Onion.
 func _visit() -> void:
+	await _pause(3.0)   # the opening has been up a while: the first visit's scene has been loading in the background
 	_press(&"entry_part_shelf")
 	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 900)
 	await _pause(3.5)
