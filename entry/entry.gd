@@ -961,7 +961,7 @@ func _look(angles: Vector3) -> void:
 
 
 func _mouse_driver() -> DesktopDriver:
-	for sibling in get_parent().get_children():
+	for sibling in App.main.get_children():
 		if sibling is DesktopDriver:
 			return sibling as DesktopDriver
 	return null
