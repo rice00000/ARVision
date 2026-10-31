@@ -1,7 +1,10 @@
 class_name TrackedHand
 extends Node
-## Joint data for fingertip contact and pinch. No rendered hand.
+## Joint data for fingertip contact and pinch. No rendered hand: in passthrough
+## the real hand is seen, and [method reveal_real_hand] keeps it in front of
+## virtual things it is in front of.
 
+const Reveal := preload("res://rig/hand_reveal.gdshader")
 const INDEX := XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP
 const THUMB := XRHandTracker.HAND_JOINT_THUMB_TIP
 const PALM := XRHandTracker.HAND_JOINT_PALM
@@ -10,7 +13,30 @@ const PALM := XRHandTracker.HAND_JOINT_PALM
 
 
 func joints() -> XRHandTracker:
-	return XRServer.get_tracker(StringName("/user/hand_tracker/%s" % side)) as XRHandTracker
+	return XRServer.get_tracker(_tracker()) as XRHandTracker
+
+
+## Passthrough only: the headset's mesh of this hand, posed by its joints and
+## drawn with [constant Reveal], so the real hand is not covered by virtual
+## things behind it.
+func reveal_real_hand() -> void:
+	var follow := XRNode3D.new()
+	follow.name = "%sRealHand" % side.capitalize()
+	follow.tracker = _tracker()
+	var mesh := OpenXRFbHandTrackingMesh.new()
+	mesh.hand = 0 if side == &"left" else 1
+	var material := ShaderMaterial.new()
+	material.shader = Reveal
+	mesh.material = material
+	var modifier := XRHandModifier3D.new()
+	modifier.hand_tracker = _tracker()
+	mesh.add_child(modifier)
+	follow.add_child(mesh)
+	get_parent().add_child(follow)
+
+
+func _tracker() -> StringName:
+	return StringName("/user/hand_tracker/%s" % side)
 
 
 func has_joints() -> bool:

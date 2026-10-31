@@ -7,5 +7,5 @@
 - **No table needed:** a virtual bench with a 3 × 2 shelf stands 0.31 m ahead, facing the work surface, 0.28-0.42 m below the eyes (on a real table in that range, so hands never go through it). Every thing and sticker is within easy reach of the small seated body. Cards tilt to face the eyes, so shapes are not squashed.
 - **Help:** 1 the thing hops and its sticker wiggles; 2 its cubby shines and the guide says so. Help then stays on for the next things.
 - **Measured:** each put is a pick (`target` = sticker, `picked` = thing) and a `put` line in the log; `first_try` = all back with no wrong put and no help.
-- **Hands:** actual fingertip and pinch joints; no virtual hand models or visible pointing beams.
-- **Not yet:** checked on a headset (pinch tolerance, reach).
+- **Hands:** actual fingertip and pinch joints; no virtual hand models or visible pointing beams. In passthrough the headset's own hand mesh, posed by the joints, clears whatever virtual thing is behind the hand (`rig/hand_reveal.gdshader`), so the real hand stays in front of the shelf and menus; things in front of it still cover it.
+- **Not yet:** checked on a headset (hand reveal, pinch tolerance, reach).

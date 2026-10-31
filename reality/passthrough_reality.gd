@@ -59,6 +59,8 @@ func _ready() -> void:
 	_scan.openxr_fb_scene_data_missing.connect(note.bind(&"room_missing", {}))
 	App.rig.add_child(_scan)
 	App.rig.add_child(_depth)
+	for side in [&"left", &"right"]:
+		App.rig.tracked_hand(side).reveal_real_hand()
 	_camera = QuestCamera.new()
 	add_child(_camera)
 	_apply()

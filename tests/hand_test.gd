@@ -53,3 +53,16 @@ func shutdown() -> void:
 		XRServer.remove_tracker(tracker)
 	_trackers.clear()
 	await super.shutdown()
+
+
+func test_the_real_hand_is_revealed_by_the_headsets_hand_mesh() -> void:
+	await boot()
+	for side: StringName in [&"left", &"right"]:
+		App.rig.tracked_hand(side).reveal_real_hand()
+		var follow := App.rig.get_node(NodePath("%sRealHand" % side.capitalize())) as XRNode3D
+		var tracker := StringName("/user/hand_tracker/%s" % side)
+		expect_eq(follow.tracker, tracker, "%s follows its hand" % side)
+		var mesh := follow.get_child(0) as OpenXRFbHandTrackingMesh
+		expect_eq(mesh.hand, 0 if side == &"left" else 1, "%s mesh is that hand's" % side)
+		expect_eq((mesh.material as ShaderMaterial).shader, TrackedHand.Reveal, "%s reveals the passthrough" % side)
+		expect_eq((mesh.get_child(0) as XRHandModifier3D).hand_tracker, tracker, "%s posed by its joints" % side)
