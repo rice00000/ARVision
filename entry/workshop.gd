@@ -1,7 +1,7 @@
 class_name Workshop
 extends Node3D
-## What the opening leaves standing when it hands over to the next scene: Onion and the
-## cauldron. It lives under Main, which keeps what is added to it across scene switches
+## What the opening leaves standing when it hands over to the next scene: Onion, the
+## cauldron and the installed mechanism. It lives under Main, which keeps what is added to it across scene switches
 ## (the scene itself and everything on the stage are freed). It survives exactly one switch,
 ## the handoff; when the child leaves that scene too, the workshop goes with it.
 ##
@@ -38,6 +38,10 @@ func take(parts: Dictionary) -> void:
 	_rest = parts.rest
 	_onion.reparent(self)
 	(parts.cauldron as Node3D).reparent(self)
+	for key in ["mechanism", "gear"]:   # the installed mechanism stays, turning
+		var part: Node3D = parts.get(key)
+		if part != null and is_instance_valid(part):
+			part.reparent(self)
 	var music: AudioStreamPlayer = parts.get("music")
 	if music != null and is_instance_valid(music):
 		music.reparent(self)

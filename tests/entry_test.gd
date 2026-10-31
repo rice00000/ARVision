@@ -69,6 +69,13 @@ func _touch_cauldron() -> void:
 	await frames(2)
 
 
+## The gear stands in the socket and is turning.
+func _docked() -> bool:
+	var gear: Node3D = entry.get("_gear")
+	var socket: Vector3 = entry.get("_socket_at")
+	return gear.visible and gear.global_position.distance_to(socket) < 0.01 and (entry.get("_gear_spin") as GearSpin).running
+
+
 func _shown(entry_details: Array) -> int:
 	return entry_details.filter(func(d: Node3D) -> bool: return is_instance_valid(d) and d.visible).size()
 
@@ -113,7 +120,7 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await _until_said(said, "Hello."), "Onion says hello")
 	expect(await _until_said(said, "I'm Onion, by the way."), "and its name")
 	await _touch_cauldron()
-	expect(await until(func() -> bool: return (entry.get("_pieces") as Array).size() == 3, 30.0), "three things come out")
+	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
 	expect(await _until_said(said, "Welcome.", 60.0), "the ripple, then welcome")
 	expect(_shown(entry.get("_details")) > 0, "the workshop is shown")
 	expect(await _until_said(said, ADVENTURE.greeting, 60.0), "Wei's World starts")
@@ -129,7 +136,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	# Ripple first: the things are already on the table, Onion aside, workshop hidden.
 	await _press(&"entry_part_ripple")
 	await frames(2)
-	expect_eq((entry.get("_pieces") as Array).size(), 3, "ripple: the things are already out")
+	expect(_docked(), "ripple: the gear is already in its socket")
 	expect(orb.global_position.distance_to(entry.call("_aside_spot")) < 0.01, "ripple: Onion is already aside")
 	expect(await _until_said(said, "Welcome.", 60.0), "ripple: plays and says welcome")
 	expect(not _said_line(said, "Hello."), "ripple: no hello")
@@ -141,7 +148,7 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	await _press(&"entry_part_hello")
 	await frames(2)
 	expect_eq(_shown(entry.get("_details")), 0, "hello: the workshop is hidden again")
-	expect((entry.get("_pieces") as Array).is_empty(), "hello: the table is clear")
+	expect(not (entry.get("_gear") as Node3D).visible, "hello: the gear is still hidden")
 	expect(await _until_said(said, "I'm Onion, by the way."), "hello: plays")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "hello: the panel comes back")
 
@@ -149,12 +156,12 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	await _press(&"entry_part_touch")
 	await _touch_cauldron()
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "touch: the panel comes back after the touch")
-	expect((entry.get("_pieces") as Array).is_empty(), "touch: nothing comes out")
+	expect(not (entry.get("_gear") as Node3D).visible, "touch: nothing comes out")
 
-	# Emerge: Onion moves aside and three things come out, then back to the panel.
+	# Emerge: Onion moves aside, the gear comes out and (for now) sets itself in, then back to the panel.
 	await _press(&"entry_part_emerge")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "emerge: the panel comes back")
-	expect_eq((entry.get("_pieces") as Array).size(), 3, "emerge: three things are out")
+	expect(_docked(), "emerge: the gear is in its socket, turning")
 
 	# Still one of each.
 	expect_eq(entry.find_children("*", "Target", true, false).filter(func(t: Target) -> bool: return t.id == &"entry_cauldron").size(), 1, "one cauldron")

@@ -51,7 +51,6 @@ const SHELF_ANGLE := 0.0
 ## Gap the cauldron keeps from the bench, metres; if it can't, it goes beside the bench.
 const CAULDRON_GAP := 0.02
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
-const PIECE := 0.04
 ## Seconds the ripple takes to spread across the play circle. Slow and soft: no flash.
 const RIPPLE_SECONDS := 5.0
 
@@ -94,7 +93,14 @@ var _talk_until := 0.0              # seconds (game time) until Onion stops "tal
 var _cue := false                   # the cauldron glows slowly: "something here"
 var _clock := 0.0
 var _onion_rest_y := 0.0            # Onion's height in its holder when still
-var _pieces: Array[Node3D] = []     # what came out of the cauldron (placeholders)
+var _gear: Node3D                   # the planetary gear: origin at the middle of its base
+var _gear_spin: GearSpin
+var _gear_height := 0.08            # unscaled, metres
+var _gear_rest := Vector3.ZERO      # where it lands after coming out of the cauldron
+var _mechanism: Node3D              # the table panel with the socket
+var _mech_spin: GearSpin            # the little cog in the panel's window
+var _socket_at := Vector3.ZERO      # the middle of the socket, world
+var _ripple_origin := Vector3.ZERO  # where the ripple starts: the socket
 var _details: Array[Node3D] = []    # the workshop, shown as the ripple reaches each
 var _motes: Array[Node3D] = []      # drifting specks of light, after the reveal
 var _surface_points: Array[Dictionary] = []   # real surfaces the depth rays found: {position, normal}
@@ -212,6 +218,8 @@ func run() -> void:
 	# One cauldron, one Onion, one shelf, one workshop for every part.
 	_build_shelf()
 	_build_cauldron(await _cauldron_spot())
+	_build_mechanism()
+	_build_gear()
 	_build_onion()
 	_build_workshop()
 
@@ -299,7 +307,9 @@ func _touch() -> void:
 func _out() -> void:
 	_beat("3: out of the cauldron")
 	await _onion_aside()
-	await _emerge()
+	await _emerge_gear()
+	await _wait(0.8)
+	await _dock_gear()   # PLACEHOLDER: the child will carry it to the socket
 
 
 ## 4. The reveal: a gentle ripple spreads through the nearby room.
@@ -314,8 +324,6 @@ func _reveal(fast := false) -> void:
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
 func _to_shelf(fast := false) -> void:
 	_beat("5: to the shelf")
-	if not fast:
-		await _tidy_away()   # clears the table for the shelf
 	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
@@ -532,10 +540,10 @@ func _take_press(ids: Array) -> StringName:
 ## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
 func _set_up_for(part: StringName) -> void:
 	_cue = false
-	for piece in _pieces:
-		piece.queue_free()
-	_pieces.clear()
 	_surface_points.clear()
+	_gear.visible = false
+	_gear_spin.running = false
+	_mech_spin.running = false
 	for detail in _details:
 		if is_instance_valid(detail):
 			_show_detail(detail, false)
@@ -546,10 +554,7 @@ func _set_up_for(part: StringName) -> void:
 			_orb.global_position = _peek_spot()
 		&"ripple", &"shelf":
 			_orb.global_position = _aside_spot()
-			for i in 3:
-				var piece := _new_piece(i)
-				piece.global_position = _land_spot(i)
-				piece.rotation.y += PI * 0.5
+			_dock_at_once()
 	if part == &"shelf":
 		for detail in _details:
 			if is_instance_valid(detail):
@@ -571,7 +576,7 @@ func _hand_over() -> void:
 	var workshop := Workshop.new()
 	App.main.add_child(workshop)
 	workshop.take({onion = _orb, model = _onion, face = _face, rest_y = _onion_rest_y, glow = _glow,
-			halo = _halo, cauldron = _box, rest = _beside_shelf(), music = _music})
+			halo = _halo, cauldron = _box, rest = _beside_shelf(), music = _music, mechanism = _mechanism, gear = _gear})
 	if is_instance_valid(_cauldron_target):
 		_cauldron_target.queue_free()   # nothing to touch there any more
 	_onion = null   # this opening's Onion code stops; the workshop looks after it
@@ -1584,76 +1589,273 @@ func _beside_shelf() -> Vector3:
 	return _bench * Vector3(-_bench_half + 0.02, -_bench_below + 0.3, -0.3)
 
 
-# --- What comes out (PLACEHOLDERS: not chosen yet) ---------------------------
+# --- The gear and the table mechanism ---------------------------------------
 
-## Three small things come up through the opening one after another: straight up
-## until they clear the rim, then out in an arc to the table beside the cauldron.
-func _emerge() -> void:
-	var rim_y := _box.global_position.y + _rim
-	var last: Tween
+## The prototype's gear is a light stand-in built from a few primitives (a base, a ring, three
+## planets on a carrier, a sun gear: a few hundred triangles). The real planetary gear (Hamid
+## Bairouk, Blendkit royalty-free, NOT CC0, about 57k triangles) works too: put it at GEAR_FILE and
+## set USE_REAL_GEAR. Check its licence and whether the repository is public before committing it.
+const GEAR_FILE := "res://entry/assets/planetary-gears.glb"
+const USE_REAL_GEAR := false
+## It comes out of the cauldron small (the opening is about 9 cm across) and grows to its playing size.
+const GEAR_OUT_SCALE := 0.4
+const GEAR_PLAY_SCALE := 0.6
+## The table panel: width, thickness and depth, metres; the socket's radius, and how far toward
+## the child from the panel's middle it sits.
+const PANEL := Vector3(0.30, 0.012, 0.22)
+const SOCKET_RADIUS := 0.06
+const SOCKET_Z := 0.03
+## How far from the panel's middle things must stay clear (it is roughly this round).
+const PANEL_REACH := 0.17
+
+var _cog: Node3D
+
+
+## The gear, hidden until it comes out: a holder whose origin is the middle of the gear's base,
+## so it can be set down on a surface by placing the holder there.
+func _build_gear() -> void:
+	_gear = Node3D.new()
+	_gear.name = "Gear"
+	add_child(_gear)
+	_gear_spin = GearSpin.new()
+	_gear.add_child(_gear_spin)
+	var model: Node3D
+	var player: AnimationPlayer
+	if USE_REAL_GEAR and ResourceLoader.exists(GEAR_FILE):
+		model = (load(GEAR_FILE) as PackedScene).instantiate()
+		_gear.add_child(model)
+		player = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	else:
+		model = _standin_gear()
+		_gear.add_child(model)
+	var box := _bounds(model)
+	_gear_height = box.size.y
+	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z)
+	if player != null:
+		_gear_spin.read(player.get_node(player.root_node), player.get_animation(player.get_animation_list()[0]))
+		player.queue_free()   # the clip does not loop; the parts are turned directly
+	_gear.visible = false
+	print("ENTRY gear: ", snappedf(box.size.x, 0.001), " m wide, ", snappedf(_gear_height, 0.001), " m high at full size, ", "real" if player != null else "stand-in")
+
+
+## A planetary gear from primitives: a base, a ring, three planets on a carrier and a sun gear
+## on a shaft. About 17.5 cm wide, 8 cm tall, like the real one. Registers its turning parts.
+func _standin_gear() -> Node3D:
+	var root := Node3D.new()
+	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
+	var steel := _lit(Color(0.62, 0.65, 0.68), 0.6)
+	var sage := _lit(Color(0.42, 0.55, 0.45))
+	root.add_child(_disc(0.0875, 0.012, 0.006, sage))
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.07
+	torus.outer_radius = 0.0875
+	torus.material = brass
+	ring.mesh = torus
+	ring.position.y = 0.03
+	root.add_child(ring)
+	var carrier := Node3D.new()
+	carrier.position.y = 0.024
+	root.add_child(carrier)
+	carrier.add_child(_disc(0.06, 0.005, 0.0, steel))
+	_gear_spin.add(carrier, 0.5)
 	for i in 3:
-		var piece := _new_piece(i)
-		# Through the opening: start under the brew, a little off centre, inside the opening.
-		var across := _left.rotated(Vector3.UP, i * TAU / 3.0) * (_mouth_radius - PIECE * 0.6) * 0.5
-		var start := _mouth + across + Vector3.DOWN * (PIECE + 0.01)
-		var clear := Vector3(_mouth.x + across.x, rim_y + PIECE * 0.5 + 0.05, _mouth.z + across.z)
-		var land := _land_spot(i)
-		piece.global_position = start
-		last = _runner.create_tween()
-		last.tween_property(piece, "global_position", clear, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		last.tween_method(_arc.bind(piece, clear, land, 0.06), 0.0, 1.0, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		last.tween_property(piece, "rotation:y", piece.rotation.y + PI * 0.5, 0.4)
-		if DEBUG:
-			print("ENTRY piece ", i, ": from ", snappedf(start.y - rim_y, 0.001), " m (under the rim) up to ",
-					snappedf(clear.y - rim_y, 0.001), " m over it, lands ", snappedf(land.distance_to(_box.global_position), 0.01), " m out")
-		await _wait(0.6)
-	await last.finished
+		var planet := _cogwheel(0.02, 8, brass)
+		planet.position = Vector3(0.042, 0.012, 0.0).rotated(Vector3.UP, i * TAU / 3.0)
+		carrier.add_child(planet)
+		_gear_spin.add(planet, -1.5)
+	var sun := _cogwheel(0.022, 8, brass)
+	sun.position.y = 0.036
+	root.add_child(sun)
+	_gear_spin.add(sun, 2.0)
+	root.add_child(_disc(0.006, 0.078, 0.039, steel))   # the shaft: gives its full height
+	return root
 
 
-## Placeholder thing number [param i] (0..2): a sphere, a cylinder or a prism.
-func _new_piece(i: int) -> MeshInstance3D:
-	var shapes: Array[Mesh] = [SphereMesh.new(), CylinderMesh.new(), PrismMesh.new()]
-	var colours := [Color(0.35, 0.65, 0.85), Color(0.85, 0.55, 0.25), Color(0.5, 0.75, 0.4)]
-	var piece := MeshInstance3D.new()
-	var mesh := shapes[i]
-	mesh.set("radius", PIECE * 0.5)
-	mesh.set("height", PIECE)
-	mesh.set("top_radius", PIECE * 0.4)
-	mesh.set("bottom_radius", PIECE * 0.4)
-	mesh.set("size", Vector3.ONE * PIECE)
+func _disc(radius: float, height: float, y: float, material: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = radius
+	cylinder.bottom_radius = radius
+	cylinder.height = height
+	cylinder.radial_segments = 24
+	cylinder.material = material
+	mesh.mesh = cylinder
+	mesh.position.y = y
+	return mesh
+
+
+## A toothed wheel: a hub with [param teeth] little blocks around it. A node that turns about Y.
+func _cogwheel(radius: float, teeth: int, material: Material) -> Node3D:
+	var wheel := Node3D.new()
+	wheel.add_child(_disc(radius, 0.012, 0.0, material))
+	for i in teeth:
+		var arm := Node3D.new()
+		arm.rotation.y = i * TAU / teeth
+		arm.add_child(_slab(Vector3(0.008, 0.012, 0.009), Vector3(radius + 0.002, 0, 0), material))
+		wheel.add_child(arm)
+	return wheel
+
+
+## The table panel, shallow, with the socket for the gear and a little window showing a cog
+## that turns when the gear is in. Lies on the table where it is clear of the cauldron and the
+## shelf, facing the child. The ripple will start from its socket.
+func _build_mechanism() -> void:
+	_mechanism = Node3D.new()
+	_mechanism.name = "Mechanism"
+	add_child(_mechanism)
+	var spot := _mechanism_spot()
+	_mechanism.global_position = spot
+	var eye := App.head().global_position
+	_mechanism.rotation.y = atan2(eye.x - spot.x, eye.z - spot.z)   # its front (+z) to the child
+	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
+	var sage := _lit(Color(0.36, 0.46, 0.39))
+	var dark := _lit(Color(0.07, 0.08, 0.09))
+	_mechanism.add_child(_slab(Vector3(PANEL.x + 0.012, 0.006, PANEL.z + 0.012), Vector3(0, 0.003, 0), brass))
+	_mechanism.add_child(_slab(Vector3(PANEL.x, 0.006, PANEL.z), Vector3(0, 0.009, 0), sage))
+	var well := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = SOCKET_RADIUS
+	disc.bottom_radius = SOCKET_RADIUS
+	disc.height = 0.002
+	disc.material = dark
+	well.mesh = disc
+	well.position = Vector3(0, PANEL.y + 0.0005, SOCKET_Z)
+	_mechanism.add_child(well)
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = SOCKET_RADIUS
+	torus.outer_radius = SOCKET_RADIUS + 0.008
+	torus.material = brass
+	ring.mesh = torus
+	ring.position = Vector3(0, PANEL.y + 0.0015, SOCKET_Z)
+	_mechanism.add_child(ring)
+	_mechanism.add_child(_slab(Vector3(0.20, 0.003, 0.04), Vector3(0, PANEL.y + 0.0005, -0.085), dark))   # the window
+	_cog = Node3D.new()
+	_cog.position = Vector3(0, PANEL.y + 0.004, -0.085)
+	_mechanism.add_child(_cog)
+	var hub := MeshInstance3D.new()
+	var hub_mesh := CylinderMesh.new()
+	hub_mesh.top_radius = 0.011
+	hub_mesh.bottom_radius = 0.011
+	hub_mesh.height = 0.004
+	hub_mesh.material = brass
+	hub.mesh = hub_mesh
+	_cog.add_child(hub)
+	for i in 8:
+		var arm := Node3D.new()
+		arm.rotation.y = i * TAU / 8.0
+		arm.add_child(_slab(Vector3(0.005, 0.004, 0.006), Vector3(0.0125, 0, 0), brass))
+		_cog.add_child(arm)
+	_mech_spin = GearSpin.new()
+	_mechanism.add_child(_mech_spin)
+	_mech_spin.add(_cog, 1.2)
+	_socket_at = _mechanism.to_global(Vector3(0, PANEL.y, SOCKET_Z))
+	_ripple_origin = _socket_at
+	# Where the gear lands: between the cauldron and the socket, within reach, not on the cauldron.
+	var between := _box.global_position.lerp(_socket_at, 0.45)
+	var away := Vector3(between.x - _box.global_position.x, 0.0, between.z - _box.global_position.z)
+	if away.length() < CAULDRON_WIDTH * 0.5 + 0.08:
+		between = _box.global_position + away.normalized() * (CAULDRON_WIDTH * 0.5 + 0.08)
+	_gear_rest = Vector3(between.x, _box.global_position.y, between.z)
+	print("ENTRY mechanism: ", _away(spot), " m away at ", snappedf(rad_to_deg(_ahead.signed_angle_to(Vector3(spot.x - eye.x, 0.0, spot.z - eye.z).normalized(), Vector3.UP)), 1), " degrees")
+
+
+## Where the panel goes: on the table, clear of the cauldron and of the shelf's footprint
+## (the bench and the things on it), as near the middle as that allows, 35 to 45 cm out.
+func _mechanism_spot() -> Vector3:
+	var eye := App.head().global_position
+	var table := App.reality.work_surface()
+	var inverse := table.transform.affine_inverse()
+	var half := table.size * 0.5 - Vector2.ONE * 0.15
+	var best := Vector3(eye.x, _box.global_position.y, eye.z) + _ahead * 0.42
+	var best_score := -INF
+	for angle in range(-50, 55, 5):
+		for distance: float in [0.40, 0.45, 0.35]:
+			var p := Vector3(eye.x, _box.global_position.y, eye.z) + _ahead.rotated(Vector3.UP, deg_to_rad(angle)) * distance
+			var on_table := inverse * p
+			if absf(on_table.x) > half.x or absf(on_table.z) > half.y:
+				continue
+			var clear := _slot_clearance(p)
+			var score := (0.0 if clear >= 0.02 else -10.0 + clear) - absf(angle) * 0.01 - absf(distance - 0.42) * 0.5
+			if score > best_score:
+				best_score = score
+				best = p
+	return best
+
+
+## How much room a panel at [param p] has beside the cauldron and the shelf's footprint, metres.
+func _slot_clearance(p: Vector3) -> float:
+	var to_cauldron := Vector2(p.x - _box.global_position.x, p.z - _box.global_position.z).length() - CAULDRON_WIDTH * 0.5 - PANEL_REACH
+	var local := _bench.affine_inverse() * p
+	var ahead_of_bench := -local.z
+	var dx := maxf(absf(local.x) - (ShelfCopy.THINGS_WIDE + 0.06) * 0.5, 0.0)
+	var dz := maxf(maxf(0.11 - ahead_of_bench, ahead_of_bench - 0.40), 0.0)
+	return minf(to_cauldron, Vector2(dx, dz).length() - PANEL_REACH)
+
+
+## The gear pops up through the brew (small, with a little overshoot), clears the rim, then
+## arcs out, tilting and growing, and stands within reach. No flash, no sound but its own.
+func _emerge_gear() -> void:
+	_gear.visible = true
+	_gear.scale = Vector3.ONE * GEAR_OUT_SCALE
+	_gear.rotation = Vector3.ZERO
+	var start := _mouth + Vector3.DOWN * (_gear_height * GEAR_OUT_SCALE + 0.012)
+	var clear := Vector3(_mouth.x, _box.global_position.y + _rim + 0.05, _mouth.z)
+	_gear.global_position = start
+	print("ENTRY gear: out of the cauldron, ", snappedf(_gear_height * GEAR_OUT_SCALE, 0.001), " m tall, to ", _away(_gear_rest), " m away")
+	var tween := _runner.create_tween()
+	tween.tween_property(_gear, "global_position", clear, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_method(_gear_arc.bind(clear, _gear_rest, 0.06), 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await tween.finished
+
+
+## One step of the arc from [param from] to [param to]: it grows, tilts, comes down upright.
+func _gear_arc(k: float, from: Vector3, to: Vector3, height: float) -> void:
+	_gear.global_position = from.lerp(to, k) + Vector3.UP * height * 4.0 * k * (1.0 - k)
+	_gear.scale = Vector3.ONE * lerpf(GEAR_OUT_SCALE, GEAR_PLAY_SCALE, k)
+	_gear.rotation = Vector3(sin(k * PI) * 0.35, 0.0, 0.0)
+
+
+## PLACEHOLDER (the child will carry it): the gear lifts and sets itself into the socket, then
+## the gears and the panel's cog start turning.
+func _dock_gear() -> void:
+	var from := _gear.global_position
+	var tween := _runner.create_tween()
+	tween.tween_method(func(k: float) -> void:
+		_gear.global_position = from.lerp(_socket_at, k) + Vector3.UP * 0.05 * 4.0 * k * (1.0 - k)
+		_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE, 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await tween.finished
+	_dock_at_once()
+	Events.feedback.emit(&"hint", _socket_at)
+
+
+## The gear in the socket, upright, turning; the panel's cog turning.
+func _dock_at_once() -> void:
+	_gear.visible = true
+	_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE
+	_gear.global_position = _socket_at
+	_gear.rotation = Vector3(0.0, _mechanism.rotation.y, 0.0)
+	_gear_spin.running = true
+	_mech_spin.running = true
+
+
+func _slab(size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	box.material = material
+	mesh.mesh = box
+	mesh.position = at
+	return mesh
+
+
+func _lit(colour: Color, metallic := 0.0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
-	material.albedo_color = colours[i]
-	mesh.material = material
-	piece.mesh = mesh
-	add_child(piece)
-	_pieces.append(piece)
-	return piece
-
-
-## Where thing [param i] lands: on the child's left of the cauldron, toward the child.
-func _land_spot(i: int) -> Vector3:
-	var spots: Array[Vector2] = [Vector2(0.16, 0.0), Vector2(0.13, 0.10), Vector2(0.04, 0.16)]   # [toward, left] metres
-	return _box.global_position - _ahead * spots[i].x + _left * spots[i].y + Vector3.UP * PIECE * 0.5
-
-
-## One step of a hop from [param from] to [param to], [param height] high in the middle.
-func _arc(k: float, thing: Node3D, from: Vector3, to: Vector3, height: float) -> void:
-	thing.global_position = from.lerp(to, k) + Vector3.UP * height * 4.0 * k * (1.0 - k)
-
-
-## The things hop back into the cauldron (the table is clear for the shelf).
-func _tidy_away() -> void:
-	var rim_y := _box.global_position.y + _rim
-	var last: Tween
-	for piece in _pieces:
-		var over := Vector3(_mouth.x, rim_y + PIECE * 0.5 + 0.05, _mouth.z)
-		last = _runner.create_tween()
-		last.tween_method(_arc.bind(piece, piece.global_position, over, 0.06), 0.0, 1.0, 0.7).set_trans(Tween.TRANS_SINE)
-		last.tween_property(piece, "global_position", _mouth + Vector3.DOWN * (PIECE + 0.01), 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		last.tween_callback(piece.queue_free)
-		await _wait(0.3)
-	await last.finished
-	_pieces.clear()
+	material.albedo_color = colour
+	material.metallic = metallic
+	material.roughness = 0.55
+	return material
 
 
 # --- The reveal --------------------------------------------------------------
@@ -1665,7 +1867,7 @@ func _tidy_away() -> void:
 func _ripple() -> void:
 	_surface_points.clear()
 	_sample_room()
-	var reach := PLAY_RADIUS * 1.6 + _away(_box.global_position)
+	var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)
 	for wave in 3:   # three rings, a second apart, each fainter
 		var ring := MeshInstance3D.new()
 		var torus := TorusMesh.new()
@@ -1680,7 +1882,7 @@ func _ripple() -> void:
 		ring.mesh = torus
 		add_child(ring)
 		ring.add_to_group(&"entry_transient")
-		ring.global_position = _box.global_position + Vector3.UP * 0.004
+		ring.global_position = _ripple_origin + Vector3.UP * 0.004
 		var spread := _runner.create_tween()
 		spread.tween_method(_spread.bind(ring, light, reach, light.albedo_color.a, wave == 0), 0.0, 1.0, RIPPLE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		spread.tween_callback(ring.queue_free)
@@ -1696,11 +1898,11 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 	if not shows:
 		return
 	for point in _surface_points:
-		if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_box.global_position) <= radius:
+		if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= radius:
 			point.shown = true
 			_glint(point.position, point.normal)
 	for detail in _details:
-		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_box.global_position) <= radius:
+		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_ripple_origin) <= radius:
 			detail.set_meta(&"shown", true)
 			detail.visible = true
 			_runner.create_tween().tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -1777,15 +1979,6 @@ func _build_workshop() -> void:
 	var table_y := _box.global_position.y
 	var around := func(degrees: float, distance: float, height: float) -> Vector3:
 		return Vector3(eye.x, height, eye.z) + ahead.rotated(Vector3.UP, deg_to_rad(degrees)) * distance
-	var flame := _material(Color(1.0, 0.75, 0.3), true)
-	# Motes of light drifting through the play circle.
-	for i in 16:
-		var mote := _shape(SphereMesh.new(), Vector3.ONE * 0.008, flame)
-		var angle := -80.0 + i * 160.0 / 15.0
-		var spot: Vector3 = around.call(angle, 0.35 + fmod(i * 0.37, 1.0) * (PLAY_RADIUS - 0.35), table_y + 0.1 + fmod(i * 0.61, 1.0) * 0.5)
-		mote.set_meta(&"home", spot)
-		_detail(mote, spot)
-		_motes.append(mote)
 	# Beyond the circle: a soft doorway of light, ahead and to the right. Only to look at.
 	var door := Node3D.new()
 	var glow := _shape(QuadMesh.new(), Vector3(0.45, 0.8, 1.0), _material(Color(1.0, 0.85, 0.6, 0.35), true))
