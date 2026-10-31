@@ -469,6 +469,13 @@ func _pickup() -> void:
 	_attend(null)
 
 
+## The cauldron shrinks away into the table over about a second, then hides.
+func _cauldron_away() -> void:
+	var tween := _runner.create_tween()
+	tween.tween_property(_box, "scale", Vector3(0.02, 0.02, 0.02), 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void: _box.visible = false)
+
+
 ## A soft steady glow over the whole gear (the casing) while its pick-up is being shown.
 func _glow_gear(on: bool) -> void:
 	var overlay: StandardMaterial3D = null
@@ -513,6 +520,7 @@ func _reveal(fast := false) -> void:
 	_actions.lean_to(_runner, 0.0, 0.5)
 	_attend(_shelf)   # as the ripple spreads Onion straightens and turns to one revealed feature (the shelf)
 	await _ripple()
+	_cauldron_away()   # its job is done: the cauldron sinks away after the ripple (Megan)
 	_attend(null)   # "I've been looking forward..." turns back to the child and holds a welcoming pose
 	await say("I've been looking forward to showing you this.")
 	if not fast:
@@ -766,6 +774,8 @@ func _set_up_for(part: StringName) -> void:
 	if USE_REAL_CARRY:
 		_carry.reset()
 	_surface_points.clear()
+	_box.visible = part != &"shelf"   # back for every part but the shelf (it went after the ripple)
+	_box.scale = Vector3.ONE
 	_gear.visible = false
 	_gear_spin.running = false
 	_mech_spin.running = false

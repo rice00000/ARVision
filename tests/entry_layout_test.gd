@@ -62,7 +62,7 @@ func test_onion_stays_clear_of_the_teaching_hand_the_socket_the_panel_and_the_la
 	expect(layout.report() == "", "and nothing overlaps: %s" % layout.report())
 	var body := layout._circle(&"b", layout.onion_mouth, EntryLayout.ONION_BODY, 0.0)
 	expect(EntryLayout.gap(body, layout.zone(&"hand_tap")) >= EntryLayout.HAND_CLEAR - 0.001, "Onion beside the mouth is a hand-breadth clear of the tap")
-	expect(layout.onion_mouth_offset.length() > 0.065 and layout.onion_mouth_offset.length() < 0.075, "at about the story's 7 cm from the mouth")
+	expect(absf(layout.onion_mouth_offset.length() - EntryLayout.BESIDE_MOUTH) < 0.025, "at about BESIDE_MOUTH from the mouth (Megan moved Onion further out: 13 cm)")
 
 
 func test_the_checker_catches_onion_on_the_hands_path() -> void:
