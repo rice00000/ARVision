@@ -559,8 +559,8 @@ func _pickup() -> void:
 	_actions.lean_to(_runner, 0.0, 0.4)
 	_actions.lift(_runner, 0.02, 0.6)   # a small pleased lift
 	_attend(_gear)   # follows the held gear gently (the look is smoothed, so hand tremor is ignored)
-	await say("Quite a little thing, isn't it?")   # no answer expected
-	await _wait(0.4)   # shortened (Megan): straight on to setting it in
+	# (no line: "Quite a little thing, isn't it?" was cut, Megan Nov 1) a moment with the gear in hand
+	await _wait(1.0)
 	_attend(null)
 
 

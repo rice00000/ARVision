@@ -155,8 +155,8 @@ while the hand shows the pinch (it goes the moment you grab it). The teaching ha
 the gear and lifts it a little, looping (the real gear does not move). Pinch the real gear with thumb and finger: it follows your hand, stopped.
 If you wait about 14 seconds without touching it, the teaching hand comes back to show the pinch again.
 **Hear:** "Would you pick it up for me?" / "Pinch your fingers together, and keep them closed." / once you hold it:
-"Quite a little thing, isn't it?" ("There you go." was cut) then a quiet moment. Onion makes a small pleased lift and follows the
-"Quite a little thing, isn't it?" then a quiet moment. Onion makes a small pleased lift and follows the
+(no line: "There you go." and "Quite a little thing, isn't it?" were cut) a short quiet moment. Onion makes a small pleased lift and follows the
+(no line) a short quiet moment. Onion makes a small pleased lift and follows the
 held gear with its look.
 
 Judge:
@@ -165,7 +165,7 @@ Judge:
 - [ ] The teaching hand does not hide the gear: you still see most of it.
 - [ ] The glow is soft (not a flash) and clearly says "this one": ______. It disappears when you grab.
 - [ ] Holding it and turning it in your hand feels natural; it does not jump.
-- [ ] The quiet moment after "Quite a little thing" is long enough / too long / too short.
+- [ ] The quiet moment after the pickup (1 s) is long enough / too long / too short.
 
 Notes:
 
