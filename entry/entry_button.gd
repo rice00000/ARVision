@@ -1,25 +1,16 @@
 class_name EntryButton
 extends Node3D
-## A floating button for the entry's setup and debug panels (TESTING). Forgiving to press:
-## poke it (a fingertip enters its box, see [method reaches]), or point at it and pinch.
-## Its hit box is the whole plate plus [member margin], and it lights up and nudges
-## back when a ray or a fingertip is on it, so it is clear what a press will hit.
-## The entry does the poking and routes the press; this node is the look and the box.
+## An entry panel button. Pointer owns aiming and pinch confirmation.
 
-## How far in front of the plate a fingertip already counts, and how far behind
-## (fingers go through a button in the air), metres.
-const FRONT := 0.02
-const BACK := 0.07
+const DEPTH := 0.03
 
 var id: StringName
 ## The plate's width and height, metres.
 var plate := Vector2(0.22, 0.06)
-## Extra reach around the plate, metres, for pokes and rays alike.
+## Extra reach around the plate, metres, for rays.
 var margin := 0.02
 ## What a ray hits, and what presses are reported as (a child of this node).
-var target: Target
-## Game-clock seconds when it appeared: a finger already there then does not press it.
-var born := 0.0
+var target: UITarget
 
 var _face: MeshInstance3D
 var _words: Label3D
@@ -52,31 +43,17 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 	_words.pixel_size = 0.0006
 	_words.position = Vector3(0, 0, 0.007)
 	_face.add_child(_words)
-	# The hit box covers the plate and its margin, and runs from FRONT to BACK, so a ray or a
-	# finger reaches it anywhere on the plate, not only at the middle.
-	target = Target.new()
+	target = UITarget.new()
 	target.id = id
 	target.name = String(id)
+	target.show_ray = not String(id).begins_with("entry_debug_")
 	var shape := CollisionShape3D.new()
 	var hit := BoxShape3D.new()
-	hit.size = Vector3(plate.x + margin * 2.0, plate.y + margin * 2.0, FRONT + BACK)
+	hit.size = Vector3(plate.x + margin * 2.0, plate.y + margin * 2.0, DEPTH)
 	shape.shape = hit
-	shape.position = Vector3(0, 0, (FRONT - BACK) * 0.5)
 	target.add_child(shape)
+	target.hover_changed.connect(set_hot)
 	add_child(target)
-
-
-## Whether a fingertip at [param world] is in the button's box (in front of it, on it, or pushed through it).
-func reaches(world: Vector3) -> bool:
-	var p := to_local(world)
-	return absf(p.x) <= plate.x * 0.5 + margin and absf(p.y) <= plate.y * 0.5 + margin \
-			and p.z <= FRONT and p.z >= -BACK
-
-
-## How far [param world] is from the plate's middle, across the plate (to pick the nearest of two).
-func off_centre(world: Vector3) -> float:
-	var p := to_local(world)
-	return Vector2(p.x, p.y).length()
 
 
 ## Changes the words on the plate.
@@ -88,7 +65,7 @@ func text() -> String:
 	return _words.text
 
 
-## A ray or fingertip is on the button now.
+## A hand ray is on the button now.
 func set_hot(on: bool) -> void:
 	_hot = on
 

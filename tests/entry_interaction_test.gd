@@ -374,6 +374,7 @@ func test_the_gear_settles_clear_of_the_cauldron_wherever_it_stands_now() -> voi
 	pot.global_position = Vector3(eye.x + 0.30, table_y, eye.z - 0.30)   # it moved since configure()
 	carry.follow(pot, null)
 	await _carry_to(pot.global_position + Vector3(0.01, 0.2, 0.0))   # let go right over its mouth
+	expect(not App.menu_active(), "carrying the gear stays clear of the home entrance")
 	await _press(false)
 	await wait(1.4)
 	expect(_flat(gear.global_position, pot.global_position) >= 0.17 - 0.005, "beside the cauldron in its new place (%s m)" % _flat(gear.global_position, pot.global_position))
@@ -785,7 +786,7 @@ func test_the_real_opening_configures_carry_and_the_gear_docks_in_its_socket() -
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.skip_setup = false
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
 	input.click(&"right", &"trigger_click")
@@ -831,7 +832,7 @@ func test_the_real_opening_can_be_tried_with_the_mouse_hand_and_reminds_a_waitin
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.skip_setup = false
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
 	input.click(&"right", &"trigger_click")
@@ -880,7 +881,7 @@ func test_the_real_opening_does_not_wait_for_a_gear_the_child_already_set_in() -
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.skip_setup = false
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
 	input.click(&"right", &"trigger_click")
@@ -920,7 +921,7 @@ func _opening_at_start() -> Entry:
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
-	entry.poke_in_sim = false   # a desktop: only a click presses
+	entry.touch_cauldron_in_sim = false   # a desktop: only a click presses
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_part_touch") != null, 30.0)
 	return entry

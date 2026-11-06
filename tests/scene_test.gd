@@ -26,7 +26,7 @@ func test_the_menu_switches_freely_between_all_three_scenes() -> void:
 		expect(await until(func() -> bool: return app.current_scene == id and not app.switching), "switched to %s" % id)
 		expect(not facilitator.is_open and not get_tree().paused, "the menu closes and play resumes")
 		expect(App.rig == rig and App.reality == reality, "the rig and room stay")
-		expect_eq(get_tree().get_nodes_in_group(Module.GROUP).size(), 6, "modules stay without duplicates")
+		expect_eq(get_tree().get_nodes_in_group(Module.GROUP).size(), app.get_node(^"Modules").get_child_count(), "modules stay without duplicates")
 		expect_eq(App.session.get_parent().name, {&"intro": &"Intro", &"find_object": &"FindTheObject", &"global_motion": &"GlobalMotion"}[id], "one active scene")
 	await wait(3.0)
 	expect(app.find_child("Entry", true, false) != null and App.world == null, "Intro can be replayed")

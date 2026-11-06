@@ -154,7 +154,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
 	expect(entry.find_child("entry_part_place", true, false) != null, "the dev jumps are there")
@@ -197,7 +197,7 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var copy: Variant = entry.get("_shelf")
@@ -238,7 +238,7 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var layout: EntryLayout = entry.get("_layout")

@@ -172,7 +172,7 @@ class Panel(SimCase):
         sim = self.start(None, profile="test_sim_saves")
         actor = Actor(sim)
         menu = self.menu(sim)
-        actor.touch("left", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_1")["position"]), radius=0.01)
+        actor.point("left", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_1")["position"]), expect="task_tidy_shelf_1")
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         self.menu(sim)

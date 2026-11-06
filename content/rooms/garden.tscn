@@ -1,0 +1,116 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://content/rooms/kenney/wall.obj" id="wall"]
+
+[ext_resource type="ArrayMesh" path="res://content/rooms/kenney/wallWindow.obj" id="window"]
+
+[ext_resource type="ArrayMesh" path="res://content/rooms/kenney/wallDoorway.obj" id="door"]
+
+[ext_resource type="ArrayMesh" path="res://content/rooms/kenney/floorFull.obj" id="floor"]
+
+[sub_resource type="StandardMaterial3D" id="paint"]
+
+albedo_color = Color(0.56, 0.76, 0.58, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="ground"]
+
+albedo_color = Color(0.31, 0.24, 0.17, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="roof_mesh"]
+
+size = Vector3(6.4, 0.1, 4.8)
+
+[sub_resource type="StandardMaterial3D" id="sky_mat"]
+
+shading_mode = 0
+albedo_color = Color(0.56, 0.74, 0.87, 1)
+cull_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="glass"]
+albedo_color = Color(0.51, 0.76, 0.87, 1)
+emission_enabled = true
+emission = Color(0.12, 0.19, 0.23, 1)
+roughness = 0.4
+
+[sub_resource type="SphereMesh" id="sky_mesh"]
+
+radius = 18.0
+height = 36.0
+
+[node name="Room" type="Node3D"]
+
+metadata/size = Vector2(6.4, 4.8)
+
+[node name="Floor" type="Node3D" parent="."]
+
+position = Vector3(0, -0.06, 0)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Floor"]
+
+position = Vector3(3.2, -0.06, -2.4)
+scale = Vector3(0.64, 0.24, 0.48)
+mesh = ExtResource("floor")
+material_override = SubResource("ground")
+
+[node name="Back" type="Node3D" parent="."]
+
+position = Vector3(0, 1.35, -2.4)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Back"]
+
+position = Vector3(3.2, -1.35, -0.03367003367003367)
+scale = Vector3(0.64, 0.20937828607587872, 0.13468013468013468)
+mesh = ExtResource("door")
+surface_material_override/0 = SubResource("paint")
+
+[node name="Front" type="Node3D" parent="."]
+
+position = Vector3(0, 1.35, 2.4)
+rotation_degrees = Vector3(0, 0, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Front"]
+
+position = Vector3(3.2, -1.35, -0.06)
+scale = Vector3(0.64, 0.20937828607587872, 0.24)
+mesh = ExtResource("wall")
+surface_material_override/1 = SubResource("paint")
+
+[node name="Left" type="Node3D" parent="."]
+
+position = Vector3(-3.2, 1.35, 0)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Left"]
+
+position = Vector3(2.4, -1.35, -0.03367003367003367)
+scale = Vector3(0.48, 0.20937828607587872, 0.13468013468013468)
+mesh = ExtResource("window")
+surface_material_override/2 = SubResource("paint")
+surface_material_override/3 = SubResource("glass")
+
+[node name="Right" type="Node3D" parent="."]
+
+position = Vector3(3.2, 1.35, 0)
+rotation_degrees = Vector3(0, 90, 0)
+
+[node name="Mesh" type="MeshInstance3D" parent="Right"]
+
+position = Vector3(2.4, -1.35, -0.06)
+scale = Vector3(0.48, 0.20937828607587872, 0.24)
+mesh = ExtResource("wall")
+surface_material_override/1 = SubResource("paint")
+
+[node name="Roof" type="MeshInstance3D" parent="."]
+
+position = Vector3(0, 2.75, 0)
+mesh = SubResource("roof_mesh")
+material_override = SubResource("paint")
+
+[node name="Sky" type="MeshInstance3D" parent="."]
+
+mesh = SubResource("sky_mesh")
+material_override = SubResource("sky_mat")

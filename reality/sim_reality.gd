@@ -11,6 +11,7 @@ extends Reality
 const FILTER := preload("res://reality/reality_filter.tres")
 
 var room: PackedScene
+var _scenery: Node3D
 
 
 func kind() -> String:
@@ -19,12 +20,17 @@ func kind() -> String:
 
 func _ready() -> void:
 	var scene := room.instantiate()
+	_scenery = scene
 	add_child(scene)
 	for mesh: GeometryInstance3D in scene.find_children("*", "GeometryInstance3D", true, false):
 		mesh.material_overlay = FILTER
 	for marker: SimSurface in get_tree().get_nodes_in_group(SimSurface.GROUP):
 		add_surface(Surface.new(marker.kind, marker.global_transform, marker.size, marker))
 	_apply()
+
+
+func _home_visibility_changed() -> void:
+	_scenery.visible = home_room == null
 
 
 ## Every real object in the room.

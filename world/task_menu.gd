@@ -2,11 +2,9 @@ class_name TaskMenu
 extends Node3D
 ## A place's tasks, unfolded in reach between the child and the place: per
 ## task its title, and under it one big button per level. It leans back like a
-## console on the table, so reaching a near row never brushes a far one. Touch a button, or point
-## and pinch. Three kinds of button, never told apart by colour alone:
+## console on the table, so reaching a near row never brushes a far one. Point at a button and pinch. Three kinds of button, never told apart by colour alone:
 ## the current level (first not done) is bigger, yellow, and breathes inside a glow; a done
-## level is blue and carries a gold medal; any other is blue. Every level is open. A fingertip coming close lifts a button
-## toward it and the guide reads it out ("Level 2. A new one!"), so a child who
+## level is blue and carries a gold medal; any other is blue. Every level is open. A hand ray lifts its aimed button and the guide reads it out ("Level 2. A new one!"), so a child who
 ## cannot read the numbers yet still knows what is under the hand.
 ## Drawn over everything, so nothing virtual or simulated hides part of it (on a
 ## Quest real things never do).
@@ -27,10 +25,6 @@ const TITLE_WIDTH := 0.2
 ## The next level's button is this much bigger, and breathes by [constant BREATH].
 const NEXT_SIZE := 1.25
 const BREATH := 0.08
-## A fingertip over a button and at most [constant HOVER_NEAR] metres in front of
-## it hovers it; it stays hovered until the tip is [constant HOVER_FAR] away.
-const HOVER_NEAR := 0.07
-const HOVER_FAR := 0.1
 const LIFT := 0.012
 
 var _place: Place
@@ -40,7 +34,7 @@ var _open := false
 ## The next level's face and glow, which breathe.
 var _breathing: Array[Node3D] = []
 var _time := 0.0
-## The button under a fingertip, or null.
+## The button under a hand ray, or null.
 var _hovered: Target
 
 
@@ -58,7 +52,6 @@ func _ready() -> void:
 	unfold.tween_callback(func() -> void: _open = true)
 	Events.selected.connect(func(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
 		_press(target))
-	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _press(target))
 
 
 func _process(delta: float) -> void:
@@ -67,26 +60,16 @@ func _process(delta: float) -> void:
 	for node in _breathing:
 		node.scale = Vector3(breath, breath, 1.0)
 	if _open and not get_tree().paused:
-		_hover(_under_tip())
+		_hover(_under_ray())
 
 
-## The button a fingertip is over, nearest first; the one hovered now keeps
-## its hold out to [constant HOVER_FAR].
-func _under_tip() -> Target:
-	var best: Target
-	var best_depth := INF
+## The button aimed at by a tracked hand.
+func _under_ray() -> Target:
 	for side: StringName in [&"left", &"right"]:
-		var pointer := App.rig.pointer(side)
-		if not pointer.tracked():
-			continue
-		var tip := to_local(pointer.tip())
-		for button: Target in _buttons:
-			var reach := HOVER_FAR if button == _hovered else HOVER_NEAR
-			var off := tip - Vector3(button.position.x, button.position.y, 0.0)
-			if absf(off.x) <= GAP * 0.5 and absf(off.y) <= ROW * 0.5 and off.z > -0.02 and off.z <= reach and off.z < best_depth:
-				best = button
-				best_depth = off.z
-	return best
+		var target := App.rig.pointer(side).aimed
+		if is_instance_valid(target) and _buttons.has(target):
+			return target
+	return null
 
 
 func _hover(button: Target) -> void:
@@ -105,8 +88,7 @@ func _hover(button: Target) -> void:
 		Events.say("Level %d. A new one!" % (level + 1))
 
 
-## Lifts what [param button] looks like toward the hand; its touch box stays put,
-## so lifting never makes a touch.
+## Lifts the aimed button while its ray hit box stays put.
 func _lift(button: Target, up: bool) -> void:
 	if button:
 		(button.get_node(^"Look") as Node3D).position.z = LIFT if up else 0.0
@@ -138,7 +120,6 @@ func _press(target: Target) -> void:
 	var task: Task = _buttons[target][0]
 	var level: int = _buttons[target][1]
 	_open = false
-	Events.feedback.emit(&"good", target.global_position)
 	chosen.emit([task, level])
 
 
@@ -175,7 +156,7 @@ func _button(task: Task, level: int) -> Target:
 	var done := _world.is_done(task, level)
 	var next := level == _world.current(task)
 	var size := BUTTON * (NEXT_SIZE if next else 1.0)
-	var button := Target.new()
+	var button := UITarget.new()
 	button.id = StringName("task_%s_%d" % [task.id, level + 1])
 	button.name = String(button.id)
 	_buttons[button] = [task, level]

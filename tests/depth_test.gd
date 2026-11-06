@@ -156,7 +156,7 @@ func test_the_wall_breaks_where_the_wall_is_and_cleans_up() -> void:
 	expect(report.found and is_equal_approx(report.at.z, -2.95), "on the wall: %s" % report)
 	expect(report.hole.x < WallBreak.HOLE_SIZE.x, "a nearer wall gets a smaller hole: %s" % report.hole)
 	var effect: WallBreak = App.stage.get_children().filter(func(node: Node) -> bool: return node is WallBreak)[0]
-	var shards := effect.get_children().filter(func(node: Node) -> bool: return node is MeshInstance3D).size() - 1
-	expect(shards > 40, "many pieces: %d" % shards)
+	expect(effect.piece_count >= 30, "irregular wall pieces")
+	expect_eq(effect.find_children("*", "MeshInstance3D", false, false).size(), 2, "one GPU mesh and one impact surface")
 	expect(await until(func() -> bool: return not App.stage.get_children().any(func(node: Node) -> bool: return node is WallBreak),
 		WallBreak.STAY_SECONDS[WallBreak.Style.CRACK] + 2.0), "gone after the hole closes")

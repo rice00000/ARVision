@@ -75,7 +75,10 @@ func run() -> void:
 		var task: Task = picked[0]
 		var level: int = picked[1]
 		await App.session.play(task.levels[level])
-		await _complete(task, level)
+		if App.session.won:
+			await _complete(task, level)
+		else:
+			Events.report(&"task_unfinished", {task = task.id, level = level + 1})
 
 
 func is_done(task: Task, level := -1) -> bool:
@@ -197,8 +200,10 @@ func _complete(task: Task, level: int) -> void:
 		levels.append(level)
 		done[task.id] = levels
 	Events.report(&"task_done", {task = task.id, level = level + 1})
+	Events.level_won.emit(task.id, level + 1, task.reward_stones)
 	Save.write()
 	await say(adventure.level_done)
+	await say("You earned %d magic stones!" % task.reward_stones)
 
 
 ## Says [param text] and waits about as long as it takes to hear it.

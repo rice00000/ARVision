@@ -52,8 +52,6 @@ func _ready() -> void:
 		if hand == &"left" and action == &"menu_pressed" and pressed:
 			toggle())
 	Events.selected.connect(_on_selected)
-	Events.touched.connect(func(hand: StringName, target: Target) -> void:
-		_on_selected(hand, target, Vector3.ZERO, Vector3.ZERO))
 
 
 func _exit_tree() -> void:
@@ -282,7 +280,7 @@ func _text(label: Label3D, at: Vector2, parent: Node3D) -> void:
 
 
 func _button(id: String, text: String, size: Vector2, at: Vector2, parent: Node3D) -> Target:
-	var button := Target.new()
+	var button := UITarget.new()
 	button.id = StringName(id)
 	button.name = id
 	button.collision_layer = Pointer.MENU_LAYER
@@ -313,6 +311,7 @@ func _button(id: String, text: String, size: Vector2, at: Vector2, parent: Node3
 ## A button that cannot be pressed looks sunk and grey.
 func _enable(button: Target, on: bool) -> void:
 	_disabled[button] = not on
+	button.collision_layer = Pointer.MENU_LAYER if on else 0
 	(button.get_node(^"Face") as MeshInstance3D).material_override = _face if on else _greyed
 
 

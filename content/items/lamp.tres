@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ItemDef" format=3]
+
+[ext_resource type="Script" path="res://core/item_def.gd" id="1"]
+[ext_resource type="PackedScene" path="res://content/items/visuals/lamp.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+title = "Lamp"
+scene = ExtResource("2")
+price = 2
+snap_to_floor = true

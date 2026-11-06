@@ -13,7 +13,9 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 
 **Scenes:** the app opens with Megan's **Intro**. Its final invitation enters **Find the object** (the existing five shelf levels; [tidy up](docs/tidy.md)). **Global motion** has the two spell-wall levels in its own scene, available immediately. Open the facilitator menu (**M** on PC, left-hand menu pinch on Quest), then **Scenes**, to switch freely between all three. A short fade clears the outgoing activity; progress stays saved, interrupted rounds are unscored. The room stays in normal colour. The **Saves** tab makes, names, copies and switches child saves. A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
 
-**Quest controls (hands, no controllers):** touch to choose (point and pinch also works, with no visible beam; a resting hand touches nothing). In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, touch the yellow ball to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
+**Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
+
+**Home:** point at the house and pinch on the right for furniture, purchasable rooms, decorating and direct game selection. Completed levels/replays earn magic stones. Browse a 3D model, then confirm a purchase; pinch furniture to move it. Home pauses training and resumes the same real-world activity when closed. [Modules, controls and asset sources](docs/home.md).
 
 ## Test
 

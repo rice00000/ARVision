@@ -13,6 +13,8 @@ Trials never touch the headset. They ask **`App.reality`** for the real world:
 
 Input works the same way: on a Quest the headset moves the `Rig`; without one, `SimInput` sets synthetic trackers, so trials get identical hand events. The desktop driver and the tests both use `SimInput`.
 
+UI uses `UITarget`: `Pointer` owns ray focus, pinch confirmation and feedback. Modal panels exclude in-world UI; fingertips touch gameplay targets only.
+
 ## Layers
 
 `core` ← `rig`, `reality` ← `modules`, `trials` ← `world` ← `content`. Modules and trials never call each other; they talk through `Events`. `App.module(name)` returns an optional module or null.
@@ -45,6 +47,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
 - **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
+- **Home / Inventory / Rooms / Decor:** persistent side entry, atomic purchases/rewards, room selection and separate furniture layouts. `Events.level_won` follows successful scored levels only; home pauses the activity. [Details](home.md).
 - **Facilitator:** in-headset panel, pauses play. Scenes tab: all three scenes, current one disabled. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
 
 ## Not verified on a headset yet

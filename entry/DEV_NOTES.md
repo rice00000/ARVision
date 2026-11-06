@@ -9,7 +9,7 @@ The opening ("scene one") is `entry/` in Wei's ARVision (Godot 4.7.2, Quest 3). 
 | File | What |
 |---|---|
 | `entry/entry.gd` | the opening: setup (4 steps for the grown-up), the parts (`_hello`, `_touch`, `_out`, `_reveal`, `_to_shelf`), Onion, cauldron, gear, panel, ripple, hand-over |
-| `entry/setup_panel.gd`, `entry_button.gd` | the setup panel and its buttons (poke / pinch / hover, forgiving hit boxes) |
+| `entry/setup_panel.gd`, `entry_button.gd` | the setup panel and its buttons (ray / pinch / hover, forgiving hit boxes) |
 | `entry/part_runner.gd` | everything a part waits on lives on one runner; a jump button frees it to cancel the part |
 | `entry/workshop.gd` | what survives the scene switch: Onion, cauldron, panel, gear (it becomes the shelf scene's guide) |
 | `entry/gear_spin.gd` | turns the gear's parts at steady speeds, for ever |
@@ -233,8 +233,7 @@ spot, the click at the socket, the reveal pad at the socket (where the ripple st
 
 **Setup panel** for a grown-up new to it: "Step 2 of 4" in the bar (the step dots read left to right, the current one
 bigger); every check line says its state without colour: a tick and dimmed when done, "!" when worth a look; the first
-line still waiting stays bright with its dot breathing (what to do now); a line at the foot: "To press: touch a button
-with a fingertip, or point at it and pinch." The panel stands 12 cm above the eyes so its buttons stay above the shelf
+line still waiting stays bright with its dot breathing (what to do now); a line at the foot: "To press: aim the hand ray at a button, then pinch." The panel stands 12 cm above the eyes so its buttons stay above the shelf
 in view.
 
 **Not done** (next): the UI audit and proposals for Wei's World (task menu, level announcements, subtitles: when

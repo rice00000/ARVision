@@ -35,7 +35,7 @@ var _step_words: Label3D
 var _clock := 0.0
 
 ## The line at the foot of the plate.
-const HOW_TO_PRESS := "To press: touch a button with a fingertip, or point at it and pinch."
+const HOW_TO_PRESS := "To press: aim the hand ray at a button, then pinch."
 
 
 func _ready() -> void:

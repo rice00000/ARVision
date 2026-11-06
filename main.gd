@@ -82,6 +82,14 @@ func restart(between: Callable) -> void:
 	_load_scene(current_scene)
 
 
+func show_activity(on: bool) -> void:
+	App.stage.visible = on
+	if _scene is Node3D:
+		_scene.visible = on
+	for scenery: Node3D in get_tree().get_nodes_in_group(&"activity_scenery"):
+		scenery.visible = on
+
+
 func _load_scene(id: StringName) -> void:
 	current_scene = id
 	_scene = load(SCENES[id].path).instantiate()

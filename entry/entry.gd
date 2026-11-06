@@ -20,9 +20,8 @@ const PAUSE := 1.2
 const BREATH := 0.25   # the pause after each line (was 0.5: Megan wants quicker dialogue)
 ## How high above the brew Onion stands once it has popped up and settled, metres.
 const PEEK_LIFT := 0.06
-## Without a headset (desktop), only a click presses: moving the mouse over a button
-## doesn't. Tests turn this on to drive the hands by fingertip.
-@export var poke_in_sim := false
+## Tests enable direct cauldron taps with synthetic fingertips on desktop.
+@export var touch_cauldron_in_sim := false
 
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
@@ -59,9 +58,6 @@ const DEBUG := true
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
 const TEST_SPEED := 1.0
-## Draw each hand's pointing ray (Wei's pointer casts it but only draws it on the
-## desktop). Only while pointing is on (his [method Pointer.ray_on]).
-const SHOW_RAYS := true
 ## TESTING: before the opening, show where the table was found and ask to confirm it
 ## (or point at the real table and pinch).
 const CONFIRM_TABLE := true
@@ -141,27 +137,11 @@ signal _part_pressed(part: StringName)
 ## DEBUG: Onion's soft halo.
 var _halo: StandardMaterial3D
 
-# Pressing: pokes, pinches, hover (the code is under "Pressing" below).
-## How far back a pinch looks for what was aimed at, seconds: the aim shifts as the fingers close.
-const PINCH_LOOKBACK := 0.15
-## ...but only when the ray has moved less than this since, radians (5 degrees): a slip, not a move.
-const PINCH_DRIFT := 0.087
-## A button ignores a second press this soon after the first, seconds (a poke and a pinch together).
-const PRESS_GAP := 0.6
-## The ray stays drawn this long after the hand's aim is lost, seconds, so a brief drop doesn't blink it.
-const RAY_GRACE := 0.3
 ## "Exit app" quits on a second press within this many seconds, so a stray pinch can't close the app.
 const EXIT_WINDOW := 3.0
 var _real := 0.0                    # seconds that pass at normal speed, whatever TEST_SPEED is
-var _buttons: Array[EntryButton] = []
-var _poking: Dictionary = {}        # side -> the button its fingertip is in
-var _pressed_at: Dictionary = {}    # button id -> _real when last pressed
-var _aim_log: Dictionary = {}       # side -> [[_real, Target aimed at], ...], the last 0.4 s
 var _cauldron_target: Target
 var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's reach
-var _ray_seen: Dictionary = {}      # side -> _real when the aim pose was last there
-var _hand_state: Dictionary = {}    # side -> last logged "aim ... joints ..." text
-var _hand_logged: Dictionary = {}   # side -> _real of that log line
 var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
 var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
 var _early_part: StringName = &""   # a jump button pressed during setup: skip the rest, play this
@@ -243,9 +223,9 @@ func run() -> void:
 	add_child(_runner)
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
-		if _hand_pokes():
+		if _cauldron_touches_enabled() and target == _cauldron_target:
 			_on_target(target))
-	Events.selected.connect(func(hand: StringName, target: Target, _o: Vector3, direction: Vector3) -> void: _on_target(_pinched(hand, target, direction)))
+	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _direction: Vector3) -> void: _on_target(target))
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
@@ -921,10 +901,6 @@ func _on_target(target: Target) -> void:
 	if get_tree().paused:
 		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
-		# One press, whether it came as a poke, a pinch or both.
-		if _real - float(_pressed_at.get(target.id, -100.0)) < PRESS_GAP:
-			return
-		_pressed_at[target.id] = _real
 		_presses.append(target.id)
 		if target.get_parent() is EntryButton:
 			(target.get_parent() as EntryButton).flash()
@@ -952,17 +928,14 @@ func _on_target(target: Target) -> void:
 		get_tree().quit()
 		return
 	if target != null and String(target.id).begins_with("entry_part_"):
-		Events.feedback.emit(&"hint", target.global_position)
 		var chosen := StringName(String(target.id).trim_prefix("entry_part_"))
 		if _part_running:
 			_interrupt(chosen)
 		_part_pressed.emit(chosen)
 		return
 	if target != null and String(target.id).begins_with("entry_step"):
-		Events.feedback.emit(&"hint", target.global_position)
 		return
 	if target != null and String(target.id).begins_with("entry_confirm"):
-		Events.feedback.emit(&"hint", target.global_position)
 		_confirm_pressed.emit(target.id)
 		return
 	if target == null or target.id != &"entry_cauldron" or not (_cue or _tap_open):
@@ -989,88 +962,6 @@ func _beat(text: String) -> void:
 		_beat_label.position = Vector3(0, -0.22, -0.6)
 		App.rig.head.add_child(_beat_label)
 	_beat_label.text = "beat " + text
-
-
-# --- The hand rays ------------------------------------------------------------
-
-var _rays: Dictionary = {}   # side -> [beam, end dot, material]
-
-## A thin beam from each tracked hand, as far as what it meets: faint white, blue and
-## brighter on something to press (a Target); a small dot where it lands.
-func _draw_rays() -> void:
-	if App.rig == null:
-		return
-	for side: StringName in [&"left", &"right"]:
-		var pointer := App.rig.pointer(side)
-		if not _rays.has(side):
-			_rays[side] = _new_ray()
-		var beam: MeshInstance3D = _rays[side][0]
-		var dot: MeshInstance3D = _rays[side][1]
-		var light: StandardMaterial3D = _rays[side][2]
-		var on := pointer != null and pointer.ray_on() and _aim_there(side, pointer) and (App.xr != null or side == &"right")
-		beam.visible = on
-		dot.visible = on
-		if not on:
-			continue
-		var from := pointer.global_position
-		var direction := -pointer.global_basis.z
-		var target := pointer.aimed
-		var length := 0.8
-		if target:
-			length = maxf(0.05, (target.global_position - from).dot(direction))
-		else:
-			var found: Dictionary = App.reality.hit(from, direction) if App.reality else {}
-			if not found.is_empty():
-				length = minf(2.0, from.distance_to(found.position))
-		if App.xr == null:
-			# Desktop: the hand is on the line of sight through the cursor, so its ray would be seen
-			# end-on, as a dot. Draw it from the lower right of the view to where it lands instead.
-			var landed := from + direction * length
-			from = App.head().global_transform * Vector3(0.22, -0.3, -0.2)
-			length = from.distance_to(landed)
-			direction = (landed - from) / maxf(length, 0.001)
-		light.albedo_color = Color(0.45, 0.75, 1.0, 0.75) if target else Color(1.0, 1.0, 1.0, 0.3)
-		var x := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
-		beam.global_transform = Transform3D(Basis(x, direction * length, x.cross(direction)), from + direction * length * 0.5)
-		dot.global_position = from + direction * length
-
-
-## Whether to draw [param side]'s ray: while the hand's aim pose is there (the game's
-## own check wants the index tip, thumb and palm too, and blinks the ray out without
-## them), and RAY_GRACE seconds after a brief loss. A change is logged, at most twice a second.
-func _aim_there(side: StringName, pointer: Pointer) -> bool:
-	var aim := App.rig.hand(side).get_has_tracking_data()
-	var joints := pointer.tracked()
-	if aim or joints:
-		_ray_seen[side] = _real
-	var state := "aim pose %s, hand check %s" % ["yes" if aim else "NO", "yes" if joints else "NO"]
-	if state != _hand_state.get(side, "") and _real - float(_hand_logged.get(side, -10.0)) > 0.5:
-		_hand_state[side] = state
-		_hand_logged[side] = _real
-		print("ENTRY hand ", side, ": ", state)
-	return _real - float(_ray_seen.get(side, -10.0)) < RAY_GRACE
-
-
-func _new_ray() -> Array:
-	var light := _material(Color(1, 1, 1, 0.3), true)
-	light.no_depth_test = App.xr == null   # desktop: the ray and its dot show over buttons
-	var beam := MeshInstance3D.new()
-	var line := CylinderMesh.new()
-	line.top_radius = 0.0015
-	line.bottom_radius = 0.0025
-	line.height = 1.0
-	line.radial_segments = 6
-	line.material = light
-	beam.mesh = line
-	add_child(beam)
-	var dot := MeshInstance3D.new()
-	var end := SphereMesh.new()
-	end.radius = 0.008
-	end.height = 0.016
-	end.material = light
-	dot.mesh = end
-	add_child(dot)
-	return [beam, dot, light]
 
 
 # --- DESKTOP: moving the head ------------------------------------------------
@@ -1147,41 +1038,15 @@ func _hand_to_cursor() -> void:
 
 # --- Pressing -----------------------------------------------------------------
 
-## Remembers, for each hand, what its ray pointed at over the last 0.4 s.
-func _log_aim() -> void:
-	for side: StringName in [&"left", &"right"]:
-		var log: Array = _aim_log.get_or_add(side, [])
-		var pointer := App.rig.pointer(side)
-		log.append([_real, pointer.aimed, -pointer.global_basis.z])
-		while not log.is_empty() and _real - float(log[0][0]) > 0.4:
-			log.pop_front()
-
-
-## A pinch moves the aim a little as the fingers close. So a press counts what the ray
-## pointed at PINCH_LOOKBACK seconds before the click, when that was a Target; else what
-## it hits at the click.
-func _pinched(side: StringName, at_click: Target, direction: Vector3) -> Target:
-	var log: Array = _aim_log.get(side, [])
-	var then: Variant = null
-	var then_direction := Vector3.ZERO
-	for sample: Array in log:
-		if float(sample[0]) <= _real - PINCH_LOOKBACK:
-			then = sample[1]
-			then_direction = sample[2]
-	if then != null and is_instance_valid(then) and then_direction.angle_to(direction) <= PINCH_DRIFT:
-		return then as Target
-	return at_click
-
-
-## Whether touching counts: on a headset always; on desktop only when [member poke_in_sim].
-func _hand_pokes() -> bool:
-	return App.xr != null or poke_in_sim
+## Whether direct cauldron taps count in this run.
+func _cauldron_touches_enabled() -> bool:
+	return App.xr != null or touch_cauldron_in_sim
 
 
 ## The index fingertip (world), or null. Only the index tip has to be tracked: the game's
 ## own check also wants the thumb and the palm, and drops the whole hand without them.
 func _fingertip(side: StringName) -> Variant:
-	if not _hand_pokes():
+	if not _cauldron_touches_enabled():
 		return null
 	if App.xr != null:
 		var joints := App.rig.tracked_hand(side).joints()
@@ -1192,36 +1057,6 @@ func _fingertip(side: StringName) -> Variant:
 		return App.rig.global_transform * joints.get_hand_joint_transform(TrackedHand.INDEX).origin
 	var pointer := App.rig.pointer(side)
 	return pointer.tip() if pointer.tracked() else null
-
-
-## A fingertip that goes into a button's box presses it (the nearest button, when two boxes
-## meet). A finger already in a box when the button appears does not press it: it has to
-## leave and come back. Buttons light up under a fingertip or a ray.
-func _poke_buttons() -> void:
-	_buttons.assign(_buttons.filter(func(b: Variant) -> bool: return is_instance_valid(b) and not b.is_queued_for_deletion()))
-	var hot: Array[EntryButton] = []
-	for side: StringName in [&"left", &"right"]:
-		var tip: Variant = _fingertip(side)
-		var inside: EntryButton = null
-		var best := INF
-		if tip != null:
-			for button in _buttons:
-				if button.reaches(tip):
-					var off := button.off_centre(tip)
-					if off < best:
-						best = off
-						inside = button
-		var was: Variant = _poking.get(side)
-		_poking[side] = inside
-		if inside != null:
-			hot.append(inside)
-			if inside != was and _real - inside.born > 0.8:
-				_on_target(inside.target)
-		var aimed := App.rig.pointer(side).aimed
-		if aimed != null and aimed.get_parent() is EntryButton:
-			hot.append(aimed.get_parent() as EntryButton)
-	for button in _buttons:
-		button.set_hot(button in hot)
 
 
 ## The same for the cauldron: a fingertip going into its reach touches it (while it glows).
@@ -1608,7 +1443,7 @@ func _outline(table: Surface, real: bool) -> Node3D:
 	return sheet
 
 
-## A floating button with [param text]: poke it, or point at it and pinch. Its box is the
+## A floating button with [param text]: point at it and pinch. Its box is the
 ## plate plus [param margin] all round (see [EntryButton]).
 func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.45, 0.85),
 		wide := 0.22, margin := 0.02) -> EntryButton:
@@ -1616,10 +1451,8 @@ func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.
 	add_child(button)
 	button.setup(text, id, colour, Vector2(wide, 0.06 if wide > 0.15 else 0.05), margin)
 	button.global_position = at
-	button.born = _real
 	button.look_at(Vector3(App.head().global_position.x, at.y, App.head().global_position.z), Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)   # its face to the child
-	_buttons.append(button)
 	return button
 
 
@@ -1820,6 +1653,10 @@ func _build_onion() -> void:
 	bounds = _bounds(_onion)
 	_onion.global_position -= bounds.get_center() - _orb.global_position
 	_onion_rest_y = _onion.position.y
+	var touch := OnionTouch.new()
+	touch.setup(_onion)
+	touch.minimum_y = _mouth.y + ONION_HEIGHT * 0.3
+	_orb.add_child(touch)
 	# Which way the eyes look: from the body's centre to the eyes' centre.
 	for mesh: MeshInstance3D in _onion.find_children("*Eyes*", "MeshInstance3D", true, false):
 		var eyes := (mesh.global_transform * mesh.get_aabb()).get_center()
@@ -1897,11 +1734,7 @@ func _process(delta: float) -> void:
 	if _exit_button != null and is_instance_valid(_exit_button) and _real - _exit_armed > EXIT_WINDOW and _exit_button.text() != "Exit app":
 		_exit_button.set_text("Exit app")
 	if App.rig != null:
-		_log_aim()
-		_poke_buttons()
 		_poke_cauldron()
-	if SHOW_RAYS:
-		_draw_rays()
 	if SHOW_HANDS or _show_hands_now:
 		_draw_hands()
 	if _aiming:

@@ -29,6 +29,26 @@ var is_settled := true
 
 var _surfaces: Array[Surface] = []
 var _focus := Vector3.ZERO
+## Leisure rooms are separate from measured AR surfaces; training is paused.
+var home_room: Node3D
+var room_frame := Transform3D.IDENTITY
+var room_size := Vector2(4.8, 4.8)
+
+
+func show_home_room(scene: PackedScene) -> void:
+	if home_room:
+		home_room.free()
+		home_room = null
+	if scene:
+		home_room = scene.instantiate()
+		add_child(home_room)
+		home_room.global_transform = room_frame
+		room_size = home_room.get_meta(&"size")
+	_home_visibility_changed()
+
+
+func _home_visibility_changed() -> void:
+	pass
 
 
 ## &"passthrough" or &"sim", for the log.
