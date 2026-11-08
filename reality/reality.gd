@@ -21,6 +21,8 @@ const HIT_RANGE := 6.0
 
 ## The work surface is decided: a real table was found, or the search gave up.
 signal settled
+## A fresh table measurement is ready to place the activity again.
+signal work_surface_reset
 
 ## How the real world is shown now. Change it with [method apply_view].
 var view := View.new()

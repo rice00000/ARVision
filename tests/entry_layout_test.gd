@@ -33,6 +33,18 @@ func test_nothing_overlaps_on_tables_big_enough_for_everything() -> void:
 	expect_eq(cases, 42, "every case was tried")
 
 
+func test_the_bench_fits_a_shallow_desk_viewed_at_an_angle() -> void:
+	var layout := EntryLayout.new()
+	layout.table = Transform3D(Basis.looking_at(Vector3(0.99, 0.0, 0.14)), Vector3(0.21, 0.66, -0.08))
+	layout.table_size = Vector2(0.82, 0.34)
+	layout.eye = Vector3(-0.25, 1.04, -0.18)
+	layout.ahead = Vector3(0.83, 0.0, -0.56).normalized()
+	layout.plan()
+	for corner in layout.zone(&"bench").outline():
+		var local := layout.table.affine_inverse() * Vector3(corner.x, layout.table_y(), corner.y)
+		expect(absf(local.x) < 0.41 and absf(local.z) < 0.17, "bench corner %s lies inside the tabletop" % local)
+
+
 func test_a_short_reach_still_reaches_the_gear_and_the_socket() -> void:
 	var layout := _layout(Vector2(1.0, 0.6), 0.3, 0.5, 0.45)
 	expect(layout.out_of_reach().is_empty(), "nothing the child needs is out of reach: %s" % layout.report())

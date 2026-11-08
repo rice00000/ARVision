@@ -41,8 +41,9 @@ const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 ## in front of the player. 0 is Wei's original. The opening sets it, and it stays for the
 ## shelf scene, so the opening's shelf and the real one stand in the same place.
 static var push := 0.0
-## The opening aims its shelf to the side of the table for the first visit.
-static var shelf_aim := Vector3.INF
+## The planned bench stays in the same place from the opening to the first visit.
+static var shelf_frame := Transform3D.IDENTITY
+static var shelf_below := 0.0
 ## While Onion leads the first visit it speaks for the shelf: the instruction, the first "fits" and the end.
 static var onion_voice := false
 ## Layout chat (round 5): the opening already showed the first round's things with the shelf. If non-zero,
@@ -537,12 +538,15 @@ func _move(thing: Target, to: Vector3, seconds: float) -> Tween:
 
 ## The bench and the shelf, once per block, facing the work surface from the eyes.
 func _build_shelf() -> void:
-	var eye := App.head().global_position
-	var at := App.reality.work_surface().transform.origin if shelf_aim == Vector3.INF else shelf_aim
-	var toward := at - eye
-	var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
-	_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
-	_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST) # just above a real table
+	if shelf_frame != Transform3D.IDENTITY:
+		_frame = shelf_frame
+		_below = shelf_below
+	else:
+		var eye := App.head().global_position
+		var toward := App.reality.work_surface().transform.origin - eye
+		var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
+		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
+		_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST)
 	_shelf = Node3D.new()
 	_shelf.name = "Shelf"
 	add_child(_shelf)

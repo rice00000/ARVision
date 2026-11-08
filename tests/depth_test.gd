@@ -110,28 +110,41 @@ func test_the_depth_table_is_believed_once_the_looks_agree() -> void:
 	expect_eq(TableFinder.agreeing(looks, 3, 0.03), best, "the fullest of the agreeing looks")
 
 
-func test_a_rescan_waits_for_fresh_looks_and_keeps_the_confirmed_spot() -> void:
+func test_the_chosen_look_supplies_both_the_size_and_the_heading() -> void:
+	var full := _room_grid()
+	var partial := _room_grid()
+	for i in partial.size * partial.size:
+		if i % partial.size < partial.size / 3:
+			partial.valid[i] = 0
+	var measured := full.table(EYE, Vector3.FORWARD)
+	var turned := Transform3D(Basis(Vector3.UP, 0.7), EYE)
+	var less := partial.table(EYE, -turned.basis.z)
+	expect(less.has("centre") and less.support < measured.support, "the turned looks see less of the table")
+	var finder := TableFinder.new()
+	finder.look(full, Transform3D(Basis.IDENTITY, EYE))
+	for i in TableFinder.AGREE - 2:
+		finder.look(partial, turned)
+	expect_eq(finder.look(partial, turned), &"found", "the looks agree on the table height")
+	expect_eq(finder.table.size, measured.size, "uses the fullest measurement")
+	expect_eq(finder.table.forward, Vector3.FORWARD, "keeps that measurement's axes")
+
+
+func test_a_rescan_waits_for_fresh_looks_and_replaces_the_measurement() -> void:
 	var grid := _room_grid()
 	var finder := TableFinder.new()
-	var placed := Vector3(0.12, TABLE_Y - 0.06, -0.72)
-	var table := Surface.new(&"table", Transform3D(Basis.IDENTITY, placed), Vector2(1.0, 0.7))
 	var eye := Transform3D(Basis(Vector3.UP, 0.8), EYE)
+	var measured := grid.table(EYE, -eye.basis.z)
+	finder.hold(Vector3(0.9, TABLE_Y - 0.06, -0.72), Vector2.ONE, Vector3.FORWARD)
+	finder.reset()
 	for i in TableFinder.AGREE - 1:
-		finder.look(grid, eye, table)
-	finder.reset() # recenter discards the looks from the old space
+		finder.look(grid, eye, true)
+	finder.reset()
 	for i in TableFinder.AGREE - 1:
-		expect_eq(finder.look(grid, eye, table), &"", "still collecting fresh looks")
-	expect_eq(finder.look(grid, eye, table), &"found", "four fresh looks confirm the table")
-	expect(finder.table.centre.is_equal_approx(Vector3(placed.x, TABLE_Y, placed.z)), "only the height is corrected")
-	expect_eq(finder.table.forward, Vector3.FORWARD, "turning the head does not rotate the layout")
-
-
-func test_a_rescan_does_not_move_to_a_patch_elsewhere_when_the_table_is_unseen() -> void:
-	var grid := _room_grid()
-	var finder := TableFinder.new()
-	var table := Surface.new(&"table", Transform3D(Basis.IDENTITY, Vector3(0.7, TABLE_Y, -0.72)), Vector2(1.0, 0.7))
-	for i in TableFinder.LOOKS + 1:
-		expect_eq(finder.look(grid, Transform3D(Basis.IDENTITY, EYE), table), &"", "the last table is out of view")
+		expect_eq(finder.look(grid, eye, true), &"", "still collecting fresh looks")
+	expect_eq(finder.look(grid, eye, true), &"found", "four fresh looks confirm the table")
+	expect(finder.table.centre.is_equal_approx(measured.centre), "uses the new centre")
+	expect(finder.table.forward.is_equal_approx(-eye.basis.z), "uses the new heading")
+	expect_eq(finder.table.size, measured.size, "uses the new dimensions")
 
 
 func test_the_table_is_measured_the_way_the_child_faces() -> void:

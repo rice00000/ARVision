@@ -9,6 +9,8 @@ const RADIUS := 0.065
 const REARM_DISTANCE := 0.11
 ## Designed for this touch; already about as soft as the pop (entry/assets/audio/README.md).
 const SOUND := preload("res://entry/assets/audio/onion-touch.ogg")
+## Touch sound loudness, dB. Mix here.
+const SOUND_DB := 6.0
 var reactions := 0
 var minimum_y := -INF
 var _model: Node3D
@@ -32,6 +34,8 @@ func _ready() -> void:
 	(shape.shape as SphereShape3D).radius = RADIUS
 	add_child(shape)
 	_sound.stream = SOUND
+	_sound.volume_db = SOUND_DB
+	_sound.max_db = SOUND_DB # the 3D player caps at +3 dB by default
 	_sound.max_polyphony = 4 # quick taps overlap instead of cutting each other off
 	_sound.max_distance = 3.0
 	add_child(_sound)

@@ -55,21 +55,16 @@ func test_an_anchored_surface_follows_its_anchor() -> void:
 	anchor.free()
 
 
-func test_realigning_the_rig_keeps_the_toys_on_the_tracked_table() -> void:
+func test_a_fresh_table_rebuilds_the_activity_with_the_new_surface() -> void:
 	await boot()
-	var anchor := Node3D.new()
-	App.rig.add_child(anchor)
-	anchor.position = Vector3(0, 0.72, -0.55)
-	var placed := anchor.global_transform
-	var table := Surface.new(&"table", placed, Vector2.ONE, anchor)
-	var toy := Node3D.new()
-	App.stage.add_child(toy)
-	toy.global_position = table.point(0.4, -0.3) + Vector3.UP * 0.04
-	var offset := placed.affine_inverse() * toy.global_transform
-	anchor.transform = Transform3D(Basis(Vector3.UP, 0.6), Vector3(0.3, 0.81, -0.8))
-	App.rig.align_table(table.transform, placed)
-	expect(table.transform.is_equal_approx(placed), "the table is back in the activity's frame")
-	expect((table.transform.affine_inverse() * toy.global_transform).is_equal_approx(offset), "the toy keeps its tabletop offset")
+	var previous := App.session.get_instance_id()
+	var table := _turned_surface()
+	App.reality.select_table(table)
+	App.reality.work_surface_reset.emit()
+	await frames(2)
+	expect_eq(App.main.current_scene, &"find_object", "the activity is reopened")
+	expect(App.session.get_instance_id() != previous, "the old session was replaced")
+	expect_eq(App.reality.work_surface(), table, "the new activity uses the new tabletop")
 
 
 # -- CameraFrame --------------------------------------------------------------

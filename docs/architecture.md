@@ -56,4 +56,4 @@ On a Quest 3 so far: the passthrough camera gives frames (left camera, feed `50`
 
 ## The room frame
 
-The rig maps OpenXR Stage space into the room. After a Quest recenter, Reality reads the tracked table anchor again or waits for four agreeing depth looks. The rig aligns that measurement with the existing table frame, so objects keep their tabletop positions. For depth alone, look at the table again to confirm it. Its heading stays fixed.
+After Quest recenter, Reality reads a tracked table anchor or measures a new tabletop from four agreeing depth looks. The activity rebuilds its layout from that table. First Visit returns to Intro to rebuild the workshop. The save is kept and interrupted rounds are unscored.

@@ -11,11 +11,8 @@ extends RefCounted
 const LOOKS := 5
 const AGREE := 4
 const TOLERANCE := 0.03
-## A rescan must also agree on the centre before it can move the table.
+## A fresh scan after recenter must also agree on where the top is.
 const RESCAN_SPAN := 0.12
-const RESCAN_PATCH := 0.15
-const RESCAN_POINTS := 12
-const HEIGHT_JITTER := 0.01
 ## Looks in a row that see the table's place but not its top before it is dropped.
 const DOUBTS := 4
 ## A look checks the points this far (horizontally) around the table's centre...
@@ -37,33 +34,23 @@ var _doubts := 0
 
 ## One look from [param eye] (the head's pose): &"found" when a table is believed
 ## from now, &"lost" when the believed one was dropped, else &"".
-func look(grid: DepthGrid, eye: Transform3D, reference: Surface = null) -> StringName:
+func look(grid: DepthGrid, eye: Transform3D, rescanning := false) -> StringName:
 	if not table.is_empty():
 		return &"lost" if _doubted(grid) else &""
-	var forward := -reference.transform.basis.z if reference else -eye.basis.z
+	var forward := -eye.basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
 	var seen := grid.table(eye.origin, forward)
+	seen.forward = forward # the measured width and depth are along these axes
 	support = seen.support
 	_looks.append(seen)
 	if _looks.size() > LOOKS:
 		_looks.pop_front()
-	var agreed := agreeing(_looks, AGREE, TOLERANCE, RESCAN_SPAN if reference else INF)
+	var agreed := agreeing(_looks, AGREE, TOLERANCE, RESCAN_SPAN if rescanning else INF)
 	if agreed.is_empty():
 		return &""
-	var centre: Vector3 = agreed.centre
-	if reference:
-		if not seen.has("centre") or not _near(seen.centre, centre, TOLERANCE, RESCAN_SPAN):
-			return &""
-		var previous := reference.transform.origin
-		var patch := Vector3(previous.x, centre.y, previous.z)
-		var observed := grid.around(patch, RESCAN_PATCH)
-		if observed.y < RESCAN_POINTS:
-			return &"" # an unseen patch cannot justify a sideways move
-		if observed.x >= RESCAN_POINTS:
-			centre = patch # the old spot is still on the top; the visible edges can change
-		if absf(centre.y - previous.y) < HEIGHT_JITTER:
-			centre.y = previous.y
-	hold(centre, agreed.size, forward)
+	if rescanning and (not seen.has("centre") or not _near(seen.centre, agreed.centre, TOLERANCE, RESCAN_SPAN)):
+		return &""
+	hold(agreed.centre, agreed.size, agreed.forward)
 	return &"found"
 
 

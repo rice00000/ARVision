@@ -209,7 +209,7 @@ func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.push = 0.0
-		ShelfCopy.shelf_aim = Vector3.INF
+		ShelfCopy.shelf_frame = Transform3D.IDENTITY
 		show_sim_props(true)
 	if is_instance_valid(_beat_label):
 		_beat_label.free()
@@ -241,7 +241,8 @@ func run() -> void:
 	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
 	_on_table = await _cauldron_on_table()
-	_shelf_to_the_side()
+	ShelfCopy.shelf_frame = _layout.bench
+	ShelfCopy.shelf_below = _layout.bench_below
 	_table = App.reality.work_surface()
 	# One cauldron, one Onion, one shelf, one workshop for every part.
 	_build_shelf()
@@ -580,7 +581,7 @@ func _to_shelf(fast := false) -> void:
 ## cauldron are not carried over to it yet.
 func _to_dots() -> void:
 	_beat("jump: the dots")
-	ShelfCopy.shelf_aim = Vector3.INF
+	ShelfCopy.shelf_frame = Transform3D.IDENTITY
 	Engine.time_scale = 1.0
 	_hand_over()
 	App.main.change_scene.call_deferred(&"global_motion")
@@ -1202,21 +1203,6 @@ func _toggle_zones() -> void:
 
 
 # --- The shelf to the side ----------------------------------------------------
-
-## Aim the first shelf to the side at the layout's chosen angle.
-func _shelf_to_the_side() -> void:
-	var table := App.reality.work_surface()
-	if not App.reality.surfaces(&"table").has(table):
-		print("ENTRY shelf: no real table, so it stays straight ahead")
-		return
-	var eye := App.head().global_position
-	var reach := Vector2(table.transform.origin.x - eye.x, table.transform.origin.z - eye.z).length()
-	var angle := _layout.shelf_angle
-	var point := eye + _ahead.rotated(Vector3.UP, -deg_to_rad(angle)) * reach
-	point.y = table.transform.origin.y
-	ShelfCopy.shelf_aim = point
-	print("ENTRY shelf: ", angle, " degrees right, ", snappedf(reach, 0.01), " m away")
-
 
 ## Works out the layout (EntryLayout) from the confirmed table, the head and the reach, and
 ## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]

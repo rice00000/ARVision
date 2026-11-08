@@ -41,6 +41,7 @@ func _ready() -> void:
 		reality.room = sim_room
 	reality.name = "Reality"
 	App.reality = reality
+	reality.work_surface_reset.connect(_restart_for_table, CONNECT_DEFERRED)
 	add_child(reality)
 	if App.xr == null:
 		App.sim_input = SimInput.new(App.rig)
@@ -74,12 +75,23 @@ func change_scene(id: StringName, fade := true) -> void:
 	switching = false
 
 
-## Another save was opened: rebuild the current scene on the new files.
-func restart(between: Callable) -> void:
+## Rebuild the current scene, optionally changing the save between scenes.
+func restart(between := Callable()) -> void:
 	_clear_scene()
-	between.call()
+	if between.is_valid():
+		between.call()
 	App.reality.apply_view(View.new())
 	_load_scene(current_scene)
+
+
+func _restart_for_table() -> void:
+	if switching:
+		return # the incoming scene will use the new table
+	if current_scene == &"first_visit":
+		change_scene(&"intro") # rebuild the workshop and Onion from the new tabletop
+	else:
+		Save.write()
+		restart()
 
 
 func show_activity(on: bool) -> void:
