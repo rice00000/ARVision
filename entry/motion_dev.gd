@@ -9,7 +9,7 @@ extends Node3D
 ## Where things stand is [EntryMotionLayout] (marker_spot, coherence_spot). Use:
 ##   var dev := EntryMotionDev.new(); add_child(dev); dev.set_scene(&"Motion")
 ## The scene that owns it frees it (or [method queue_free]) when it ends. Pressing works like the entry's own DEV
-## buttons: poke a fingertip into a button, or point and pinch.
+## buttons: point and pinch (Wei's UITarget buttons, Nov 5).
 
 ## Pressed: the coherence now pinned, percent.
 signal pinned(percent: float)
@@ -20,7 +20,6 @@ const STEP := 5.0
 var _label: Label3D
 var _readout: Label3D
 var _buttons: Array[EntryButton] = []
-var _poking := {}
 var _clock := 0.0
 var _since_readout := 1.0
 
@@ -103,7 +102,6 @@ func _button(text: String, at: Vector3, id: StringName, wide: float) -> void:
 	var head := App.head().global_position
 	button.look_at(Vector3(head.x, at.y, head.z), Vector3.UP)
 	button.rotate_object_local(Vector3.UP, PI)
-	button.born = _clock
 	_buttons.append(button)
 
 
@@ -113,25 +111,7 @@ func _process(delta: float) -> void:
 	if _since_readout > 0.3:
 		_since_readout = 0.0
 		_refresh()
-	for side: StringName in [&"left", &"right"]:
-		var tip: Variant = _fingertip(side)
-		var inside: EntryButton = null
-		if tip != null:
-			var best := INF
-			for button in _buttons:
-				if button.reaches(tip) and button.off_centre(tip) < best:
-					best = button.off_centre(tip)
-					inside = button
-		var was: Variant = _poking.get(side)
-		_poking[side] = inside
-		if inside != null and inside != was and _clock - inside.born > 0.8:
-			_press(inside.id)
-	for button in _buttons:
-		var hot := false
-		for side: StringName in [&"left", &"right"]:
-			var aimed := App.rig.pointer(side).aimed
-			hot = hot or (aimed != null and aimed.get_parent() == button) or _poking.get(side) == button
-		button.set_hot(hot)
+	# Wei's buttons (Nov 5) are aimed at and pinched; they light up on hover themselves.
 
 
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
@@ -149,12 +129,3 @@ func _press(id: StringName) -> void:
 		pin(float(text.trim_prefix("dev_coh_")))
 
 
-func _fingertip(side: StringName) -> Variant:
-	if App.xr != null:
-		var joints := App.rig.tracked_hand(side).joints()
-		if joints == null or not joints.has_tracking_data:
-			return null
-		if (joints.get_hand_joint_flags(TrackedHand.INDEX) & XRHandTracker.HAND_JOINT_FLAG_POSITION_VALID) == 0:
-			return null
-		return App.rig.global_transform * joints.get_hand_joint_transform(TrackedHand.INDEX).origin
-	return null
