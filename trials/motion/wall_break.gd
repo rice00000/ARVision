@@ -1,6 +1,10 @@
 class_name WallBreak
 extends Node3D
-## Voronoi wall pieces animated together on the GPU. See docs/home.md for sources.
+## Voronoi wall pieces animated together on the GPU. The pieces' own jagged outline
+## is the hole: a dark patch of the same shape lies behind them, with no rim.
+## Everything starts on the frame of the hit. The shatter's left and right
+## channels play from the hole's left and right edges, falling with the pieces.
+## See docs/home.md for sources.
 
 enum Style {CRACK, SPACE}
 const HOLE_SIZE := Vector2(2.4, 1.7)
@@ -8,6 +12,11 @@ const FULL_SIZE_AT := 3.0
 const STAY_SECONDS := {Style.CRACK: 3.0, Style.SPACE: 6.0}
 const SHARDS := preload("res://trials/motion/wall_shatter.gdshader")
 const IMPACT := preload("res://trials/motion/wall_impact.gdshader")
+const SHATTER: Array[AudioStream] = [preload("res://trials/motion/sounds/wall_shatter_left.ogg"),
+	preload("res://trials/motion/sounds/wall_shatter_right.ogg")]
+## The hole's outline: points around an ellipse, each pushed in or out.
+const RIM_POINTS := 28
+const RIM_JAG := Vector2(0.84, 1.06)
 var piece_count := 0
 var _style := Style.CRACK
 var _age := 0.0
@@ -37,9 +46,10 @@ func _build(size: Vector2, flow: Vector3, frame: CameraFrame) -> void:
 	if frame:
 		_material.set_shader_parameter(&"has_picture", true)
 		_material.set_shader_parameter(&"picture", ImageTexture.create_from_image(frame.image))
+	var rim := _rim(size)
 	var body := MeshInstance3D.new()
 	body.name = "Shards"
-	body.mesh = _mesh(size, frame)
+	body.mesh = _mesh(size, rim, frame)
 	body.material_override = _material
 	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.extra_cull_margin = 4.0
@@ -48,26 +58,45 @@ func _build(size: Vector2, flow: Vector3, frame: CameraFrame) -> void:
 	_impact.set_shader_parameter(&"space", _style == Style.SPACE)
 	var patch := MeshInstance3D.new()
 	patch.name = "Impact"
-	patch.mesh = QuadMesh.new()
-	(patch.mesh as QuadMesh).size = size
+	patch.mesh = _hole(size, rim)
 	patch.material_override = _impact
 	patch.position.z = -0.008
 	patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(patch)
-	_crash()
+	_shatter(size)
 
 
-func _mesh(size: Vector2, frame: CameraFrame) -> ArrayMesh:
+## A jagged outline: every other point pushed further in, so it has teeth.
+static func _rim(size: Vector2) -> PackedVector2Array:
+	var rim := PackedVector2Array()
+	for i in RIM_POINTS:
+		var a := TAU * (i + randf_range(-0.3, 0.3)) / RIM_POINTS
+		var reach := randf_range(RIM_JAG.x, RIM_JAG.y) - (0.08 if i % 2 else 0.0)
+		rim.append(Vector2(cos(a), sin(a)) * size * 0.47 * reach)
+	return rim
+
+
+## The dark patch behind the pieces, the rim's shape. Vertex colour runs 1 at the
+## centre to 0 at the rim, for the shadow just inside the edge.
+static func _hole(size: Vector2, rim: PackedVector2Array) -> ArrayMesh:
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in rim.size():
+		for point: Vector2 in [Vector2.ZERO, rim[(i + 1) % rim.size()], rim[i]]:
+			tool.set_color(Color.WHITE if point == Vector2.ZERO else Color.BLACK)
+			tool.set_uv(point / size + Vector2.ONE * 0.5)
+			tool.set_normal(Vector3.BACK)
+			tool.add_vertex(Vector3(point.x, point.y, 0.0))
+	return tool.commit()
+
+
+func _mesh(size: Vector2, rim: PackedVector2Array, frame: CameraFrame) -> ArrayMesh:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 43619
+	rng.randomize()
 	var seeds: Array[Vector2] = []
 	for y in 5:
 		for x in 7:
 			seeds.append((Vector2(x + rng.randf_range(0.15, 0.85), y + rng.randf_range(0.15, 0.85)) / Vector2(7, 5) - Vector2.ONE * 0.5) * size)
-	var rim := PackedVector2Array()
-	for i in 32:
-		var a := TAU * i / 32.0
-		rim.append(Vector2(cos(a), sin(a)) * size * 0.47)
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	tool.set_custom_format(0, SurfaceTool.CUSTOM_RGBA_FLOAT)
@@ -119,26 +148,18 @@ func _vertex(tool: SurfaceTool, point: Vector2, z: float, centre: Vector2, rando
 func _process(delta: float) -> void:
 	_age += delta
 	_material.set_shader_parameter(&"age", _age)
-	_impact.set_shader_parameter(&"age", _age)
 	_impact.set_shader_parameter(&"opacity", clampf((STAY_SECONDS[_style] + 0.5 - _age) / 0.5, 0, 1))
 	if _age > STAY_SECONDS[_style] + 0.5: queue_free()
 
 
-func _crash() -> void:
-	var rate := 22050
-	var samples := PackedByteArray()
-	samples.resize(int(rate * 0.8) * 2)
-	for i in samples.size() / 2:
-		var t := float(i) / rate
-		var noise := randf_range(-1.0, 1.0) * exp(-t * 7.0)
-		var rumble := sin(TAU * (90.0 - 50.0 * t) * t) * exp(-t * 4.0)
-		samples.encode_s16(i * 2, int(clampf(noise * 0.6 + rumble * 0.5, -1.0, 1.0) * 30000.0))
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = rate
-	stream.data = samples
-	var player := AudioStreamPlayer3D.new()
-	player.stream = stream
-	player.unit_size = 4.0
-	add_child(player)
-	player.play()
+## Left and right channels at the hole's edges, dropping with the pieces.
+func _shatter(size: Vector2) -> void:
+	for side in 2:
+		var player := AudioStreamPlayer3D.new()
+		player.stream = SHATTER[side]
+		player.unit_size = 4.0
+		player.position = Vector3(size.x * (side - 0.5), 0.0, 0.0)
+		add_child(player)
+		player.play()
+		var fall := create_tween().tween_property(player, ^"position:y", -size.y * 0.5, player.stream.get_length())
+		fall.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)

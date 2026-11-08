@@ -23,7 +23,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 python tools/test.py
 ```
 
-Runs every suite headlessly on `test` profiles: GDScript unit tests and whole sessions played by a simulated child ([testing](docs/testing.md)). One GDScript suite: `godot --headless --xr-mode off --fixed-fps 60 --path . res://tests/run.tscn -- --profile=test --only=smoke`. Rendered walkthrough with screenshots: `python tools/sim/walkthrough.py` → `build/walkthrough/review.html`. Screenshots of every view: `godot --xr-mode off --path . res://tools/capture.tscn -- --profile=test_capture` → `build/captures/`.
+Run before submitting changes. For visual changes, also run `python tools/sim/walkthrough.py` and review `build/walkthrough/review.html`. See [testing](docs/testing.md) for targeted checks.
 
 ## Where things are
 

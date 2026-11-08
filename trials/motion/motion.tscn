@@ -3,13 +3,16 @@
 [ext_resource type="Script" path="res://trials/motion/motion_trial.gd" id="1_motion"]
 [ext_resource type="Shader" path="res://trials/motion/motion_dots.gdshader" id="2_dots"]
 [ext_resource type="Script" path="res://trials/motion/sweep_trail.gd" id="3_trail"]
+[ext_resource type="AudioStream" uid="uid://bpt7sh7bt2vr4" path="res://trials/motion/sounds/dots_shimmer.ogg" id="4_shimmer"]
 
 [sub_resource type="ShaderMaterial" id="flow"]
 resource_local_to_scene = true
 shader = ExtResource("2_dots")
 
 [sub_resource type="StandardMaterial3D" id="dot_material"]
+transparency = 1
 shading_mode = 0
+vertex_color_use_as_albedo = true
 albedo_color = Color(0.75, 0.95, 1, 1)
 
 [sub_resource type="SphereMesh" id="dot"]
@@ -29,9 +32,14 @@ explosiveness = 1.0
 fixed_fps = 0
 visibility_aabb = AABB(-1.1, -0.8, -1.1, 2.2, 1.6, 2.2)
 local_coords = true
+draw_order = 3
 process_material = SubResource("flow")
 draw_pass_1 = SubResource("dot")
 cast_shadow = 0
+
+[node name="Shimmer" type="AudioStreamPlayer3D" parent="Cloud"]
+stream = ExtResource("4_shimmer")
+unit_size = 3.0
 
 [node name="LeftTrail" type="Node3D" parent="."]
 script = ExtResource("3_trail")

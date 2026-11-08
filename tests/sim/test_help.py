@@ -96,7 +96,7 @@ class Help(SimCase):
         child.actor.wait(20)
         self.assertEqual(self.reports(sim, "hint"), [], "no help by itself")
         cloud = sim.observe()["stimuli"]["cloud"]
-        self.assertEqual(cloud["signal_count"], 30)
+        self.assertEqual(cloud["signal_count"], 49, "0.15 of 328 dots, fading shell included")
         child.actor.help("left")
         cloud = sim.observe()["stimuli"]["cloud"]
         self.assertEqual(cloud["signal_count"], cloud["dot_count"], "help: every dot follows the flow")

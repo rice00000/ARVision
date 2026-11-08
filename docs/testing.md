@@ -1,11 +1,14 @@
 # Testing
 
-`python tools/test.py` runs everything headless, in parallel, in about 15 s; non-zero exit on any failure.
+Run `python tools/test.py` before submitting. It checks baked speech, GDScript tests and Python scenarios headlessly on test profiles.
 
 - **GDScript unit tests** `tests/*_test.gd` (`TestCase`): one piece at a time on the real app.
 - **Scenarios** `tests/sim/test_*.py` (`unittest`): whole sessions on the real `main.tscn`, played by a simulated child.
 
-`python tools/sim/walkthrough.py` renders a walkthrough to `build/walkthrough/` (PNGs + `review.html`) and runs `tests/rendered/` against `tools/cv_server.py --fake`. Open the pictures: a finished script is not a visual pass.
+For visual changes, run `python tools/sim/walkthrough.py`. It runs `tests/rendered/` with fake CV and captures Find it, real objects and Global motion. Review `build/walkthrough/review.html`.
+
+- One GDScript suite `godot --headless --xr-mode off --fixed-fps 60 --path . res://tests/run.tscn -- --profile=test --only=smoke`.
+- Extra view screenshots `godot --xr-mode off --path . res://tools/capture.tscn -- --profile=test_capture` → `build/captures/`.
 
 ## The simulated child
 

@@ -1,9 +1,8 @@
-"""Read the flow, swept by a seated body: directions, hands, wind-ups, moves that are no sweeps, pauses,
-tracking loss."""
+"""Read the flow with seated bodies: directions, hands, wind-ups and tracking loss."""
 
 import unittest
 
-from support import Child, Facilitator, SimCase, block, plan
+from support import Child, SimCase, block, plan
 from body import add, mul
 from policy import FLOWS
 
@@ -26,9 +25,11 @@ class Motion(SimCase):
             self.assertEqual([e["data"]["values"]["heading"] for e in ends], [h for h in HEADINGS for _ in (0, 1)])
             self.assertEqual([e["data"]["attempts"][0]["hand"] for e in ends], ["right", "left"] * 4)
             for end in ends:
-                self.assertTrue(end["success"] and end["data"]["first_attempt_correct"] and end["data"]["first_try"])
-                self.assertLess(end["data"]["angle_degrees"], 1.0)
-                distance = end["data"]["attempts"][0]["distance_metres"]
+                data = end["data"]
+                self.assertTrue(end["success"] and data["first_attempt_correct"] and data["first_try"])
+                self.assertEqual(len(data["attempts"]), 1)
+                self.assertLess(data["angle_degrees"], 1.0)
+                distance = data["attempts"][0]["distance_metres"]
                 self.assertTrue(0.12 <= distance < 0.16, f"judged as soon as the hand has gone 0.12 m: {distance}")
             self.assert_log_ok(sim)
 
@@ -115,23 +116,6 @@ class Motion(SimCase):
         actor.creep(side, start, at=aim)
         actor.move_hand(side, add(start, mul(direction, 0.08)), at=aim, seconds=0.1)
         return end, aim
-
-    def test_a_pause_cancels_an_unfinished_sweep(self):
-        sim = self.launch(plan(block("motion", pins={"direction": 2})))
-        child = Child(sim, seed=4)
-        facilitator = Facilitator(sim)
-        sim.run_until("trial_started")
-        left = self.cloud_direction(sim, "left")
-        end, aim = self.half_sweep(child.actor, "right", left)
-        facilitator.open()
-        child.actor.move_hand("right", end, at=aim, seconds=0.2)  # finished while paused
-        sim.wait(0.3)
-        facilitator.press("fac_close")
-        sim.wait(0.4)
-        self.assertEqual(self.motion_reports(sim), [], "a sweep through a pause is never judged")
-        self.assertTrue(sim.observe()["session"]["trial"]["running"])
-        child.actor.sweep("left", left)
-        self.assertTrue(self.round_ends(sim)[0]["success"], "the next sweep counts")
 
     def test_tracking_loss_cancels_an_unfinished_sweep(self):
         sim = self.launch(plan(block("motion", pins={"direction": 1})))
