@@ -56,4 +56,4 @@ On a Quest 3 so far: the passthrough camera gives frames (left camera, feed `50`
 
 ## The room frame
 
-Everything lives in OpenXR's Stage space, which stays on the room. The app never recentres (`center_on_hmd`): Quest asks on every headset off and on, and recentring left menus behind while the table moved. A Quest that is off still reports the head as tracked, from a placeholder pose; a table found then is dropped once worn looks contradict it (`TableFinder`).
+The rig maps OpenXR Stage space into the room. After a Quest recenter, Reality reads the tracked table anchor again or waits for four agreeing depth looks. The rig aligns that measurement with the existing table frame, so objects keep their tabletop positions. For depth alone, look at the table again to confirm it. Its heading stays fixed.

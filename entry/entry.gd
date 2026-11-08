@@ -209,6 +209,7 @@ func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.push = 0.0
+		ShelfCopy.shelf_aim = Vector3.INF
 		show_sim_props(true)
 	if is_instance_valid(_beat_label):
 		_beat_label.free()
@@ -569,7 +570,6 @@ func _to_shelf(fast := false) -> void:
 	if FIRST_THINGS and _first_seed != 0:   # the real trial makes the same things, already in place
 		ShelfCopy.seed_next = _first_seed
 		ShelfCopy.things_arrive = false
-	_keep_pinned()   # TESTING: Wei's World uses the chosen table
 	Engine.time_scale = 1.0   # Wei's World at normal speed
 	_hand_over()
 	_beat("done: Wei's World")
@@ -580,7 +580,7 @@ func _to_shelf(fast := false) -> void:
 ## cauldron are not carried over to it yet.
 func _to_dots() -> void:
 	_beat("jump: the dots")
-	_keep_pinned()
+	ShelfCopy.shelf_aim = Vector3.INF
 	Engine.time_scale = 1.0
 	_hand_over()
 	App.main.change_scene.call_deferred(&"global_motion")
@@ -1203,9 +1203,7 @@ func _toggle_zones() -> void:
 
 # --- The shelf to the side ----------------------------------------------------
 
-## Wei's bench faces his table point from the eyes. So to turn the shelf the layout's angle
-## right, the found table's point moves there, along the same table. Only for a real table: the
-## pretend one is always straight ahead. Wei's World follows: the alchemy table is that way.
+## Aim the first shelf to the side at the layout's chosen angle.
 func _shelf_to_the_side() -> void:
 	var table := App.reality.work_surface()
 	if not App.reality.surfaces(&"table").has(table):
@@ -1216,11 +1214,7 @@ func _shelf_to_the_side() -> void:
 	var angle := _layout.shelf_angle
 	var point := eye + _ahead.rotated(Vector3.UP, -deg_to_rad(angle)) * reach
 	point.y = table.transform.origin.y
-	App.reality._surfaces.erase(table)   # TESTING: reaches into Reality's list (ask Wei for a hook)
-	var moved := Surface.new(&"table", Transform3D(table.transform.basis, point), table.size)
-	App.reality.add_surface(moved)
-	if _pinned != null:
-		_pinned = moved
+	ShelfCopy.shelf_aim = point
 	print("ENTRY shelf: ", angle, " degrees right, ", snappedf(reach, 0.01), " m away")
 
 
@@ -1285,7 +1279,6 @@ var _aiming := false
 var _aim_dot: MeshInstance3D
 var _aim_material: StandardMaterial3D
 var _aim_hit: Dictionary = {}       # the last flat tabletop the ray found: {position, normal}
-var _pinned: Surface                # TESTING: the table chosen here; kept over others later
 func _step_table() -> bool:
 	_presses.clear()
 	_beat("TEST: is this the table?")
@@ -1306,7 +1299,7 @@ func _step_table() -> bool:
 		return true
 	if pressed == &"entry_confirm_yes":
 		if real:
-			_pinned = table
+			App.reality.select_table(table)
 		print("ENTRY table: confirmed")
 		return false
 	_panel.show_step(2, SETUP_STEPS, "Point at the table", "Point at the tabletop: the dot turns green. Then pinch.", [], [])
@@ -1338,10 +1331,10 @@ func _step_table() -> bool:
 		return true
 	var at: Vector3 = _aim_hit.position
 	var facing := Vector3(at.x - eye.origin.x, 0.0, at.z - eye.origin.z).normalized()
-	_pinned = Surface.new(&"table", Transform3D(Basis.looking_at(facing), at), Vector2(0.8, 0.5))
-	_keep_pinned()
+	var marked := Surface.new(&"table", Transform3D(Basis.looking_at(facing), at), Vector2(0.8, 0.5))
+	App.reality.select_table(marked)
 	print("ENTRY table: pointed, ", _away(at), " m away, ", snappedf(eye.origin.y - at.y, 0.01), " m below the eyes")
-	var shown := _outline(_pinned, true)
+	var shown := _outline(marked, true)
 	await _wait(1.2)
 	shown.queue_free()
 	return false
@@ -1362,19 +1355,6 @@ func _table_panel(table: Surface, real: bool) -> void:
 			["Comfortable height (%d cm down)" % roundi(drop * 100.0) if comfy else "Looks odd: %d cm below the eyes" % roundi(drop * 100.0), &"good" if comfy else &"warn"],
 			["Room for everything" if big else ("Far: hard to reach" if far > 0 else "Small: %d things overlap" % crowded), &"good" if big else &"warn"]],
 			[["Yes, that's the table", &"entry_confirm_yes", SetupPanel.GREEN], ["No, point at it", &"entry_confirm_point", SetupPanel.GREY]])
-
-
-## TESTING ONLY: the chosen table replaces any other tables (Wei's depth finder can
-## add one later; then his code would pick whichever is nearest). Reaches into
-## Reality's list: a proper "use this table" hook would be Wei's call.
-func _keep_pinned() -> void:
-	if _pinned == null:
-		return
-	for other in App.reality.surfaces(&"table"):
-		if other != _pinned:
-			App.reality._surfaces.erase(other)
-	if not App.reality.surfaces(&"table").has(_pinned):
-		App.reality.add_surface(_pinned)
 
 
 func _start_aiming() -> void:

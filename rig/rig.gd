@@ -33,3 +33,8 @@ func pointer(side: StringName) -> Pointer:
 
 func tracked_hand(side: StringName) -> TrackedHand:
 	return _left_joints if side == &"left" else _right_joints
+
+
+## Map the freshly tracked table onto the frame used by the activity.
+func align_table(tracked: Transform3D, placed: Transform3D) -> void:
+	global_transform = placed * tracked.affine_inverse() * global_transform

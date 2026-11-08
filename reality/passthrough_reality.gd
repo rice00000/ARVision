@@ -28,6 +28,9 @@ var _depth := DepthSensor.new()
 var _finder := TableFinder.new()
 ## The table found without the room scan (depth or hands); null while none.
 var _table: Surface
+var _recenter_table: Surface
+var _recenter_frame: Transform3D
+var _rescan_after := 0
 ## Say "Got it. That's your table." when depth finds the table. Off while something
 ## else sets the table up quietly (the entry's own table check).
 var announce_table := true
@@ -39,6 +42,7 @@ func kind() -> String:
 
 func _ready() -> void:
 	is_settled = false
+	set_process(false)
 	get_viewport().transparent_bg = true
 	var environment := get_world_3d().environment
 	environment.background_mode = Environment.BG_COLOR
@@ -88,6 +92,8 @@ const GIVE_UP_AFTER := 10.0
 const HAND_TABLE_RADIUS := 0.35
 ## Points on the table top around the hands it must see, when it sees the place at all.
 const HAND_TABLE_POINTS := 12
+## Let the runtime update its poses before accepting a new table measurement.
+const RECENTER_SETTLE_MS := 500
 
 
 ## Logs a step of reading the room, and prints it as one JSON line (adb logcat, tools/xrsim.py).
@@ -130,11 +136,63 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 	return found if found else _depth.hit(from, direction)
 
 
+## OpenXR emits this before updating the tracking poses for the new space.
+func _remember_table(_mode: int) -> void:
+	if _rescan_after != 0:
+		return
+	var surface := work_surface()
+	var tables := surfaces(&"table")
+	_recenter_table = surface if surface in tables else tables.front() if not tables.is_empty() else null
+	if _recenter_table:
+		_recenter_frame = _recenter_table.transform
+
+
+func _rescan_table() -> void:
+	_rescan_after = Time.get_ticks_msec() + RECENTER_SETTLE_MS
+	_depth.invalidate()
+	var anchored := _recenter_table != null and _recenter_table.anchor != null
+	if not anchored:
+		_finder.reset()
+	set_process(anchored)
+	note(&"room_table_rescan")
+
+
+func _process(_delta: float) -> void:
+	var anchor := _recenter_table.anchor as XRAnchor3D
+	if _rescan_ready() and anchor.get_has_tracking_data():
+		_align_table(_recenter_table.transform)
+
+
+func _rescan_ready() -> bool:
+	return can_process() and Time.get_ticks_msec() >= _rescan_after
+
+
+func _align_table(tracked: Transform3D) -> void:
+	App.rig.align_table(tracked, _recenter_frame)
+	_depth.invalidate()
+	_rescan_after = 0
+	_recenter_table = null
+	set_process(false)
+	note(&"room_table_realigned", {previous = _recenter_frame.origin, measured = tracked.origin})
+
+
 ## Every depth look: finds the table, or checks the one found ([TableFinder]).
 func _look_for_table() -> void:
-	match _finder.look(_depth.grid, App.head().global_transform):
+	if _rescan_after != 0 and (not _rescan_ready() or is_processing()):
+		return
+	if _rescan_after == 0 and work_surface().anchor:
+		return
+	match _finder.look(_depth.grid, App.head().global_transform, _recenter_table):
 		&"found":
-			_set_table(&"room_depth_table")
+			if _recenter_table:
+				var found := _finder.table
+				if _table != _recenter_table:
+					_surfaces.erase(_table)
+					_table = _recenter_table
+				_finder.hold(_recenter_frame.origin, _table.size, -_recenter_frame.basis.z)
+				_align_table(Transform3D(Basis.looking_at(found.forward), found.centre))
+			else:
+				_set_table(&"room_depth_table")
 		&"lost":
 			note(&"room_table_lost", {centre = _table.transform.origin})
 			_surfaces.erase(_table)
@@ -143,12 +201,12 @@ func _look_for_table() -> void:
 		note(&"depth_table", {support = _finder.support})
 
 
-## The finder's table, found without the room scan (hands or depth); toys go on
-## it from the next round. The world is never recentred, so it stays on the room.
+## The first table found without the room scan (hands or depth).
 func _set_table(how: StringName) -> void:
 	var found := _finder.table
 	_table = Surface.new(&"table", Transform3D(Basis.looking_at(found.forward), found.centre), found.size)
 	add_surface(_table)
+	_rescan_after = 0
 	if announce_table:
 		Events.say("Got it. That's your table.")
 	note(how, {centre = found.centre, size = found.size})
@@ -157,14 +215,16 @@ func _set_table(how: StringName) -> void:
 
 func _room_ready() -> void:
 	var surface := work_surface()
+	App.xr.play_area_changed.connect(_remember_table)
+	App.xr.pose_recentered.connect(_rescan_table)
+	_depth.refreshed.connect(_look_for_table)
 	_depth.start()
 	if surface in _surfaces:
 		_settle()
 	else:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
-		_depth.refreshed.connect(_look_for_table)
 		get_tree().create_timer(ASK_HANDS_AFTER).timeout.connect(func() -> void:
-			if not _table:
+			if work_surface() not in _surfaces:
 				_hands_asked = true
 				Events.say("Put both hands flat on the table for a moment."))
 		get_tree().create_timer(ASK_HANDS_AFTER + GIVE_UP_AFTER).timeout.connect(_settle)

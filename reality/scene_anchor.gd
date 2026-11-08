@@ -21,7 +21,7 @@ func setup_scene(entity: OpenXRFbSpatialEntity) -> void:
 	shape.free()
 	var face := top_face(box, global_basis)
 	var frame: Transform3D = global_transform * face.frame
-	App.reality.add_surface(Surface.new(StringName(label), frame, face.size, self))
+	App.reality.add_surface(Surface.new(StringName(label), frame, face.size, anchor))
 	PassthroughReality.note(&"room_surface", {kind = label, size = face.size, centre = frame.origin, normal = frame.basis.y})
 
 

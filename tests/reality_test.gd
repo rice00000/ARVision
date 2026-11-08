@@ -55,6 +55,23 @@ func test_an_anchored_surface_follows_its_anchor() -> void:
 	anchor.free()
 
 
+func test_realigning_the_rig_keeps_the_toys_on_the_tracked_table() -> void:
+	await boot()
+	var anchor := Node3D.new()
+	App.rig.add_child(anchor)
+	anchor.position = Vector3(0, 0.72, -0.55)
+	var placed := anchor.global_transform
+	var table := Surface.new(&"table", placed, Vector2.ONE, anchor)
+	var toy := Node3D.new()
+	App.stage.add_child(toy)
+	toy.global_position = table.point(0.4, -0.3) + Vector3.UP * 0.04
+	var offset := placed.affine_inverse() * toy.global_transform
+	anchor.transform = Transform3D(Basis(Vector3.UP, 0.6), Vector3(0.3, 0.81, -0.8))
+	App.rig.align_table(table.transform, placed)
+	expect(table.transform.is_equal_approx(placed), "the table is back in the activity's frame")
+	expect((table.transform.affine_inverse() * toy.global_transform).is_equal_approx(offset), "the toy keeps its tabletop offset")
+
+
 # -- CameraFrame --------------------------------------------------------------
 
 func test_camera_rays_go_through_the_image() -> void:
