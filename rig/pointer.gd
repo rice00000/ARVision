@@ -13,7 +13,12 @@ extends Node3D
 ## it, so pointing works the same over passthrough and in the simulated room.
 
 const TARGET_LAYER := 1
+## Modal panels and their furniture; these own input while a menu is open.
 const MENU_LAYER := 4
+## Non-blocking touch reactions (e.g. Onion), excluded from pointing rays.
+const REACTION_LAYER := 8
+## In-world UI (setup, level choices, replay), excluded by modal panels.
+const UI_LAYER := 16
 ## How close the fingertip must be to a Target to grab it, metres.
 const GRAB_RADIUS := 0.07
 ## A hand rising or falling more steeply than this (the sine of 50 degrees) is not sweeping.
@@ -61,6 +66,10 @@ var aimed: Target
 @onready var _controller := get_parent() as XRController3D
 var _finger: Area3D
 var _marker: MeshInstance3D
+var _beam := MeshInstance3D.new()
+var _dot := MeshInstance3D.new()
+var _ray_material := StandardMaterial3D.new()
+var _hit_at := Vector3.ZERO
 var _last_tip := Vector3.INF
 var _tip_moved := false
 ## Where the fingertip last moved to, and for how long it has stayed near it.
@@ -91,15 +100,55 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_finger.collision_mask = _input_layer()
-	aimed = cast() if ray_on() else null
+	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER | REACTION_LAYER
+	_set_aim(cast() if tracked() else null)
 	_marker.visible = App.xr == null and tracked()
+	_draw_ui_ray()
+
+
+func _set_aim(target: Target) -> void:
+	if is_instance_valid(aimed) and aimed is UITarget and aimed != target:
+		aimed.focus(side, false)
+	aimed = target
+	if aimed is UITarget:
+		aimed.focus(side, true)
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(aimed) and aimed is UITarget:
+		aimed.focus(side, false)
+
+
+func _draw_ui_ray() -> void:
+	var show := aimed is UITarget or App.menu_active()
+	if not show:
+		for target: UITarget in get_tree().get_nodes_in_group(UITarget.GROUP):
+			if target.show_ray and target.is_visible_in_tree() and target.collision_layer != 0:
+				show = true
+				break
+	show = show and tracked() and (App.xr != null or side == &"right")
+	_beam.visible = show
+	_dot.visible = show and aimed is UITarget
+	if not show: return
+	var from := global_position
+	var direction := -global_basis.z
+	var distance := minf(length, 1.0)
+	if aimed is UITarget:
+		distance = from.distance_to(_hit_at)
+	var end := from + direction * distance
+	if App.xr == null:
+		from = App.head().global_transform * Vector3(0.22, -0.3, -0.2)
+		distance = from.distance_to(end)
+		direction = (end - from).normalized()
+	_ray_material.albedo_color = Color(1.0, 0.9, 0.45) if aimed is UITarget else Color(0.75, 0.85, 1.0)
+	var across := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
+	_beam.global_transform = Transform3D(Basis(across, direction * distance, across.cross(direction)), from + direction * distance * 0.5)
+	_dot.global_position = end
 
 
 ## The ray points: while the facilitator panel is open, and in blocks that use it.
 func ray_on() -> bool:
-	var panel := App.module(&"Facilitator")
-	if panel and panel.is_open:
+	if App.menu_active():
 		return true
 	return App.session == null or App.session.block == null or App.session.block.ray
 
@@ -176,13 +225,14 @@ func cast() -> Target:
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit: _hit_at = hit.position
 	return hit.collider as Target if hit else null
 
 
 ## The open panel owns input, even when a game target sits in front of it.
 func _input_layer() -> int:
-	var panel := App.module(&"Facilitator")
-	return MENU_LAYER if panel and panel.is_open else TARGET_LAYER
+	if App.menu_active(): return MENU_LAYER
+	return UI_LAYER | MENU_LAYER | (TARGET_LAYER if ray_on() else 0)
 
 
 ## Where the fingertip is.
@@ -207,10 +257,14 @@ func tracked() -> bool:
 
 func _on_button(action: String, pressed: bool) -> void:
 	Events.button.emit(side, StringName(action), pressed)
-	if not pressed:
+	if not pressed or not tracked():
 		return
-	if action == "trigger_click" and ray_on():
-		Events.selected.emit(side, cast(), global_position, -global_basis.z)
+	var target := cast() if action == "trigger_click" else null
+	if action == "trigger_click" and (ray_on() or target is UITarget):
+		_set_aim(target)
+		if target is UITarget:
+			target.confirm()
+		Events.selected.emit(side, target, global_position, -global_basis.z)
 	elif action in ["trigger_click", "grip_click"]:
 		_grab()
 
@@ -222,7 +276,7 @@ func _grab() -> void:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = ball
 	query.transform = Transform3D(Basis.IDENTITY, tip())
-	query.collision_mask = _input_layer()
+	query.collision_mask = 0 if App.menu_active() else TARGET_LAYER
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var near: Target
@@ -260,3 +314,25 @@ func _build() -> void:
 		if area is Target and _tip_moved and not resting():
 			Events.touched.emit(side, area))
 	add_child(finger)
+	_ray_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ray_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_ray_material.render_priority = 100
+	_ray_material.no_depth_test = true
+	var line := CylinderMesh.new()
+	line.top_radius = 0.0015
+	line.bottom_radius = 0.0015
+	line.height = 1.0
+	line.radial_segments = 6
+	_beam.name = "UIRay"
+	_beam.mesh = line
+	_beam.material_override = _ray_material
+	_beam.visible = false
+	add_child(_beam)
+	var dot := SphereMesh.new()
+	dot.radius = 0.006
+	dot.height = 0.012
+	_dot.name = "UICursor"
+	_dot.mesh = dot
+	_dot.material_override = _ray_material
+	_dot.visible = false
+	add_child(_dot)

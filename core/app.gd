@@ -32,9 +32,6 @@ func _ready() -> void:
 		Engine.physics_ticks_per_second = roundi(xr.display_refresh_rate))
 	xr.session_visible.connect(hold_pause.bind(&"headset", true)) # system menu on top
 	xr.session_focussed.connect(hold_pause.bind(&"headset", false))
-	# Never center_on_hmd: the Stage space stays on the room, and recentring the
-	# world (Quest asks on every headset off and on) left the menus behind while
-	# the table moved.
 
 
 ## True when the headset can show the real world behind the app.
@@ -53,6 +50,10 @@ func module(module_name: StringName) -> Node:
 
 func head() -> XRCamera3D:
 	return rig.head
+
+
+func menu_active() -> bool:
+	return _pause_holds.has(&"home") or _pause_holds.has(&"facilitator")
 
 
 ## Pauses the world for [param who] ([param on]) or lets go of that pause.

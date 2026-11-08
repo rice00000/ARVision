@@ -27,6 +27,7 @@ var _player := AudioStreamPlayer.new()
 var _hide_at := 0.0
 var _speaking := ""
 var _finish_at := 0.0
+var _suspended_line := ""
 
 
 func _ready() -> void:
@@ -44,11 +45,29 @@ func _ready() -> void:
 	App.rig.add_child(_label)
 	add_child(_player)
 	Events.said.connect(_say)
+	Events.home_toggled.connect(_home)
 	_player.finished.connect(func() -> void: _end_line(true))
 	Events.scene_changing.connect(func() -> void:
+		_suspended_line = ""
 		_player.stop()
 		_label.visible = false
 		_end_line(false))
+
+
+## Keep an awaited story line pending while the home speaks; replay it on return.
+func _home(open: bool) -> void:
+	if open:
+		_suspended_line = _speaking
+		_player.stop()
+		_speaking = ""
+		_label.visible = false
+	else:
+		var resume := _suspended_line
+		_suspended_line = ""
+		_player.stop()
+		_end_line(false)
+		_label.visible = false
+		if not resume.is_empty(): _say(resume)
 
 
 func _process(_delta: float) -> void:

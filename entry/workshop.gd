@@ -38,8 +38,10 @@ var layout: EntryLayout
 ## Takes over from the opening. [param parts]: onion (holder), model, face, rest_y, glow, halo,
 ## cauldron, rest (where Onion waits), music (or null). Call after adding this to Main.
 func take(parts: Dictionary) -> void:
+	add_to_group(&"activity_scenery")
 	name = "Workshop"
 	_onion = parts.onion
+	(_onion.get_node(^"OnionTouch") as OnionTouch).minimum_y = -INF
 	_model = parts.model
 	_face = parts.face
 	_model_rest_y = parts.rest_y

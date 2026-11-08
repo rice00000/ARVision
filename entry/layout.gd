@@ -545,12 +545,34 @@ func toward(degrees: float) -> Vector3:
 	return ahead.rotated(Vector3.UP, -deg_to_rad(degrees))
 
 
-## Wei's bench frame if the shelf faced [param angle] degrees right: at the eyes, pushed back by
-## [member push], facing the shelf. Its top is [member bench_below] below.
+## The bench starts at the preferred reach and angle, then fits inside the measured table.
 func bench_frame(angle: float) -> Transform3D:
 	var facing := toward(angle)
 	bench_below = clampf(eye.y - table_y() - 0.01, BENCH_HIGHEST, BENCH_LOWEST)
-	return Transform3D(Basis.looking_at(facing), eye + facing * push)
+	var frame := Transform3D(Basis.looking_at(facing), eye + facing * push)
+	if not real_table:
+		return frame
+	var inverse := table.affine_inverse()
+	var half := Vector2(BENCH_HALF, (BENCH_FAR - BENCH_NEAR) * 0.5)
+	var extent := _bench_extent(inverse.basis * frame.basis, half)
+	var usable := (table_size * 0.5 - Vector2.ONE * 0.005).max(Vector2.ZERO)
+	if extent.x > usable.x or extent.y > usable.y:
+		var aligned := -table.basis.z if table_size.x >= table_size.y else table.basis.x
+		aligned = Vector3(aligned.x, 0.0, aligned.z).normalized()
+		frame.basis = Basis.looking_at(aligned if aligned.dot(facing) >= 0.0 else -aligned)
+		extent = _bench_extent(inverse.basis * frame.basis, half)
+	var middle := frame * Vector3(0.0, -bench_below, -(BENCH_NEAR + BENCH_FAR) * 0.5)
+	var local := inverse * middle
+	var room := (usable - extent).max(Vector2.ZERO)
+	var shift := table.basis * Vector3(clampf(local.x, -room.x, room.x) - local.x, 0.0,
+		clampf(local.z, -room.y, room.y) - local.z)
+	frame.origin += Vector3(shift.x, 0.0, shift.z)
+	return frame
+
+
+static func _bench_extent(local: Basis, half: Vector2) -> Vector2:
+	return Vector2(absf(local.x.x) * half.x + absf(local.z.x) * half.y,
+		absf(local.x.z) * half.x + absf(local.z.z) * half.y)
 
 
 ## Where on the bench frame [param point] lies: x across, -z ahead.

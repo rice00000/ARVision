@@ -33,6 +33,18 @@ func test_nothing_overlaps_on_tables_big_enough_for_everything() -> void:
 	expect_eq(cases, 42, "every case was tried")
 
 
+func test_the_bench_fits_a_shallow_desk_viewed_at_an_angle() -> void:
+	var layout := EntryLayout.new()
+	layout.table = Transform3D(Basis.looking_at(Vector3(0.99, 0.0, 0.14)), Vector3(0.21, 0.66, -0.08))
+	layout.table_size = Vector2(0.82, 0.34)
+	layout.eye = Vector3(-0.25, 1.04, -0.18)
+	layout.ahead = Vector3(0.83, 0.0, -0.56).normalized()
+	layout.plan()
+	for corner in layout.zone(&"bench").outline():
+		var local := layout.table.affine_inverse() * Vector3(corner.x, layout.table_y(), corner.y)
+		expect(absf(local.x) < 0.41 and absf(local.z) < 0.17, "bench corner %s lies inside the tabletop" % local)
+
+
 func test_a_short_reach_still_reaches_the_gear_and_the_socket() -> void:
 	var layout := _layout(Vector2(1.0, 0.6), 0.3, 0.5, 0.45)
 	expect(layout.out_of_reach().is_empty(), "nothing the child needs is out of reach: %s" % layout.report())
@@ -155,7 +167,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
 	expect(entry.find_child("entry_part_place", true, false) != null, "the dev jumps are there")
@@ -199,7 +211,7 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var copy: Variant = entry.get("_shelf")
@@ -241,7 +253,7 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var layout: EntryLayout = entry.get("_layout")

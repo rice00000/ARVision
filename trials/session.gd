@@ -27,6 +27,8 @@ var trial: Trial
 ## Level pinned for the rest of this play by the facilitator; NAN = not pinned.
 var pinned := NAN
 var running := false
+## False after any skipped, failed, abandoned or probe round.
+var won := false
 
 var _skip := false
 
@@ -38,6 +40,8 @@ func _ready() -> void:
 ## Plays [member plan], then offers to play it again.
 func run() -> void:
 	await play(plan)
+	if won:
+		Events.level_won.emit(StringName(plan.resource_path.get_file().get_basename()), 1, 2)
 	_offer_replay()
 
 
@@ -46,6 +50,7 @@ func play(session_plan: SessionPlan) -> void:
 	plan = session_plan
 	pinned = NAN
 	running = true
+	won = not plan.blocks.is_empty()
 	await _announce(plan.greeting)
 	if not App.reality.is_settled:
 		await App.reality.settled # toys placed before the table is known land on the lap
@@ -66,7 +71,7 @@ func _offer_replay() -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	button.global_position = eye.origin + forward * 0.4 + Vector3.DOWN * 0.15
-	Events.say("To play again, touch the yellow ball.")
+	Events.say("To play again, point at the yellow ball and pinch.")
 	await button.pressed
 	button.queue_free()
 	Events.report(&"replay")
@@ -96,6 +101,7 @@ func unpin() -> void:
 
 ## Ends the current block now; its running round is dropped unscored.
 func skip_block() -> void:
+	won = false
 	_skip = true
 	if trial:
 		trial.abandon()
@@ -105,6 +111,7 @@ func _run_block() -> void:
 	var def := block.trial
 	var missing := def.requires.filter(func(module_name: StringName) -> bool: return App.module(module_name) == null)
 	if not missing.is_empty():
+		won = false
 		Events.report(&"block_skipped", {trial = def.id, missing = missing})
 		return
 	App.reality.apply_view(block.view if block.view else base_view)
@@ -121,6 +128,7 @@ func _run_block() -> void:
 		condition.view = App.reality.view.to_log()
 		trial.begin(condition)
 		var result: Array = await trial.ended
+		won = won and result[0] and result[1] and not block.probe
 		if result[1] and not block.probe and block.difficulty < 0.0 and is_nan(pinned):
 			var first_try: bool = result[0] and trial.tries == 0 and trial.hint_level == 0
 			var before := Profile.level(def.skill)

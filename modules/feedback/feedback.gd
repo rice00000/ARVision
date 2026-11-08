@@ -12,6 +12,7 @@ var _sounds: Dictionary[StringName, AudioStreamWAV] = {}
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	for kind: StringName in NOTES:
 		_sounds[kind] = _chime(NOTES[kind])
 	Events.feedback.connect(_on_feedback)

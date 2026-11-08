@@ -20,9 +20,8 @@ func _boot_entry() -> void:
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
-	entry.poke_in_sim = true   # the tests move a fingertip; on desktop only clicks count
-	entry.skip_setup = false
-	entry.plan_at_start = false   # the tests go through the four steps
+	entry.touch_cauldron_in_sim = true   # the tests tap the cauldron with a fingertip
+	entry.skip_setup = false   # the tests go through the four steps
 	entry.simulate_child = true   # a pretend child picks the gear up and sets it in
 	entry.run()
 
@@ -198,20 +197,24 @@ func _poke_at(button: EntryButton, local: Vector3) -> void:
 	await frames(3)
 
 
-func test_poking_anywhere_on_the_plate_presses_it() -> void:
+func test_a_fingertip_crossing_the_plate_does_not_press_it() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	var pressed := record(entry._part_pressed)
 	var start: EntryButton = _target(&"entry_part_all").get_parent()
-	await wait(1.0)   # a finger already there as a button appears doesn't count
+	await wait(1.0)   # give the setup its normal settling time
 	# Near the far end of the plate, which the old round hit area missed.
 	await _poke_at(start, Vector3(start.plate.x * 0.5 - 0.01, 0.0, 0.15))
 	await _poke_at(start, Vector3(start.plate.x * 0.5 - 0.01, 0.0, -0.01))
-	expect_eq(pressed.size(), 1, "one press from one poke (pokes and pinches don't double)")
-	expect_eq(pressed[0][0] if not pressed.is_empty() else null, &"all", "and it was Start")
+	expect_eq(pressed.size(), 0, "crossing the UI never confirms it")
+	Events.touched.emit(&"right", start.target)
+	await frames(2)
+	expect(pressed.is_empty(), "the old touch event has no UI listener")
+	await select(start.global_position)
+	expect_eq(pressed.size(), 1, "an aimed pinch confirms once")
 
 
-func test_a_pinch_counts_what_was_aimed_at_before_the_fingers_closed() -> void:
+func test_a_pinch_off_the_button_does_not_press_a_previous_target() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	var pressed := record(entry._part_pressed)
@@ -229,7 +232,7 @@ func test_a_pinch_counts_what_was_aimed_at_before_the_fingers_closed() -> void:
 	await wait(0.08)
 	input.click(&"right", &"trigger_click")
 	await frames(3)
-	expect_eq(pressed.size(), 1, "the pinch still presses the button that was aimed at")
+	expect(pressed.is_empty(), "only the current ray hit can confirm a button")
 
 
 func test_a_pinch_after_a_real_move_to_another_button_goes_to_that_button() -> void:
@@ -278,7 +281,7 @@ func test_exit_needs_two_presses_so_a_stray_pinch_cannot_close_the_app() -> void
 
 func test_on_desktop_only_a_click_presses_not_moving_over_a_button() -> void:
 	await _boot_entry()
-	entry.poke_in_sim = false
+	entry.touch_cauldron_in_sim = false
 	await _to_setup_panel()
 	var pressed := record(entry._part_pressed)
 	var start: EntryButton = _target(&"entry_part_all").get_parent()
@@ -438,7 +441,7 @@ func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> 
 	if workshop == null:
 		return
 	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "with Onion (and its light)")
-	expect(workshop.get_children().filter(func(n: Node) -> bool: return n is Node3D and n.find_children("*", "Target", true, false).is_empty() == false).is_empty(), "the cauldron cannot be touched any more")
+	expect(workshop.find_children("*", "Target", true, false).filter(func(n: Target) -> bool: return n.collision_layer & Pointer.TARGET_LAYER != 0).is_empty(), "the cauldron cannot be touched any more; Onion only uses the reaction layer")
 	expect(App.world == null, "no World welcome or menu in the first visit")
 	await App.main.change_scene(&"global_motion")
 	await wait(0.5)
@@ -515,7 +518,7 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 func shutdown() -> void:
 	await super.shutdown()
 	Tidy.push = 0.0
-	Tidy.fixed_frame_on = false
+	Tidy.shelf_frame = Transform3D.IDENTITY
 	Tidy.onion_voice = false
 	Motion.onion_voice = false
 	Engine.time_scale = 1.0
@@ -614,7 +617,7 @@ func test_the_room_is_planned_when_start_is_pressed_from_where_the_child_sits() 
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	entry = app.get_node(^"Intro/Entry")
-	entry.poke_in_sim = true
+	entry.touch_cauldron_in_sim = true
 	entry.simulate_child = true
 	entry.run()
 	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
@@ -625,4 +628,4 @@ func test_the_room_is_planned_when_start_is_pressed_from_where_the_child_sits() 
 	expect(await until(func() -> bool: return entry.get("_layout") != null, 20.0), "Start plans the room")
 	var planned: Transform3D = entry.get("_plan_head")
 	expect(absf(planned.basis.get_euler().y - 0.3) < 0.05, "from the head as it is when Start is pressed")
-	expect(Tidy.fixed_frame_on, "and Wei's shelf will stand where the plan put the bench")
+	expect(Tidy.shelf_frame != Transform3D.IDENTITY, "and Wei's shelf will stand where the plan put the bench")

@@ -1,7 +1,7 @@
 class_name ReplayButton
-extends Target
+extends UITarget
 ## After a session: a glowing ball with "Play again" over it. Point at it and
-## pinch, or touch it, and [signal pressed] goes out.
+## pinch to emit [signal pressed].
 
 signal pressed
 
@@ -32,14 +32,10 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	super()
 	Events.selected.connect(_on_selected)
-	Events.touched.connect(_on_touched)
 
 
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
-	_on_touched(_hand, target)
-
-
-func _on_touched(_hand: StringName, target: Target) -> void:
 	if target == self and not get_tree().paused:
 		pressed.emit()

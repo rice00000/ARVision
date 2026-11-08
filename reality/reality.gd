@@ -21,6 +21,8 @@ const HIT_RANGE := 6.0
 
 ## The work surface is decided: a real table was found, or the search gave up.
 signal settled
+## A fresh table measurement is ready to place the activity again.
+signal work_surface_reset
 
 ## How the real world is shown now. Change it with [method apply_view].
 var view := View.new()
@@ -28,7 +30,28 @@ var view := View.new()
 var is_settled := true
 
 var _surfaces: Array[Surface] = []
+var _selected_table: Surface
 var _focus := Vector3.ZERO
+## Leisure rooms are separate from measured AR surfaces; training is paused.
+var home_room: Node3D
+var room_frame := Transform3D.IDENTITY
+var room_size := Vector2(4.8, 4.8)
+
+
+func show_home_room(scene: PackedScene) -> void:
+	if home_room:
+		home_room.free()
+		home_room = null
+	if scene:
+		home_room = scene.instantiate()
+		add_child(home_room)
+		home_room.global_transform = room_frame
+		room_size = home_room.get_meta(&"size")
+	_home_visibility_changed()
+
+
+func _home_visibility_changed() -> void:
+	pass
 
 
 ## &"passthrough" or &"sim", for the log.
@@ -50,6 +73,8 @@ func surfaces(surface_kind: StringName) -> Array[Surface]:
 ## Where tabletop stimuli go: the nearest table in reach, else a virtual patch
 ## in front of the child (no room scan, or no table in it).
 func work_surface() -> Surface:
+	if _selected_table in _surfaces:
+		return _selected_table
 	var eye := App.head().global_transform
 	for table in surfaces(&"table"):
 		if table.transform.origin.distance_to(eye.origin) < TABLE_REACH:
@@ -87,6 +112,13 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 
 func add_surface(surface: Surface) -> void:
 	_surfaces.append(surface)
+
+
+## The table confirmed or marked by the facilitator.
+func select_table(surface: Surface) -> void:
+	_selected_table = surface
+	if surface not in _surfaces:
+		add_surface(surface)
 
 
 func _settle() -> void:

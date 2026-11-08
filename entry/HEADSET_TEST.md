@@ -52,8 +52,7 @@ there are no checks). To test the four setup steps, set `SKIP_SETUP := false` in
 Without the setup steps the layout uses the usual reach (60 cm); on your real table it still uses the table the headset found.
 
 **See:** a dark panel just above eye level, straight ahead: a sage bar "SETUP · for the grown-up", "Step N of 4" and
-dots, a title, one or two lines, check lines with dots, buttons. At the foot: "To press: touch a button with a
-fingertip, or point at it and pinch."
+dots, a title, one or two lines, check lines with dots, buttons. At the foot: "To press: aim the hand ray at a button, then pinch."
 Steps: 1 "Check the hands", 2 "Find the table" (an outline on the table; "Yes, that's the table" / "No, point at it"),
 3 "Find the reach" (slide a hand out along the table, then "Done", or "Use usual spot"), 4 "Sound and room" (a soft
 chime; "Yes, I heard it" / "Play again"), then "All set" + Start.
@@ -63,7 +62,7 @@ Judge:
 - [ ] Without reading the words, could you tell which step you are on and what to do now? (The waiting line stays
       bright with a breathing dot; done lines dim and get a tick.)
 - [ ] The panel is easy to read without leaning: text sharp, not too high. Too high / right / too low (circle).
-- [ ] Every button pressed at the first try, by poke AND by point-and-pinch.
+- [ ] Every button pressed at the first try, by aiming and pinching; passing through a button never presses it.
 - [ ] Step 2: the outline sits on your real table (within a few cm). Off by about ______ cm.
 - [ ] Step 2 check line says "Room for everything" (or what did it say? ________________).
 - [ ] Step 3: the reach it shows: ______ cm. Does that match an easy (not stretched) reach? yes / no

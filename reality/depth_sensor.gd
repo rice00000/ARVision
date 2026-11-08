@@ -6,8 +6,7 @@ extends Node3D
 ## of left-eye depth pixels into points (the plugin's own CPU readback is broken
 ## on Vulkan, #517); [member grid] is the latest look.
 ##
-## Meta's depth comes in the OpenXR Stage space, which stays on the room; the
-## app never recentres the world, so the points line up with everything else.
+## Meta's depth comes in OpenXR Stage space; the rig maps it into the room.
 
 signal refreshed
 
@@ -42,6 +41,7 @@ var _view := SubViewport.new()
 var _looks := 0
 var _read_ms := 0.0
 var _record_folder := ""
+var _generation := 0
 
 
 ## Starts the depth and looks every [member interval] seconds from now on.
@@ -101,8 +101,17 @@ func hit(from: Vector3, direction: Vector3) -> Dictionary:
 	return grid.hit(from, direction) if grid else {}
 
 
+func invalidate() -> void:
+	grid = null
+	_generation += 1
+
+
 func _look() -> void:
-	grid = await read_once()
+	var generation := _generation
+	var fresh := await read_once()
+	if generation != _generation:
+		return
+	grid = fresh
 	if record and _looks < RECORD_LIMIT:
 		_record()
 	if _looks % LOG_EVERY == 0:

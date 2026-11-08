@@ -8,7 +8,7 @@
    - Judge input in `_on_selected(hand, target, origin, direction)`, `_on_touched(hand, target)`, `_on_sweeping(hand, from, to, seconds)` (every tick of a sweep), `_on_swept(hand)` (the sweep is done), `_on_button(hand, action, pressed)` or `_on_tracking(hand, tracked)`. They only run during a live, unpaused round, so drop half-done gestures in `_notification(NOTIFICATION_PAUSED)`.
    - Right: `judge(&"good", at)` then `finish(true, extra)`. Wrong: `judge(&"bad", at)` and `count_try()`. The staircase only counts rounds solved on the first try without help.
    - `_hint(level)`: help from gentlest (1) to `max_hint`. `_teardown()`: stop what the round started.
-   - Place things with `App.reality.work_surface()`, `surfaces(kind)` or `in_front(distance)`. Clickable things are `Target`s.
+   - Place things with `App.reality.work_surface()`, `surfaces(kind)` or `in_front(distance)`. Game objects use `Target`; UI buttons use `UITarget` (ray and pinch).
    - Override `focus_point()` when the action is not on the work surface (spotlight views centre there).
 3. **Scene** whose root has the script. Child nodes are fine; the instance lives for one block. Mark materials the script changes `resource_local_to_scene`.
 4. **TrialDef** `.tres`: `scene`, `skill`, `axes` (one `driven`), help timing, `time_limit`, and `requires` (e.g. `&"Detector"`).

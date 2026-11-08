@@ -50,6 +50,15 @@ signal picked(data: Dictionary)
 signal trial_ended(skill: StringName, success: bool, data: Dictionary)
 signal block_started(index: int, info: Dictionary)
 signal session_finished
+## A fully successful, scored level; repeats earn the same reward.
+signal level_won(task: StringName, level: int, stones: int)
+signal inventory_changed
+signal home_toggled(open: bool)
+signal room_changed(id: StringName)
+signal furniture_requested(id: StringName)
+signal furniture_editing(active: bool)
+signal furniture_store_requested
+signal furniture_turn_requested
 
 # -- the rest -----------------------------------------------------------------
 

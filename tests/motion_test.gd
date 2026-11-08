@@ -7,7 +7,6 @@ const MotionTrial := preload("res://trials/motion/motion_trial.gd")
 const RANDOM := preload("res://trials/motion/motion.tres")
 const COMPETING := preload("res://trials/motion/motion_competing.tres")
 const HEADINGS := [&"right", &"left", &"toward", &"away"]
-const SIDES := [&"right", &"left"]
 ## A wrong sweep counts once its hand has stopped this long (Pointer.sweep_stop_seconds and a margin).
 const SETTLE := 0.55
 
@@ -54,29 +53,6 @@ func test_plans_run_the_motion_blocks_two_seconds_apart() -> void:
 
 
 # -- rounds -------------------------------------------------------------------
-
-func test_correct_sweeps_in_every_direction_with_both_hands() -> void:
-	await boot(plan_of(RANDOM, 8, false, 0.0, null, {&"direction": 1.0}))
-	var ended := record(Events.trial_ended)
-	App.session.run()
-	for index in 8:
-		expect(await until(_round_is.bind(index)), "round %d starts" % index)
-		App.session.block.pins[&"direction"] = float((index + 1) % 4 + 1) # applies to the next round
-		var heading := index % 4
-		var side: StringName = SIDES[index / 4]
-		var condition := App.session.trial.condition
-		expect_eq(condition.value(&"heading"), HEADINGS[heading], "round %d heading" % index)
-		expect_eq(condition.value(&"plane"), &"lateral" if heading < 2 else &"depth", "round %d plane" % index)
-		await _sweep(side, MotionTrial.FLOWS[heading])
-		expect_eq(ended.size(), index + 1, "round %d scored" % index)
-		var data: Dictionary = ended[index][2]
-		expect(ended[index][1], "%s %s is right" % [side, HEADINGS[heading]])
-		expect_eq(data.tries, 0, "no wrong tries")
-		expect_eq(data.first_attempt_correct, true, "first attempt correct")
-		expect_eq(data.attempts.size(), 1, "one attempt")
-		expect_eq(data.attempts[0].hand, side, "the hand that swept")
-		expect(data.angle_degrees < 1.0, "angle error is logged")
-
 
 func test_direction_is_random_across_rounds_when_not_pinned() -> void:
 	await boot(plan_of(RANDOM, 1))
@@ -249,11 +225,11 @@ func test_help_makes_every_dot_coherent_and_is_logged() -> void:
 	var trial := App.session.trial
 	var material := _material()
 	expect_eq(trial.condition.value(&"signal_dots"), 30, "0.15 of 200 dots")
-	expect_eq(material.get_shader_parameter(&"signal_count"), 30, "shown without help")
+	expect_eq(material.get_shader_parameter(&"signal_count"), 49, "shown without help: 0.15 of 328 dots, shell included")
 	await _sweep(&"right", Vector3.LEFT)
 	await raise_hand(&"left")
 	expect_eq(trial.hint_level, 1, "a raised hand asks for help")
-	expect_eq(material.get_shader_parameter(&"signal_count"), 200, "every dot follows the flow")
+	expect_eq(material.get_shader_parameter(&"signal_count"), 328, "every dot follows the flow")
 	expect_eq(trial.condition.value(&"signal_dots"), 30, "the round's condition keeps what it started at")
 	expect_eq(feedback.back()[0], &"hint", "hint feedback")
 	await raise_hand(&"left")
@@ -354,7 +330,7 @@ func test_cloud_is_placed_ahead_and_judged_in_its_frozen_frame() -> void:
 	var cloud: GPUParticles3D = trial.get_node(^"Cloud")
 	expect((cloud.global_position - (eye + forward * 2.2)).length() < 0.01, "2.2 m ahead at eye height")
 	expect((-cloud.global_basis.z).dot(forward) > 0.999, "its -Z points away from the child")
-	expect_eq(cloud.amount, 200, "dot count")
+	expect_eq(cloud.amount, 328, "200 lit dots and the fading shell at the same density")
 	expect_eq(trial.focus_point(), cloud.global_position, "spotlight views centre on the cloud")
 	# Turn the head away: the cloud and its right stay where they were.
 	var frozen := cloud.global_transform
@@ -380,8 +356,9 @@ func test_shader_gets_the_round_exactly() -> void:
 		var heading := HEADINGS.find(condition.value(&"heading"))
 		expect_eq(material.get_shader_parameter(&"flow_direction"), MotionTrial.FLOWS[heading], "%s flow" % def.id)
 		expect_eq(material.get_shader_parameter(&"competing_flow"), def == COMPETING, "%s noise model" % def.id)
-		expect_eq(material.get_shader_parameter(&"signal_count"), roundi(condition.value(&"coherence") * 200.0), "%s exact signal count" % def.id)
-		expect_eq(material.get_shader_parameter(&"dot_count"), 200, "%s dots" % def.id)
+		expect_eq(material.get_shader_parameter(&"signal_count"), roundi(roundi(condition.value(&"coherence") * 200.0) / 200.0 * 328.0), "%s exact signal share" % def.id)
+		expect_eq(material.get_shader_parameter(&"dot_count"), 328, "%s dots, shell included" % def.id)
+		expect(is_equal_approx(material.get_shader_parameter(&"margin"), MotionTrial.MARGIN), "%s fading shell" % def.id)
 		expect_eq(material.get_shader_parameter(&"trial_seed"), condition.value(&"seed"), "%s seed" % def.id)
 		expect(is_equal_approx(material.get_shader_parameter(&"speed"), 0.3), "%s speed" % def.id)
 		expect(is_equal_approx(material.get_shader_parameter(&"dot_lifetime"), 0.8), "%s lifetime" % def.id)

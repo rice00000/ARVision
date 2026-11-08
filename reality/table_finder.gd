@@ -11,6 +11,8 @@ extends RefCounted
 const LOOKS := 5
 const AGREE := 4
 const TOLERANCE := 0.03
+## A fresh scan after recenter must also agree on where the top is.
+const RESCAN_SPAN := 0.12
 ## Looks in a row that see the table's place but not its top before it is dropped.
 const DOUBTS := 4
 ## A look checks the points this far (horizontally) around the table's centre...
@@ -32,21 +34,31 @@ var _doubts := 0
 
 ## One look from [param eye] (the head's pose): &"found" when a table is believed
 ## from now, &"lost" when the believed one was dropped, else &"".
-func look(grid: DepthGrid, eye: Transform3D) -> StringName:
+func look(grid: DepthGrid, eye: Transform3D, rescanning := false) -> StringName:
 	if not table.is_empty():
 		return &"lost" if _doubted(grid) else &""
 	var forward := -eye.basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
 	var seen := grid.table(eye.origin, forward)
+	seen.forward = forward # the measured width and depth are along these axes
 	support = seen.support
 	_looks.append(seen)
 	if _looks.size() > LOOKS:
 		_looks.pop_front()
-	var agreed := agreeing(_looks, AGREE, TOLERANCE)
+	var agreed := agreeing(_looks, AGREE, TOLERANCE, RESCAN_SPAN if rescanning else INF)
 	if agreed.is_empty():
 		return &""
-	hold(agreed.centre, agreed.size, forward)
+	if rescanning and (not seen.has("centre") or not _near(seen.centre, agreed.centre, TOLERANCE, RESCAN_SPAN)):
+		return &""
+	hold(agreed.centre, agreed.size, agreed.forward)
 	return &"found"
+
+
+func reset() -> void:
+	table.clear()
+	_looks.clear()
+	_doubts = 0
+	support = 0
 
 
 ## Believes a table found some other way (the hands on it); checked like the depth's.
@@ -69,13 +81,17 @@ func _doubted(grid: DepthGrid) -> bool:
 
 ## The table most of [param looks] agree on: the one with the most points among
 ## at least [param needed] whose tops lie within [param tolerance] metres of it.
-static func agreeing(looks: Array[Dictionary], needed: int, tolerance: float) -> Dictionary:
+static func agreeing(looks: Array[Dictionary], needed: int, tolerance: float, span := INF) -> Dictionary:
 	var best := {}
 	for candidate in looks:
 		if not candidate.has("centre"):
 			continue
 		var near := looks.filter(func(other: Dictionary) -> bool:
-			return other.has("centre") and absf(other.centre.y - candidate.centre.y) <= tolerance)
+			return other.has("centre") and _near(other.centre, candidate.centre, tolerance, span))
 		if near.size() >= needed and (best.is_empty() or candidate.support > best.support):
 			best = candidate
 	return best
+
+
+static func _near(a: Vector3, b: Vector3, height: float, span: float) -> bool:
+	return absf(a.y - b.y) <= height and Vector2(a.x - b.x, a.z - b.z).length() <= span

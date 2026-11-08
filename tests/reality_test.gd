@@ -55,6 +55,18 @@ func test_an_anchored_surface_follows_its_anchor() -> void:
 	anchor.free()
 
 
+func test_a_fresh_table_rebuilds_the_activity_with_the_new_surface() -> void:
+	await boot()
+	var previous := App.session.get_instance_id()
+	var table := _turned_surface()
+	App.reality.select_table(table)
+	App.reality.work_surface_reset.emit()
+	await frames(2)
+	expect_eq(App.main.current_scene, &"find_object", "the activity is reopened")
+	expect(App.session.get_instance_id() != previous, "the old session was replaced")
+	expect_eq(App.reality.work_surface(), table, "the new activity uses the new tabletop")
+
+
 # -- CameraFrame --------------------------------------------------------------
 
 func test_camera_rays_go_through_the_image() -> void:

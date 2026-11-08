@@ -80,6 +80,8 @@ func _invitation_open() -> bool:
 
 func _play() -> void:
 	await App.session.play(_reminder.prepare(plan))   # Wei's first hint is held back so the reminder comes first
+	if App.session.won:
+		Events.level_won.emit(&"tidy_shelf", 1, 2)
 	await _closing()
 
 
@@ -115,7 +117,7 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 func _exit_tree() -> void:
 	Tidy.onion_voice = false
 	Tidy.push = 0.0   # the opening's shelf distance ends with the first visit
-	Tidy.fixed_frame_on = false   # and so does the opening's planned bench
+	Tidy.shelf_frame = Transform3D.IDENTITY   # and so does the opening's planned bench
 	Entry.show_sim_props(true)
 
 
@@ -145,6 +147,7 @@ func _say(text: String) -> void:
 	var limit := maxf(6.0, text.length() * 0.2)
 	while not done.finished and waited < limit:
 		await get_tree().process_frame
+		if get_tree().paused: continue
 		waited += get_process_delta_time()
 	voice.line_finished.disconnect(on_finished)
 	if not done.completed:

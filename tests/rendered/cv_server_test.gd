@@ -15,6 +15,10 @@ func test_the_fake_servers_cup_lands_where_the_camera_looks() -> void:
 			server = arg.trim_prefix("--cv-server=")
 	expect(not server.is_empty(), "started with --cv-server=<url>")
 	await boot(plan_of(POINT, 1))
+	# Mouse motion in the test window can move the hand between aiming and pinching.
+	for node in app.get_children():
+		if node is DesktopDriver:
+			node.set_process_unhandled_input(false)
 	var detector := App.module(&"Detector")
 	detector.server = server
 	detector.backend = 2 # REMOTE

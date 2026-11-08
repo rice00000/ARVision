@@ -24,8 +24,8 @@ class Adventure(SimCase):
     def press(self, sim, actor, button_id):
         buttons = sim.observe()["world"]["menu"]["buttons"]
         row = [b for b in buttons if b["id"].rsplit("_", 1)[0] == button_id.rsplit("_", 1)[0]]
-        side = "left" if row.index(self.button(sim, button_id)) < len(row) / 2 else "right"  # the near hand: no brushing past others
-        actor.touch(side, tuple(self.button(sim, button_id)["position"]), radius=0.01)  # poke the middle
+        side = "left" if row.index(self.button(sim, button_id)) < len(row) / 2 else "right"  # aim with the hand on this side of the row
+        actor.point(side, tuple(self.button(sim, button_id)["position"]), expect=button_id)
 
     def last_said(self, sim):
         return sim.events("said")[-1]["text"]

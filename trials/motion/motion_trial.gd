@@ -9,6 +9,10 @@ extends Trial
 ## random lateral),
 ## dots, speed, dot_lifetime, half_width / half_height / half_depth (cloud, m),
 ## distance (m), tolerance (degrees).
+## The cloud is fully lit inside its half size; a [constant MARGIN] shell around
+## it, where dots fade in and out, gets extra dots at the same density, so
+## [code]dots[/code] stay in the lit part and the signal share is the same.
+## The dots' own shimmer plays from the cloud, looping, while they are shown.
 ## Sweeps come from the rig, no pinch ([signal Events.sweeping]). The moment a
 ## hand has gone the right way, the round is won. A sweep the wrong way counts a
 ## try once that hand stops ([signal Events.swept]); one that turns straight into
@@ -27,6 +31,8 @@ const FLOWS: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector
 const NEAR := 0.6
 const ALIGN_SECONDS := 0.6
 const ARM_SECONDS := 0.8
+## The fading shell around the lit cloud, metres.
+const MARGIN := 0.12
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
@@ -40,6 +46,8 @@ var _rng := RandomNumberGenerator.new()
 var _frame := Transform3D.IDENTITY
 var _flow := Vector3.RIGHT
 var _dots := 0
+## Dots in the whole cloud, its fading shell included.
+var _particles := 0
 ## Dots following the flow now (all of them once help is on).
 var _signal_dots := 0
 var _tolerance := 0.0
@@ -49,6 +57,7 @@ var _wrong: Dictionary[StringName, Dictionary] = {}
 var _align: Tween
 
 @onready var _cloud: GPUParticles3D = $Cloud
+@onready var _shimmer: AudioStreamPlayer3D = $Cloud/Shimmer
 @onready var _trails: Dictionary[StringName, SweepTrail] = {&"left": $LeftTrail, &"right": $RightTrail}
 @onready var _material := _cloud.process_material as ShaderMaterial
 
@@ -78,21 +87,25 @@ func _setup(round_condition: TrialCondition) -> void:
 	_tolerance = round_condition.value(&"tolerance")
 	var half := Vector3(round_condition.value(&"half_width"), round_condition.value(&"half_height"),
 		round_condition.value(&"half_depth"))
-	_frame = in_front(maxf(round_condition.value(&"distance"), half.z + NEAR))
+	var outer := half + Vector3.ONE * MARGIN
+	_particles = roundi(_dots * (outer.x * outer.y * outer.z) / (half.x * half.y * half.z))
+	_frame = in_front(maxf(round_condition.value(&"distance"), outer.z + NEAR))
 	_cloud.global_transform = _frame
-	_cloud.amount = _dots
-	_cloud.visibility_aabb = AABB(-half - Vector3.ONE * 0.3, half * 2.0 + Vector3.ONE * 0.6)
+	_cloud.amount = _particles
+	_cloud.visibility_aabb = AABB(-outer - Vector3.ONE * 0.3, outer * 2.0 + Vector3.ONE * 0.6)
 	var trial_seed := _rng.randi_range(1, 1000000)
 	_material.set_shader_parameter(&"flow_direction", _flow)
 	_material.set_shader_parameter(&"competing_flow", round_condition.value(&"competing") > 0.5)
 	_material.set_shader_parameter(&"speed", round_condition.value(&"speed"))
 	_material.set_shader_parameter(&"half_size", half)
-	_material.set_shader_parameter(&"dot_count", _dots)
+	_material.set_shader_parameter(&"margin", MARGIN)
+	_material.set_shader_parameter(&"dot_count", _particles)
 	_material.set_shader_parameter(&"dot_lifetime", round_condition.value(&"dot_lifetime"))
 	_material.set_shader_parameter(&"trial_seed", trial_seed)
 	_material.set_shader_parameter(&"alignment", 0.0)
 	_show_signal(signal_dots)
 	_cloud.restart()
+	_shimmer.play()
 	round_condition.set_value(&"heading", HEADINGS[heading])
 	round_condition.set_value(&"plane", &"lateral" if heading < 2 else &"depth")
 	round_condition.set_value(&"flow", _flow)
@@ -165,9 +178,10 @@ func _hint(_level: int) -> void:
 		say("Now every dot goes the same way. Watch, then sweep.")
 
 
+## [param count] of the lit part's dots follow the flow; the shell keeps the same share.
 func _show_signal(count: int) -> void:
 	_signal_dots = count
-	_material.set_shader_parameter(&"signal_count", count)
+	_material.set_shader_parameter(&"signal_count", roundi(float(count) / _dots * _particles))
 
 
 func _set_alignment(amount: float) -> void:

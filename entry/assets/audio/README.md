@@ -10,6 +10,7 @@ Files supplied for build integration and audition. No scene code changed. All si
 | onion-pop-a.mp3 | Gentle Air Bubble Burst — humordome | Pixabay Content License | 0.73 s |
 | onion-pop-c.mp3 | Light Bubble Pop — Virtual_Vibes | Pixabay Content License | 2.14 s |
 | workshop-reveal.mp3 | Floating Pad Magic — humordome | Pixabay Content License | 5.04 s |
+| onion-touch.ogg | SFX_Guide_Touch_Interact — made by the team (November 7, 2026) | Own work | 0.48 s, mono, peak −16 dB |
 
 ## Source pages
 

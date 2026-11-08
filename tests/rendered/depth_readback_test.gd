@@ -7,6 +7,8 @@ const DEPTH_SIZE := 4
 
 
 func test_points_come_back_where_the_depth_puts_them() -> void:
+	# Let the depth extension register its shader globals before overriding them.
+	await frames(2)
 	var depth := Image.create_empty(DEPTH_SIZE, DEPTH_SIZE, false, Image.FORMAT_RF)
 	for y in DEPTH_SIZE:
 		for x in DEPTH_SIZE:
@@ -15,11 +17,11 @@ func test_points_come_back_where_the_depth_puts_them() -> void:
 	layers.create_from_images([depth, depth])
 	var eye := Transform3D(Basis(Vector3.UP, 0.3), Vector3(0.2, 1.1, -0.3))
 	var inverse := (Projection.create_perspective(90.0, 1.0, 0.1, 10.0) * Projection(eye.affine_inverse())).inverse()
-	var globals := {&"META_ENVIRONMENT_DEPTH_AVAILABLE": [RenderingServer.GLOBAL_VAR_TYPE_BOOL, true],
-		&"META_ENVIRONMENT_DEPTH_TEXTURE": [RenderingServer.GLOBAL_VAR_TYPE_SAMPLER2DARRAY, layers],
-		&"META_ENVIRONMENT_DEPTH_INV_PROJECTION_VIEW_LEFT": [RenderingServer.GLOBAL_VAR_TYPE_MAT4, inverse]}
+	var globals := {&"META_ENVIRONMENT_DEPTH_AVAILABLE": true,
+		&"META_ENVIRONMENT_DEPTH_TEXTURE": layers.get_rid(),
+		&"META_ENVIRONMENT_DEPTH_INV_PROJECTION_VIEW_LEFT": inverse}
 	for name: StringName in globals:
-		RenderingServer.global_shader_parameter_add(name, globals[name][0], globals[name][1])
+		RenderingServer.global_shader_parameter_set_override(name, globals[name])
 	var rig := Node3D.new()
 	add_child(rig)
 	var sensor := DepthSensor.new()
@@ -36,4 +38,4 @@ func test_points_come_back_where_the_depth_puts_them() -> void:
 	expect(worst < 0.01, "within a centimetre (half floats): %.4f m" % worst)
 	rig.free()
 	for name: StringName in globals:
-		RenderingServer.global_shader_parameter_remove(name)
+		RenderingServer.global_shader_parameter_set_override(name, null)

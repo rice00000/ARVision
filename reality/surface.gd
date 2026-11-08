@@ -7,18 +7,18 @@ extends RefCounted
 
 var kind: StringName
 var size: Vector2
+var anchor: Node3D
 var transform: Transform3D:
 	get:
-		return _anchor.global_transform * _offset if _anchor else _offset
+		return anchor.global_transform * _offset if anchor else _offset
 
-var _anchor: Node3D
 var _offset: Transform3D
 
 
-func _init(surface_kind: StringName, frame: Transform3D, extent: Vector2, anchor: Node3D = null) -> void:
+func _init(surface_kind: StringName, frame: Transform3D, extent: Vector2, tracking_anchor: Node3D = null) -> void:
 	kind = surface_kind
 	size = extent
-	_anchor = anchor
+	anchor = tracking_anchor
 	_offset = anchor.global_transform.affine_inverse() * frame if anchor else frame
 
 

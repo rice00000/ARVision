@@ -89,7 +89,7 @@ func test_any_level_plays_at_its_level() -> void:
 	expect_eq(started[0][1].view.title, "Normal", "played in normal colour")
 
 
-func test_a_fingertip_near_a_button_hears_what_it_is() -> void:
+func test_a_ray_on_a_button_hears_what_it_is() -> void:
 	await boot()
 	var said := record(Events.said)
 	App.world.run()
@@ -97,7 +97,7 @@ func test_a_fingertip_near_a_button_hears_what_it_is() -> void:
 	for case in [["task_tidy_shelf_1", "Level 1. A new one!"], ["task_tidy_shelf_2", "Level 2. A new one!"]]:
 		var button := _button(case[0])
 		var front := button.global_basis.z
-		input.point(&"right", button.global_position + front * (0.05 + 0.04), button.global_position) # fingertip 4 cm out
+		input.point(&"right", button.global_position + front * 0.4, button.global_position) # aim from a distance
 		await frames(3)
 		expect_eq(said.back()[0], case[1], "read out")
 		expect((button.get_node(^"Look") as Node3D).position.z > 0.0, "lifted toward the hand")
