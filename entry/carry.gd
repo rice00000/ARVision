@@ -100,10 +100,14 @@ var _reminded := false
 
 func _ready() -> void:
 	Events.button.connect(_on_button)
-	Events.facilitator_toggled.connect(func(open: bool) -> void:
-		if open:
-			_let_go())
 	Events.scene_changing.connect(stop)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED:
+		_pinching.clear()
+		_press_age.clear()
+		_let_go()
 
 
 ## Configures the surroundings. [param floor_y] is the tabletop, [param eyes] and [param reach] say
@@ -235,7 +239,7 @@ static func middle_of(gear: Node3D) -> Vector3:
 # --- Input ---------------------------------------------------------------------
 
 func _on_button(side: StringName, action: StringName, pressed: bool) -> void:
-	if action != &"trigger_click":
+	if action != &"trigger_click" or get_tree().paused:
 		return
 	_pinching[side] = pressed
 	if pressed:

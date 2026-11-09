@@ -11,11 +11,13 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Scenes:** the app opens with Megan's **Intro**. Its final invitation enters **Find the object** (the existing five shelf levels; [tidy up](docs/tidy.md)). **Global motion** has the two spell-wall levels in its own scene, available immediately. Open the facilitator menu (**M** on PC, left-hand menu pinch on Quest), then **Scenes**, to switch freely between all three. A short fade clears the outgoing activity; progress stays saved, interrupted rounds are unscored. The room stays in normal colour. The **Saves** tab makes, names, copies and switches child saves. A fixed session instead: `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
+**Menu → Staff tools** opens the facilitator panel on **Tools** for Intro jumps, layout zones, restart and exit. **Scenes**, **Training** and **Saves** are tabs on the same panel. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps saved progress and leaves interrupted rounds unscored.
 
-**Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again. The left-hand menu pinch (left palm facing you, pinch) opens the facilitator panel, which pauses play.
+**Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 
-**Home:** point at the house and pinch on the right for furniture, purchasable rooms, decorating and direct game selection. Completed levels/replays earn magic stones. Browse a 3D model, then confirm a purchase; pinch furniture to move it. Home pauses training and resumes the same real-world activity when closed. [Modules, controls and asset sources](docs/home.md).
+Point and pinch **Menu** on the upper right. **Keep playing** resumes the same round. **Games** offers Find the object and Global motion. **My room** opens the room, shop and decorating. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
+
+Run a fixed session with `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
 
 ## Test
 
@@ -46,7 +48,7 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Trial:** `trials/<kind>/` with a scene whose root extends `Trial` and a `TrialDef` `.tres`; add a `Block` to a session plan.
 - **View preset:** a `View` `.tres` in `content/views/`.
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
-- **Task:** a `Task` `.tres` in `content/tasks/` (one plan per level, what it needs, rewards); add it to a `Place` in `content/places/`.
+- **Task:** a `Task` `.tres` in `content/tasks/`. Each level has a plan, short title, project and two rewards. [Level configuration](docs/world.md).
 - **Saved state:** `save_state()` / `load_state()` on a node ([Save](core/save.gd), as in XRVision).
 - **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.

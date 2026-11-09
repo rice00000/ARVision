@@ -19,7 +19,12 @@ func _ready() -> void:
 	await _frames(5)
 	App.module(&"Inventory").add(&"magic_stone", 8)
 	var home := App.module(&"Home")
+	await shot("menu_entry", "menu_open")
 	home.open()
+	await shot("menu", "menu_staff_tools", false)
+	home._show(&"games")
+	await shot("games", "menu_game_global_motion", false)
+	home._show(&"room")
 	await shot("home", "home_shop")
 	home._show(&"shop")
 	await shot("shop", "home_next")
@@ -71,6 +76,12 @@ func _ready() -> void:
 	entry.run()
 	await _frames(10)
 	await shot("intro_setup", "entry_step_next")
+	await press_button("menu_open")
+	await get_tree().create_timer(0.35).timeout
+	await press_button("menu_staff_tools")
+	await shot("intro_tools", "fac_jump_reveal", false)
+	await press_button("fac_restart")
+	await shot("confirm_restart", "fac_cancel_tool", false)
 	Profile.wipe()
 	get_tree().quit()
 
@@ -79,10 +90,18 @@ func _frames(count: int) -> void:
 	for i in count: await get_tree().process_frame
 
 
-func shot(name: String, aimed_id := "") -> void:
+func press_button(id: String) -> void:
+	var target := App.main.find_child(id, true, false) as UITarget
+	App.sim_input.point(&"right", App.head().global_position + Vector3(0.12, -0.18, -0.15), target.global_position)
+	await _frames(3)
+	App.sim_input.click(&"right", &"trigger_click")
+	await _frames(3)
+
+
+func shot(name: String, aimed_id := "", look_at_button := true) -> void:
 	if not aimed_id.is_empty():
 		var target := App.main.find_child(aimed_id, true, false) as UITarget
-		App.sim_input.look_at(target.global_position)
+		if look_at_button: App.sim_input.look_at(target.global_position)
 		App.sim_input.point(&"right", App.head().global_position + Vector3(0.12, -0.18, -0.15), target.global_position)
 	await get_tree().physics_frame
 	await _frames(3)

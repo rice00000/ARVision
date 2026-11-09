@@ -13,7 +13,7 @@ func _inventory() -> Node:
 
 func _press(id: String) -> void:
 	await wait(0.35)
-	var target: Target = _home().find_child(id, true, false) if id != "home_open" else App.rig.find_child(id, true, false)
+	var target: Target = app.find_child(id, true, false)
 	expect(target != null, "button exists: " + id)
 	if target: await select(target.global_position)
 	await frames(3)
@@ -58,12 +58,16 @@ func test_home_opens_during_grab_only_training_and_resumes_same_round() -> void:
 	await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
 	var trial := App.session.trial
 	var before := trial.seconds()
-	await _press("home_open")
-	expect(_home().is_open and get_tree().paused, "always reachable even without a trial ray")
+	await _press("menu_open")
+	expect(_home().is_open and get_tree().paused, "the menu opens even without a trial ray")
+	expect(App.stage.visible and App.reality.home_room == null, "the menu starts over the current activity")
 	await wait(0.5)
 	expect(trial.seconds() - before < 0.4, "training clock paused")
+	await _press("menu_room")
 	expect(not App.stage.visible and App.reality.home_room != null, "leisure room replaces training view")
-	await _press("home_close")
+	await _press("menu_back")
+	expect(get_tree().paused and App.stage.visible and App.reality.home_room == null, "back restores the AR view while still paused")
+	await _press("menu_resume")
 	expect(not get_tree().paused and App.stage.visible and App.reality.home_room == null, "AR view restored")
 	expect(App.session.trial == trial and trial.is_running(), "same unscored round continues")
 
@@ -71,7 +75,8 @@ func test_home_opens_during_grab_only_training_and_resumes_same_round() -> void:
 func test_shop_needs_separate_confirmation_and_a_second_press_cannot_buy_twice() -> void:
 	await boot()
 	_inventory().add(&"magic_stone", 5)
-	await _press("home_open")
+	await _press("menu_open")
+	await _press("menu_room")
 	await _press("home_shop")
 	var id: StringName = _home()._item().id
 	await _press("home_buy")
@@ -112,6 +117,7 @@ func test_furniture_moves_by_pinch_and_last_stored_item_stays_gone() -> void:
 	_home().close()
 	Save.reload()
 	_home().open()
+	_home()._show(&"room")
 	expect_eq(decor.items().size(), 0, "last item never resurrects on reload")
 	_home().close()
 
@@ -173,3 +179,14 @@ func test_story_voice_waits_while_home_speaks() -> void:
 	expect(not finished.any(func(e: Array) -> bool: return e[0] == "Look around the room."), "story line not ended by home")
 	_home().close()
 	expect_eq(voice.speaking(), "Look around the room.", "same story instruction replays")
+
+
+func test_player_games_offer_only_playable_training_and_switch_once() -> void:
+	await boot()
+	await _press("menu_open")
+	await _press("menu_games")
+	var panel := _home()
+	expect_eq(panel.find_children("menu_game_*", "Target", true, false).size(), 1, "only the other training game can be picked")
+	await _press("menu_game_global_motion")
+	expect(await until(func() -> bool: return app.current_scene == &"global_motion" and not app.switching), "the other game opens")
+	expect(not panel.is_open and not get_tree().paused, "the scene change closes the menu")

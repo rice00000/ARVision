@@ -42,9 +42,9 @@ func test_every_level_button_is_read_out() -> void:
 	for file in DirAccess.get_files_at("res://content/tasks"):
 		if file.ends_with(".tres"):
 			var task: Task = load("res://content/tasks/" + file)
-			for level in task.levels.size():
-				_baked("Level %d. A new one!" % (level + 1))
-				_baked("Level %d. Done!" % (level + 1))
+			for level in task.levels:
+				_baked("%s. Level %d. %d magic stones." % [level.title, task.project_number(level), level.first_reward])
+	_baked("One magic stone.")
 
 
 func test_voice_plays_the_line_and_cuts_off_the_last() -> void:

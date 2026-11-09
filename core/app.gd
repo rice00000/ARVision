@@ -53,7 +53,7 @@ func head() -> XRCamera3D:
 
 
 func menu_active() -> bool:
-	return _pause_holds.has(&"home") or _pause_holds.has(&"facilitator")
+	return _pause_holds.has(&"player_menu") or _pause_holds.has(&"facilitator")
 
 
 ## Pauses the world for [param who] ([param on]) or lets go of that pause.

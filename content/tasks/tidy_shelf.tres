@@ -5,6 +5,8 @@
 [ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
 [ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="4_tidy"]
 
+[ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
+
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
@@ -105,7 +107,131 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_6")])
 
+[sub_resource type="Resource" id="odd_colour_easy"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.0
+pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 0.0})
+intro = "Two blocks have the same colour. Pinch the one that looks different, then put it in the marked cubby."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="odd_colour_medium"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.0
+pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 1.0})
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="odd_colour_hard"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.0
+pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 2.0})
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="odd_colour_plan_1"]
+script = ExtResource("2_plan")
+title = "Odd Color, level 1"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_easy")])
+
+[sub_resource type="Resource" id="odd_colour_plan_2"]
+script = ExtResource("2_plan")
+title = "Odd Color, level 2"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_medium")])
+
+[sub_resource type="Resource" id="odd_colour_plan_3"]
+script = ExtResource("2_plan")
+title = "Odd Color, level 3"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_hard")])
+
+[sub_resource type="Resource" id="shadow"]
+script = ExtResource("5_level")
+id = &"shadow"
+project = &"shadow"
+title = "Shadow Match"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_1")
+
+[sub_resource type="Resource" id="similar_shadows"]
+script = ExtResource("5_level")
+id = &"similar_shadows"
+project = &"shadow"
+title = "Similar Shadows"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_2")
+
+[sub_resource type="Resource" id="outline"]
+script = ExtResource("5_level")
+id = &"outline"
+project = &"outline"
+title = "Outline Match"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_3")
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("5_level")
+id = &"size"
+project = &"size"
+title = "Size Match"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_4")
+
+[sub_resource type="Resource" id="color"]
+script = ExtResource("5_level")
+id = &"color"
+project = &"color"
+title = "Color Match"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_5")
+
+[sub_resource type="Resource" id="clutter"]
+script = ExtResource("5_level")
+id = &"clutter"
+project = &"clutter"
+title = "Clutter Search"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_6")
+
+[sub_resource type="Resource" id="odd_color_1"]
+script = ExtResource("5_level")
+id = &"odd_color_1"
+project = &"odd_color"
+title = "Odd Color"
+plan = SubResource("odd_colour_plan_1")
+
+[sub_resource type="Resource" id="odd_color_2"]
+script = ExtResource("5_level")
+id = &"odd_color_2"
+project = &"odd_color"
+title = "Odd Color"
+plan = SubResource("odd_colour_plan_2")
+
+[sub_resource type="Resource" id="odd_color_3"]
+script = ExtResource("5_level")
+id = &"odd_color_3"
+project = &"odd_color"
+title = "Odd Color"
+plan = SubResource("odd_colour_plan_3")
+
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2"), SubResource("level_3"), SubResource("level_4"), SubResource("level_5"), SubResource("level_6")])
+levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3")])

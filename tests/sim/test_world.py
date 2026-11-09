@@ -22,10 +22,9 @@ class Adventure(SimCase):
         self.fail(f"no open menu at {place}: {sim.observe()['world']}")
 
     def press(self, sim, actor, button_id):
-        buttons = sim.observe()["world"]["menu"]["buttons"]
-        row = [b for b in buttons if b["id"].rsplit("_", 1)[0] == button_id.rsplit("_", 1)[0]]
-        side = "left" if row.index(self.button(sim, button_id)) < len(row) / 2 else "right"  # aim with the hand on this side of the row
-        actor.point(side, tuple(self.button(sim, button_id)["position"]), expect=button_id)
+        point = tuple(self.button(sim, button_id)["position"])
+        side = "left" if actor.body.local(point)[0] < 0 else "right"
+        actor.point(side, point, expect=button_id)
 
     def last_said(self, sim):
         return sim.events("said")[-1]["text"]
@@ -54,9 +53,15 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Alchemy table", timeout=5)
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
-                         [(f"task_tidy_shelf_{n}", n == 1) for n in range(1, 7)], "the table's own list")
-        self.press(sim, actor, "task_tidy_shelf_1")
-        self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1})
+                         [(f"task_tidy_shelf_{name}", name == "shadow") for name in
+                          ("shadow", "similar_shadows", "outline", "size", "color", "clutter",
+                           "odd_color_1", "odd_color_2", "odd_color_3")], "the table's own list")
+        self.assertEqual([(b["title"], b["reward"]) for b in world["menu"]["buttons"]],
+                         [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Outline Match L1", 3),
+                          ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3),
+                          ("Odd Color L1", 3), ("Odd Color L2", 3), ("Odd Color L3", 3)])
+        self.press(sim, actor, "task_tidy_shelf_shadow")
+        self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1, "level_id": "shadow"})
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         ends = self.round_ends(sim)
@@ -72,7 +77,8 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Alchemy table")
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "motion lives in another scene")
-        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 4,
+        self.assertEqual(world["menu"]["buttons"][0]["reward"], 2, "the completed card shows the replay reward")
+        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 7,
                          "level 2 lights up")
 
         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
@@ -80,8 +86,8 @@ class Adventure(SimCase):
         world = self.menu_at(sim, "Spell wall", timeout=15)
         self.assertFalse(world["guide"]["visible"], "nothing new left elsewhere: the guide rests")
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
-                         [("task_break_wall_1", True), ("task_break_wall_2", False)], "the wall's own list")
-        self.press(sim, actor, "task_break_wall_1")
+                         [("task_break_wall_steady_flow", True), ("task_break_wall_mixed_flow", False)], "the wall's own list")
+        self.press(sim, actor, "task_break_wall_steady_flow")
         Child(sim, seed=4).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=15))
         ends = [e for e in self.round_ends(sim) if e["skill"] != "visual_matching"]
@@ -95,11 +101,11 @@ class Adventure(SimCase):
 
         again = self.launch(None, profile="test_sim_world", keep_profile=True)
         world = self.menu_at(again, "Alchemy table")
-        self.assertEqual(world["done"], {"tidy_shelf": [0], "break_wall": [0]}, "saved")
+        self.assertEqual(world["done"], {"tidy_shelf": ["shadow"], "break_wall": ["steady_flow"]}, "saved")
         self.assertEqual(again.observe()["view"]["title"], "Normal", "relaunching keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "everything open was seen before: no nagging")
 
-    def test_every_button_is_in_reach_of_every_body(self):
+    def test_every_card_can_be_aimed_at_with_every_body(self):
         for body in ("small", "medium", "large"):
             with self.subTest(body=body):
                 sim = self.launch(None, profile=f"test_sim_world_reach_{body}", body=body)
@@ -110,10 +116,11 @@ class Adventure(SimCase):
                     menu = self.menu_at(sim, place)["menu"]
                     points = [tuple(button["position"]) for button in menu["buttons"]]
                     actor.look_at(tuple(sum(axis) / len(points) for axis in zip(*points)))
-                    for point in points:
+                    for button, point in zip(menu["buttons"], points):
                         side = "left" if actor.body.local(point)[0] < 0 else "right"
-                        actor.body.path(side, actor.body.ready(side), point)  # ConstraintError if out of reach
                         actor.body.check_view(sim.observe()["head"], point)
+                        actor.move_hand(side, actor.body.ready(side), at=point)
+                        self.assertEqual(sim.observe()["hands"][side]["aimed"], button["id"])
                 sim.close()
 
 

@@ -34,7 +34,8 @@ def rendered_cv_test():
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         server.stdout.readline()  # "CV server on ..."
-        command = [str(godot.executable(console=True)), "--xr-mode", "off", "--fixed-fps", "60", "--path", str(ROOT),
+        command = [str(godot.executable(console=True)), "--xr-mode", "off", "--audio-driver", "Dummy",
+                   "--fixed-fps", "60", "--path", str(ROOT),
                    "res://tests/run.tscn", "--", "--profile=test_rendered", f"--cv-server=http://127.0.0.1:{port}/detect"]
         done = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         print("\n".join(line for line in done.stdout.splitlines() if "::" in line or "TESTS" in line or "FAIL" in line))

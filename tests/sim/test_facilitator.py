@@ -172,7 +172,7 @@ class Panel(SimCase):
         sim = self.start(None, profile="test_sim_saves")
         actor = Actor(sim)
         menu = self.menu(sim)
-        actor.point("left", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_1")["position"]), expect="task_tidy_shelf_1")
+        actor.point("left", tuple(next(b for b in menu["buttons"] if b["id"] == "task_tidy_shelf_shadow")["position"]), expect="task_tidy_shelf_shadow")
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         self.menu(sim)
@@ -191,7 +191,7 @@ class Panel(SimCase):
         self.assertEqual((observation["profile"], observation["paused"], observation["facilitator"]["open"]),
                          ("test_sim_saves_s1", False, False), "plays the new save at once")
         self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({}, "Normal"), "from the start")
-        self.assertEqual([b["current"] for b in self.menu(sim)["buttons"]], [True] + [False] * 5)
+        self.assertEqual([b["id"] for b in self.menu(sim)["buttons"] if b["current"]], ["task_tidy_shelf_shadow"])
 
         self.facilitator.open()
         self.facilitator.press("fac_saves")
@@ -202,8 +202,9 @@ class Panel(SimCase):
         sim.wait(0.5)
         observation = sim.observe()
         self.assertEqual(observation["profile"], "test_sim_saves")
-        self.assertEqual((observation["world"]["done"], observation["view"]["title"]), ({"tidy_shelf": [0]}, "Normal"), "where it was left")
-        self.assertEqual([b["current"] for b in self.menu(sim)["buttons"]], [False, True] + [False] * 4)
+        self.assertEqual((observation["world"]["done"], observation["view"]["title"]),
+                         ({"tidy_shelf": ["shadow"]}, "Normal"), "where it was left")
+        self.assertEqual([b["id"] for b in self.menu(sim)["buttons"] if b["current"]], ["task_tidy_shelf_similar_shadows"])
 
         self.facilitator.open()
         self.facilitator.press("fac_saves")
@@ -216,7 +217,7 @@ class Panel(SimCase):
         sim.wait(0.5)
         observation = sim.observe()
         self.assertEqual(observation["profile"], "test_sim_saves_s2", observation["facilitator"])
-        self.assertEqual(observation["world"]["done"], {"tidy_shelf": [0]}, "the copy carries the progress")
+        self.assertEqual(observation["world"]["done"], {"tidy_shelf": ["shadow"]}, "the copy carries the progress")
         self.assertEqual([(r["from"], r["to"]) for r in self.reports(sim, "save_switched")],
                          [("test_sim_saves", "test_sim_saves_s1"), ("test_sim_saves_s1", "test_sim_saves"),
                           ("test_sim_saves", "test_sim_saves_s2")])

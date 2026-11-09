@@ -253,15 +253,21 @@ func tracked() -> bool:
 
 
 func _on_button(action: String, pressed: bool) -> void:
-	Events.button.emit(side, StringName(action), pressed)
-	if not pressed or not tracked():
+	var active := pressed and tracked()
+	var target := cast() if active and action == "trigger_click" else null
+	var on_ui := target is UITarget
+	# A menu opener must pause play before the raw pinch reaches gameplay.
+	if not on_ui:
+		Events.button.emit(side, StringName(action), pressed)
+	if not active:
 		return
-	var target := cast() if action == "trigger_click" else null
-	if action == "trigger_click" and (ray_on() or target is UITarget):
+	if action == "trigger_click" and (on_ui or ray_on()):
 		_set_aim(target)
-		if target is UITarget:
+		if on_ui:
 			target.confirm()
 		Events.selected.emit(side, target, global_position, -global_basis.z)
+		if on_ui:
+			Events.button.emit(side, StringName(action), pressed)
 	elif action in ["trigger_click", "grip_click"]:
 		_grab()
 

@@ -29,14 +29,14 @@ func _ready() -> void:
 	_entry = app.get_node(^"Intro/Entry")
 	_entry.run()
 	app.autostart = true   # the shelf scene starts itself after the hand-over
-	await _until(func() -> bool: return _entry.find_child("entry_part_emerge", true, false) != null)
+	await _until(func() -> bool: return _entry.zones_available())
 	await _pause(0.8)
 	_look(-0.12)
 	await _save("1_setup_head_level")
 	_look(0.0, true)
 	await _save("1b_setup_wide")
 	_look(-0.7)
-	_press(&"entry_part_emerge")
+	_entry.jump_to(&"emerge")
 	await _pause(0.6)
 	_toggle()
 	await _pause(2.9)
@@ -44,14 +44,14 @@ func _ready() -> void:
 	await _until(func() -> bool: return _entry.find_child("entry_part_all", true, false) != null)
 	await _pause(0.6)
 	await _save("3_opening_docked_all_set")
-	_press(&"entry_part_ripple")
+	_entry.jump_to(&"reveal")
 	await _pause(7.5)
 	await _save("4_revealed")
 	_toggle()
 	await _pause(0.3)
 	await _save("4b_revealed_no_zones")
 	await _until(func() -> bool: return _entry.find_child("entry_part_all", true, false) != null)
-	_press(&"entry_part_shelf")
+	_entry.jump_to(&"shelf")
 	await _until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 600)
 	await _pause(2.5)
 	_look(-0.7)
@@ -71,14 +71,9 @@ func _look(pitch: float, wide := false, yaw := 0.0) -> void:
 
 
 func _toggle() -> void:
-	if _zones and _entry.has_method(&"_toggle_zones"):
-		_entry._toggle_zones()
+	if _zones and _entry.zones_available():
+		_entry.toggle_zones()
 
-
-func _press(id: StringName) -> void:
-	var target := _entry.find_child(String(id), true, false) as Target
-	if target != null:
-		_entry._on_target(target)
 
 
 func _pause(seconds: float) -> void:

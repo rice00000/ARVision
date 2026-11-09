@@ -242,9 +242,14 @@ func test_a_short_tracking_blink_does_not_drop_it() -> void:
 func test_a_pause_lets_go_and_settles() -> void:
 	await _scene()
 	await _carry_to(Vector3(eye.x + 0.1, table_y + 0.1, eye.z - 0.3))
-	Events.facilitator_toggled.emit(true)
-	await wait(1.2)
+	input.menu()
 	expect(not carry.held, "let go")
+	await _pinch_at(Carry.middle_of(gear))
+	input.press(&"right", &"trigger_click", false)
+	input.click(&"right", &"trigger_click")
+	expect(not carry.held, "a menu pinch cannot take the gear")
+	input.menu()
+	await wait(1.2)
 	expect(absf(gear.global_position.y - table_y) < 0.003, "on the table")
 
 
@@ -923,13 +928,13 @@ func _opening_at_start() -> Entry:
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.touch_cauldron_in_sim = false   # a desktop: only a click presses
 	entry.run()
-	await until(func() -> bool: return _target(&"entry_part_touch") != null, 30.0)
+	await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0)
 	return entry
 
 
 func test_a_click_on_the_cauldron_registers_every_time_a_click_beside_it_does_not() -> void:
 	var entry := await _opening_at_start()
-	await _press_button(&"entry_part_touch")
+	await jump_to_intro_part(&"touch")
 	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
 	var driver: DesktopDriver = entry._desktop_driver()
 	var camera := App.rig.head
@@ -993,7 +998,7 @@ func _take_real_gear(entry: Entry, base: Vector3) -> void:
 func test_grabbing_the_gear_during_the_ask_takes_the_glow_and_the_hand_away_at_once() -> void:
 	var entry := await _opening_at_start()
 	var said := record(Events.said)
-	await _press_button(&"entry_part_pickup")
+	await jump_to_intro_part(&"pickup")
 	expect(await until(func() -> bool: return _glowing(entry), 20.0), "the gear glows while Onion asks")
 	var carry_node: Carry = entry.get("_carry")
 	expect(carry_node.enabled, "and the child may already take it (a jump straight here switches Carry on)")
@@ -1023,11 +1028,11 @@ func test_the_glow_goes_the_moment_the_gear_is_picked_up_or_reset_whatever_the_s
 
 func test_a_jump_button_while_the_pinch_is_shown_clears_the_glow_and_the_hand() -> void:
 	var entry := await _opening_at_start()
-	await _press_button(&"entry_part_pickup")
+	await jump_to_intro_part(&"pickup")
 	expect(await until(func() -> bool: return _glowing(entry), 20.0), "glowing")
 	var demo: DemoHand = entry.get("_demo")
 	expect(await until(func() -> bool: return demo.visible, 25.0), "and the hand shows the pinch")
-	await _press_button(&"entry_part_hello")   # a jump button cuts in
+	await jump_to_intro_part(&"hello")   # a jump button cuts in
 	await wait(0.6)
 	expect(not _glowing(entry), "the glow is gone")
 	expect(not demo.visible and demo._mode == DemoHand.Mode.NONE, "and so is the hand")
@@ -1035,24 +1040,16 @@ func test_a_jump_button_while_the_pinch_is_shown_clears_the_glow_and_the_hand() 
 	expect(not (entry.get("_carry") as Carry).enabled, "and Carry is off")
 
 
-## The grown-up presses a jump button with the LEFT hand, while the child's right hand may be holding the gear.
-func _press_with_left(id: StringName) -> void:
-	await until(func() -> bool: return _target(id) != null, 20.0)
-	await select(_target(id).global_position, &"left")
-	await frames(2)
-	await wait(0.7)
-
-
 func test_a_jump_button_while_carrying_lets_go_cleanly() -> void:
 	var entry := await _opening_at_start()
-	await _press_button(&"entry_part_pickup")
+	await jump_to_intro_part(&"pickup")
 	expect(await until(func() -> bool: return _glowing(entry), 20.0), "glowing")
 	var real_gear: Node3D = entry.get("_gear")
 	var rest: Vector3 = entry.get("_gear_rest")
 	await _take_real_gear(entry, rest + Vector3(0.05, 0.12, 0.0))
 	var carry_node: Carry = entry.get("_carry")
 	expect(carry_node.held, "carrying it")
-	await _press_with_left(&"entry_part_touch")   # a jump button, mid-carry (the pinch is still closed)
+	await jump_to_intro_part(&"touch", &"left")   # a jump button, mid-carry (the pinch is still closed)
 	await wait(0.5)
 	expect(not carry_node.held and not carry_node.enabled and not carry_node.has_been_picked_up(), "let go of and forgotten")
 	expect(not real_gear.visible and not _glowing(entry), "the gear is put away, with no glow")
@@ -1092,7 +1089,7 @@ func test_a_child_who_sets_the_gear_in_while_onion_talks_is_not_asked_to() -> vo
 func test_tracking_lost_while_carrying_in_the_set_in_beat_sets_it_down_and_the_beat_waits() -> void:
 	var entry := await _opening_at_start()
 	var said := record(Events.said)
-	await _press_button(&"entry_part_place")
+	await jump_to_intro_part(&"place")
 	var demo: DemoHand = entry.get("_demo")
 	expect(await until(func() -> bool: return demo.visible, 25.0), "the hand shows the set-in")
 	var real_gear: Node3D = entry.get("_gear")
@@ -1484,7 +1481,7 @@ func test_losing_the_hand_joints_in_a_headset_lets_the_gear_go_after_a_blink_and
 
 func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_finger_does_not() -> void:
 	var entry := await _opening_at_start()
-	await _press_button(&"entry_part_touch")
+	await jump_to_intro_part(&"touch")
 	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
 	_headset_on()   # from here the hand is a real one
 	_fake_hand(&"right")
@@ -1510,7 +1507,7 @@ func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_
 
 func test_in_a_headset_the_desktop_click_and_keys_stay_out_of_the_way() -> void:
 	var entry := await _opening_at_start()
-	await _press_button(&"entry_part_touch")
+	await jump_to_intro_part(&"touch")
 	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting")
 	_headset_on()
 	var taps := record(entry._runner.cauldron_touched)
@@ -1594,7 +1591,7 @@ func _line_log() -> Array:
 func test_a_click_on_onion_cuts_its_line_short_and_the_story_goes_straight_to_the_next() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_hello")
+	await jump_to_intro_part(&"hello")
 	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "Onion says its first line")
 	var before := Time.get_ticks_msec()
 	await _click_onion(entry)
@@ -1610,7 +1607,7 @@ func test_a_click_on_onion_cuts_its_line_short_and_the_story_goes_straight_to_th
 func test_every_line_is_still_said_once_when_the_child_skips_through_them() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_hello")
+	await jump_to_intro_part(&"hello")
 	var spent := 0.0
 	while spent < 40.0 and not log.any(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Could you help me with something?"):
 		if _voice().speaking() != "":
@@ -1631,7 +1628,7 @@ func test_every_line_is_still_said_once_when_the_child_skips_through_them() -> v
 func test_an_instruction_the_child_still_needs_is_never_cut_and_a_press_on_onion_is_not_a_tap() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_touch")
+	await jump_to_intro_part(&"touch")
 	expect(await until(func() -> bool: return _voice().speaking() == "Give the cauldron a little tap.", 30.0), "the tap is asked for")
 	await _click_onion(entry)   # Onion stands beside the opening, inside the cauldron's own reach
 	await wait(0.5)
@@ -1649,7 +1646,7 @@ func test_an_instruction_the_child_still_needs_is_never_cut_and_a_press_on_onion
 func test_the_pick_up_instruction_is_not_cut_while_the_gear_waits_to_be_taken() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_pickup")
+	await jump_to_intro_part(&"pickup")
 	expect(await until(func() -> bool: return _voice().speaking() == "Would you pick it up for me?", 30.0), "Onion asks")
 	await _click_onion(entry)
 	await wait(0.4)
@@ -1664,7 +1661,7 @@ func test_the_pick_up_instruction_is_not_cut_while_the_gear_waits_to_be_taken() 
 func test_a_press_meant_for_the_cauldron_or_one_that_just_took_something_is_never_a_skip() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_hello")
+	await jump_to_intro_part(&"hello")
 	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "a line is being spoken")
 	var pot: Target = entry.get("_cauldron_target")
 	await _click_at(entry, pot.global_position + Vector3(0.0, -0.05, 0.0), 0.9)   # the cauldron's body, aimed through its middle
@@ -1685,7 +1682,7 @@ func test_a_press_meant_for_the_cauldron_or_one_that_just_took_something_is_neve
 func test_in_a_headset_a_fingertip_going_into_onion_cuts_its_line_once_and_a_resting_finger_does_not() -> void:
 	var entry := await _opening_at_start()
 	var log := _line_log()
-	await _press_button(&"entry_part_hello")
+	await jump_to_intro_part(&"hello")
 	expect(await until(func() -> bool: return _voice().speaking() == "Oh! Hello there.", 30.0), "a line is being spoken")
 	_headset_on()
 	_fake_hand(&"right")

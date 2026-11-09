@@ -44,6 +44,7 @@ func buy(id: StringName) -> bool:
 
 
 func _reward(task: StringName, level: int, stones: int) -> void:
+	if stones == 0: return
 	_set_count(STONE, count(STONE) + stones)
 	_changed(&"reward_granted", {task = task, level = level, stones = stones, balance = count(STONE)})
 

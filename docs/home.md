@@ -1,10 +1,10 @@
 # Home and rewards
 
-- Point at the house and pinch on the right. Furniture, rooms and games open directly; no facilitator menu.
+- Point and pinch **Menu**, then **My room** for the shop, rooms and decorating. **Games** is a separate page in the player menu.
 - Browse one rotating model at a time. Hear its name/price; count the stones. Buying needs a separate check-mark press. Sunny room is free; two more rooms cost 4/6 stones.
 - My things → Place. Pinch furniture, move/twist, release. A check/cross shows a valid/blocked spot. While holding, aim at the box with the other hand and pinch to store it. Each room remembers its layout.
-- Home pauses training and preserves its real-world view and pending speech. Closing resumes that activity. Purchased rooms are leisure spaces, not replacements for measured AR surfaces.
-- Every fully successful level/replay earns 2 stones. Skip, timeout, abandonment, missing modules and probes earn none. `Task.reward_stones` sets adventure rewards.
+- The menu pauses training and holds pending speech. Leaving the room restores the training view. **Keep playing** resumes the same round.
+- Adventure rewards come from each level's **First Reward** and **Repeat Reward**. Skip, timeout, abandonment, missing modules and probes earn none.
 
 Modules: `Inventory` owns transactions; `Rooms` owns the selected room; `Decor` owns layouts; `Home` owns UI. Contracts live in `Events`; room rendering belongs to Reality. Each module can be removed. Item `.tres` files define models/prices. Logs include purchases, declined purchases, rewards, room changes and furniture moves.
 

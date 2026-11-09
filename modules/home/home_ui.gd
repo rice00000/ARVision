@@ -41,18 +41,23 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 	node.collision_layer = Pointer.MENU_LAYER
 	node.id = id
 	node.name = String(id)
-	node.show_ray = id != &"home_open"
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(0.135, 0.125, 0.04)
+	var face_size := Vector2(0.23, 0.064) if icon.is_empty() else Vector2(0.115, 0.105)
+	box.size = Vector3(face_size.x + 0.02, face_size.y + 0.02, 0.04)
 	shape.shape = box
 	node.add_child(shape)
 	node.set_meta(&"speech", speech)
 	node.position = at
 	parent.add_child(node)
-	var face := box(node, Vector3(0.115, 0.105, 0.025), Vector3.ZERO, CREAM)
+	var face := box(node, Vector3(face_size.x, face_size.y, 0.025), Vector3.ZERO, CREAM)
 	face.name = "Face"
-	if icon == "house":
+	if icon.is_empty():
+		var words := label(node, caption, Vector3(0, 0, 0.018))
+		words.modulate = INK
+		words.outline_size = 0
+		return node
+	elif icon == "house":
 		box(node, Vector3(0.06, 0.042, 0.025), Vector3(0, -0.006, 0.025), INK)
 		var roof := box(node, Vector3(0.047, 0.047, 0.015), Vector3(0, 0.019, 0.023), GOLD)
 		roof.rotation.z = PI / 4

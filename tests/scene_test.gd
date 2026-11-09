@@ -77,32 +77,61 @@ func test_game_targets_in_front_of_the_panel_cannot_block_a_scene_button() -> vo
 
 func test_progress_survives_scene_switches_and_the_headset_keeps_its_pause() -> void:
 	await boot()
-	await App.world._complete(load("res://content/tasks/tidy_shelf.tres"), 0)
+	var tidy_shelf: Task = load("res://content/tasks/tidy_shelf.tres")
+	await App.world._complete(tidy_shelf, tidy_shelf.level_by_id(&"shadow"))
 	App.hold_pause(&"headset", true)
 	await app.change_scene(&"global_motion")
 	expect(get_tree().paused, "switching does not release the headset's pause")
 	App.hold_pause(&"headset", false)
-	await App.world._complete(load("res://content/tasks/break_wall.tres"), 0)
+	var break_wall: Task = load("res://content/tasks/break_wall.tres")
+	await App.world._complete(break_wall, break_wall.level_by_id(&"steady_flow"))
 	await app.change_scene(&"find_object")
-	expect_eq(App.world.done, {&"tidy_shelf": [0], &"break_wall": [0]}, "both activities keep their progress")
+	expect_eq(App.main.progress.done, {&"tidy_shelf": [&"shadow"], &"break_wall": [&"steady_flow"]}, "both activities keep their progress")
 	var session := App.session
 	await app.change_scene(&"find_object")
 	expect(App.session == session and not app.switching, "choosing the current scene does not restart it")
 
 
-func test_leaving_intro_removes_its_music_debug_label_and_waiting_story() -> void:
+func test_leaving_intro_removes_its_music_and_waiting_story() -> void:
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.run()
 	# The opening waits for the grown-up's setup; a jump button skips it and starts the story.
-	await until(func() -> bool: return entry.find_child("entry_part_hello", true, false) != null, 10.0)
-	entry._on_target(entry.find_child("entry_part_hello", true, false) as Target)
+	await jump_to_intro_part(&"hello")
 	await wait(3.0)
 	var music: AudioStreamPlayer = entry.get("_music")
-	var label: Label3D = entry.get("_beat_label")
-	expect(music.playing and label.is_inside_tree(), "the opening is playing")
+	expect(music.playing, "the opening is playing")
 	await app.change_scene(&"find_object")
-	expect(not is_instance_valid(entry) and not is_instance_valid(music) and not is_instance_valid(label), "all opening output removed")
+	expect(not is_instance_valid(entry) and not is_instance_valid(music), "all opening output removed")
 	var said := record(Events.said)
 	await wait(10.0)
 	expect(said.is_empty(), "the old story never speaks again")
+
+
+func test_tools_confirmations_cancel_cleanly_and_restart_preserves_progress() -> void:
+	await boot(plan_of(FIND, 1))
+	App.module(&"Inventory").add(&"magic_stone", 4)
+	App.session.run()
+	await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
+	var ended := record(Events.trial_ended)
+	var session := App.session
+	var rig := App.rig
+	var profile := Profile.id
+	await open_intro_tools()
+	await press_facilitator("fac_exit")
+	expect(App.session == session and get_tree().paused, "Exit opens a confirmation")
+	await press_facilitator("fac_cancel_tool")
+	await press_facilitator("fac_restart")
+	expect(App.session == session, "one pinch cannot restart a scene")
+	input.menu()
+	await frames(2)
+	await open_intro_tools()
+	var facilitator := App.module(&"Facilitator")
+	expect(facilitator.find_child("fac_confirm_tool", true, false) == null, "closing the panel cancels confirmation")
+	await press_facilitator("fac_restart")
+	await press_facilitator("fac_confirm_tool")
+	await frames(2)
+	expect(not is_instance_valid(session) and App.rig == rig, "only the current scene is rebuilt")
+	expect_eq(Profile.id, profile, "the same save is in use")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 4, "rewards survive")
+	expect(ended.is_empty() and not get_tree().paused and not facilitator.is_open, "the interrupted round is unscored and the panel closes")

@@ -24,26 +24,24 @@ func _ready() -> void:
 	_entry = app.get_node(^"Intro/Entry")
 	_entry.run()
 	app.autostart = true
-	await _until(func() -> bool: return _entry.find_child("entry_part_touch", true, false) != null)
+	await _until(func() -> bool: return _entry.zones_available())
 	await _pause(0.5)
 	if "--part=sub" in OS.get_cmdline_user_args():
 		await _subtitles()
 		get_tree().quit()
 		return
-	await _save("0_dev_columns_left", Vector3(-0.05, 1.0, 0.0))
-	await _save("0_dev_columns_right", Vector3(-0.05, -1.0, 0.0))
 	var demo: Node3D = _entry.get("_demo").get("_figure")   # the hand sets its own node's basis each frame
 	# The tap, over the cauldron's rim.
-	_press(&"entry_part_touch")
+	_entry.jump_to(&"touch")
 	await _pause(4.5)   # the line, then the hand loops
 	await _hand(demo, "tap", func() -> Vector3: return _entry.call("_rim_point"), 0.05)
 	# The pinch, on the gear.
-	_press(&"entry_part_pickup")
+	_entry.jump_to(&"pickup")
 	await _pause(5.5)
 	await _hand(demo, "pinch", func() -> Vector3: return (_entry.get("_gear") as Node3D).global_position + Vector3.UP * 0.047, 0.0525)
 	# Lower and open, over the socket.
 	for k: float in [0.4, 0.5, 0.6]:   # a fresh jump each time: after 14 s the reminder shows the pinch instead
-		_press(&"entry_part_place")
+		_entry.jump_to(&"place")
 		await _pause(1.5)
 		await _hand(demo, "place", func() -> Vector3: return _entry.get("_socket_at"), 0.06, [k])
 	get_tree().quit()
@@ -51,7 +49,7 @@ func _ready() -> void:
 
 ## The first visit: the subtitle at Wei's setting and the proposed one, looking at the things and at Onion.
 func _subtitles() -> void:
-	_press(&"entry_part_shelf")
+	_entry.jump_to(&"shelf")
 	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 900)
 	await _pause(3.0)
 	var voice := App.module(&"Voice")
@@ -146,11 +144,6 @@ func _look_at(at: Vector3) -> void:
 	var flat := Vector2(d.x, d.z).length()
 	App.rig.head.rotation = Vector3(atan2(d.y, flat), atan2(-d.x, -d.z), 0.0)
 
-
-func _press(id: StringName) -> void:
-	var target := _entry.find_child(String(id), true, false) as Target
-	if target != null:
-		_entry._on_target(target)
 
 
 func _pause(seconds: float) -> void:

@@ -22,4 +22,5 @@ def executable(console=False):
 
 def headless(*args):
     """Command line for a headless, XR-off run of this project."""
-    return [str(executable(console=True)), "--headless", "--xr-mode", "off", "--path", str(ROOT), *args]
+    return [str(executable(console=True)), "--headless", "--xr-mode", "off", "--audio-driver", "Dummy",
+            "--path", str(ROOT), *args]

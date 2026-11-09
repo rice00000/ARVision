@@ -85,7 +85,8 @@ static func levels() -> Dictionary:
 	elif App.world:
 		for place in App.world.adventure.places:
 			for task in place.tasks:
-				plans.append_array(task.levels)
+				for level in task.levels:
+					plans.append(level.plan)
 	var result := {}
 	for plan in plans:
 		for block in plan.blocks:
@@ -99,14 +100,15 @@ static func world() -> Dictionary:
 	if world == null:
 		return {}
 	var guide: Node3D = world.get("_guide")
-	var result := {done = world.done, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
+	var result := {done = App.main.progress.done, place = world.place.title if world.place else "", guide = {visible = guide.visible, position = guide.global_position},
 		menu = null}
 	if world.menu and world.menu.is_inside_tree():
 		var buttons := []
 		for button: Target in world.menu.find_children("task_*", "Target", false, false):
 			var entry: Array = world.menu.get("_buttons")[button]
 			buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
-				current = entry[1] == world.current(entry[0]), done = world.is_done(entry[0], entry[1])})
+				current = entry[1] == world.current(entry[0]), done = App.main.progress.is_done(entry[0], entry[1]),
+				title = (button.get_node(^"Look/Title") as Label3D).text, reward = App.main.progress.reward(entry[0], entry[1])})
 		result.menu = {open = world.menu.get("_open"), buttons = buttons}
 	return result
 

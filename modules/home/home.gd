@@ -1,15 +1,17 @@
 extends Module
-## Persistent right-side home. Single-item browsing, explicit purchase confirmation.
-## Training pauses, keeps its objects and resumes in the original real room.
+## Main menu for games, the room and staff tools.
+
+const GAMES := [&"find_object", &"global_motion"]
 
 var is_open := false
-var page := &"home"
+var page := &"menu"
+var _in_room := false
 var _index := 0
 var _entry: Target
 var _panel := Node3D.new()
 var _preview: Node3D
 var _view: View
-var _pending := false
+var _pending: StringName
 var _cooldown := 0.0
 var _hover: Target
 var _hover_seconds := 0.0
@@ -19,17 +21,19 @@ var _offscreen := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_entry = HomeUI.button(App.rig, &"home_open", "Home", "Point at the little house and pinch to visit your room and shop.", Vector3.ZERO, "house")
+	_entry = HomeUI.button(App.rig, &"menu_open", "Menu", "Point and pinch to open the game menu.", Vector3.ZERO, "≡")
+	_entry.show_ray = false
+	_entry.collision_layer = Pointer.UI_LAYER
 	_panel.visible = false
 	add_child(_panel)
 	Events.selected.connect(_select)
 	Events.scene_changing.connect(close)
+	Events.player_menu_requested.connect(open)
 	Events.facilitator_toggled.connect(func(open: bool) -> void:
-		_entry.visible = not open
-		_entry.collision_layer = 0 if open else Pointer.MENU_LAYER
-		if open: close())
+		if open: close()
+		_update_entry())
 	Events.inventory_changed.connect(func() -> void:
-		if is_open: _build.call_deferred())
+		if _in_room: _build.call_deferred())
 	_anchor_entry.call_deferred()
 
 
@@ -37,68 +41,72 @@ func _anchor_entry() -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
 	var frame := Basis.looking_at(forward)
-	_entry.global_transform = Transform3D(frame, eye.origin + frame * Vector3(0.45, -0.12, -0.35))
+	# Above the work surface so pointing at a table object cannot hit the menu.
+	_entry.global_transform = Transform3D(frame, eye.origin + frame * Vector3(0.30, 0.09, -0.49))
 	_anchor = eye.origin
 
 
 func open() -> void:
 	if is_open or App.main.switching: return
-	if App.module(&"Inventory") == null or App.module(&"Rooms") == null:
-		App.hold_pause(&"home", false)
-		Events.say("The home is switched off.")
-		return
 	is_open = true
-	App.hold_pause(&"home", true)
-	App.main.show_activity(false)
-	_view = App.reality.view
-	App.reality.apply_view(View.new())
-	Events.home_toggled.emit(true)
+	App.hold_pause(&"player_menu", true)
+	_update_entry()
+	Events.player_menu_toggled.emit(true)
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
-	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8), eye.origin + forward * 0.44 + Vector3.DOWN * 0.08)
+	var height := clampf(-eye.basis.z.y * 0.48, -0.16, 0.16) - 0.035
+	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8),
+		eye.origin + forward * 0.48 + Vector3.UP * height)
 	_panel.visible = true
-	_show(&"home")
-	Events.say("Your home. Point and pinch to choose furniture, rooms, or decorating.")
+	_show(&"menu")
+	Events.say("Point and pinch to keep playing, choose a game, or visit your room.")
 
 
 func close() -> void:
-	if not is_open: return
-	is_open = false
-	Events.furniture_editing.emit(false)
-	Events.home_toggled.emit(false)
-	App.main.show_activity(true)
-	App.reality.apply_view(_view)
-	_panel.visible = false
-	_clear_panel()
-	App.hold_pause(&"home", false)
-	_anchor_entry()
-	Events.report(&"home_closed")
+	_pending = &""
+	if is_open:
+		is_open = false
+		_set_room(false)
+		Events.player_menu_toggled.emit(false)
+		_panel.visible = false
+		_clear_panel()
+		_anchor_entry()
+	App.hold_pause(&"player_menu", false)
+	_update_entry()
 
 
 func _select(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
-	if target == null or _pending or _cooldown > 0: return
-	if target != _entry and not _panel.is_ancestor_of(target): return
-	if App.main.switching: return
-	# Pause synchronously so this same press cannot answer a trial.
-	if target == _entry and not is_open: App.hold_pause(&"home", true)
-	_pending = true
-	_activate.call_deferred(target.id)
+	if target == null or _pending != &"" or _cooldown > 0 or App.main.switching: return
+	if target == _entry:
+		if App.menu_active(): return
+		# Keep the opening pinch out of the active trial.
+		App.hold_pause(&"player_menu", true)
+	elif not is_open or not _panel.is_ancestor_of(target): return
+	_pending = target.id
+	_activate.call_deferred()
 
 
-func _activate(id: StringName) -> void:
-	_pending = false
+func _activate() -> void:
+	var id := _pending
+	_pending = &""
+	if id == &"": return
 	_cooldown = 0.3
-	Events.report(&"home_action", {button = id, page = page})
+	Events.report(&"player_menu", {button = id, page = page})
 	match id:
-		&"home_open":
-			if is_open: close()
-			else: open()
-		&"home_close": close()
-		&"home_back": _show(&"home")
+		&"menu_open": open()
+		&"menu_resume": close()
+		&"menu_back": _show(&"menu")
+		&"menu_staff_tools": Events.staff_tools_requested.emit()
+		&"menu_games":
+			_show(&"games")
+			Events.say("Choose a game. Finish it to earn magic stones.")
+		&"menu_room":
+			_show(&"room")
+			Events.say("Your home. Point and pinch to choose furniture, rooms, or decorating.")
+		&"home_back": _show(&"room")
 		&"home_shop": _index = 0; _show(&"shop")
 		&"home_rooms": _index = 0; _show(&"rooms")
 		&"home_bag": _index = 0; _show(&"bag")
-		&"home_games": _show(&"games")
 		&"home_prev", &"home_next":
 			_index = posmod(_index + (-1 if id == &"home_prev" else 1), _catalogue().size())
 			_build(); _speak_item()
@@ -125,19 +133,32 @@ func _activate(id: StringName) -> void:
 		&"home_decorate": _show(&"decorate")
 		&"home_store": Events.furniture_store_requested.emit()
 		&"home_turn": Events.furniture_turn_requested.emit()
-		_:
-			if String(id).begins_with("home_scene_"):
-				var scene := StringName(String(id).trim_prefix("home_scene_"))
-				close()
-				App.main.change_scene(scene)
+		&"menu_game_find_object", &"menu_game_global_motion":
+			App.main.change_scene(StringName(String(id).trim_prefix("menu_game_")))
 
 
 func _show(next: StringName) -> void:
 	page = next
-	Events.furniture_editing.emit(page == &"decorate")
+	_set_room(page not in [&"menu", &"games"])
+	if _in_room: Events.furniture_editing.emit(page == &"decorate")
 	_build()
 	if page in [&"shop", &"rooms", &"bag"]: _speak_item()
 	if page == &"decorate": Events.say("Pinch to move furniture. Let go to place it. Hold it and point at the box with your other hand, then pinch to put it away.")
+
+
+func _set_room(on: bool) -> void:
+	if _in_room == on: return
+	_in_room = on
+	if on:
+		_view = App.reality.view
+		App.main.show_activity(false)
+		App.reality.apply_view(View.new())
+		Events.home_toggled.emit(true)
+	else:
+		Events.home_toggled.emit(false)
+		App.main.show_activity(true)
+		App.reality.apply_view(_view)
+		_view = null
 
 
 func _catalogue() -> Array[ItemDef]:
@@ -168,7 +189,6 @@ func _clear_panel() -> void:
 func _build() -> void:
 	if not is_open: return
 	_clear_panel()
-	var inventory := App.module(&"Inventory")
 	if page == &"decorate":
 		# Move the controls to the side; the centre stays clear for furniture.
 		HomeUI.button(_panel, &"home_back", "Back", "Back to the home menu.", Vector3(-0.27, 0.16, 0), "←")
@@ -177,21 +197,38 @@ func _build() -> void:
 		HomeUI.button(_panel, &"home_bag", "My things", "Choose furniture from your bag.", Vector3(-0.27, -0.05, 0), "chair")
 		return
 	HomeUI.box(_panel, Vector3(0.68, 0.53, 0.025), Vector3(0, 0, -0.05), HomeUI.INK)
-	HomeUI.label(_panel, "HOME     ◆ %d" % inventory.count(&"magic_stone"), Vector3(0, 0.225, 0), 32)
-	HomeUI.button(_panel, &"home_close", "Return", "Return to your game.", Vector3(0.265, 0.21, 0), "×")
-	if page != &"home": HomeUI.button(_panel, &"home_back", "Home", "Back to the home menu.", Vector3(-0.265, 0.21, 0), "←")
-	if page == &"home":
+	if page == &"menu":
+		HomeUI.label(_panel, "MENU", Vector3(0, 0.10, 0), 44)
+		HomeUI.button(_panel, &"menu_resume", "Keep playing", "Return to your game.", Vector3(-0.22, 0, 0.02), "▶")
+		HomeUI.button(_panel, &"menu_games", "Games", "Choose a game. Finish it to earn magic stones.", Vector3(0, 0, 0.02), "◎")
+		if App.module(&"Inventory") and App.module(&"Rooms"):
+			HomeUI.button(_panel, &"menu_room", "My room", "Visit your room and shop.", Vector3(0.22, 0, 0.02), "house")
+		if App.module(&"Facilitator"):
+			HomeUI.button(_panel, &"menu_staff_tools", "Staff tools", "Open the staff tools.", Vector3(0, -0.17, 0.02))
+		return
+	if page == &"games":
+		HomeUI.label(_panel, "GAMES", Vector3(0, 0.10, 0), 44)
+		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.265, 0.17, 0), "←")
+		for i in GAMES.size():
+			var scene: StringName = GAMES[i]
+			var title: String = Main.SCENES[scene].title
+			var at := Vector3(-0.17 + i * 0.34, -0.02, 0.02)
+			if scene == App.main.current_scene:
+				HomeUI.label(_panel, title + "\nPlaying now", at, 29)
+			else:
+				HomeUI.button(_panel, StringName("menu_game_" + scene), title, title, at, "chair" if i == 0 else "◎")
+		return
+	var inventory := App.module(&"Inventory")
+	HomeUI.label(_panel, "MY ROOM     ◆ %d" % inventory.count(&"magic_stone"), Vector3(0, 0.225, 0), 32)
+	HomeUI.button(_panel, &"menu_resume", "Resume", "Return to your game.", Vector3(0.265, 0.21, 0), "▶")
+	if page == &"room":
+		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.265, 0.21, 0), "←")
 		HomeUI.button(_panel, &"home_shop", "Furniture", "Shop for furniture.", Vector3(-0.15, 0.08, 0.02), "chair")
 		HomeUI.button(_panel, &"home_rooms", "Rooms", "See rooms. You can buy a new room or visit one you own.", Vector3(0.15, 0.08, 0.02), "house")
 		HomeUI.button(_panel, &"home_bag", "My things", "Put your furniture in your room.", Vector3(-0.15, -0.12, 0.02), "bag")
-		HomeUI.button(_panel, &"home_games", "Games", "Choose a game. Finish it to earn magic stones.", Vector3(0.15, -0.12, 0.02), "▶")
-	elif page == &"games":
-		var i := 0
-		for scene: StringName in Main.SCENES:
-			HomeUI.button(_panel, StringName("home_scene_" + String(scene)), Main.SCENES[scene].title, Main.SCENES[scene].title,
-				Vector3(-0.16 + (i % 2) * 0.32, 0.07 - (i / 2) * 0.20, 0.02), ["◎", "chair", "◎", "→"][i])
-			i += 1
+		HomeUI.button(_panel, &"home_decorate", "Decorate", "Move the furniture in your room.", Vector3(0.15, -0.12, 0.02), "↔")
 	else:
+		HomeUI.button(_panel, &"home_back", "My room", "Back to the home menu.", Vector3(-0.265, 0.21, 0), "←")
 		if _catalogue().is_empty():
 			HomeUI.button(_panel, &"home_shop", "Furniture", "Shop for furniture.", Vector3(-0.15, 0, 0.02), "chair")
 			HomeUI.button(_panel, &"home_decorate", "My room", "Move the furniture in your room.", Vector3(0.15, 0, 0.02), "house")
@@ -218,20 +255,20 @@ func _build() -> void:
 
 func _process(delta: float) -> void:
 	_cooldown = maxf(0, _cooldown - delta)
-	if not is_instance_valid(_entry) or App.reality == null: return
-	if not is_open and App.head().global_position.distance_to(_anchor) > 0.35: _anchor_entry()
-	var toward := (_entry.global_position - App.head().global_position).normalized()
-	_offscreen = _offscreen + delta if toward.dot(-App.head().global_basis.z) < 0.17 else 0.0
-	if not is_open and _offscreen > 0.8:
-		_anchor_entry()
-		_offscreen = 0.0
+	_update_entry()
+	if _entry.visible:
+		var toward := (_entry.global_position - App.head().global_position).normalized()
+		_offscreen = _offscreen + delta if toward.dot(-App.head().global_basis.z) < 0.17 else 0.0
+		if _offscreen > 0.8 or App.head().global_position.distance_to(_anchor) > 0.35:
+			_anchor_entry()
+			_offscreen = 0.0
 	if _preview: _preview.rotation.y += delta * 0.18
 	var near: Target
 	for side in [&"left", &"right"]:
 		var pointer := App.rig.pointer(side)
 		if not pointer.tracked(): continue
 		var target := pointer.aimed
-		if target and (target == _entry or _panel.is_ancestor_of(target)):
+		if target and ((_entry.visible and target == _entry) or (is_open and _panel.is_ancestor_of(target))):
 			near = target
 	if near != _hover:
 		_hover = near
@@ -242,6 +279,13 @@ func _process(delta: float) -> void:
 		if before < 0.6 and _hover_seconds >= 0.6: Events.say(near.get_meta(&"speech"))
 
 
+func _update_entry() -> void:
+	var available := not App.menu_active() and not App.main.switching
+	if _entry.visible == available: return
+	_entry.visible = available
+	_entry.collision_layer = Pointer.UI_LAYER if available else 0
+
+
 func _exit_tree() -> void:
-	App.hold_pause(&"home", false)
+	App.hold_pause(&"player_menu", false)
 	if is_instance_valid(_entry): _entry.queue_free()

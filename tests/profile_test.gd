@@ -59,7 +59,7 @@ func test_progress_is_saved_and_wiped() -> void:
 func test_each_save_keeps_its_own_progress_and_switching_starts_a_fresh_game() -> void:
 	await boot()
 	var first := Profile.id
-	App.world.done = {&"tidy_shelf": [0]}
+	App.main.progress.done = {&"tidy_shelf": [&"shadow"]}
 	Profile.adapt(SKILL, false, 2, 0.1)
 	var second := Profile.new_save("Ben")
 	expect_eq(Profile.saves(), [first, second], "listed, oldest first")
@@ -69,15 +69,15 @@ func test_each_save_keeps_its_own_progress_and_switching_starts_a_fresh_game() -
 	await frames(2)
 	expect_eq(Profile.id, second, "playing the new save")
 	expect(App.world != world and is_instance_valid(App.world), "a fresh world")
-	expect_eq([App.world.done, Profile.level(SKILL)], [{}, Profile.START_LEVEL], "starts from nothing")
-	App.world.done = {&"break_wall": [1]}
+	expect_eq([App.main.progress.done, Profile.level(SKILL)], [{}, Profile.START_LEVEL], "starts from nothing")
+	App.main.progress.done = {&"break_wall": [&"mixed_flow"]}
 	Profile.switch(first)
 	await frames(2)
-	expect_eq([App.world.done, Profile.level(SKILL)], [{&"tidy_shelf": [0]}, 0.2], "the first save as it was left")
+	expect_eq([App.main.progress.done, Profile.level(SKILL)], [{&"tidy_shelf": [&"shadow"]}, 0.2], "the first save as it was left")
 	var copied := Profile.copy("Checkpoint")
 	expect(FileAccess.file_exists("%s%s/save.json" % [Profile.ROOT, copied]), "a copy of what is on disk")
 	Profile.switch(second)
 	await frames(2)
-	expect_eq(App.world.done, {&"break_wall": [1]}, "the second save was written when it was left")
+	expect_eq(App.main.progress.done, {&"break_wall": [&"mixed_flow"]}, "the second save was written when it was left")
 	Profile.switch(first)
 	await frames(2)

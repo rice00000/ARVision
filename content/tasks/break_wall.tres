@@ -5,6 +5,8 @@
 [ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
 [ext_resource type="Resource" path="res://trials/motion/motion_demo.tres" id="4_motion"]
 
+[ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
+
 [sub_resource type="Resource" id="wall_1"]
 script = ExtResource("3_block")
 trial = ExtResource("4_motion")
@@ -37,7 +39,25 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("wall_2")])
 
+[sub_resource type="Resource" id="steady_flow"]
+script = ExtResource("5_level")
+id = &"steady_flow"
+project = &"flow"
+title = "Steady Flow"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_1")
+
+[sub_resource type="Resource" id="mixed_flow"]
+script = ExtResource("5_level")
+id = &"mixed_flow"
+project = &"flow"
+title = "Mixed Flow"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_2")
+
 [resource]
 script = ExtResource("1_task")
 title = "Break the spell wall"
-levels = Array[ExtResource("2_plan")]([SubResource("level_1"), SubResource("level_2")])
+levels = Array[ExtResource("5_level")]([SubResource("steady_flow"), SubResource("mixed_flow")])

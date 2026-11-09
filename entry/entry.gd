@@ -45,7 +45,7 @@ const SHELF_PUSH := EntryLayout.SHELF_PUSH
 const SHELF_BACK := EntryLayout.SHELF_BACK
 ## The cauldron stands near the middle, a little left, this far from the eyes. TO TEST: reach.
 ## WHERE everything stands (the cauldron's angle, the shelf's, the panel, the gear's landing spot,
-## Onion's spots, the setup panel, the dev buttons) is worked out in entry/layout.gd (EntryLayout).
+## Onion's spots and the setup panel) is worked out in entry/layout.gd (EntryLayout).
 const CAULDRON_DISTANCE := EntryLayout.CAULDRON_DISTANCE
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
 ## Seconds the ripple takes to spread across the play circle. Slow and soft: no flash.
@@ -53,7 +53,7 @@ const RIPPLE_SECONDS := 5.0
 ## Seconds the cauldron takes to sink away at the reveal (it is gone when the first ring reaches it).
 const CAULDRON_SINK := 0.6
 
-## DEBUG: show the beat in the headset and in Output.
+## DEBUG: log the beat and enable desktop interaction checks.
 const DEBUG := true
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
@@ -63,14 +63,9 @@ const TEST_SPEED := 1.0
 const CONFIRM_TABLE := true
 ## TESTING: a rough line outline of each tracked hand (headset only).
 const SHOW_HANDS := true
-## TESTING: in setup, beside Start, buttons that play one part on its own (set up
-## as that part needs it), then come back. Start plays everything, into Wei's World.
-const JUMP_PANEL := true
 ## TESTING: skip the four setup steps (the table is the one found, reach and sound are the
 ## defaults) and go straight to the Start screen. Tests turn it off ([member skip_setup]).
 const SKIP_SETUP := true
-## Megan chose pop A. Set this to show the DEV "Pop sound" button again to compare it with C.
-const POP_AUDITION := false
 ## The build chat's first guess at Onion's waiting behaviour in the Tap beat (gaze to the rim and
 ## back). Megan did not like it; off until the story chat decides the staging.
 const TAP_STAGING := false
@@ -120,7 +115,8 @@ var _ripple_origin := Vector3.ZERO  # where the ripple starts: the socket
 var _details: Array[Node3D] = []    # the workshop, shown as the ripple reaches each
 var _motes: Array[Node3D] = []      # drifting specks of light, after the reveal
 var _surface_points: Array[Dictionary] = []   # real surfaces the depth rays found: {position, normal}
-var _beat_label := Label3D.new()    # DEBUG: which beat is playing, in view
+var beat := ""
+var tools_ready := false
 var _shelf: ShelfCopy               # Wei's shelf, built by his own code, shown by the ripple
 var _bench := Transform3D.IDENTITY  # Wei's bench frame: at the eyes, facing the work surface
 var _bench_below := 0.35            # its top, metres below that frame
@@ -137,14 +133,12 @@ signal _part_pressed(part: StringName)
 ## DEBUG: Onion's soft halo.
 var _halo: StandardMaterial3D
 
-## "Exit app" quits on a second press within this many seconds, so a stray pinch can't close the app.
-const EXIT_WINDOW := 3.0
 var _real := 0.0                    # seconds that pass at normal speed, whatever TEST_SPEED is
 var _cauldron_target: Target
 var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's reach
 var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
 var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
-var _early_part: StringName = &""   # a jump button pressed during setup: skip the rest, play this
+var _queued_part: StringName      # Start or a jump requested before playback
 var _show_hands_now := false        # the hands step shows the outlines even with SHOW_HANDS off
 ## Where things stand, degrees off straight ahead (shelf: to the right, cauldron: to the left).
 ## Variables so a picture or a test can try another layout; the constants are the defaults.
@@ -153,7 +147,6 @@ var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach 
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
 var skip_setup := SKIP_SETUP
 var _sounds: Sounds
-var _pop_button: EntryButton   # DEV: switches Onion's pop between candidates A and C
 var _actions: OnionActions          # where Onion looks, its hop and lean, the ? and ! marks
 var _tapped := false               # the child has tapped the cauldron (it counts from when Onion is up)
 var _tap_open := false             # a tap on the cauldron counts now, even before it is asked for
@@ -167,8 +160,6 @@ var _first_seed := 0                # the seed the first round's things were mad
 var _runner: PartRunner             # what the playing part waits on; freed to cancel it
 var _part_running := false          # a part is playing (a jump button cuts in on it)
 var _pending: StringName = &""      # the part a jump button asked for while another was playing
-var _exit_button: EntryButton
-var _exit_armed := -100.0           # _real when "Exit app" was first pressed; a second press within EXIT_WINDOW quits
 
 
 ## Wei's tidy trial, only to build his shelf: the same object the child then plays
@@ -204,15 +195,11 @@ class ShelfCopy extends "res://trials/tidy/tidy_trial.gd":
 
 
 func _exit_tree() -> void:
-	# This opening owns what it hung on the persistent head (the beat label) and whatever
-	# it made but never added; the rest goes with the scene.
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.push = 0.0
 		ShelfCopy.shelf_frame = Transform3D.IDENTITY
 		show_sim_props(true)
-	if is_instance_valid(_beat_label):
-		_beat_label.free()
 	for node in [_orb, _box, _music]:
 		if is_instance_valid(node) and node.get_parent() == null:
 			node.free()
@@ -227,6 +214,8 @@ func run() -> void:
 		if _cauldron_touches_enabled() and target == _cauldron_target:
 			_on_target(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _direction: Vector3) -> void: _on_target(target))
+	Events.intro_jump_requested.connect(jump_to)
+	Events.intro_zones_requested.connect(toggle_zones)
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
@@ -234,8 +223,7 @@ func run() -> void:
 		App.reality.announce_table = false
 	if not App.reality.is_settled:
 		await App.reality.settled
-	if DEBUG:
-		_debug_buttons()
+	tools_ready = true
 	show_sim_props(false)
 	await _setup()
 	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
@@ -595,7 +583,6 @@ func _to_dots() -> void:
 func _setup() -> void:
 	_panel = SetupPanel.new()
 	add_child(_panel)
-	_panel.make_button = _button
 	_panel.place(App.head().global_transform)
 	if skip_setup:
 		_panel.hide_all()
@@ -622,7 +609,7 @@ func _step_hands() -> bool:
 			[["Next", &"entry_step_next", SetupPanel.GREY]])
 	var seen := {pinch = false}
 	var on_button := func(_side: StringName, action: StringName, down: bool) -> void:
-		if action == &"trigger_click" and down:
+		if action == &"trigger_click" and down and not get_tree().paused:
 			seen.pinch = true
 	Events.button.connect(on_button)
 	var skipped := false
@@ -675,6 +662,9 @@ func _step_reach() -> bool:
 			[["Done", &"entry_step_next", SetupPanel.GREY], ["Use usual spot", &"entry_step_alt", SetupPanel.GREY]])
 	var used := false
 	while true:
+		if get_tree().paused:
+			await get_tree().process_frame
+			continue
 		var eye := App.head().global_position
 		for side: StringName in [&"left", &"right"]:
 			var tip: Variant = _fingertip(side)
@@ -753,52 +743,30 @@ func _chime() -> void:
 
 # --- TESTING: Start, and jumping to one part ----------------------------------
 
-## The last screen of setup: "All set" with Start. Waits for Start (or a jump button, which
-## is always there at the left). Returns the part, or &"all" for Start.
+## Waits for Start or a jump from the Tools page.
 func _choose_part() -> StringName:
-	if _early_part != &"":
-		var early := _early_part
-		_early_part = &""
-		print("ENTRY setup: jumped to ", early, " from an earlier step")
-		return early
-	var queued := _take_part()   # a jump button pressed while the layout was being planned (on a worker thread)
-	if queued != &"":
-		print("ENTRY setup: jump to ", queued, " (pressed while the layout was planned)")
-		_panel.hide_all()
-		return queued
-	_beat("setup done: press Start" + (" or jump to a part" if JUMP_PANEL else ""))
-	_panel.show_step(SETUP_STEPS, SETUP_STEPS, "All set", "Hand the headset to the child. Press Start when they are ready.",
-			[], [["Start", &"entry_part_all", SetupPanel.GREEN]])
-	_presses.clear()
-	var part := &""
-	while part == &"":
+	if _queued_part == &"":
+		_beat("setup done: press Start")
+		_panel.show_step(SETUP_STEPS, SETUP_STEPS, "All set", "Hand the headset to the child. Press Start when they are ready.",
+				[], [["Start", &"entry_part_all", SetupPanel.GREEN]])
+	while _queued_part == &"" or get_tree().paused:
 		await get_tree().process_frame
-		part = _take_part()
+	var part := _queued_part
+	_queued_part = &""
 	_panel.hide_all()
 	print("ENTRY setup: ", "Start" if part == &"all" else "jump to " + part)
 	return part
 
 
-## The part named by the last jump or Start press, or &"".
-func _take_part() -> StringName:
-	var found := &""
-	for id in _presses:
-		if String(id).begins_with("entry_part_"):
-			found = StringName(String(id).trim_prefix("entry_part_"))
-	_presses.clear()
-	return found
-
-
-## The first of [param ids] pressed since last asked, or &"". A jump button counts as
-## &"skip": the rest of setup is skipped and that part is remembered for later.
+## The first setup answer, or &"skip" when Tools queued a jump.
 func _take_press(ids: Array) -> StringName:
+	if get_tree().paused: return &""
+	if _queued_part != &"": return &"skip"
 	var result := &""
 	for id in _presses:
-		if String(id).begins_with("entry_part_"):
-			_early_part = StringName(String(id).trim_prefix("entry_part_"))
-			result = &"skip"
-		elif id in ids and result == &"":
+		if id in ids:
 			result = id
+			break
 	_presses.clear()
 	return result
 
@@ -901,39 +869,14 @@ func _wait(seconds: float) -> void:
 func _on_target(target: Target) -> void:
 	if get_tree().paused:
 		return
+	if target != null and target.id == &"entry_part_all":
+		(target.get_parent() as EntryButton).flash()
+		jump_to(&"all")
+		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
 		_presses.append(target.id)
 		if target.get_parent() is EntryButton:
 			(target.get_parent() as EntryButton).flash()
-	if target != null and target.id == &"entry_pop_toggle":
-		var pick := _sounds.toggle_pop()
-		_pop_button.set_text("Pop sound: " + pick.to_upper())
-		_sounds.play_pop(_peek_spot())   # hear it right away
-		return
-	if target != null and target.id == &"entry_debug_restart":
-		print("ENTRY DEBUG: restart")
-		Engine.time_scale = 1.0
-		get_tree().reload_current_scene.call_deferred()
-		return
-	if target != null and target.id == &"entry_debug_zones":   # layout chat: the zone map, on and off
-		_toggle_zones()
-		return
-	if target != null and target.id == &"entry_debug_exit":
-		if _real - _exit_armed > EXIT_WINDOW:
-			_exit_armed = _real
-			if _exit_button != null:
-				_exit_button.set_text("Press again to exit")
-			print("ENTRY DEBUG: exit asked; press again within ", EXIT_WINDOW, " s")
-			return
-		print("ENTRY DEBUG: exit")
-		get_tree().quit()
-		return
-	if target != null and String(target.id).begins_with("entry_part_"):
-		var chosen := StringName(String(target.id).trim_prefix("entry_part_"))
-		if _part_running:
-			_interrupt(chosen)
-		_part_pressed.emit(chosen)
-		return
 	if target != null and String(target.id).begins_with("entry_step"):
 		return
 	if target != null and String(target.id).begins_with("entry_confirm"):
@@ -950,19 +893,9 @@ func _on_target(target: Target) -> void:
 	_runner.cauldron_touched.emit()
 
 
-## DEBUG: the beat name in Output and floating low in view.
 func _beat(text: String) -> void:
-	if not DEBUG:
-		return
-	print("ENTRY beat ", text)
-	if _beat_label.get_parent() == null:
-		_beat_label.font_size = 24
-		_beat_label.pixel_size = 0.0006
-		_beat_label.modulate = Color(1, 1, 1, 0.6)
-		_beat_label.no_depth_test = true
-		_beat_label.position = Vector3(0, -0.22, -0.6)
-		App.rig.head.add_child(_beat_label)
-	_beat_label.text = "beat " + text
+	beat = text
+	if DEBUG: print("ENTRY beat ", text)
 
 
 # --- DESKTOP: moving the head ------------------------------------------------
@@ -1147,54 +1080,25 @@ func _new_hand() -> Array:
 	return [outline, lines, dots]
 
 
-# --- DEBUG: restart and exit -------------------------------------------------
+# --- Intro tools -------------------------------------------------------------
 
-## Two small buttons up on the right, out of the way, for the whole run (Wei's World
-## too): "Restart" plays the opening again from the start, "Exit app" closes the app.
-## 15 cm apart, so each is easy to hit on its own.
-func _debug_buttons() -> void:
-	var head := App.head().global_transform
-	var restart := _button("Restart", EntryLayout.dev_right_spot(head, 0), &"entry_debug_restart", Color(0.35, 0.35, 0.4))
-	var leave := _button("Exit app", EntryLayout.dev_right_spot(head, 1), &"entry_debug_exit", Color(0.55, 0.25, 0.25))
-	var zones := _button("Zones", EntryLayout.dev_right_spot(head, 2), &"entry_debug_zones", Color(0.3, 0.45, 0.4), 0.14, 0.01)
-	_exit_button = leave
-	print("ENTRY DEBUG: Restart / Exit / Zones ", _away(restart.global_position), " m away, ", EntryLayout.DEV_ANGLE, " degrees right, ",
-			snappedf(restart.global_position.distance_to(leave.global_position), 0.01), " m apart")
-	for button in [restart, leave, zones]:
-		button.set_meta(&"debug", true)
-	if JUMP_PANEL:
-		_dev_jumps()
+func jump_to(part: StringName) -> void:
+	if _part_running:
+		_interrupt(part)
+	else:
+		_queued_part = part
+	_part_pressed.emit(part)
 
 
-## DEV: one button per part, two columns of four out at the left (EntryLayout.DEV_ANGLE), in story
-## order, there from the start; the pop sound A/C under them. Pressing one in the middle of setup
-## skips the rest of setup and plays that part.
-func _dev_jumps() -> void:
-	var head := App.head().global_transform
-	var words := Label3D.new()
-	words.text = "DEV · jump to"
-	words.font_size = 26
-	words.pixel_size = 0.0006
-	words.outline_size = 8
-	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	add_child(words)
-	words.global_position = EntryLayout.dev_jump_label(head)
-	var names: Array = PARTS.keys()
-	for i in names.size():
-		_button(PARTS[names[i]], EntryLayout.dev_jump_spot(head, i), StringName("entry_part_" + names[i]), Color(0.3, 0.4, 0.6), EntryLayout.DEV_JUMP_WIDE, 0.005)
-	if POP_AUDITION:
-		_pop_button = _button("Pop sound: A", EntryLayout.dev_pop_spot(head), &"entry_pop_toggle", Color(0.5, 0.35, 0.55), 0.18, 0.005)
+func zones_available() -> bool:
+	return _box.is_inside_tree()
 
 
-## DEV: shows or hides the zone map on the table (the "Zones" button, or SHOW_ZONES from the start).
-func _toggle_zones() -> void:
+func toggle_zones() -> void:
 	if _zones != null and is_instance_valid(_zones):
 		_zones.queue_free()
 		_zones = null
 		print("ENTRY zones: hidden")
-		return
-	if _layout == null:
-		print("ENTRY zones: nothing placed yet (after setup)")
 		return
 	_zones = EntryZoneOverlay.new()
 	add_child(_zones)
@@ -1407,19 +1311,6 @@ func _outline(table: Surface, real: bool) -> Node3D:
 	words.position = Vector3.UP * 0.06
 	sheet.add_child(words)
 	return sheet
-
-
-## A floating button with [param text]: point at it and pinch. Its box is the
-## plate plus [param margin] all round (see [EntryButton]).
-func _button(text: String, at: Vector3, id: StringName, colour := Color(0.25, 0.45, 0.85),
-		wide := 0.22, margin := 0.02) -> EntryButton:
-	var button := EntryButton.new()
-	add_child(button)
-	button.setup(text, id, colour, Vector2(wide, 0.06 if wide > 0.15 else 0.05), margin)
-	button.global_position = at
-	button.look_at(Vector3(App.head().global_position.x, at.y, App.head().global_position.z), Vector3.UP)
-	button.rotate_object_local(Vector3.UP, PI)   # its face to the child
-	return button
 
 
 # --- The cauldron ------------------------------------------------------------
@@ -1697,8 +1588,6 @@ func _process(delta: float) -> void:
 	_clock += delta
 	_real += delta / maxf(Engine.time_scale, 0.05)
 	_move_head(delta)
-	if _exit_button != null and is_instance_valid(_exit_button) and _real - _exit_armed > EXIT_WINDOW and _exit_button.text() != "Exit app":
-		_exit_button.set_text("Exit app")
 	if App.rig != null:
 		_poke_cauldron()
 	if SHOW_HANDS or _show_hands_now:

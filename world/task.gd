@@ -1,15 +1,30 @@
 class_name Task
 extends Resource
-## Something the child can choose at a [Place]: one [SessionPlan] per level.
+## Something the child can choose at a [Place].
 ## Lives in content/tasks/; the file name is its id.
 ## Every level is always open.
 
 @export var title := ""
-@export_range(1, 9) var reward_stones := 2
-## Easiest first. Each block sets its own [member Block.difficulty] and
-## [member Block.pins], so a level can change more than how hard it is.
-@export var levels: Array[SessionPlan] = []
+## Menu order. Each project numbers its own entries in this order.
+@export var levels: Array[TaskLevel] = []
 
 var id: StringName:
 	get:
 		return StringName(resource_path.get_file().get_basename())
+
+
+func level_by_id(level_id: StringName) -> TaskLevel:
+	for level in levels:
+		if level.id == level_id:
+			return level
+	return null
+
+
+func project_number(level: TaskLevel) -> int:
+	var number := 0
+	for candidate in levels:
+		if candidate.project == level.project:
+			number += 1
+		if candidate == level:
+			return number
+	return number

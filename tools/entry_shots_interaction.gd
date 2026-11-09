@@ -15,8 +15,8 @@ func _ready() -> void:
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	App.rig.head.rotation.x = -0.55   # looking down at the table, as a seated child does
 	entry.run()
-	await _until(func() -> bool: return entry.find_child("entry_part_touch", true, false) != null)
-	entry._on_target(entry.find_child("entry_part_touch", true, false) as Target)
+	await _until(func() -> bool: return entry.zones_available())
+	entry.jump_to(&"touch")
 	await get_tree().create_timer(2.5).timeout
 	var gear: Node3D = entry.get("_gear")
 	var carry: Carry = entry.get("_carry")
