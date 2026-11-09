@@ -75,6 +75,9 @@ class Adventure(SimCase):
         self.assertEqual([row["correct"] == "1" for row in picks], [put["correct"] for put in puts], "a row per put")
 
         world = self.menu_at(sim, "Alchemy table")
+        intro = "Point and pinch a card to play."
+        self.assertEqual(sum(e["text"].startswith(intro) for e in sim.events("said")), 2,
+                         "the gameplay intro plays on the first open and on return")
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "motion lives in another scene")
         self.assertEqual(world["menu"]["buttons"][0]["reward"], 2, "the completed card shows the replay reward")

@@ -39,7 +39,7 @@ const MUSIC_DB := -15.0
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.
 const PLAY_RADIUS := 0.75
 ## The shelf and the things to tidy stand this much farther along the table than Wei's
-## original, metres, so they are not right in front of the player. See TidyTrial.push.
+## original, metres, so they are not right in front of the player.
 const SHELF_PUSH := EntryLayout.SHELF_PUSH
 ## The back of Wei's shelf from the eyes before the push: SHELF_AHEAD 0.31 + DEPTH 0.09, metres.
 const SHELF_BACK := EntryLayout.SHELF_BACK
@@ -197,7 +197,6 @@ class ShelfCopy extends "res://trials/tidy/tidy_trial.gd":
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
 	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
-		ShelfCopy.push = 0.0
 		ShelfCopy.shelf_frame = Transform3D.IDENTITY
 		show_sim_props(true)
 	for node in [_orb, _box, _music]:
@@ -226,7 +225,6 @@ func run() -> void:
 	tools_ready = true
 	show_sim_props(false)
 	await _setup()
-	ShelfCopy.push = shelf_push   # set by the reach step, or the usual SHELF_PUSH
 	_ahead = Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
 	_on_table = await _cauldron_on_table()
 	ShelfCopy.shelf_frame = _layout.bench

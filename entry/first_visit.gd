@@ -103,7 +103,6 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 
 func _exit_tree() -> void:
 	Tidy.onion_voice = false
-	Tidy.push = 0.0   # the opening's shelf distance ends with the first visit
 	Tidy.shelf_frame = Transform3D.IDENTITY
 	Entry.show_sim_props(true)
 

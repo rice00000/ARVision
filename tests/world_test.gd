@@ -130,19 +130,26 @@ func test_any_level_plays_at_its_level() -> void:
 	expect_eq(started[0][1].view.title, "Normal", "played in normal colour")
 
 
-func test_a_ray_on_a_button_hears_what_it_is() -> void:
+func test_the_menu_opens_during_its_intro_and_cards_are_silent() -> void:
 	await boot()
 	var said := record(Events.said)
+	var started := record(Events.trial_started)
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "facing the table: the menu")
-	for case in [["task_tidy_shelf_shadow", "Shadow Match. Level 1. 3 magic stones."], ["task_tidy_shelf_similar_shadows", "Similar Shadows. Level 2. 3 magic stones."]]:
-		var button := _button(case[0])
+	var intro := App.world.place.arrive
+	expect_eq(said, [[intro]], "opening the menu speaks its gameplay introduction once")
+	expect_eq(App.module(&"Voice").speaking(), intro, "cards are usable while the line plays")
+	for id in ["task_tidy_shelf_shadow", "task_tidy_shelf_similar_shadows"]:
+		var button := _button(id)
 		var front := button.global_basis.z
 		input.point(&"right", button.global_position + front * 0.4, button.global_position) # aim from a distance
 		await frames(3)
-		expect_eq(said.back()[0], case[1], "read out")
 		expect((button.get_node(^"Look") as Node3D).position.z > 0.0, "lifted toward the hand")
 	expect(App.world.menu != null and not App.session.running, "hovering chooses nothing")
+	expect_eq(said, [[intro]], "hovering does not interrupt the line")
+	await select(_button("task_tidy_shelf_odd_color_1").global_position)
+	expect(await until(func() -> bool: return started.size() == 1, 1.0), "choosing starts the round promptly")
+	expect_eq(said, [[intro], ["Pinch the block with a different colour."]], "only the menu intro and the round instruction")
 
 
 func test_motion_is_only_in_its_own_scene_and_needs_no_shelf_progress() -> void:

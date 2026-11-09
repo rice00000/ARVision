@@ -14,7 +14,6 @@ var entry: Entry
 ## Boots main.tscn and starts the opening, like a launch without a plan does.
 func _boot_entry() -> void:
 	Engine.time_scale = 1.0   # an earlier test may have left the opening's half speed on
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0   # the opening sets it; each test starts from the original
 	await boot(null, &"intro")
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
@@ -439,10 +438,9 @@ func test_the_shelf_stands_back_along_the_table_not_in_front_of_the_player() -> 
 	await _boot_entry()
 	await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0)
 	await _to_setup_panel()
-	var tidy_trial = load("res://trials/tidy/tidy_trial.gd")
-	expect_eq(tidy_trial.push, Entry.SHELF_PUSH, "the opening sets how far back the shelf stands")
 	var eye := App.head().global_position
 	var bench: Transform3D = entry.get("_bench")
+	expect_eq(Tidy.shelf_frame, bench, "the opening hands the first visit its planned shelf position")
 	var away := Vector2(bench.origin.x - eye.x, bench.origin.z - eye.z).length()
 	expect(absf(away - Entry.SHELF_PUSH) < 0.01, "the whole play set is that far along the table from the eyes, got %s" % away)
 	var cauldron: Node3D = entry.get("_box")
@@ -510,7 +508,6 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
 func shutdown() -> void:
 	await super.shutdown()
-	Tidy.push = 0.0
 	Tidy.onion_voice = false
 	Engine.time_scale = 1.0
 

@@ -76,14 +76,7 @@ func _hover(button: Target) -> void:
 		return
 	_lift(_hovered, false)
 	_hovered = button
-	if button == null:
-		return
 	_lift(button, true)
-	var task: Task = _buttons[button][0]
-	var level: TaskLevel = _buttons[button][1]
-	var stones := App.main.progress.reward(task, level)
-	var reward := "%d magic stones." % stones if stones != 1 else "One magic stone."
-	Events.say("%s. Level %d. %s" % [level.title, task.project_number(level), reward])
 
 
 ## Lifts the aimed button while its ray hit box stays put.
@@ -111,10 +104,7 @@ func fold() -> void:
 func _press(target: Target) -> void:
 	if not _open or not _buttons.has(target) or get_tree().paused:
 		return
-	if target != _hovered: # pressed without hovering (point and pinch): taken as read, never read out after the press
-		_lift(_hovered, false)
-		_hovered = target
-		_lift(target, true)
+	_hover(target)
 	var task: Task = _buttons[target][0]
 	var level: TaskLevel = _buttons[target][1]
 	_open = false

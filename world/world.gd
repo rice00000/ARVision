@@ -166,7 +166,6 @@ func _choose() -> Array:
 		var task: Task = picked[0]
 		var level: TaskLevel = picked[1]
 		Events.report(&"task_chosen", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
-		await say("%s. Level %d!" % [level.title, task.project_number(level)])
 	return picked
 
 
@@ -180,5 +179,7 @@ func _complete(task: Task, level: TaskLevel) -> void:
 
 ## Says [param text] and waits about as long as it takes to hear it.
 func say(text: String) -> void:
+	if text.is_empty():
+		return
 	Events.say(text)
 	await get_tree().create_timer(clampf(text.length() * 0.06, 1.5, 6.0), false).timeout

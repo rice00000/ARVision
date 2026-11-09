@@ -163,7 +163,6 @@ func test_the_marks_look_the_same_size_near_and_far() -> void:
 
 func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_reveal() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.touch_cauldron_in_sim = true
@@ -192,7 +191,6 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 
 func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_same_ones() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
@@ -216,7 +214,6 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 			expect(thing.global_position.distance_to(before[thing.name]) < 0.001, "%s is in the same place (no swap, no drop-in)" % thing.name)
 	await App.main.change_scene(&"global_motion")   # leave the first visit: it gives the shelf's static settings back
 	var tidy = load("res://trials/tidy/tidy_trial.gd")
-	tidy.push = 0.0
 	tidy.seed_next = 0
 	tidy.things_arrive = true
 	tidy.onion_voice = false
@@ -234,7 +231,6 @@ func test_onions_float_toward_the_shapes_stays_clear_of_the_shelf_the_things_and
 
 func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.touch_cauldron_in_sim = true
@@ -259,7 +255,6 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 
 func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does_not_freeze() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.run()

@@ -78,6 +78,8 @@ class TidyUp(SimCase):
         middle = [sum(axis) / len(cells) for axis in zip(*cells)]
         bearing = lambda p: math.degrees(math.atan2(p[0] - eye[0], -(p[2] - eye[2])))
         self.assert_close(bearing(middle), bearing(table), 2.0, "the shelf stands toward the table")
+        self.assertGreater(math.hypot(middle[0] - eye[0], middle[2] - eye[2]), 0.42,
+                           "the table-side shelf leaves space in front of the player")
         child.play_round(first, ["right"] * 3)
         second = sim.run_until("trial_started")
         child.actor.look_at(tuple(sim.observe()["work_surface"]["position"]))

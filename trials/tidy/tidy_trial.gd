@@ -44,11 +44,6 @@ const COLOUR_NAMES: Array[String] = ["red", "blue", "yellow", "green", "purple",
 const SIZES: Array[float] = [0.55, 0.69, 0.86, 1.08, 1.35]
 const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 
-## How far farther along the table the whole play set (shelf, things, mess) stands than
-## its own distances below say, metres: they are measured from the eyes, which puts it right
-## in front of the player. 0 is Wei's original. The opening sets it, and it stays for the
-## shelf scene, so the opening's shelf and the real one stand in the same place.
-static var push := 0.0
 ## The planned bench stays in the same place from the opening to the first visit.
 static var shelf_frame := Transform3D.IDENTITY
 static var shelf_below := 0.0
@@ -67,6 +62,8 @@ static var things_arrive := true
 const SHELF_AHEAD := 0.31
 const BENCH_HIGHEST := 0.28
 const BENCH_LOWEST := 0.42
+const BENCH_NEAR := 0.11
+const PREFERRED_SETBACK := 0.08
 ## A cubby: width, height (taller, so the board above hides no sticker from eyes
 ## looking down), depth; the shelf has COLUMNS x ROWS of them. Its card stands
 ## CARD_IN in front of the back, tilted back to face the eyes, so a sticker shows
@@ -602,9 +599,18 @@ func _build_shelf() -> void:
 		_below = shelf_below
 	else:
 		var eye := App.head().global_position
-		var toward := App.reality.work_surface().transform.origin - eye
+		var table := App.reality.work_surface()
+		var toward := table.transform.origin - eye
 		var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
-		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
+		var local := table.transform.affine_inverse() * eye
+		var half := table.size * 0.5
+		var edge := table.transform * Vector3(clampf(local.x, -half.x, half.x), 0.0, clampf(local.z, -half.y, half.y))
+		var table_setback := (edge - eye).dot(ahead) - BENCH_NEAR
+		# Shorter seated players need the cubbies closer, even on a deep table.
+		var eye_height := eye.y - App.rig.global_position.y
+		var reach_setback := clampf(0.42 * eye_height - 0.39, 0.04, 0.14)
+		var setback := minf(maxf(PREFERRED_SETBACK, table_setback), reach_setback)
+		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * setback)
 		_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST)
 	_shelf = Node3D.new()
 	_shelf.name = "Shelf"
@@ -613,7 +619,7 @@ func _build_shelf() -> void:
 	var wide := COLUMNS * CELL + BOARD
 	var high := PLINTH + ROWS * (CELL_HIGH + BOARD)
 	var back := -(SHELF_AHEAD + DEPTH)
-	var near := THINGS_NEAR - 0.05
+	var near := BENCH_NEAR
 	_box(Vector3(THINGS_WIDE + 0.06, 0.012, -back - near + 0.01), Vector3(0.0, -_below - 0.006, (back - near) * 0.5), WOOD.lightened(0.15))
 	_box(Vector3(wide, high, 0.01), Vector3(0.0, -_below + high * 0.5, back - 0.005), WOOD)
 	for row in ROWS + 1:
