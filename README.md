@@ -33,7 +33,7 @@ Run before submitting changes. For visual changes, also run `python tools/sim/wa
 core/      Events (signal bus), App, Profile, Save, Log, Module
 rig/       head and hands, Pointer, Target, SimInput, DesktopDriver
 reality/   Reality API: PassthroughReality (Quest), SimReality + rooms/ (no headset), View, Surface
-modules/   voice, feedback, cv (Detector), facilitator, magic (effects), picks (CSV): each one unpluggable
+modules/   voice, feedback, cv (Detector), facilitator, magic (effects), picks (CSV), home, pets...: each one unpluggable
 trials/    Trial, TrialDef, Session; one folder per trial
 world/     World, Guide, TaskMenu; Adventure, Place, Task
 scenes/    Intro, Find the object, Global motion; Main switches the active scene

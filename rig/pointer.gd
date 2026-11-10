@@ -248,6 +248,11 @@ func grip() -> Transform3D:
 	return Transform3D(global_basis, tip())
 
 
+## The palm faces up: the back of the hand (the palm's own up) faces the floor.
+func palm_up() -> bool:
+	return tracked() and grip().basis.y.y < -0.7
+
+
 func tracked() -> bool:
 	return App.rig.tracked_hand(side).has_joints() if App.xr != null else _controller.get_has_tracking_data()
 

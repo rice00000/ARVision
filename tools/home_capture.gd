@@ -39,6 +39,33 @@ func _ready() -> void:
 	Events.furniture_requested.emit(&"chair")
 	App.sim_input.look_at(App.reality.room_frame * Vector3(0, 0.55, -1.0))
 	await shot("decorate")
+	var inventory := App.module(&"Inventory")
+	inventory.add(&"pet_cat")
+	inventory.add(&"pet_dog")
+	inventory.add(&"cushion")
+	home._show(&"room")
+	await shot("home_pets", "home_pets")
+	home._show(&"pets")
+	home._index = 2
+	home._build()
+	await shot("pet_shop", "home_next")
+	home._show(&"decorate")
+	Events.furniture_requested.emit(&"cushion")
+	var cat: Pet = App.module(&"Pets").pets()[0]
+	var dog: Pet = App.module(&"Pets").pets()[1]
+	cat.has_stone = true
+	dog._mood = Pet.Act.REST
+	dog._spot = App.module(&"Pets").cushions()[0]
+	dog._mood_for = 600.0
+	for pet: Pet in [cat, dog]: pet.position = Vector3(1.2, 0, -1.6)
+	App.sim_input.look_at(App.reality.room_frame * Vector3(0.6, 0.5, -1.2))
+	await get_tree().create_timer(1.0).timeout
+	await shot("pets_walking")
+	await get_tree().create_timer(12.0).timeout
+	App.sim_input.look_at(App.reality.room_frame * Vector3(0.25, 0.7, -0.32))
+	await shot("pet_brings_stone")
+	App.sim_input.look_at(App.reality.room_frame * (dog.position + Vector3.UP * 0.1))
+	await shot("pet_resting")
 	home.close()
 	App.sim_input.menu()
 	await shot("facilitator", "fac_saves")

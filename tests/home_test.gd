@@ -72,12 +72,60 @@ func test_home_opens_during_grab_only_training_and_resumes_same_round() -> void:
 	expect(App.session.trial == trial and trial.is_running(), "same unscored round continues")
 
 
+func test_the_level_picker_waits_behind_player_and_staff_menus() -> void:
+	await boot()
+	input.set_head(Transform3D(Basis(Vector3.UP, deg_to_rad(19.0)), App.head().global_position))
+	await frames(2)
+	await _press("menu_open")
+	await _press("menu_resume") # reanchor the side button while looking left of the table
+	var entry := App.rig.get_node(^"menu_open") as UITarget
+	var side_pose := entry.global_transform
+	var started := record(Events.trial_started)
+	App.world.run()
+	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "level picker ready")
+	var menu := App.world.menu
+	var back := menu.get_child(0) as MeshInstance3D
+	var card := menu.get_node(^"task_tidy_shelf_similar_shadows") as Target
+	var at := card.global_position
+	var half_panel := (back.mesh as QuadMesh).size * 0.5
+	var half_button := ((entry.get_child(0) as CollisionShape3D).shape as BoxShape3D).size * 0.5
+	var local := menu.to_local(entry.global_position)
+	expect(local.x - half_button.x > half_panel.x * 0.5 and local.x + half_button.x < half_panel.x,
+		"the Menu button fits the right of the header while looking left")
+	expect(local.y - half_button.y > card.position.y + TaskMenu.CARD.y * 0.5 and local.y + half_button.y < half_panel.y,
+		"the Menu button fits above the level cards")
+	await _press("menu_open")
+	expect(_home().is_open and not menu.is_visible_in_tree(), "the player menu hides the level picker")
+	await _press("menu_room")
+	await _press("menu_back")
+	expect(_home().page == &"menu" and not menu.is_visible_in_tree(), "returning from the room keeps the level picker hidden")
+	await _press("menu_staff_tools")
+	expect(App.module(&"Facilitator").is_open and not menu.is_visible_in_tree(), "staff tools also hide the level picker")
+	await press_facilitator("fac_close")
+	expect(_home().is_open and not menu.is_visible_in_tree(), "returning from staff tools keeps the level picker hidden")
+	await _press("menu_resume")
+	expect(App.world.menu == menu and menu.is_visible_in_tree() and not get_tree().paused, "the same level picker comes back")
+	expect_eq(card.global_position, at, "the level card stays in place")
+	expect(started.is_empty(), "the menus did not choose a level")
+	await select(at)
+	expect(await until(func() -> bool: return started.size() == 1), "the restored level card starts its round")
+	await wait(0.25)
+	expect(entry.global_transform.is_equal_approx(side_pose), "the button returns to its side position after the panel folds")
+
+
 func test_shop_needs_separate_confirmation_and_a_second_press_cannot_buy_twice() -> void:
 	await boot()
-	_inventory().add(&"magic_stone", 5)
 	await _press("menu_open")
 	await _press("menu_room")
+	var said := record(Events.said)
 	await _press("home_shop")
+	expect(_home().find_child("home_buy", true, false) == null, "nothing to press without enough stones")
+	expect(_home().find_child("menu_resume", true, false) == null, "only the room page leaves the room")
+	expect_eq(said[-1][0], "Chair. 1 magic stones. You need 1 more.", "the price and what is missing are spoken")
+	for line in ["Dog. 8 magic stones. You need 11 more.", "Cat. 8 magic stones. You can buy it.", "Panda. It is yours!"]:
+		expect(not BakedSpeech.paths_for(line).is_empty(), "baked: " + line)
+	_inventory().add(&"magic_stone", 5)
+	await frames(2)
 	var id: StringName = _home()._item().id
 	await _press("home_buy")
 	expect_eq(_inventory().count(id), 0, "preview costs nothing")

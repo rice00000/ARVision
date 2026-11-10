@@ -21,6 +21,7 @@
 [ext_resource type="Script" path="res://modules/rooms/rooms.gd" id="22_rooms"]
 [ext_resource type="Script" path="res://modules/placement/decor_layout.gd" id="23_decor"]
 [ext_resource type="Script" path="res://modules/home/home.gd" id="24_home"]
+[ext_resource type="Script" path="res://modules/pets/pets.gd" id="25_pets"]
 
 [sub_resource type="Environment" id="environment"]
 background_mode = 1
@@ -74,6 +75,9 @@ script = ExtResource("22_rooms")
 
 [node name="Decor" type="Node" parent="Modules"]
 script = ExtResource("23_decor")
+
+[node name="Pets" type="Node" parent="Modules"]
+script = ExtResource("25_pets")
 
 [node name="Home" type="Node" parent="Modules"]
 script = ExtResource("24_home")

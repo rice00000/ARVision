@@ -14,6 +14,7 @@ const COLUMNS := 2
 const CARD := Vector2(0.285, 0.066)
 const COLUMN_PITCH := 0.315
 const ROW_PITCH := 0.088
+const HEADER_ROW := 0.076
 const TITLE_ROW := 0.056
 const PANEL_PADDING := Vector2(0.046, 0.015)
 const PANEL_COLOR := Color("#18232e")
@@ -44,6 +45,7 @@ func _init(where: Place, world: World) -> void:
 
 
 func _ready() -> void:
+	visible = not get_tree().paused
 	_build()
 	scale = Vector3(1.0, 0.05, 1.0)
 	var unfold := create_tween()
@@ -51,6 +53,12 @@ func _ready() -> void:
 	unfold.tween_callback(func() -> void: _open = true)
 	Events.selected.connect(func(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
 		_press(target))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_UNPAUSED:
+		# Switching between modal menus keeps the world paused.
+		visible = what == NOTIFICATION_UNPAUSED
 
 
 func _process(delta: float) -> void:
@@ -113,7 +121,7 @@ func _press(target: Target) -> void:
 
 func _build() -> void:
 	var width := CARD.x + COLUMN_PITCH
-	var height := TITLE_ROW + 0.016
+	var height := HEADER_ROW + 0.016
 	for task in _place.tasks:
 		height += TITLE_ROW + ceili(task.levels.size() / float(COLUMNS)) * ROW_PITCH
 	var back := MeshInstance3D.new()
@@ -124,10 +132,14 @@ func _build() -> void:
 	back.position.z = -0.02
 	add_child(back)
 	var top := height * 0.5
+	var menu_slot := Marker3D.new()
+	menu_slot.position = Vector3(quad.size.x * 0.5 - 0.085, top - 0.05, back.position.z)
+	menu_slot.add_to_group(App.PLAYER_MENU_SLOT)
+	add_child(menu_slot)
 	var header := _label(_place.title, 50)
-	header.position.y = top - TITLE_ROW * 0.5
+	header.position.y = top - HEADER_ROW * 0.5
 	add_child(header)
-	top -= TITLE_ROW
+	top -= HEADER_ROW
 	for task in _place.tasks:
 		var title := _label(task.title, 38)
 		title.position.y = top - TITLE_ROW * 0.5

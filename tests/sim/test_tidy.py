@@ -17,7 +17,9 @@ class TidyUp(SimCase):
     def test_every_body_reaches_every_thing_and_sticker_without_stretching(self):
         for body in ("small", "medium", "large"):
             with self.subTest(body=body):
-                sim = self.launch(plan(block("tidy", rounds=1, difficulty=1.0, ray=False)),
+                # Small size-match pieces sit deeper in a cubby.
+                pins = {"size": 0.033} if body == "small" else None
+                sim = self.launch(plan(block("tidy", rounds=1, difficulty=1.0, pins=pins, ray=False)),
                                   profile=f"test_sim_tidy_reach_{body}", body=body)
                 child = Child(sim, body=body, seed=6)
                 started = sim.run_until("trial_started")

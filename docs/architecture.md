@@ -47,7 +47,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
 - **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
-- **Home, Inventory, Rooms and Decor** handle the player menu, purchases, rewards, room selection and furniture layouts. [Details](home.md).
+- **Home, Inventory, Rooms, Decor and Pets** handle the player menu, purchases, rewards, room selection, furniture layouts and pets. [Details](home.md).
 - **Facilitator** takes input from the player menu and keeps play paused. Tools holds Intro jumps and zones, restart and exit.
 
 ## Not verified on a headset yet

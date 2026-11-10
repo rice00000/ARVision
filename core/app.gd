@@ -5,6 +5,8 @@ extends Node
 ## Without an OpenXR runtime the app still runs: main.tscn then simulates the
 ## room and the desktop driver moves the hands (see SimReality, DesktopDriver).
 
+const PLAYER_MENU_SLOT := &"player_menu_slot"
+
 ## The OpenXR interface, or null when there is no runtime.
 var xr: OpenXRInterface
 ## Set by main.tscn's pieces as they become ready.
@@ -50,6 +52,11 @@ func module(module_name: StringName) -> Node:
 
 func head() -> XRCamera3D:
 	return rig.head
+
+
+## The pose of the player Menu button, when a panel reserves space for it.
+func player_menu_slot() -> Marker3D:
+	return get_tree().get_first_node_in_group(PLAYER_MENU_SLOT) as Marker3D
 
 
 func menu_active() -> bool:

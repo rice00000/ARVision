@@ -48,9 +48,15 @@ class Unplugged(SimCase):
         self.assertIsNone(observation["facilitator"])
         self.assertEqual(sim.events("facilitator_toggled"), [])
 
+    def test_without_the_inventory_pets_stay_out_of_the_way(self):
+        sim = self.launch(SHORT, unplug=["Inventory"])
+        Child(sim, seed=3).play()
+        self.assertEqual(len(self.round_ends(sim)), 4)
+        self.assert_log_ok(sim)
+
     def test_everything_optional_unplugged(self):
         sim = self.launch("demo", unplug=["Voice", "Feedback", "Detector", "Facilitator", "Magic", "Picks",
-                                         "Inventory", "Rooms", "Decor", "Home"])
+                                         "Inventory", "Rooms", "Decor", "Pets", "Home"])
         self.assertEqual(sim.observe()["modules"], [])
         Child(sim, perception="strong", seed=4).play()
         self.assertEqual(len(self.round_ends(sim)), 18)

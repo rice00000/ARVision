@@ -606,9 +606,9 @@ func _build_shelf() -> void:
 		var half := table.size * 0.5
 		var edge := table.transform * Vector3(clampf(local.x, -half.x, half.x), 0.0, clampf(local.z, -half.y, half.y))
 		var table_setback := (edge - eye).dot(ahead) - BENCH_NEAR
-		# Shorter seated players need the cubbies closer, even on a deep table.
+		# Leave reach for thin pieces that sit deeper in the top cubbies.
 		var eye_height := eye.y - App.rig.global_position.y
-		var reach_setback := clampf(0.42 * eye_height - 0.39, 0.04, 0.14)
+		var reach_setback := clampf(0.52 * (eye_height - 1.0), 0.01, 0.14)
 		var setback := minf(maxf(PREFERRED_SETBACK, table_setback), reach_setback)
 		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * setback)
 		_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST)

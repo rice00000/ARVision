@@ -1,13 +1,13 @@
 class_name ItemDef
 extends Resource
-## XRVision's item catalogue, with rooms as unique purchases. Scene is visual only.
+## XRVision's item catalogue, with rooms and pets as unique purchases. Scene is visual only.
 
-enum Kind {FURNITURE, ROOM}
+enum Kind {FURNITURE, ROOM, PET}
 const DIR := "res://content/items/"
 @export var title := ""
 @export var kind := Kind.FURNITURE
 @export var scene: PackedScene
-@export_range(1, 9) var price := 1
+@export_range(1, 20) var price := 1
 @export var snap_to_floor := true
 
 var id: StringName:

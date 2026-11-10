@@ -68,6 +68,22 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 		item.position = Vector3(0, -0.038, 0.04)
 		item.rotation.y = -0.4
 		node.add_child(item)
+	elif icon == "pet":
+		var pet: Node3D = load("res://content/pets/kenney/cat.glb").instantiate()
+		pet.scale = Vector3.ONE * 0.045
+		pet.position = Vector3(0, -0.036, 0.045)
+		pet.rotation.y = 0.4
+		node.add_child(pet)
+	elif icon in ["left", "right"]:
+		arrow(node, Vector3(0, 0, 0.03), 0.075, icon == "left")
+	elif icon == "back":
+		arrow(node, Vector3(-0.02, 0, 0.03), 0.045, true)
+		box(node, Vector3(0.045, 0.022, 0.025), Vector3(0.022, 0, 0.03), INK)
+	elif icon == "check":
+		check(node, Vector3(0, 0, 0.025), 1.0)
+	elif icon == "cross":
+		for turn in [PI / 4, -PI / 4]:
+			box(node, Vector3(0.08, 0.02, 0.02), Vector3(0, 0, 0.025), INK).rotation.z = turn
 	elif icon == "bag":
 		box(node, Vector3(0.065, 0.045, 0.04), Vector3(0, -0.006, 0.035), GOLD)
 		box(node, Vector3(0.07, 0.014, 0.045), Vector3(0, 0.023, 0.035), INK)
@@ -79,18 +95,44 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 	return node
 
 
-static func stones(parent: Node3D, count: int, at: Vector3, owned := -1) -> void:
-	for i in mini(count, 9):
-		var gem := MeshInstance3D.new()
-		var mesh := SphereMesh.new()
-		mesh.radius = 0.012
-		mesh.height = 0.03
-		mesh.radial_segments = 6
-		mesh.rings = 2
-		gem.mesh = mesh
-		gem.material_override = material(GOLD if owned < 0 or i < owned else Color(0.28, 0.31, 0.37))
-		gem.position = at + Vector3((i - (mini(count, 9) - 1) * 0.5) * 0.032, 0, 0)
-		parent.add_child(gem)
+## A solid triangle pointing left or right.
+static func arrow(parent: Node3D, at: Vector3, size: float, left: bool) -> void:
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = PrismMesh.new()
+	(mesh.mesh as PrismMesh).size = Vector3(size, size * 0.8, 0.025)
+	mesh.material_override = material(INK)
+	mesh.position = at
+	mesh.rotation.z = PI / 2 if left else -PI / 2
+	parent.add_child(mesh)
+
+
+## A thick check mark.
+static func check(parent: Node3D, at: Vector3, size: float, colour := INK) -> void:
+	box(parent, Vector3(0.036, 0.02, 0.02) * size, at + Vector3(-0.024, -0.012, 0) * size, colour).rotation.z = -PI / 4
+	box(parent, Vector3(0.072, 0.02, 0.02) * size, at + Vector3(0.012, 0.002, 0) * size, colour).rotation.z = PI / 3.6
+
+
+## A magic stone and how many: the balance, or a price.
+static func stones(parent: Node3D, count: int, at: Vector3) -> void:
+	var gem: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+	gem.scale = Vector3.ONE * 0.5
+	gem.position = at + Vector3(-0.03, -0.02, 0)
+	parent.add_child(gem)
+	label(parent, str(count), at + Vector3(0.03, 0, 0), 48)
+
+
+## A price: the stone and its number, then a bar of fixed length that fills as
+## the child's stones near the price, and a check mark once they are enough.
+## Length and the mark carry it, not colour.
+static func price(parent: Node3D, cost: int, owned: int, at: Vector3) -> void:
+	stones(parent, cost, at + Vector3(-0.19, 0, 0))
+	var length := 0.26
+	var filled := length * minf(1.0, float(owned) / cost)
+	box(parent, Vector3(length, 0.022, 0.01), at + Vector3(0.05, 0, 0), Color(0.28, 0.31, 0.37))
+	if filled > 0:
+		box(parent, Vector3(filled, 0.036, 0.018), at + Vector3(0.05 - (length - filled) * 0.5, 0, 0), GOLD)
+	if owned >= cost:
+		check(parent, at + Vector3(0.245, 0, 0.01), 0.8, GOLD)
 
 
 static func preview(parent: Node3D, item: ItemDef, at: Vector3, size: float) -> Node3D:
