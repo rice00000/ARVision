@@ -179,7 +179,7 @@ from the eyes (a seated adult reaches them). All positions come from `EntryLayou
 dev_right_spot / dev_jump_label`; the test checks every button is in reach and none overlaps another.
 
 **Zone map.** Covers setup, the opening, the reveal and the shelf scene / first_visit (the bench, shelf and things stay
-where the reveal showed them: `ShelfCopy.push` and the moved table point). Clean for every table at least 1.0 x 0.7 m
+where the reveal showed them, using the planned bench frame). Clean for every table at least 1.0 x 0.7 m
 whose near edge is at least 15 cm inside the reach (42 cases in the test). Reported, not fixable by placement: a
 0.8 x 0.5 desk (Wei's 54 cm bench covers it), and a table starting near the end of the reach. The setup's table step
 says "Small: N things overlap" / "Far: hard to reach" from the same map. Changes: a short reach can put the cauldron

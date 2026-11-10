@@ -1,8 +1,7 @@
 extends Module
-## The facilitator's panel, hidden from the child: the left-hand menu pinch
-## (palm facing you, pinch) opens and closes it (desktop: M), and play pauses
-## while it is open. Point and pinch to press a button.
-## Scenes: switch freely between Intro, Find the object and Global motion.
+## The facilitator's panel opens from Menu → Staff tools or the left-hand
+## menu pinch (desktop: M). Play pauses while it is open.
+## Scenes and saves manage the session. Tools holds developer actions.
 ##
 ## Training
 ##   Easier / Harder   pin the level 0.1 lower / higher for the rest of the session
@@ -31,8 +30,13 @@ var _panel := Node3D.new()
 ## Page name -> its node; only the page shown is in the tree, so the others cannot be pressed.
 var _pages: Dictionary[StringName, Node3D] = {}
 var _page_shown: StringName = &"Training"
+var _from_menu := false
 var _status := Label3D.new()
 var _scene_label := Label3D.new()
+var _intro_status := Label3D.new()
+var _confirm_label := Label3D.new()
+var _confirmed_action: StringName
+var _pending: Target
 var _playing := Label3D.new()
 var _page_label := Label3D.new()
 var _name := Label3D.new()
@@ -52,6 +56,8 @@ func _ready() -> void:
 		if hand == &"left" and action == &"menu_pressed" and pressed:
 			toggle())
 	Events.selected.connect(_on_selected)
+	Events.staff_tools_requested.connect(_open.bind(true))
+	Events.scene_changing.connect(_close)
 
 
 func _exit_tree() -> void:
@@ -67,22 +73,49 @@ func _exit_tree() -> void:
 func toggle() -> void:
 	if App.main.switching:
 		return
-	is_open = not is_open
 	if is_open:
-		var eye := App.head().global_transform
-		var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-		add_child(_panel)
-		_panel.global_transform = Transform3D(Basis.looking_at(forward), eye.origin + forward * 0.55 + Vector3.DOWN * 0.12)
-		_refresh()
-	else:
-		remove_child(_panel)
-	App.hold_pause(&"facilitator", is_open)
-	Events.facilitator_toggled.emit(is_open)
+		_close()
+		return
+	_open(false)
+
+
+func _open(from_menu: bool) -> void:
+	if is_open or App.main.switching: return
+	is_open = true
+	_from_menu = from_menu
+	App.hold_pause(&"facilitator", true)
+	Events.facilitator_toggled.emit(true)
+	if from_menu and _page_shown != &"Tools": _show(&"Tools")
+	(_panel.get_node(^"fac_close/Caption") as Label3D).text = "Menu" if from_menu else "Close"
+	var eye := App.head().global_transform
+	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	add_child(_panel)
+	_panel.global_transform = Transform3D(Basis.looking_at(forward), eye.origin + forward * 0.55 + Vector3.DOWN * 0.12)
+	_refresh()
+
+
+func _close(return_to_menu := false) -> void:
+	if not is_open: return
+	is_open = false
+	_pending = null
+	if _page_shown == &"Confirm": _show(&"Tools")
+	remove_child(_panel)
+	if return_to_menu: Events.player_menu_requested.emit()
+	App.hold_pause(&"facilitator", false)
+	Events.facilitator_toggled.emit(false)
 
 
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
-	if not is_open or target == null or not _panel.is_ancestor_of(target) or _disabled.get(target, false):
+	if not is_open or App.main.switching or _pending or target == null or not _panel.is_ancestor_of(target) or _disabled.get(target, false):
 		return
+	_pending = target
+	_activate.call_deferred()
+
+
+func _activate() -> void:
+	var target := _pending
+	_pending = null
+	if not is_instance_valid(target): return
 	if App.session.block == null and target.id in [&"fac_easier", &"fac_harder", &"fac_skip"]:
 		return # nothing running to steer
 	Events.report(&"facilitator", {button = target.id})
@@ -93,7 +126,12 @@ func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _directio
 		_open_save(StringName(String(target.id).trim_prefix("fac_slot_")))
 		return
 	if String(target.id).begins_with("fac_scene_"):
-		_switch_scene.call_deferred(StringName(String(target.id).trim_prefix("fac_scene_")))
+		_view_index = 0
+		App.main.change_scene(StringName(String(target.id).trim_prefix("fac_scene_")))
+		return
+	if String(target.id).begins_with("fac_jump_"):
+		_close()
+		Events.intro_jump_requested.emit(StringName(String(target.id).trim_prefix("fac_jump_")))
 		return
 	match target.id:
 		&"fac_scenes":
@@ -130,20 +168,32 @@ func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _directio
 			Profile.copy(_typed.strip_edges())
 			_show(&"Saves")
 		&"fac_close":
-			toggle.call_deferred() # after this press has reached every listener: a trial must not take it as an answer
+			_close(_from_menu)
+			return
+		&"fac_tools", &"fac_cancel_tool":
+			_show(&"Tools")
+		&"fac_zones":
+			_close()
+			Events.intro_zones_requested.emit()
+			return
+		&"fac_restart", &"fac_exit":
+			_confirmed_action = target.id
+			_confirm_label.text = "Restart this scene?" if target.id == &"fac_restart" else "Exit ARVision?"
+			_show(&"Confirm")
+		&"fac_confirm_tool":
+			Save.write()
+			if _confirmed_action == &"fac_restart":
+				_view_index = 0
+				App.main.restart()
+			else:
+				get_tree().quit()
 			return
 	_refresh()
 
 
-func _switch_scene(id: StringName) -> void:
-	toggle()
-	_view_index = 0
-	App.main.change_scene(id)
-
-
 ## Closes the panel and plays [param save]: the game starts again from it.
 func _open_save(save: StringName) -> void:
-	toggle.call_deferred()
+	_close()
 	Profile.switch(save)
 
 
@@ -166,6 +216,13 @@ func _refresh() -> void:
 	_refresh_training()
 	_refresh_saves()
 	_name.text = "Name: %s_" % _typed
+	var intro := App.main.intro()
+	var tools := _pages[&"Tools"]
+	var can_jump := intro != null and intro.tools_ready
+	_intro_status.text = "Intro: " + intro.beat if can_jump else "Intro tools available in Intro"
+	for part: String in Entry.PARTS:
+		_enable(tools.get_node("fac_jump_" + part), can_jump)
+	_enable(tools.get_node(^"fac_zones"), can_jump and intro.zones_available())
 
 
 func _refresh_training() -> void:
@@ -220,16 +277,17 @@ func _build() -> void:
 	back.mesh = quad
 	back.position = Vector3(0.0, 0.0, -0.012)
 	_panel.add_child(back)
-	for i in 4:
-		_button(["fac_scenes", "fac_training", "fac_saves", "fac_close"][i], ["Scenes", "Training", "Saves", "Close"][i],
-			Vector2(0.1, 0.05), Vector2(-0.165 + i * 0.11, 0.17), _panel)
+	var tabs := [["fac_scenes", "Scenes"], ["fac_training", "Training"], ["fac_saves", "Saves"],
+		["fac_tools", "Tools"], ["fac_close", "Close"]]
+	for i in tabs.size():
+		_button(tabs[i][0], tabs[i][1], Vector2(0.082, 0.045), Vector2(-0.172 + i * 0.086, 0.17), _panel)
 
 	var scenes := _page(&"Scenes")
 	_text(_scene_label, Vector2(0.0, 0.1), scenes)
 	var row := 0
 	for id: StringName in Main.SCENES:
-		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.065),
-			Vector2(0.0, 0.025 - row * 0.085), scenes)
+		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.055),
+			Vector2(0.0, 0.032 - row * 0.063), scenes)
 		row += 1
 
 	var training := _page(&"Training")
@@ -259,6 +317,22 @@ func _build() -> void:
 		_button(edits[i][0], edits[i][1], Vector2(0.13, 0.045), Vector2(-0.145 + 0.145 * i, -0.13), naming)
 	_button("fac_create", "Start fresh", Vector2(0.2, 0.045), Vector2(-0.105, -0.183), naming)
 	_button("fac_copy", "Copy this save", Vector2(0.2, 0.045), Vector2(0.105, -0.183), naming)
+
+	var tools := _page(&"Tools")
+	_text(_intro_status, Vector2(0, 0.11), tools)
+	var parts := Entry.PARTS.keys()
+	for i in parts.size():
+		var part: String = parts[i]
+		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.041),
+			Vector2(-0.095 + 0.19 * (i % 2), 0.06 - 0.047 * floori(i / 2.0)), tools)
+	_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
+	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022, -0.16), tools)
+	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127, -0.16), tools)
+
+	var confirm := _page(&"Confirm")
+	_text(_confirm_label, Vector2(0, 0.06), confirm)
+	_button("fac_cancel_tool", "Cancel", Vector2(0.16, 0.05), Vector2(-0.09, -0.045), confirm)
+	_button("fac_confirm_tool", "Confirm", Vector2(0.16, 0.05), Vector2(0.09, -0.045), confirm)
 	_panel.add_child(_pages[_page_shown])
 
 
@@ -296,9 +370,10 @@ func _button(id: String, text: String, size: Vector2, at: Vector2, parent: Node3
 	mesh.material_override = _face
 	button.add_child(mesh)
 	var label := Label3D.new()
+	label.name = "Caption"
 	label.text = text
 	label.pixel_size = 0.0004
-	label.font_size = 40 if size.y < 0.05 else 48
+	label.font_size = 34 if size.x < 0.1 else (40 if size.y < 0.05 else 48)
 	label.position.z = 0.006
 	label.no_depth_test = true
 	label.render_priority = 23

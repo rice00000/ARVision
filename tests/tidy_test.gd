@@ -4,6 +4,7 @@ extends TestCase
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
 const TRIAL := preload("res://trials/tidy/tidy_trial.gd")
+const SHELF_TASK := preload("res://content/tasks/tidy_shelf.tres")
 
 
 func _start(rounds := 1, difficulty := 0.0, pins: Dictionary = {}) -> Trial:
@@ -241,3 +242,53 @@ func test_clutter_scatters_junk_that_fits_no_sticker_among_the_things() -> void:
 	var thing: Target = trial.get("_things")[0]
 	await _carry(trial, thing, _cell(trial, trial.get("_key")[thing]))
 	expect(trial.get("_placed").has(thing), "a thing in the mess still goes home")
+
+
+func test_odd_colour_levels_narrow_the_gap_with_three_blocks_and_one_blank_cubby() -> void:
+	var previous_gap := INF
+	for level_id in [&"odd_color_1", &"odd_color_2", &"odd_color_3"]:
+		await boot(SHELF_TASK.level_by_id(level_id).plan)
+		App.session.run()
+		await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())
+		var trial := App.session.trial
+		var things: Array = trial.get("_things")
+		var colours := things.map(func(thing: Target) -> Color:
+			return (thing.get_meta(&"material") as StandardMaterial3D).albedo_color)
+		expect_eq(things.size(), 3, "three blocks on each level")
+		expect_eq(colours.count(colours[0]), 1, "only one odd colour")
+		expect_eq(colours[1], colours[2], "the other two are identical")
+		var delta: Color = colours[0] - colours[1]
+		var gap := Vector3(delta.r, delta.g, delta.b).length()
+		expect(gap > 0.0 and gap < previous_gap, "smaller colour gap on the next level")
+		previous_gap = gap
+		expect_eq((trial.get("_cell_key") as Array).count(""), 5, "one destination")
+		expect_eq((trial.get("_stickers") as Array).count(null), 6, "no matching symbols")
+		expect(not trial.get("_placement_outline").visible, "the outline waits for a correct pick")
+		await shutdown()
+
+
+func test_odd_colour_scores_the_choice_before_placement_and_only_once_after_success() -> void:
+	var trial := await _start(2, 0.0, {&"match": 3.0, &"colour_step": 2.0})
+	var picked := record(Events.picked)
+	var ended := record(Events.trial_ended)
+	var cue: MeshInstance3D = trial.get("_placement_outline")
+	var decoy := _thing(trial, "same")
+	await _tip_to(decoy.global_position)
+	input.click(&"right", &"trigger_click")
+	expect_eq(picked.size(), 1, "the wrong pinch is recorded immediately")
+	expect(not cue.visible and trial.get("_carried").is_empty(), "the decoy stays on the bench")
+	var odd := _thing(trial, "odd")
+	await _tip_to(odd.global_position)
+	input.press(&"right", &"trigger_click", true)
+	expect_eq(picked.size(), 2, "the correct pinch is recorded before the put")
+	expect(cue.visible and ended.is_empty(), "the cubby appears while the round continues")
+	input.press(&"right", &"trigger_click", false)
+	await wait(TRIAL.RELEASE_DELAY + TRIAL.TAKE_PAUSE + 0.3)
+	expect(trial.get("_carried").is_empty() and cue.visible, "a dropped block returns with the destination still visible")
+	await _carry(trial, odd, _cell(trial, "odd"))
+	expect_eq(picked.map(func(args: Array) -> bool: return args[0].correct), [false, true], "re-gripping and putting do not count as choices")
+	expect_eq(ended.size(), 1, "placing just the odd block ends the round")
+	expect_eq(ended[0][2].puts.size(), 1, "placement is logged separately")
+	expect(not ended[0][2].first_try, "the first choice was wrong")
+	await until(func() -> bool: return trial.is_running())
+	expect(not cue.visible, "the next round starts with the outline hidden")

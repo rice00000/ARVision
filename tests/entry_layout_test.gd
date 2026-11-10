@@ -163,27 +163,13 @@ func test_the_marks_look_the_same_size_near_and_far() -> void:
 
 func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_reveal() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
-	expect(entry.find_child("entry_part_place", true, false) != null, "the dev jumps are there")
-	# Every dev button: in reach of a seated grown-up, none on top of another.
-	var buttons: Array = entry.find_children("*", "EntryButton", true, false)
-	var eye := App.head().global_position
-	for i in buttons.size():
-		var a: EntryButton = buttons[i]
-		expect(a.global_position.distance_to(eye) < 0.65, "%s is in reach (%d cm)" % [a.id, roundi(a.global_position.distance_to(eye) * 100)])
-		for j in range(i + 1, buttons.size()):
-			var b: EntryButton = buttons[j]
-			var apart := b.global_position - a.global_position
-			var across := absf(Vector2(apart.x, apart.z).length())
-			var up := absf(apart.y)
-			expect(across >= (a.plate.x + b.plate.x) * 0.5 - 0.001 or up >= (a.plate.y + b.plate.y) * 0.5 - 0.001, "%s and %s do not overlap" % [a.id, b.id])
-	entry._on_target(entry.find_child("entry_part_place", true, false) as Target)
+	entry.jump_to(&"place")
 	expect(await until(func() -> bool: return entry.get("_layout") != null and entry.get("_part_running"), 30.0), "a jump plays a part")
 	var layout: EntryLayout = entry.get("_layout")
 	var box: Node3D = entry.get("_box")
@@ -192,7 +178,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	expect(flat.call(box.global_position).distance_to(flat.call(layout.cauldron)) < 0.01, "the cauldron stands at the map's spot")
 	expect(flat.call(plate.global_position).distance_to(flat.call(layout.mechanism)) < 0.01, "and the panel")
 	expect(layout.zone(&"gear_landing") != null and flat.call(entry.get("_gear_rest")).distance_to(flat.call(layout.gear_rest)) < 0.01, "the gear lands where the map says")
-	entry._on_target(entry.find_child("entry_part_reveal", true, false) as Target)
+	entry.jump_to(&"reveal")
 	await wait(2.5)
 	# Where the panel is fixed it never moves; where it glides, it ends at the map's spot for the revealed room.
 	var want_box := layout.cauldron_after if entry.get("_made_way") else layout.cauldron
@@ -206,7 +192,6 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 
 func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_same_ones() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
@@ -220,7 +205,7 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	for thing: Node3D in copy.things():
 		before[thing.name] = thing.global_position
 		expect(not thing.visible, "%s is hidden until the ripple reaches it" % thing.name)
-	entry._on_target(entry.find_child("entry_part_shelf", true, false) as Target)
+	entry.jump_to(&"shelf")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "the first visit loads")
 	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.get("_things") != null and not (App.session.trial.get("_things") as Array).is_empty(), 30.0), "and its trial makes things")
 	var made: Array = App.session.trial.get("_things")
@@ -231,7 +216,6 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 			expect(thing.global_position.distance_to(before[thing.name]) < 0.001, "%s is in the same place (no swap, no drop-in)" % thing.name)
 	await App.main.change_scene(&"global_motion")   # leave the first visit: it gives the shelf's static settings back
 	var tidy = load("res://trials/tidy/tidy_trial.gd")
-	tidy.push = 0.0
 	tidy.seed_next = 0
 	tidy.things_arrive = true
 	tidy.onion_voice = false
@@ -249,7 +233,6 @@ func test_onions_float_toward_the_shapes_stays_clear_of_the_shelf_the_things_and
 
 func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
@@ -261,7 +244,7 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	layout.mechanism_after = layout.mechanism + Vector3(0.25, 0.0, 0.0)
 	layout.mechanism_yaw_after = layout._facing(layout.mechanism_after)
 	layout.socket_after = layout._socket_of(layout.mechanism_after, layout.mechanism_yaw_after)
-	entry._on_target(entry.find_child("entry_part_reveal", true, false) as Target)
+	entry.jump_to(&"reveal")
 	expect(await until(func() -> bool: return entry.get_node_or_null("SocketTrack") != null, 20.0), "a groove is drawn from the socket to its new place")
 	var plate: Node3D = entry.get("_mechanism")
 	var track: Node3D = entry.get_node_or_null("SocketTrack")
@@ -275,7 +258,6 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 
 func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does_not_freeze() -> void:
 	Engine.time_scale = 1.0
-	load("res://trials/tidy/tidy_trial.gd").push = 0.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything

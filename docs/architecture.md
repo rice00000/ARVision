@@ -36,7 +36,7 @@ Session ─ waits for App.reality.settled (the table is known, or the search gav
 
 Without a plan the [World](world.md) chooses: it plays one `Task` level (a plan) at a time with `Session.play(plan)`.
 
-`Main` keeps the rig, Reality and modules, and loads one `scenes/*.tscn`: Intro (Entry + Session), Find the object or Global motion (World + Session). The facilitator's Scenes tab calls `Main.change_scene`: pause, fade, save, free the old scene and stage, reset the view, load, fade in. `Events.scene_changing` clears module output. Save switches rebuild the current scene, including Intro.
+`Main` keeps the rig, Reality and modules while loading one activity scene. Scene switches pause, fade, save, clear the outgoing scene and stage, reset the view and load the next scene. `Events.scene_changing` closes menus and clears transient output. Save switches and Tools → Restart scene rebuild the current scene.
 
 ## Modules
 
@@ -47,8 +47,8 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
 - **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
-- **Home / Inventory / Rooms / Decor:** persistent side entry, atomic purchases/rewards, room selection and separate furniture layouts. `Events.level_won` follows successful scored levels only; home pauses the activity. [Details](home.md).
-- **Facilitator:** in-headset panel, pauses play. Scenes tab: all three scenes, current one disabled. Training tab: level, view, skip. Saves tab: list (a page of 4), + New save with an on-panel keyboard, Start fresh, Copy this save.
+- **Home, Inventory, Rooms, Decor and Pets** handle the player menu, purchases, rewards, room selection, furniture layouts and pets. [Details](home.md).
+- **Facilitator** takes input from the player menu and keeps play paused. Tools holds Intro jumps and zones, restart and exit.
 
 ## Not verified on a headset yet
 

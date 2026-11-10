@@ -21,6 +21,7 @@ const SCENES := {
 
 var current_scene: StringName
 var switching := false
+var progress := TaskProgress.new()
 var _scene: Node
 var _fade := StandardMaterial3D.new()
 
@@ -32,6 +33,7 @@ func _enter_tree() -> void:
 
 
 func _ready() -> void:
+	add_child(progress)
 	App.stage = $Stage
 	var reality: Reality
 	if App.has_passthrough() and not "--sim" in OS.get_cmdline_user_args():
@@ -77,11 +79,20 @@ func change_scene(id: StringName, fade := true) -> void:
 
 ## Rebuild the current scene, optionally changing the save between scenes.
 func restart(between := Callable()) -> void:
+	if switching: return
+	switching = true
+	App.hold_pause(&"scene", true)
 	_clear_scene()
 	if between.is_valid():
 		between.call()
 	App.reality.apply_view(View.new())
 	_load_scene(current_scene)
+	App.hold_pause(&"scene", false)
+	switching = false
+
+
+func intro() -> Entry:
+	return _scene.get_node(^"Entry") if current_scene == &"intro" else null
 
 
 func _restart_for_table() -> void:

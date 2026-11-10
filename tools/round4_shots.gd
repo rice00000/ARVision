@@ -48,17 +48,17 @@ func _round5() -> void:
 	var layout: EntryLayout = _entry.get("_layout")
 	print("R5 layout ", layout.summary(), " fixed ", layout.panel_fixed, " make_way ", layout.make_way)
 	print("R5 report ", layout.report().replace("\n", "; ") if layout.report() != "" else "no problems")
-	_press(&"entry_part_place")
+	_entry.jump_to(&"place")
 	await _pause(1.6)
 	var socket: Vector3 = _entry.get("_socket_at")
 	_look_at(socket + Vector3(0, 0, -0.05))
 	await _save("r5_set_in_onion_beside_socket")
-	_entry._toggle_zones()
+	_entry.toggle_zones()
 	await _pause(0.3)
 	_look_at(socket + Vector3(0, 0, -0.1))
 	await _save("r5_zones_3d_set_in")
-	_entry._toggle_zones()
-	_press(&"entry_part_reveal")
+	_entry.toggle_zones()
+	_entry.jump_to(&"reveal")
 	for k in 6:
 		await _pause(1.1)
 		_look_at(socket + Vector3(0.1, 0, -0.2))
@@ -75,25 +75,25 @@ func _hands(zones: bool) -> void:
 		place = [func() -> Vector3: return _entry.get("_socket_at"), 2.4, "place"],
 	}
 	for part: String in plan:
-		_press(StringName("entry_part_" + part))
+		_entry.jump_to(StringName(part))
 		_look_at(plan[part][0].call())
 		await _pause(plan[part][1])
 		if zones and part == "touch":
-			_entry._toggle_zones()
+			_entry.toggle_zones()
 			await _pause(0.2)
 		for k in 3:
 			_look_at(plan[part][0].call())
 			await _pause(0.45)
 			await _save("hand_%s_%d%s" % [plan[part][2], k, "_zones" if zones and part == "touch" else ""])
 		if zones and part == "touch":
-			_entry._toggle_zones()
+			_entry.toggle_zones()
 
 
 ## The first visit seated: Onion at rest beside the shelf, the cauldron hidden, the subtitle at today's
 ## setting and the proposed one, looking at the things, the shelf's first row and Onion.
 func _visit() -> void:
 	await _pause(3.0)   # the opening has been up a while: the first visit's scene has been loading in the background
-	_press(&"entry_part_shelf")
+	_entry.jump_to(&"shelf")
 	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 900)
 	await _pause(3.5)
 	var voice := App.module(&"Voice")
@@ -123,11 +123,6 @@ func _look_at(at: Vector3) -> void:
 	var flat := Vector2(d.x, d.z).length()
 	App.rig.head.rotation = Vector3(atan2(d.y, flat), atan2(-d.x, -d.z), 0.0)
 
-
-func _press(id: StringName) -> void:
-	var target := _entry.find_child(String(id), true, false) as Target
-	if target != null:
-		_entry._on_target(target)
 
 
 func _pause(seconds: float) -> void:

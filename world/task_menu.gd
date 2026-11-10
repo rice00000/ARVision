@@ -1,30 +1,30 @@
 class_name TaskMenu
 extends Node3D
-## A place's tasks, unfolded in reach between the child and the place: per
-## task its title, and under it one big button per level. It leans back like a
-## console on the table, so reaching a near row never brushes a far one. Point at a button and pinch. Three kinds of button, never told apart by colour alone:
-## the current level (first not done) is bigger, yellow, and breathes inside a glow; a done
-## level is blue and carries a gold medal; any other is blue. Every level is open. A hand ray lifts its aimed button and the guide reads it out ("Level 2. A new one!"), so a child who
-## cannot read the numbers yet still knows what is under the hand.
-## Drawn over everything, so nothing virtual or simulated hides part of it (on a
-## Quest real things never do).
-##
-## Buttons are Targets named "task_<task id>_<level>" (level from 1).
+## The place's level cards, opened in front of a seated player. Point and pinch.
+## The next card glows and breathes. Completed cards carry a medal.
 
 signal chosen(choice: Array)
 
-## Metres ahead of the eyes, toward the place, and below them: a seated child's reach.
-const DISTANCE := 0.4
+## Metres ahead of the eyes, toward the place, and below them.
+const DISTANCE := 0.58
 const BELOW_EYES := 0.12
 ## Degrees the top leans away from the child.
 const TILT := 30.0
-const BUTTON := 0.06
-const GAP := 0.09
-const ROW := 0.085
-const TITLE_WIDTH := 0.2
-## The next level's button is this much bigger, and breathes by [constant BREATH].
-const NEXT_SIZE := 1.25
-const BREATH := 0.08
+const COLUMNS := 2
+const CARD := Vector2(0.285, 0.066)
+const COLUMN_PITCH := 0.315
+const ROW_PITCH := 0.088
+const HEADER_ROW := 0.076
+const TITLE_ROW := 0.056
+const PANEL_PADDING := Vector2(0.046, 0.015)
+const PANEL_COLOR := Color("#18232e")
+const CARD_COLOR := Color("#425a6c")
+const NEXT_COLOR := Color("#e5cc94")
+const GLOW_COLOR := Color("#f4e3bc")
+const TEXT_COLOR := Color("#f7f4ed")
+const INK_COLOR := Color("#242b32")
+const GOLD_COLOR := Color("#f3d28a")
+const BREATH := 0.035
 const LIFT := 0.012
 
 var _place: Place
@@ -45,6 +45,7 @@ func _init(where: Place, world: World) -> void:
 
 
 func _ready() -> void:
+	visible = not get_tree().paused
 	_build()
 	scale = Vector3(1.0, 0.05, 1.0)
 	var unfold := create_tween()
@@ -52,6 +53,12 @@ func _ready() -> void:
 	unfold.tween_callback(func() -> void: _open = true)
 	Events.selected.connect(func(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
 		_press(target))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_UNPAUSED:
+		# Switching between modal menus keeps the world paused.
+		visible = what == NOTIFICATION_UNPAUSED
 
 
 func _process(delta: float) -> void:
@@ -77,15 +84,7 @@ func _hover(button: Target) -> void:
 		return
 	_lift(_hovered, false)
 	_hovered = button
-	if button == null:
-		return
 	_lift(button, true)
-	var task: Task = _buttons[button][0]
-	var level: int = _buttons[button][1]
-	if _world.is_done(task, level):
-		Events.say("Level %d. Done!" % (level + 1))
-	else:
-		Events.say("Level %d. A new one!" % (level + 1))
 
 
 ## Lifts the aimed button while its ray hit box stays put.
@@ -113,85 +112,98 @@ func fold() -> void:
 func _press(target: Target) -> void:
 	if not _open or not _buttons.has(target) or get_tree().paused:
 		return
-	if target != _hovered: # pressed without hovering (point and pinch): taken as read, never read out after the press
-		_lift(_hovered, false)
-		_hovered = target
-		_lift(target, true)
+	_hover(target)
 	var task: Task = _buttons[target][0]
-	var level: int = _buttons[target][1]
+	var level: TaskLevel = _buttons[target][1]
 	_open = false
 	chosen.emit([task, level])
 
 
 func _build() -> void:
-	var rows := _place.tasks.size()
-	var most := _place.tasks.map(func(task: Task) -> int: return task.levels.size()).max() as int
-	var width := maxf(TITLE_WIDTH, GAP * most) + 0.02
-	var height := ROW * (rows * 2 + 1)
-	for layer in [[0.012, Color(0.85, 0.85, 0.8), -1], [0.0, Color(0.08, 0.09, 0.12), 0]]: # a light rim, dark or light behind
-		var back := MeshInstance3D.new()
-		var quad := QuadMesh.new()
-		quad.size = Vector2(width, height) + Vector2.ONE * layer[0] * 2.0
-		quad.material = _flat(layer[1], layer[2])
-		back.mesh = quad
-		back.position = Vector3(0.0, 0.0, -0.02)
-		add_child(back)
-	var top := height * 0.5 - ROW * 0.5
-	var header := _label(_place.title, 44)
-	header.position = Vector3(0.0, top, 0.0)
+	var width := CARD.x + COLUMN_PITCH
+	var height := HEADER_ROW + 0.016
+	for task in _place.tasks:
+		height += TITLE_ROW + ceili(task.levels.size() / float(COLUMNS)) * ROW_PITCH
+	var back := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(width, height) + PANEL_PADDING * 2.0
+	quad.material = _flat(PANEL_COLOR, 0)
+	back.mesh = quad
+	back.position.z = -0.02
+	add_child(back)
+	var top := height * 0.5
+	var menu_slot := Marker3D.new()
+	menu_slot.position = Vector3(quad.size.x * 0.5 - 0.085, top - 0.05, back.position.z)
+	menu_slot.add_to_group(App.PLAYER_MENU_SLOT)
+	add_child(menu_slot)
+	var header := _label(_place.title, 50)
+	header.position.y = top - HEADER_ROW * 0.5
 	add_child(header)
-	for row in rows:
-		var task := _place.tasks[row]
-		var y := top - ROW * (row * 2 + 1)
-		var title := _label(task.title, 44)
-		title.position = Vector3(0.0, y, 0.0)
+	top -= HEADER_ROW
+	for task in _place.tasks:
+		var title := _label(task.title, 38)
+		title.position.y = top - TITLE_ROW * 0.5
 		add_child(title)
-		for level in task.levels.size():
-			var button := _button(task, level)
-			button.position = Vector3(GAP * (level - (task.levels.size() - 1) * 0.5), y - ROW, 0.0)
+		top -= TITLE_ROW
+		var next := _world.current(task)
+		for index in task.levels.size():
+			var button := _button(task, task.levels[index], task.levels[index] == next)
+			var row := floori(index / float(COLUMNS))
+			var in_row := mini(COLUMNS, task.levels.size() - row * COLUMNS)
+			button.position = Vector3(COLUMN_PITCH * (index % COLUMNS - (in_row - 1) * 0.5),
+				top - ROW_PITCH * (row + 0.5), 0)
 			add_child(button)
+		top -= ceili(task.levels.size() / float(COLUMNS)) * ROW_PITCH
 
 
-func _button(task: Task, level: int) -> Target:
-	var done := _world.is_done(task, level)
-	var next := level == _world.current(task)
-	var size := BUTTON * (NEXT_SIZE if next else 1.0)
+func _button(task: Task, level: TaskLevel, next: bool) -> Target:
+	var progress := App.main.progress
+	var done := progress.is_done(task, level)
 	var button := UITarget.new()
-	button.id = StringName("task_%s_%d" % [task.id, level + 1])
+	button.id = StringName("task_%s_%s" % [task.id, level.id])
 	button.name = String(button.id)
 	_buttons[button] = [task, level]
 	var shape := CollisionShape3D.new()
 	shape.shape = BoxShape3D.new()
-	(shape.shape as BoxShape3D).size = Vector3(size, size, 0.02)
+	(shape.shape as BoxShape3D).size = Vector3(CARD.x, CARD.y, 0.02)
 	button.add_child(shape)
 	var look := Node3D.new()
 	look.name = "Look"
 	button.add_child(look)
 	var face := MeshInstance3D.new()
 	face.mesh = BoxMesh.new()
-	(face.mesh as BoxMesh).size = Vector3(size, size, 0.012)
-	(face.mesh as BoxMesh).material = _flat(Color(1.0, 0.78, 0.2) if next else Color(0.3, 0.45, 0.85), 2)
+	(face.mesh as BoxMesh).size = Vector3(CARD.x, CARD.y, 0.012)
+	(face.mesh as BoxMesh).material = _flat(NEXT_COLOR if next else CARD_COLOR, 2)
 	look.add_child(face)
 	if next:
 		var glow := MeshInstance3D.new()
 		glow.mesh = QuadMesh.new()
-		(glow.mesh as QuadMesh).size = Vector2.ONE * size * 1.3
-		glow.material_override = _flat(Color(1.0, 0.92, 0.55), 1)
+		(glow.mesh as QuadMesh).size = CARD + Vector2(0.014, 0.014)
+		glow.material_override = _flat(GLOW_COLOR, 1)
 		look.add_child(glow)
 		_breathing.append_array([face, glow])
-	var label := _label(str(level + 1), 84 if next else 72)
-	label.position.z = 0.008
-	if next: # dark on yellow
-		label.modulate = Color(0.1, 0.1, 0.15)
-		label.outline_modulate = Color(1.0, 0.95, 0.8)
+	var label := _label("%s L%d" % [level.title, task.project_number(level)], 36)
+	label.name = "Title"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.position = Vector3(-CARD.x * 0.5 + 0.012, 0, 0.008)
 	look.add_child(label)
+	var reward := _label("◆ %d" % progress.reward(task, level), 36)
+	reward.name = "Reward"
+	reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	reward.position = Vector3(CARD.x * 0.5 - 0.012, 0, 0.008)
+	reward.modulate = GOLD_COLOR
+	look.add_child(reward)
+	if next:
+		for text in [label, reward]:
+			text.modulate = INK_COLOR
+			text.outline_size = 0
 	if done:
 		var medal := MeshInstance3D.new()
 		medal.mesh = SphereMesh.new()
-		(medal.mesh as SphereMesh).radius = 0.012
-		(medal.mesh as SphereMesh).height = 0.024
-		medal.material_override = _flat(Color(1.0, 0.8, 0.25), 5)
-		medal.position = Vector3(BUTTON * 0.4, BUTTON * 0.4, 0.012)
+		(medal.mesh as SphereMesh).radius = 0.005
+		(medal.mesh as SphereMesh).height = 0.01
+		medal.material_override = _flat(GOLD_COLOR, 5)
+		medal.position = Vector3(CARD.x * 0.5 - 0.012, CARD.y * 0.5 - 0.012, 0.012)
 		look.add_child(medal)
 	return button
 
@@ -200,8 +212,9 @@ static func _label(text: String, size: int) -> Label3D:
 	var label := Label3D.new()
 	label.text = text
 	label.font_size = size
-	label.pixel_size = 0.0004
-	label.outline_size = 8
+	label.pixel_size = 0.0005
+	label.modulate = TEXT_COLOR
+	label.outline_size = 5
 	label.no_depth_test = true
 	label.render_priority = 4
 	label.outline_render_priority = 3

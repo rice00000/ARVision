@@ -45,7 +45,7 @@ func _ready() -> void:
 	App.rig.add_child(_label)
 	add_child(_player)
 	Events.said.connect(_say)
-	Events.home_toggled.connect(_home)
+	Events.player_menu_toggled.connect(_player_menu)
 	_player.finished.connect(func() -> void: _end_line(true))
 	Events.scene_changing.connect(func() -> void:
 		_suspended_line = ""
@@ -54,8 +54,8 @@ func _ready() -> void:
 		_end_line(false))
 
 
-## Keep an awaited story line pending while the home speaks; replay it on return.
-func _home(open: bool) -> void:
+## Keep an awaited story line pending while the player menu speaks.
+func _player_menu(open: bool) -> void:
 	if open:
 		_suspended_line = _speaking
 		_player.stop()

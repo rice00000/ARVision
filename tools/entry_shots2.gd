@@ -13,10 +13,10 @@ func _ready() -> void:
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	App.rig.head.rotation.x = -0.55   # looking down at the table, as a seated child does
 	entry.run()
-	await _until(func() -> bool: return entry.find_child("entry_part_emerge", true, false) != null)
+	await _until(func() -> bool: return entry.zones_available())
 	await get_tree().create_timer(0.5).timeout
 	await _save("0_before")
-	entry._on_target(entry.find_child("entry_part_emerge", true, false) as Target)
+	entry.jump_to(&"emerge")
 	await get_tree().create_timer(2.0).timeout    # onion aside (1.5 s) + the pop begins
 	await _save("1_popping")
 	await get_tree().create_timer(1.1).timeout

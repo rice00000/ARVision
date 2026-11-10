@@ -6,6 +6,7 @@ extends Trial
 ## clicks in; a wrong one does not fit and goes back to the bench. The round is
 ## done when everything is back. Trains matching shape, size and colour, and
 ## placing by sight (vision for action).
+## In the odd-colour rounds only the different piece goes in the blank cubby.
 ##
 ## No table needed: a small virtual bench with the shelf on its back edge stands
 ## in front of the child, in easy reach, facing the work surface (the real table,
@@ -26,6 +27,13 @@ extends Trial
 const SHAPE := 0
 const SIZE := 1
 const COLOUR := 2
+const ODD_COLOUR := 3
+const ODD_KEY := "odd"
+const ODD_CELL := 1 # bottom centre
+
+## Approximately equal sRGB luminance, with successively smaller hue gaps.
+const ODD_BLUE := Color("#4c9cd9")
+const ODD_COLOURS: Array[Color] = [Color("#cb8740"), Color("#12a3c8"), Color("#429ed6")]
 
 const SHAPES: Array[StringName] = [&"ball", &"block", &"cone", &"ring", &"gem"]
 const LOOK_ALIKES: Array[StringName] = [&"egg", &"drum"]
@@ -36,11 +44,6 @@ const COLOUR_NAMES: Array[String] = ["red", "blue", "yellow", "green", "purple",
 const SIZES: Array[float] = [0.55, 0.69, 0.86, 1.08, 1.35]
 const SIZE_NAMES: Array[String] = ["tiny", "small", "middle", "big", "huge"]
 
-## How far farther along the table the whole play set (shelf, things, mess) stands than
-## its own distances below say, metres: they are measured from the eyes, which puts it right
-## in front of the player. 0 is Wei's original. The opening sets it, and it stays for the
-## shelf scene, so the opening's shelf and the real one stand in the same place.
-static var push := 0.0
 ## The planned bench stays in the same place from the opening to the first visit.
 static var shelf_frame := Transform3D.IDENTITY
 static var shelf_below := 0.0
@@ -59,6 +62,8 @@ static var things_arrive := true
 const SHELF_AHEAD := 0.31
 const BENCH_HIGHEST := 0.28
 const BENCH_LOWEST := 0.42
+const BENCH_NEAR := 0.11
+const PREFERRED_SETBACK := 0.08
 ## A cubby: width, height (taller, so the board above hides no sticker from eyes
 ## looking down), depth; the shelf has COLUMNS x ROWS of them. Its card stands
 ## CARD_IN in front of the back, tilted back to face the eyes, so a sticker shows
@@ -111,6 +116,8 @@ var _cell_key: Array[String] = []
 var _cell_point: Array[Vector3] = []
 var _filled: Array[bool] = []
 var _stickers: Array[Node3D] = []
+var _placement_outline: MeshInstance3D
+var _odd_found := false
 ## This round's things, in the order help goes through them.
 var _things: Array[Target] = []
 var _key: Dictionary[Target, String] = {}
@@ -144,18 +151,22 @@ func _setup(round_condition: TrialCondition) -> void:
 	round_condition.set_value(&"seed", _rng.seed)
 	var arrive := things_arrive
 	things_arrive = true
+	_match = int(round_condition.value(&"match", SHAPE))
 	if _shelf == null:
 		_build_shelf()
-	_match = int(round_condition.value(&"match", SHAPE))
 	_outline = round_condition.value(&"outline", 0.0) > 0.5
-	var looks := _looks(roundi(round_condition.value(&"things", 3.0)), round_condition.value(&"size", 0.06))
-	var cells := range(COLUMNS * ROWS)
-	cells.shuffle()
-	for i in looks.size():
-		var cell: int = cells[i]
-		_cell_key[cell] = looks[i].key
-		_cell_point[cell] = _frame * (_card_at[cell] * Vector3(0.0, 0.0, _extent(looks[i].shape, looks[i].size).z * 0.5 + 0.004))
-		_sticker(cell, looks[i])
+	var size: float = round_condition.value(&"size", 0.06)
+	var looks: Array[Dictionary]
+	if _match == ODD_COLOUR:
+		looks = _odd_colour_looks(size)
+		_set_cubby(ODD_CELL, looks[0])
+	else:
+		looks = _looks(roundi(round_condition.value(&"things", 3.0)), size)
+		var cells := range(COLUMNS * ROWS)
+		cells.shuffle()
+		for i in looks.size():
+			_set_cubby(cells[i], looks[i])
+			_sticker(cells[i], looks[i])
 	var clutter := roundi(round_condition.value(&"clutter", 0.0))
 	var spots := _spots(looks.size()) if clutter == 0 else _messy_spots(looks.size() + clutter)
 	for i in clutter:
@@ -178,6 +189,8 @@ func _setup(round_condition: TrialCondition) -> void:
 				say("Put each one on the shadow of its size!")
 			COLOUR:
 				say("Put each one on its colour!")
+			ODD_COLOUR:
+				say("Pinch the block with a different colour.")
 			_:
 				say("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!")
 
@@ -273,6 +286,17 @@ func _looks(count: int, size: float) -> Array[Dictionary]:
 	return looks
 
 
+func _odd_colour_looks(size: float) -> Array[Dictionary]:
+	var other := ODD_COLOURS[int(condition.value(&"colour_step"))]
+	var odd := ODD_BLUE if _rng.randf() < 0.5 else other
+	var pair := other if odd == ODD_BLUE else ODD_BLUE
+	condition.set_value(&"odd_colour", odd.to_html(false))
+	condition.set_value(&"pair_colour", pair.to_html(false))
+	return [{key = ODD_KEY, shape = &"block", size = size, colour = odd},
+		{key = "same", shape = &"block", size = size, colour = pair},
+		{key = "same", shape = &"block", size = size, colour = pair}]
+
+
 func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
 	if action != &"trigger_click":
 		return
@@ -302,6 +326,20 @@ func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
 
 ## Keep the contact point: a thing never jumps to the centre of the hand.
 func _take(hand: StringName, thing: Target) -> void:
+	if _match == ODD_COLOUR:
+		if not _odd_found:
+			pick(ODD_KEY, _key[thing])
+			if _key[thing] != ODD_KEY:
+				judge(&"bad", thing.global_position)
+				count_try()
+				say("Look again. Which colour is different?")
+				return
+			_odd_found = true
+			_placement_outline.show()
+			_arm_hint()
+			say("Put it in the marked cubby.")
+		elif _key[thing] != ODD_KEY:
+			return
 	if _moves.has(thing):
 		_moves[thing].kill()
 		_moves.erase(thing)
@@ -373,7 +411,8 @@ func _put(hand: StringName, cell: int) -> void:
 	var thing: Target = _carried[hand]
 	_let_go(hand)
 	var right := _cell_key[cell] == _key[thing]
-	pick(_cell_key[cell], _key[thing])
+	if _match != ODD_COLOUR:
+		pick(_cell_key[cell], _key[thing])
 	_puts.append({thing = _key[thing], slot = _cell_key[cell], correct = right, seconds = snappedf(seconds(), 0.01)})
 	Events.report(&"put", _puts.back())
 	if not right:
@@ -393,8 +432,10 @@ func _put(hand: StringName, cell: int) -> void:
 	_move(thing, _cell_point[cell], 0.15)
 	judge(&"good", _cell_point[cell])
 	_unhint()
-	if _placed.size() == _things.size():
-		if not onion_voice:
+	if _match == ODD_COLOUR or _placed.size() == _things.size():
+		if _match == ODD_COLOUR:
+			say("It fits!")
+		elif not onion_voice:
 			say("All tidy! Everything is back home.")
 		finish(true, {puts = _puts.duplicate()})
 		return
@@ -406,6 +447,14 @@ func _put(hand: StringName, cell: int) -> void:
 
 
 func _hint(level: int) -> void:
+	if _match == ODD_COLOUR:
+		if _odd_found:
+			say("Put it in the marked cubby.")
+		else:
+			say("Two colours are the same. Which one is different?")
+			if level >= 2:
+				_hop_thing(_things[0])
+		return
 	_show_hint(level)
 	if level >= 2:
 		say("Look! Its spot is shining.")
@@ -439,10 +488,7 @@ func _show_hint(level: int) -> void:
 	_wiggle.tween_property(_stickers[cell], ^"rotation:z", -0.2, 0.4).set_trans(Tween.TRANS_SINE)
 	_wiggle.tween_property(_stickers[cell], ^"rotation:z", 0.0, 0.2).set_trans(Tween.TRANS_SINE)
 	if not thing in _carried.values():
-		_hopping = thing
-		_hop = create_tween().set_loops()
-		_hop.tween_property(thing, ^"global_position", _home[thing] + _frame.basis.y * 0.04, 0.25)
-		_hop.tween_property(thing, ^"global_position", _home[thing], 0.25)
+		_hop_thing(thing)
 	if level >= 2:
 		_cards[cell].albedo_color = SHINE
 		var material: StandardMaterial3D = thing.get_meta(&"material")
@@ -451,8 +497,17 @@ func _show_hint(level: int) -> void:
 		material.emission_energy_multiplier = 1.5
 
 
+func _hop_thing(thing: Target) -> void:
+	_hopping = thing
+	_hop = create_tween().set_loops()
+	_hop.tween_property(thing, ^"global_position", _home[thing] + _frame.basis.y * 0.04, 0.25)
+	_hop.tween_property(thing, ^"global_position", _home[thing], 0.25)
+
+
 ## Stops every hint: stickers still, cubbies and things unlit, a hopping thing back down.
 func _unhint() -> void:
+	if _placement_outline:
+		_placement_outline.hide()
 	if _wiggle:
 		_wiggle.kill()
 		_wiggle = null
@@ -514,6 +569,7 @@ func _clear() -> void:
 	_free_at.clear()
 	_moves.clear()
 	_puts.clear()
+	_odd_found = false
 	for cell in _stickers.size():
 		if _stickers[cell]:
 			_stickers[cell].queue_free()
@@ -543,9 +599,18 @@ func _build_shelf() -> void:
 		_below = shelf_below
 	else:
 		var eye := App.head().global_position
-		var toward := App.reality.work_surface().transform.origin - eye
+		var table := App.reality.work_surface()
+		var toward := table.transform.origin - eye
 		var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
-		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * push)
+		var local := table.transform.affine_inverse() * eye
+		var half := table.size * 0.5
+		var edge := table.transform * Vector3(clampf(local.x, -half.x, half.x), 0.0, clampf(local.z, -half.y, half.y))
+		var table_setback := (edge - eye).dot(ahead) - BENCH_NEAR
+		# Leave reach for thin pieces that sit deeper in the top cubbies.
+		var eye_height := eye.y - App.rig.global_position.y
+		var reach_setback := clampf(0.52 * (eye_height - 1.0), 0.01, 0.14)
+		var setback := minf(maxf(PREFERRED_SETBACK, table_setback), reach_setback)
+		_frame = Transform3D(Basis.looking_at(ahead), eye + ahead * setback)
 		_below = clampf(-toward.y - 0.01, BENCH_HIGHEST, BENCH_LOWEST)
 	_shelf = Node3D.new()
 	_shelf.name = "Shelf"
@@ -554,7 +619,7 @@ func _build_shelf() -> void:
 	var wide := COLUMNS * CELL + BOARD
 	var high := PLINTH + ROWS * (CELL_HIGH + BOARD)
 	var back := -(SHELF_AHEAD + DEPTH)
-	var near := THINGS_NEAR - 0.05
+	var near := BENCH_NEAR
 	_box(Vector3(THINGS_WIDE + 0.06, 0.012, -back - near + 0.01), Vector3(0.0, -_below - 0.006, (back - near) * 0.5), WOOD.lightened(0.15))
 	_box(Vector3(wide, high, 0.01), Vector3(0.0, -_below + high * 0.5, back - 0.005), WOOD)
 	for row in ROWS + 1:
@@ -582,6 +647,29 @@ func _build_shelf() -> void:
 		_cell_point.append(_frame * centre)
 		_filled.append(false)
 		_stickers.append(null)
+	if _match == ODD_COLOUR:
+		_placement_outline = MeshInstance3D.new()
+		_placement_outline.name = "PlacementOutline"
+		var border := QuadMesh.new()
+		border.size = Vector2(CELL - BOARD - 0.024, 0.062)
+		_placement_outline.mesh = border
+		_placement_outline.material_override = _flat(SHINE)
+		_placement_outline.transform = _card_at[ODD_CELL].translated_local(Vector3(0.0, -0.012, 0.001))
+		var inside := MeshInstance3D.new()
+		var centre := QuadMesh.new()
+		centre.size = border.size - Vector2.ONE * 0.012
+		inside.mesh = centre
+		inside.material_override = _cards[ODD_CELL]
+		inside.position.z = 0.001
+		_placement_outline.add_child(inside)
+		_placement_outline.hide()
+		_shelf.add_child(_placement_outline)
+
+
+func _set_cubby(cell: int, look: Dictionary) -> void:
+	_cell_key[cell] = look.key
+	var ahead := _extent(look.shape, look.size).z * 0.5 + 0.004
+	_cell_point[cell] = _frame * (_card_at[cell] * Vector3(0.0, 0.0, ahead))
 
 
 ## The sticker of [param look] in the middle of [param cell]'s card, behind where the thing
@@ -624,6 +712,8 @@ func _make_thing(look: Dictionary, thing_id: String) -> Target:
 	var thing := Target.sphere(StringName(thing_id), look.size * 0.7)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = look.colour
+	if _match == ODD_COLOUR:
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	thing.set_meta(&"material", material)
 	var mesh := _mesh(look.shape, look.size)
 	mesh.material_override = material

@@ -8,6 +8,8 @@ extends Node
 ## the first correct placement, then, when the level is done, the closing, a bob and quiet.
 
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
+const SHELF_TASK := preload("res://content/tasks/tidy_shelf.tres")
+const TUTORIAL_LEVEL := &"shadow"
 
 @export var plan: SessionPlan
 
@@ -81,7 +83,7 @@ func _invitation_open() -> bool:
 func _play() -> void:
 	await App.session.play(_reminder.prepare(plan))   # Wei's first hint is held back so the reminder comes first
 	if App.session.won:
-		Events.level_won.emit(&"tidy_shelf", 1, 2)
+		App.main.progress.complete(SHELF_TASK, SHELF_TASK.level_by_id(TUTORIAL_LEVEL))
 	await _closing()
 
 
@@ -116,8 +118,7 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 
 func _exit_tree() -> void:
 	Tidy.onion_voice = false
-	Tidy.push = 0.0   # the opening's shelf distance ends with the first visit
-	Tidy.shelf_frame = Transform3D.IDENTITY   # and so does the opening's planned bench
+	Tidy.shelf_frame = Transform3D.IDENTITY   # the opening's planned bench ends with the first visit
 	Entry.show_sim_props(true)
 
 

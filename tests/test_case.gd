@@ -93,6 +93,25 @@ func select(at: Vector3, side := &"right") -> void:
 	await frames(1)
 
 
+func press_facilitator(id: String, side := &"right") -> void:
+	var target := App.module(&"Facilitator").find_child(id, true, false) as Target
+	await select(target.global_position, side)
+
+
+func open_intro_tools() -> void:
+	input.menu()
+	await frames(2)
+	await press_facilitator("fac_tools")
+	await frames(2)
+
+
+func jump_to_intro_part(part: StringName, side := &"right") -> void:
+	await until(func() -> bool: return App.main.intro().tools_ready)
+	await open_intro_tools()
+	await press_facilitator("fac_jump_" + part, side)
+	await wait(0.7)
+
+
 ## A one-block plan with no greeting or farewell to sit through.
 static func plan_of(def: TrialDef, rounds: int, probe := false, difficulty := -1.0, view: View = null,
 		pins: Dictionary = {}) -> SessionPlan:

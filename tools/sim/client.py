@@ -96,7 +96,8 @@ class Sim:
         with socket.socket() as probe:
             probe.bind(("127.0.0.1", 0))
             port = probe.getsockname()[1]
-        engine = [str(godot.executable(console=True)), "--xr-mode", "off", "--fixed-fps", "60", "--path", str(ROOT)]
+        engine = [str(godot.executable(console=True)), "--xr-mode", "off", "--audio-driver", "Dummy",
+                  "--fixed-fps", "60", "--path", str(ROOT)]
         if self.rendered:
             engine += ["--resolution", "1280x800", "--position", "40,40"]
         else:

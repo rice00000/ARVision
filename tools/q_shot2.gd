@@ -13,11 +13,11 @@ func _ready() -> void:
 	Events.said.connect(func(t: String) -> void: _said = t)
 	entry.run()
 	var n := 0
-	while entry.find_child("entry_part_touch", true, false) == null and n < 900:
+	while not entry.zones_available() and n < 900:
 		await get_tree().process_frame
 		n += 1
 	await get_tree().create_timer(0.5).timeout
-	entry._on_target(entry.find_child("entry_part_touch", true, false) as Target)
+	entry.jump_to(&"touch")
 	var wanted := ["I was getting things ready.", "Nearly ready.", "I'm Onion, by the way."]
 	var shots := 0
 	n = 0

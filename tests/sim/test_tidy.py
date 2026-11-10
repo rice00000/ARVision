@@ -17,7 +17,9 @@ class TidyUp(SimCase):
     def test_every_body_reaches_every_thing_and_sticker_without_stretching(self):
         for body in ("small", "medium", "large"):
             with self.subTest(body=body):
-                sim = self.launch(plan(block("tidy", rounds=1, difficulty=1.0, ray=False)),
+                # Small size-match pieces sit deeper in a cubby.
+                pins = {"size": 0.033} if body == "small" else None
+                sim = self.launch(plan(block("tidy", rounds=1, difficulty=1.0, pins=pins, ray=False)),
                                   profile=f"test_sim_tidy_reach_{body}", body=body)
                 child = Child(sim, body=body, seed=6)
                 started = sim.run_until("trial_started")
@@ -78,6 +80,8 @@ class TidyUp(SimCase):
         middle = [sum(axis) / len(cells) for axis in zip(*cells)]
         bearing = lambda p: math.degrees(math.atan2(p[0] - eye[0], -(p[2] - eye[2])))
         self.assert_close(bearing(middle), bearing(table), 2.0, "the shelf stands toward the table")
+        self.assertGreater(math.hypot(middle[0] - eye[0], middle[2] - eye[2]), 0.42,
+                           "the table-side shelf leaves space in front of the player")
         child.play_round(first, ["right"] * 3)
         second = sim.run_until("trial_started")
         child.actor.look_at(tuple(sim.observe()["work_surface"]["position"]))

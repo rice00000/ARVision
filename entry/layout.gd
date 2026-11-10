@@ -85,7 +85,6 @@ const LOOKED_GAP := 0.02
 ## Floating panels for the grown-up: they stand this far from the eyes.
 const SETUP_DISTANCE := 0.55
 const SETUP_SIZE := Vector2(0.46, 0.38)   # the plate and its buttons below
-const DEV_DISTANCE := 0.5
 
 ## When a zone is there: setup; the opening up to the gear seated; the reveal (the ripple shows the
 ## bench and shelf, Onion still aside); the shelf scene. "All set" and the dev jumps come back
@@ -1065,68 +1064,7 @@ func _zones() -> Array[Zone]:
 	all.append(hands)
 
 	all.append(_panel_zone(&"setup_panel", setup_panel_at() - eye, SETUP_SIZE, setup_panel_at().y, SETUP | OPENING | REVEAL, "the setup panel and Start (the grown-up)"))
-	for column in dev_columns():
-		all.append(_panel_zone(column.name, column.at - eye, column.size, column.at.y, ALWAYS, "dev buttons"))
 	return all
-
-
-## The DEV columns: {name, at (middle), size (wide, high)}. The jumps (two columns of four, the pop
-## sound under them) on the left; Restart, Exit and Zones on the right: out beyond the 110-degree view
-## the child plays in (the grown-up turns the head to them), above the table and the hands, in reach.
-func dev_columns() -> Array[Dictionary]:
-	var head := Transform3D(Basis.looking_at(ahead), eye)
-	var jumps := dev_spot(head, false)
-	var right := dev_spot(head, true)
-	return [{name = &"dev_jumps", at = jumps + Vector3.UP * 0.01, size = Vector2(DEV_JUMP_WIDE * 2.0 + 0.03, 0.36)},
-			{name = &"dev_restart_exit", at = right + Vector3.DOWN * 0.04, size = Vector2(0.24, 0.29)}]
-
-
-## Degrees each side of straight ahead the DEV columns stand, how far out, and their middle above
-## the eyes. The jump buttons: DEV_JUMP_WIDE wide, DEV_JUMP_ROW apart, four to a column.
-const DEV_ANGLE := 70.0
-const DEV_LIFT := 0.0
-const DEV_JUMP_WIDE := 0.11
-const DEV_JUMP_ROW := 0.055
-const DEV_JUMP_ROWS := 4
-
-
-## The middle of a DEV column for [param head] (as at the start): the right one (Restart, Exit,
-## Zones) or the left one (the jumps).
-static func dev_spot(head: Transform3D, right: bool) -> Vector3:
-	var flat := Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
-	return head.origin + flat.rotated(Vector3.UP, deg_to_rad(-DEV_ANGLE if right else DEV_ANGLE)) * DEV_DISTANCE + Vector3.UP * DEV_LIFT
-
-
-## Where jump button [param i] goes: two columns of DEV_JUMP_ROWS, in story order down the left
-## column, then down the right one.
-static func dev_jump_spot(head: Transform3D, i: int) -> Vector3:
-	var middle := dev_spot(head, false)
-	var across := _across(head, middle)
-	var column := i / DEV_JUMP_ROWS
-	var row := i % DEV_JUMP_ROWS
-	return middle + across * (column - 0.5) * (DEV_JUMP_WIDE + 0.012) + Vector3.UP * (0.11 - row * DEV_JUMP_ROW)
-
-
-## The "DEV · jump to" words, over the jump columns.
-static func dev_jump_label(head: Transform3D) -> Vector3:
-	return dev_spot(head, false) + Vector3.UP * 0.165
-
-
-## The pop sound A/C button, under the jump columns.
-static func dev_pop_spot(head: Transform3D) -> Vector3:
-	return dev_spot(head, false) + Vector3.UP * (0.11 - DEV_JUMP_ROWS * DEV_JUMP_ROW - 0.012)
-
-
-## Restart, Exit, Zones: one under the other on the right; Restart and Exit 15 cm apart, so a stray
-## press meant for one never lands on the other.
-static func dev_right_spot(head: Transform3D, i: int) -> Vector3:
-	return dev_spot(head, true) + Vector3.UP * [0.075, -0.075, -0.16][i]
-
-
-## Across, to the head's right, for something at [param at] facing the head.
-static func _across(head: Transform3D, at: Vector3) -> Vector3:
-	var to := Vector3(at.x - head.origin.x, 0.0, at.z - head.origin.z).normalized()
-	return to.cross(Vector3.UP).normalized()
 
 
 ## The setup panel stands [constant SETUP_DISTANCE] ahead of [param head], this much above the eyes:

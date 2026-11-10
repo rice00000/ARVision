@@ -53,6 +53,8 @@ signal session_finished
 ## A fully successful, scored level; repeats earn the same reward.
 signal level_won(task: StringName, level: int, stones: int)
 signal inventory_changed
+signal player_menu_requested
+signal player_menu_toggled(open: bool)
 signal home_toggled(open: bool)
 signal room_changed(id: StringName)
 signal furniture_requested(id: StringName)
@@ -64,8 +66,11 @@ signal furniture_turn_requested
 
 ## Real objects the CV module sees now (Array of Detection).
 signal detected(detections: Array)
+signal staff_tools_requested
 ## The facilitator panel opened or closed. Play pauses while it is open.
 signal facilitator_toggled(open: bool)
+signal intro_jump_requested(part: StringName)
+signal intro_zones_requested
 ## The active scene is leaving: persistent modules clear their transient output.
 signal scene_changing
 ## Any other fact worth a line in the research log.

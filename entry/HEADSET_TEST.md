@@ -38,10 +38,7 @@ Before you start:
 - [ ] The room: bright / dim (circle one). Light behind you, in front, beside?
 - [ ] Volume on the headset: ______ of 15 (keep it the same for the whole test).
 
-A beat can be replayed on its own from the **DEV jump buttons**: turn your head well to the LEFT (they stand about
-60 degrees out, above the table): Hello, Tap, Gear, Pick up / Set in, Reveal, Shelf, Dots, and "Pop sound: A/C" under
-them (the pop A/C button is gone: pop A is final). **Restart / Exit app / Zones** are well to the RIGHT (70 degrees out). "Zones" draws the layout on the table: blue = things,
-yellow = where hands work, violet = moved aside after the reveal, **red = an overlap** (tell us if you ever see red).
+Point and pinch **Menu → Staff tools**. Choose a chapter to jump to it. **Zones** draws the layout on the table (red marks overlaps). **Restart scene** and **Exit app** each ask for confirmation.
 
 ---
 

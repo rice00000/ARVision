@@ -19,8 +19,6 @@ const WAIT := Color(0.55, 0.58, 0.62)
 const GREEN := Color(0.25, 0.65, 0.35)
 const GREY := Color(0.38, 0.4, 0.45)
 
-## The Entry's button maker: (text, world position, id, colour, wide, margin) -> EntryButton.
-var make_button: Callable
 ## The buttons on the panel now.
 var buttons: Array[EntryButton] = []
 ## The step shown (1-based) and how many there are.
@@ -32,6 +30,7 @@ var _body: Label3D
 var _dots: Array[MeshInstance3D] = []
 var _checks: Array[Dictionary] = []   # {dot: MeshInstance3D, words: Label3D, sign: Label3D, state: StringName}
 var _step_words: Label3D
+var _shown := false
 var _clock := 0.0
 
 ## The line at the foot of the plate.
@@ -123,10 +122,20 @@ func show_step(number: int, total: int, title: String, words: String, checks: Ar
 		var def: Array = button_defs[i]
 		var wide := 0.215 if count > 1 else 0.24
 		var x := (i - (count - 1) * 0.5) * 0.23
-		var button: EntryButton = make_button.call(str(def[0]), to_global(Vector3(x, -0.118, 0.012)), def[1], def[2], wide, 0.012)
-		button.global_basis = global_basis   # parallel to the panel, not turned toward the head on its own
+		var button := EntryButton.new()
+		button.position = Vector3(x, -0.118, 0.012)
+		add_child(button)
+		button.setup(str(def[0]), def[1], def[2], Vector2(wide, 0.06), 0.012)
 		buttons.append(button)
-	visible = true
+	_shown = true
+	visible = not get_tree().paused
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED:
+		hide()
+	elif what == NOTIFICATION_UNPAUSED:
+		visible = _shown
 
 
 ## Changes the line of words under the title.
@@ -189,6 +198,7 @@ func clear_buttons() -> void:
 ## Takes the panel (and its buttons) away.
 func hide_all() -> void:
 	clear_buttons()
+	_shown = false
 	visible = false
 
 

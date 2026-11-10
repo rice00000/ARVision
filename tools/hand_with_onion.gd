@@ -18,18 +18,18 @@ func _ready() -> void:
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	App.rig.head.rotation.x = -0.55   # looking down at the table, as a seated child does
 	entry.run()
-	await _until(func() -> bool: return entry.find_child("entry_part_touch", true, false) != null)
-	await _gesture(entry, "tap", "entry_part_touch", DemoHand.Mode.TAP, [0.4, 0.85, 1.05, 1.5])
-	await _gesture(entry, "pinch_lift", "entry_part_pickup", DemoHand.Mode.PINCH_LIFT, [1.0, 1.7, 2.9, 5.0])
-	await _gesture(entry, "lower_release", "entry_part_place", DemoHand.Mode.LOWER_RELEASE, [0.6, 1.9, 2.4, 3.4])
+	await _until(func() -> bool: return entry.zones_available())
+	await _gesture(entry, "tap", &"touch", DemoHand.Mode.TAP, [0.4, 0.85, 1.05, 1.5])
+	await _gesture(entry, "pinch_lift", &"pickup", DemoHand.Mode.PINCH_LIFT, [1.0, 1.7, 2.9, 5.0])
+	await _gesture(entry, "lower_release", &"place", DemoHand.Mode.LOWER_RELEASE, [0.6, 1.9, 2.4, 3.4])
 	var file := FileAccess.open(_out.path_join("overlap.txt"), FileAccess.WRITE)
 	file.store_string("\n".join(_report))
 	file.close()
 	print("OVERLAP report\n", "\n".join(_report))
 	get_tree().quit()
 
-func _gesture(entry: Entry, name: String, button: String, mode: DemoHand.Mode, shot_times: Array) -> void:
-	entry._on_target(entry.find_child(button, true, false) as Target)
+func _gesture(entry: Entry, name: String, part: StringName, mode: DemoHand.Mode, shot_times: Array) -> void:
+	entry.jump_to(part)
 	var demo: DemoHand = entry.get("_demo")
 	await _until(func() -> bool: return demo._mode == mode, 1800)   # the beat's own lines come first
 	await get_tree().create_timer(1.5).timeout   # Onion gets to its place

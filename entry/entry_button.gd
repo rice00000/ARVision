@@ -46,7 +46,6 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 	target = UITarget.new()
 	target.id = id
 	target.name = String(id)
-	target.show_ray = not String(id).begins_with("entry_debug_")
 	var shape := CollisionShape3D.new()
 	var hit := BoxShape3D.new()
 	hit.size = Vector3(plate.x + margin * 2.0, plate.y + margin * 2.0, DEPTH)

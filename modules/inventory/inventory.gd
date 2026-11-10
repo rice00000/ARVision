@@ -32,7 +32,7 @@ func take(id: StringName) -> bool:
 
 func buy(id: StringName) -> bool:
 	var item := ItemDef.find(id)
-	if item == null or (item.kind == ItemDef.Kind.ROOM and count(id) > 0):
+	if item == null or (item.kind != ItemDef.Kind.FURNITURE and count(id) > 0):
 		return false
 	if count(STONE) < item.price:
 		Events.report(&"purchase_declined", {item = id, balance = count(STONE), price = item.price})
@@ -44,6 +44,7 @@ func buy(id: StringName) -> bool:
 
 
 func _reward(task: StringName, level: int, stones: int) -> void:
+	if stones == 0: return
 	_set_count(STONE, count(STONE) + stones)
 	_changed(&"reward_granted", {task = task, level = level, stones = stones, balance = count(STONE)})
 

@@ -6,6 +6,5 @@
 
 [resource]
 script = ExtResource("1_adventure")
-greeting = "Welcome, young alchemist! Your workshop needs tidying. Put each thing back where it belongs."
 level_done = "Well done, alchemist!"
 places = Array[ExtResource("2_place")]([ExtResource("3_table")])

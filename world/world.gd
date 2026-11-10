@@ -8,8 +8,6 @@ extends Node
 ## the child has not seen on a menu yet, the guide points there too.
 ## Turning to face another place folds this menu and opens that one. Only
 ## the body's turn counts for now, so it can be tested seated.
-##
-## Saved as "world" (see Save): the levels done of each task and the levels seen open.
 
 ## Degrees within which the head faces a place (left-right only).
 const FACING := 25.0
@@ -20,11 +18,6 @@ const BEHIND := 1.5
 
 @export var adventure: Adventure
 
-var save_key := "world"
-## Task id -> the levels done (0 = level 1).
-var done: Dictionary = {}
-## "<task id>:<level>" of every level shown open on a menu.
-var seen: Array = []
 ## The open menu, or null.
 var menu: TaskMenu
 ## The place the child is at, or null before the first.
@@ -35,22 +28,13 @@ var _guide := Guide.new()
 var _watching := false
 var _faced_for: Dictionary[Place, float] = {}
 
-## [Task, level] chosen on the menu, or [Place] turned to.
+## [Task, TaskLevel] chosen on the menu, or [Place] turned to.
 signal _picked(result: Array)
 
 
 func _ready() -> void:
 	App.world = self
 	add_child(_guide)
-
-
-func save_state() -> Dictionary:
-	return {done = done, seen = seen}
-
-
-func load_state(data: Dictionary) -> void:
-	done = data.get("done", {})
-	seen = data.get("seen", [])
 
 
 func run() -> void:
@@ -73,40 +57,30 @@ func run() -> void:
 			_enter(picked[0])
 			continue
 		var task: Task = picked[0]
-		var level: int = picked[1]
-		await App.session.play(task.levels[level])
+		var level: TaskLevel = picked[1]
+		await App.session.play(level.plan)
 		if App.session.won:
 			await _complete(task, level)
 		else:
-			Events.report(&"task_unfinished", {task = task.id, level = level + 1})
+			Events.report(&"task_unfinished", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
 
 
-func is_done(task: Task, level := -1) -> bool:
-	var levels: Array = done.get(task.id, [])
-	return not levels.is_empty() if level < 0 else level in levels
-
-
-## The first level of [param task] not done yet (0 = level 1), -1 when all are.
+## The first unfinished level of [param task], or null when all are done.
 ## Every level is open; this is just the one the menu lights up.
-func current(task: Task) -> int:
-	for level in task.levels.size():
-		if not is_done(task, level):
+func current(task: Task) -> TaskLevel:
+	for level in task.levels:
+		if not App.main.progress.is_done(task, level):
 			return level
-	return -1
+	return null
 
 
 ## A level at [param where] has not been seen on a menu yet.
 func has_new(where: Place) -> bool:
 	for task in where.tasks:
-		for level in task.levels.size():
-			if not key(task, level) in seen:
+		for level in task.levels:
+			if not TaskProgress.key(task, level) in App.main.progress.seen:
 				return true
 	return false
-
-
-## "<task id>:<level>": how saves name one level of a task.
-static func key(task: Task, level: int) -> String:
-	return "%s:%d" % [task.id, level]
 
 
 ## Where [param where] is in the room: the table, or [constant BEHIND] metres
@@ -164,7 +138,7 @@ func _facing(where: Place) -> bool:
 
 
 ## Unfolds [member place]'s menu, the guide pointing to anything new elsewhere,
-## and waits for a task and level ([Task, int]) or a turn to another place ([Place]).
+## and waits for a task and level ([Task, TaskLevel]) or a turn to another place ([Place]).
 func _choose() -> Array:
 	menu = TaskMenu.new(place, self)
 	App.stage.add_child(menu)
@@ -173,9 +147,10 @@ func _choose() -> Array:
 	menu.place_at(eye, Vector3(to_place.x, 0.0, to_place.z).normalized())
 	menu.chosen.connect(_picked.emit)
 	for task in place.tasks:
-		for level in task.levels.size():
-			if not key(task, level) in seen:
-				seen.append(key(task, level))
+		for level in task.levels:
+			var key := TaskProgress.key(task, level)
+			if not key in App.main.progress.seen:
+				App.main.progress.seen.append(key)
 	Save.request()
 	var elsewhere := _new_elsewhere()
 	if elsewhere:
@@ -188,25 +163,23 @@ func _choose() -> Array:
 	menu.fold()
 	menu = null
 	if picked.size() == 2:
-		Events.report(&"task_chosen", {task = picked[0].id, level = picked[1] + 1})
-		await say("%s, level %d!" % [picked[0].title, picked[1] + 1])
+		var task: Task = picked[0]
+		var level: TaskLevel = picked[1]
+		Events.report(&"task_chosen", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
 	return picked
 
 
-## Records the completed level and saves.
-func _complete(task: Task, level: int) -> void:
-	if not is_done(task, level):
-		var levels: Array = done.get(task.id, [])
-		levels.append(level)
-		done[task.id] = levels
-	Events.report(&"task_done", {task = task.id, level = level + 1})
-	Events.level_won.emit(task.id, level + 1, task.reward_stones)
-	Save.write()
+func _complete(task: Task, level: TaskLevel) -> void:
+	var stones := App.main.progress.complete(task, level)
+	Events.report(&"task_done", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
 	await say(adventure.level_done)
-	await say("You earned %d magic stones!" % task.reward_stones)
+	if stones > 0:
+		await say("You earned %d magic stones!" % stones if stones != 1 else "You earned one magic stone!")
 
 
 ## Says [param text] and waits about as long as it takes to hear it.
 func say(text: String) -> void:
+	if text.is_empty():
+		return
 	Events.say(text)
 	await get_tree().create_timer(clampf(text.length() * 0.06, 1.5, 6.0), false).timeout
