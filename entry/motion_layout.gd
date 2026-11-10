@@ -231,13 +231,26 @@ const COHERENCE_PRESETS := [90, 70, 50, 30, 15]
 const COHERENCE_PRESET_WIDE := 0.068
 const COHERENCE_STEP_WIDE := 0.11
 
+## Where the old DEV jump panel stood (70° to the child's left, 0.5 m out, eye height). Wei moved
+## the jumps into the facilitator Tools on Nov 9 and removed EntryLayout.dev_spot; the coherence
+## control keeps the same place, so nothing moves on screen.
+const DEV_ANCHOR_ANGLE := 70.0
+const DEV_ANCHOR_DISTANCE := 0.5
+
+
+static func dev_anchor(head: Transform3D) -> Vector3:
+	var flat := Vector3(-head.basis.z.x, 0.0, -head.basis.z.z).normalized()
+	return head.origin + flat.rotated(Vector3.UP, deg_to_rad(DEV_ANCHOR_ANGLE)) * DEV_ANCHOR_DISTANCE
+
+
 static func coherence_row(head: Transform3D, row: int) -> Vector3:
-	return EntryLayout.dev_spot(head, false) + Vector3.UP * (-0.255 - 0.055 * row)
+	return dev_anchor(head) + Vector3.UP * (-0.255 - 0.055 * row)
 
 
 static func coherence_spot(head: Transform3D, row: int, column: int, columns: int, wide: float) -> Vector3:
 	var middle := coherence_row(head, row)
-	var across := EntryLayout._across(head, middle)
+	var to := Vector3(middle.x - head.origin.x, 0.0, middle.z - head.origin.z).normalized()
+	var across := to.cross(Vector3.UP).normalized()
 	return middle + across * (column - (columns - 1) * 0.5) * (wide + 0.008)
 
 

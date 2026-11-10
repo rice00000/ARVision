@@ -227,7 +227,7 @@ func _more_shelf() -> void:
 	SceneMarker.show_text("Shelf, level %d" % (_shelf_level + 1))
 	Tidy.onion_voice = false
 	if _shelf_level < SHELF_TASK.levels.size():
-		await App.session.play(SHELF_TASK.levels[_shelf_level])
+		await App.session.play(SHELF_TASK.levels[_shelf_level].plan)   # Wei: levels are TaskLevels (Nov 9)
 		_shelf_level += 1
 
 

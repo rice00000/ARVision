@@ -328,7 +328,7 @@ func test_the_coherence_control_maps_levels_like_weis_axis() -> void:
 			var other := EntryMotionLayout.coherence_spot(head, 1, j, 5, EntryMotionLayout.COHERENCE_PRESET_WIDE)
 			expect(spot.distance_to(other) > EntryMotionLayout.COHERENCE_PRESET_WIDE, "presets %d and %d do not touch" % [i, j])
 	# Clear of the jump buttons above (the lowest row of the jump panel ends about 17 cm under its middle).
-	expect(EntryMotionLayout.coherence_row(head, 0).y < EntryLayout.dev_spot(head, false).y - 0.2, "the readout sits under the jump panel")
+	expect(EntryMotionLayout.coherence_row(head, 0).y < EntryMotionLayout.dev_anchor(head).y - 0.2, "the readout sits under the old jump panel's spot")
 
 
 func test_the_motion_dev_marker_and_coherence_control_build_and_pin_like_the_facilitator() -> void:
