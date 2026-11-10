@@ -53,19 +53,15 @@ const RIPPLE_SECONDS := 5.0
 ## Seconds the cauldron takes to sink away at the reveal (it is gone when the first ring reaches it).
 const CAULDRON_SINK := 0.6
 
-## DEBUG: log the beat and enable desktop interaction checks.
-const DEBUG := true
+## Dev or play (entry/play_mode.gd) replaced the DEBUG, SHOW_HANDS and SKIP_SETUP constants (Nov 10):
+## dev logs the beats, shows the hand outlines, what setup found and a "Skip setup" button; setup
+## itself runs in both modes.
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
 const TEST_SPEED := 1.0
 ## TESTING: before the opening, show where the table was found and ask to confirm it
 ## (or point at the real table and pinch).
 const CONFIRM_TABLE := true
-## TESTING: a rough line outline of each tracked hand (headset only).
-const SHOW_HANDS := true
-## TESTING: skip the four setup steps (the table is the one found, reach and sound are the
-## defaults) and go straight to the Start screen. Tests turn it off ([member skip_setup]).
-const SKIP_SETUP := true
 ## The build chat's first guess at Onion's waiting behaviour in the Tap beat (gaze to the rim and
 ## back). Megan did not like it; off until the story chat decides the staging.
 const TAP_STAGING := false
@@ -145,7 +141,11 @@ var _show_hands_now := false        # the hands step shows the outlines even wit
 var shelf_push := SHELF_PUSH
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
-var skip_setup := SKIP_SETUP
+## Skip the four setup steps (the table is the one found, reach and sound are the defaults) and go
+## straight to the Start screen. Setup runs in both modes (Megan, Nov 8): only the tests skip it by
+## default (a test hook; the entry tests turn it back on), and a dev tester can press "Skip setup".
+var skip_setup := PlayMode.testing_now()
+var _skip_rest_of_setup := false    # dev: "Skip setup" was pressed
 ## Plan the room when Start (or a jump) is pressed: the child is seated then. Tests that look at the room
 ## before pressing anything turn it off.
 var plan_at_start := true
@@ -214,6 +214,7 @@ func run() -> void:
 	_runner = PartRunner.new()
 	add_child(_runner)
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
+	PlayMode.log_start()   # every session records dev / play
 	SceneMarker.show_text("Opening")
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _cauldron_touches_enabled() and target == _cauldron_target:
@@ -336,8 +337,9 @@ func _placement_summary() -> void:
 		source, snappedf(eye.y - table.transform.origin.y, 0.01), snappedf(Vector2(to_table.x, to_table.z).length(), 0.01),
 		roundi(table_yaw), table.size, roundi(fposmod(axis + 45.0, 90.0) - 45.0), snappedf(eye.y, 0.01), snappedf(_layout.reach_used(), 0.01)]
 	print("ENTRY ", line)
-	if DEBUG:
+	if PlayMode.is_dev():
 		_beat(line)
+		SceneMarker.show_detail("ENTRY " + line)   # what setup found, on screen for the tester
 
 
 ## Plays [param part] on [param runner]; it never gets to the end if the runner is freed.
@@ -642,9 +644,10 @@ func _setup() -> void:
 	_panel = SetupPanel.new()
 	add_child(_panel)
 	_panel.place(App.head().global_transform)
+	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())   # the adult's Mode toggle; dev adds "Skip setup"
 	if skip_setup:
 		_panel.hide_all()
-		print("ENTRY setup: skipped (SKIP_SETUP)")
+		print("ENTRY setup: skipped (tests)")
 		return
 	var skipped := await _step_hands()
 	if not skipped and CONFIRM_TABLE:
@@ -819,7 +822,7 @@ func _choose_part() -> StringName:
 ## The first setup answer, or &"skip" when Tools queued a jump.
 func _take_press(ids: Array) -> StringName:
 	if get_tree().paused: return &""
-	if _queued_part != &"": return &"skip"
+	if _queued_part != &"" or _skip_rest_of_setup: return &"skip"
 	var result := &""
 	for id in _presses:
 		if id in ids:
@@ -928,6 +931,18 @@ func _wait(seconds: float) -> void:
 func _on_target(target: Target) -> void:
 	if get_tree().paused:
 		return
+	if target != null and target.id == &"entry_mode":   # the setup panel's Mode toggle (adult)
+		(target.get_parent() as EntryButton).flash()
+		PlayMode.toggle()
+		if _panel != null and is_instance_valid(_panel):
+			_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
+		print("ENTRY mode: ", PlayMode.name(), " (toggle)")
+		return
+	if target != null and target.id == &"entry_skip_setup":   # dev: straight to Start
+		(target.get_parent() as EntryButton).flash()
+		_skip_rest_of_setup = true
+		print("ENTRY setup: skip pressed")
+		return
 	if target != null and target.id == &"entry_part_all":
 		(target.get_parent() as EntryButton).flash()
 		jump_to(&"all")
@@ -943,7 +958,7 @@ func _on_target(target: Target) -> void:
 		return
 	if target == null or target.id != &"entry_cauldron" or not (_cue or _tap_open):
 		return
-	if DEBUG:
+	if PlayMode.is_dev():
 		print("ENTRY touched: ", target.id)
 	# Touch feedback (tracked hands can't vibrate): Wei's Feedback module plays a
 	# sound and shows a mark where the touch landed.
@@ -954,7 +969,7 @@ func _on_target(target: Target) -> void:
 
 func _beat(text: String) -> void:
 	beat = text
-	if DEBUG: print("ENTRY beat ", text)
+	if PlayMode.is_dev(): print("ENTRY beat ", text)
 
 
 # --- DESKTOP: moving the head ------------------------------------------------
@@ -1235,6 +1250,10 @@ func _step_table() -> bool:
 	var table := App.reality.work_surface()
 	var real := App.reality.surfaces(&"table").has(table)
 	var outline := _outline(table, real)
+	if PlayMode.is_dev():   # what setup found: every other table too, in grey, with its distance
+		for other in App.reality.surfaces(&"table"):
+			if other != table:
+				outline.add_child(_other_outline(other))
 	print("ENTRY table: ", "found" if real else "NONE found: a virtual patch", " at ", snappedf(eye.origin.y - table.transform.origin.y, 0.01),
 			" m below the eyes, ", _away(table.transform.origin), " m away, size ", table.size)
 	_table_panel(table, real)
@@ -1365,6 +1384,25 @@ func _outline(table: Surface, real: bool) -> Node3D:
 	var words := Label3D.new()
 	words.text = "table found" if real else "no table: pretend one"
 	words.font_size = 32
+	words.pixel_size = 0.0007
+	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	words.position = Vector3.UP * 0.06
+	sheet.add_child(words)
+	return sheet
+
+
+## DEV: another table setup found (not the one chosen): a grey sheet named with its distance.
+func _other_outline(other: Surface) -> Node3D:
+	var sheet := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = other.size
+	plane.material = _material(Color(0.7, 0.7, 0.75, 0.18), true)
+	sheet.mesh = plane
+	sheet.top_level = true
+	sheet.transform = other.transform.translated_local(Vector3.UP * 0.004)
+	var words := Label3D.new()
+	words.text = "other table, %s m" % _away(other.transform.origin)
+	words.font_size = 28
 	words.pixel_size = 0.0007
 	words.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	words.position = Vector3.UP * 0.06
@@ -1649,7 +1687,7 @@ func _process(delta: float) -> void:
 	_move_head(delta)
 	if App.rig != null:
 		_poke_cauldron()
-	if SHOW_HANDS or _show_hands_now:
+	if PlayMode.is_dev() or _show_hands_now:
 		_draw_hands()
 	if _aiming:
 		_aim()
@@ -2521,7 +2559,7 @@ func _onion_closer(origin: Vector3, line: Vector3, cauldron_ratio: float) -> boo
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if DEBUG and event is InputEventKey and event.pressed and not event.echo and event.keycode == TRY_CARRY_KEY:
+	if PlayMode.is_dev() and event is InputEventKey and event.pressed and not event.echo and event.keycode == TRY_CARRY_KEY:
 		_try_carry()
 
 

@@ -17,7 +17,6 @@ const BREATH := 0.25
 const SETTLE := 1.8
 const QUIET_END := 3.0
 ## DEV: buttons that set the coherence of the next rounds (pinning the level, so it is logged).
-const DEV_COHERENCE := true
 const COHERENCES := [0.9, 0.7, 0.5, 0.3, 0.15]
 
 @export var plan: SessionPlan
@@ -78,7 +77,7 @@ func run_motion() -> void:
 	_in_motion = true
 	_rounds_ended = 0
 	_rounds_won = 0
-	if DEV_COHERENCE:
+	if PlayMode.is_dev():   # dev mode only (entry/play_mode.gd)
 		_dev = EntryMotionDev.new()   # chat C: readout + buttons that pin the level (logged)
 		add_child(_dev)
 		_dev.set_scene(&"Motion")

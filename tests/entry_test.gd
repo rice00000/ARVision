@@ -522,9 +522,43 @@ func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_t
 	expect(not _said_line(said, "The shapes on the shelf show where things go."), "and the rule (the child is already playing)")
 
 
+func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
+	expect(PlayMode.is_dev(), "the tests run in dev")
+	var reports := record(Events.reported)
+	await _boot_entry()
+	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "dev"),
+		"the session logs its mode")
+	expect(await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0), "setup runs (step 1)")
+	expect(_target(&"entry_mode") != null, "the setup panel has the Mode toggle")
+	expect(_target(&"entry_skip_setup") != null, "dev: and a Skip setup button")
+	await _press(&"entry_skip_setup")
+	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0), "Skip setup goes straight to Start")
+	await _press(&"entry_mode")
+	expect(not PlayMode.is_dev(), "the toggle switches to play")
+	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "play"),
+		"the switch is logged")
+	expect(await until(func() -> bool: return _target(&"entry_skip_setup") == null, 5.0), "play: no Skip setup")
+	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
+	expect(marker == null or not marker.visible, "play: no scene marker")
+	await _press(&"entry_mode")
+	expect(PlayMode.is_dev(), "and back to dev")
+	marker = App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
+	expect(marker != null and marker.visible, "dev: the scene marker is back")
+
+
+func test_under_the_test_runner_the_mode_is_dev_and_setup_is_skipped_by_default() -> void:
+	PlayMode.reset_for_tests()
+	expect(PlayMode.testing_now(), "the runner's --profile=test is seen")
+	expect(PlayMode.is_dev(), "tests are always dev")
+	expect_eq(PlayMode.source(), "tests", "whatever was saved on the device")
+	await boot(null, &"intro")
+	expect((app.get_node(^"Intro/Entry") as Entry).skip_setup, "tests skip setup unless they turn it on (the test hook)")
+
+
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
 func shutdown() -> void:
 	await super.shutdown()
+	PlayMode.set_dev(true, "tests")
 	Tidy.onion_voice = false
 	Motion.onion_voice = false
 	Engine.time_scale = 1.0
