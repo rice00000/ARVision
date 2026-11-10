@@ -828,7 +828,7 @@ func test_the_real_opening_configures_carry_and_the_gear_docks_in_its_socket() -
 	await wait(0.5)
 	input.press(&"right", &"trigger_click", false)
 	await until(func() -> bool: return not docked.is_empty(), 3.0)
-	expect(real_gear.global_position.distance_to(real_socket) < 0.002, "docked in the real socket")
+	expect(real_gear.global_position.distance_to(entry.call("_seat_at")) < 0.002, "docked in the real socket (down in it)")
 	expect(absf(angle_difference(real_gear.global_basis.get_euler().y, (entry.get("_mechanism") as Node3D).rotation.y)) < 0.01, "turned to the panel like the story's own dock")
 
 
@@ -1087,7 +1087,7 @@ func test_a_child_who_sets_the_gear_in_while_onion_talks_is_not_asked_to() -> vo
 	expect(not _line_said(said, "Set it in here, then open your fingers."), "and does not ask for it")
 	expect((entry.get("_sounds") as Sounds).played.has(&"seat"), "but still finishes the seating (the click)")
 	expect(not (entry.get("_demo") as DemoHand).visible and not _glowing(entry), "no hand, no glow")
-	expect(real_gear.global_position.distance_to(socket_at) < 0.01, "the gear is in the socket")
+	expect(real_gear.global_position.distance_to(entry.call("_seat_at")) < 0.01, "the gear is in the socket (down in it)")
 
 
 func test_tracking_lost_while_carrying_in_the_set_in_beat_sets_it_down_and_the_beat_waits() -> void:

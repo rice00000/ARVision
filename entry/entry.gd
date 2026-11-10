@@ -603,27 +603,17 @@ func _reveal(fast := false) -> void:
 	await say("Welcome to the workshop.")
 	if not fast:
 		await _wait(1.0)   # a short quiet pause (was 3 s: Megan)
-	# The shapes arrived with the shelf (the ripple showed them): Onion notices them and floats
-	# closer, explains, and invites the child (story chat's approved replacement; Megan: in the reveal).
-	# (layout chat: toward the MIDDLE OF THE THINGS on the bench, as far as EntryLayout.invite_fraction says: 30%, or less
-	# where that would put Onion in the shelf's, the things' or the bench's way. It used the shelf node's own origin.)
-	var things := _layout.things_centre()
-	_attend(things)
-	_actions.lean_to(_runner, 0.2, 0.8)
-	_move(_orb, _layout.onion_invite if _orb.global_position.distance_to(_layout.onion_reveal) < 0.06 else _orb.global_position.lerp(Vector3(things.x, _orb.global_position.y, things.z), _layout.invite_fraction), 1.0)
-	await say("Oh! I'd nearly forgotten about these.")
-	await say("They've come quite a long way.")
-	_actions.lean_to(_runner, 0.0, 0.6)
-	_attend(_shelf)   # looks across the shapes, then toward the shelf
-	await say("The house is very good at bringing things here.")
-	await say("But finding their place is usually my job.")
-	_attend(null)   # turns toward the child
-	await say("You could join me, if you like.")
+	# The shapes arrived with the shelf (the ripple showed them). Onion's noticing and invitation lines
+	# ("Oh! I'd nearly forgotten about these." ... "You could join me, if you like.") moved to
+	# first_visit.gd on Nov 10 (Megan): there the shelf level is already running, so the child can pick
+	# the shapes up and sort while Onion talks. Its float toward the shapes moved with them.
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
 func _to_shelf(fast := false) -> void:
 	_beat("5: to the shelf")
+	if FirstVisit.start_with != &"motion":
+		FirstVisit.invite = true   # Onion notices the shapes and invites, with the level already running
 	if FIRST_THINGS and _first_seed != 0:   # the real trial makes the same things, already in place
 		ShelfCopy.seed_next = _first_seed
 		ShelfCopy.things_arrive = false
@@ -1760,6 +1750,14 @@ const TRACK_GROW := 0.7
 const TRACK_SPEED := 0.3
 const TRACK_FADE := 0.8
 const SOCKET_Z := 0.026
+## How much of the docked gear's height goes down INTO the table (Megan, Nov 10: "into the table instead
+## of sitting on top"). The dark step inside the ring hides the part below the surface; on a headset a
+## ring of "real table" (passthrough holdout, like Wei's hand reveal) round the socket hides it from a
+## low view too. 0 = sitting on top as before.
+const SOCKET_SINK := 0.6
+## How far out round the socket the holdout reaches, metres (beyond the brass lip).
+const SINK_HOLDOUT := 0.12
+const HOLDOUT_SHADER := preload("res://rig/hand_reveal.gdshader")
 ## Where the little cog turns, behind the socket (the panel node's own z, metres).
 const COG_Z := -0.074
 
@@ -1793,6 +1791,7 @@ func _build_gear() -> void:
 	_carry = Carry.new()
 	_carry.name = "Carry"
 	add_child(_carry)
+	_carry.seat_depth = _seat_depth()   # it docks down in the socket (SOCKET_SINK)
 	_demo = DemoHand.new()
 	_demo.name = "DemoHand"
 	add_child(_demo)
@@ -1859,6 +1858,36 @@ func _cogwheel(radius: float, teeth: int, material: Material) -> Node3D:
 	return wheel
 
 
+## Metres the docked gear sits below the table's surface (SOCKET_SINK of its playing height).
+func _seat_depth() -> float:
+	return _gear_height * GEAR_PLAY_SCALE * SOCKET_SINK
+
+
+## Where the docked gear's base is: down in the socket, below the table's surface.
+func _seat_at() -> Vector3:
+	return _socket_at + Vector3.DOWN * _seat_depth()
+
+
+## A flat ring at the table's surface round the socket that lets the real table show through wherever
+## something virtual is behind it (below the surface): the sunken part of the gear can't be seen past
+## the socket's edge from a low view. Headset only (on a desktop the simulated table does this).
+func _socket_holdout() -> MeshInstance3D:
+	var ring := MeshInstance3D.new()
+	ring.name = "SocketHoldout"
+	var mesh := TorusMesh.new()   # flattened to a disc with a hole: the socket's ring stays open
+	mesh.inner_radius = SOCKET_RADIUS + 0.008
+	mesh.outer_radius = SOCKET_RADIUS + 0.008 + SINK_HOLDOUT
+	mesh.rings = 48
+	var material := ShaderMaterial.new()
+	material.shader = HOLDOUT_SHADER
+	mesh.material = material
+	ring.mesh = mesh
+	ring.scale = Vector3(1.0, 0.001, 1.0)
+	ring.position = Vector3(0, -0.0003, SOCKET_Z)
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return ring
+
+
 ## The table panel, shallow, with the socket for the gear and a little window showing a cog
 ## that turns when the gear is in. Lies on the table where it is clear of the cauldron and the
 ## shelf, facing the child. The ripple will start from its socket.
@@ -1913,6 +1942,8 @@ func _build_mechanism() -> void:
 	_mech_spin = GearSpin.new()
 	_mechanism.add_child(_mech_spin)
 	_mech_spin.add(_cog, 1.2)
+	if App.has_passthrough():
+		_mechanism.add_child(_socket_holdout())
 	_socket_at = _mechanism.to_global(Vector3(0, PANEL.y, SOCKET_Z))
 	_ripple_origin = _socket_at
 	# Where the gear lands: beside the cauldron, clear of it and the panel, in reach (EntryLayout).
@@ -1947,7 +1978,7 @@ func _make_way(seconds := 1.2, back := false) -> void:
 	var lifted := _orb.global_position.distance_to(from_lifted) < 0.05
 	var orb_goes := lifted or _orb.global_position.distance_to(from_aside) < 0.05
 	var orb_to := _lifted_spot() if lifted else _aside_spot()
-	var gear_goes := is_instance_valid(_gear) and _gear.visible and _gear.global_position.distance_to(_socket_at) < 0.02
+	var gear_goes := is_instance_valid(_gear) and _gear.visible and _gear.global_position.distance_to(_seat_at()) < 0.02
 	if _zones != null and is_instance_valid(_zones):
 		_zones.draw(_layout, EntryLayout.REVEAL | EntryLayout.SHELF if _made_way else EntryLayout.SETUP | EntryLayout.OPENING)
 	_socket_at = _layout.socket if back else _layout.socket_after
@@ -1960,7 +1991,7 @@ func _make_way(seconds := 1.2, back := false) -> void:
 		_mechanism.global_position = plate
 		_mechanism.rotation.y = yaw
 		if gear_goes:
-			_gear.global_position = _socket_at
+			_gear.global_position = _seat_at()
 			_gear.rotation.y = yaw
 		if orb_goes:
 			_orb.global_position = orb_to
@@ -2002,7 +2033,7 @@ func _socket_track(from: Vector3, new_origin: Vector3, yaw: float, gear_goes: bo
 	carriage.tween_method(func(k: float) -> void: _mechanism.rotation.y = lerp_angle(start_yaw, yaw, k), 0.0, 1.0, seconds)
 	if gear_goes:
 		var gear_yaw := _gear.rotation.y
-		carriage.tween_property(_gear, "global_position", to, seconds)
+		carriage.tween_property(_gear, "global_position", _seat_at(), seconds)   # down in the socket
 		carriage.tween_method(func(k: float) -> void: _gear.rotation.y = lerp_angle(gear_yaw, yaw, k), 0.0, 1.0, seconds)
 	if orb_goes:
 		carriage.tween_property(_orb, "global_position", orb_to, seconds)
@@ -2045,7 +2076,7 @@ func _dock_gear() -> void:
 	var from := _gear.global_position
 	var tween := _runner.create_tween()
 	tween.tween_method(func(k: float) -> void:
-		_gear.global_position = from.lerp(_socket_at, k) + Vector3.UP * 0.05 * 4.0 * k * (1.0 - k)
+		_gear.global_position = from.lerp(_seat_at(), k) + Vector3.UP * 0.05 * 4.0 * k * (1.0 - k)
 		_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE, 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
 	_dock_at_once()
@@ -2056,7 +2087,7 @@ func _dock_gear() -> void:
 func _dock_at_once() -> void:
 	_gear.visible = true
 	_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE
-	_gear.global_position = _socket_at
+	_gear.global_position = _seat_at()
 	_gear.rotation = Vector3(0.0, _mechanism.rotation.y, 0.0)
 	_gear_spin.running = true
 	_mech_spin.running = true

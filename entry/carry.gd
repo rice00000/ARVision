@@ -80,6 +80,8 @@ var _state := State.IDLE
 var _gear: Node3D
 var _spin: GearSpin
 var _socket_at := Vector3.ZERO
+## How far below the socket's surface point the docked gear's base sits (entry.gd SOCKET_SINK), metres.
+var seat_depth := 0.0
 var _side: StringName = &"right"
 var _offset := Transform3D.IDENTITY   # the gear in the pinch's own frame, at pick-up
 var _scale := Vector3.ONE
@@ -376,7 +378,7 @@ func _dock() -> void:
 	var size := from.basis.get_scale()
 	var high := maxf(from.origin.y - _socket_at.y - 0.08, 0.0)
 	var seconds := clampf(ALIGN_SECONDS + high * 2.0, ALIGN_SECONDS, 0.7)
-	var socket := _socket_at
+	var socket := _socket_at + Vector3.DOWN * seat_depth   # the gear goes down into the socket
 	_tween = create_tween()
 	_tween.tween_method(func(k: float) -> void:
 		if _gear_ok():

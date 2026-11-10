@@ -76,8 +76,8 @@ func _touch_cauldron() -> void:
 ## The gear stands in the socket and is turning.
 func _docked() -> bool:
 	var gear: Node3D = entry.get("_gear")
-	var socket: Vector3 = entry.get("_socket_at")
-	return gear.visible and gear.global_position.distance_to(socket) < 0.01 and (entry.get("_gear_spin") as GearSpin).running
+	var seat: Vector3 = entry.call("_seat_at")   # down in the socket (SOCKET_SINK, Nov 10)
+	return gear.visible and gear.global_position.distance_to(seat) < 0.01 and (entry.get("_gear_spin") as GearSpin).running
 
 
 func _shown(entry_details: Array) -> int:
@@ -505,6 +505,21 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
+
+
+func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_talk() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await jump_to_intro_part(&"shelf")
+	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes in the shelf part")
+	expect_eq(App.main.current_scene, &"first_visit", "the invitation plays in the shelf scene")
+	var trial := App.session.trial
+	expect(trial != null and trial.is_running(), "the shelf round is already running: shapes can be picked up while Onion talks")
+	Events.report(&"taken", {})   # the child picks a shape up
+	await wait(12.0)
+	expect(not _said_line(said, "You could join me, if you like."), "a pick-up ends the invitation")
+	expect(not _said_line(said, "The shapes on the shelf show where things go."), "and the rule (the child is already playing)")
 
 
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
