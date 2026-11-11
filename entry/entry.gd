@@ -1788,11 +1788,12 @@ const TRACK_GROW := 0.7
 const TRACK_SPEED := 0.3
 const TRACK_FADE := 0.8
 const SOCKET_Z := 0.026
-## How much of the docked gear's height goes down INTO the table (Megan, Nov 10: "into the table instead
-## of sitting on top"). The dark step inside the ring hides the part below the surface; on a headset a
-## ring of "real table" (passthrough holdout, like Wei's hand reveal) round the socket hides it from a
-## low view too. 0 = sitting on top as before.
-const SOCKET_SINK := 0.6
+## How far the docked gear goes down INTO the table, metres (Megan, Nov 10: "into the table instead of
+## sitting on top", then "I just want it to be visible"). Only its base plate drops into the recess; the
+## ring, planets and sun stay above the surface, turning. The dark step inside the ring hides the part below
+## the surface; on a headset a ring of "real table" (passthrough holdout) round the socket hides it from a
+## low view too. 0 = sitting on top as before. (60 % of its height hid the whole gear: only the shaft showed.)
+const SOCKET_SINK := 0.008
 ## How far out round the socket the holdout reaches, metres (beyond the brass lip).
 const SINK_HOLDOUT := 0.12
 const HOLDOUT_SHADER := preload("res://rig/hand_reveal.gdshader")
@@ -1896,9 +1897,9 @@ func _cogwheel(radius: float, teeth: int, material: Material) -> Node3D:
 	return wheel
 
 
-## Metres the docked gear sits below the table's surface (SOCKET_SINK of its playing height).
+## Metres the docked gear sits below the table's surface (SOCKET_SINK).
 func _seat_depth() -> float:
-	return _gear_height * GEAR_PLAY_SCALE * SOCKET_SINK
+	return SOCKET_SINK
 
 
 ## Where the docked gear's base is: down in the socket, below the table's surface.

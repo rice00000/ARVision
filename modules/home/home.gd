@@ -4,6 +4,14 @@ extends Module
 const GAMES := [&"find_object", &"global_motion"]
 ## Above the work surface so a ray toward a table object misses the menu.
 const ENTRY_OFFSET := Vector3(0.30, 0.09, -0.49)
+## Megan, Nov 10: the Menu button stays at the TOP LEFT of the view (head-relative, about 24 deg left and
+## 15 deg up, 0.5 m away), following the head gently instead of being left in the room and re-placed.
+## It is still well above the work surface, so a ray at a table object misses it.
+const ENTRY_VIEW_OFFSET := Vector3(-0.22, 0.13, -0.5)
+## How quickly it catches up with the head (1/s); a big jump (a recentre) snaps.
+const ENTRY_FOLLOW := 6.0
+## How far in front of the eyes the menu panel opens, metres (was 0.48; the panel scales to look the same size).
+const MENU_DISTANCE := 0.34
 ## Each browsing page and the page that confirms its purchase.
 const TITLES := {&"room": "MY ROOM", &"shop": "FURNITURE", &"rooms": "ROOMS", &"pets": "PETS", &"bag": "MY THINGS",
 	&"confirm_item": "BUY?", &"confirm_room": "BUY?", &"confirm_pet": "BUY?"}
@@ -24,6 +32,7 @@ var _hover: Target
 var _hover_seconds := 0.0
 var _entry_frame := Transform3D.IDENTITY
 var _offscreen := 0.0
+var _wallet := Node3D.new()   # the magic stones the child has, beside the Menu button (Megan, Nov 10)
 
 
 func _ready() -> void:
@@ -32,6 +41,11 @@ func _ready() -> void:
 	_entry.show_ray = false
 	_entry.collision_layer = Pointer.UI_LAYER
 	_entry_face = (_entry.get_node(^"Face") as MeshInstance3D).material_override as StandardMaterial3D
+	_wallet.name = "Wallet"
+	_wallet.position = Vector3(0.115, 0.0, 0.0)   # just right of the button
+	_entry.add_child(_wallet)
+	Events.inventory_changed.connect(_update_wallet)
+	_update_wallet.call_deferred()
 	_entry_face.render_priority = 5
 	for text: Label3D in _entry.find_children("*", "Label3D", false, false):
 		text.render_priority = 6
@@ -49,11 +63,24 @@ func _ready() -> void:
 	_anchor_entry.call_deferred()
 
 
+## The stone and the number of magic stones beside the Menu button (nothing if there is no Inventory).
+func _update_wallet() -> void:
+	for child in _wallet.get_children():
+		child.queue_free()
+	var inventory := App.module(&"Inventory")
+	if inventory == null:
+		return
+	HomeUI.stones(_wallet, inventory.count(&"magic_stone"), Vector3(0.03, 0.0, 0.0))
+	for text: Label3D in _wallet.find_children("*", "Label3D", true, false):
+		text.no_depth_test = true   # readable over whatever is behind it
+		text.render_priority = 20
+
+
 func _anchor_entry() -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
 	_entry_frame = Transform3D(Basis.looking_at(forward), eye.origin)
-	_offscreen = 0.0
+	_offscreen = -1.0   # the next frame places it at the top left of the view at once
 
 
 func open() -> void:
@@ -65,8 +92,10 @@ func open() -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
 	var height := clampf(-eye.basis.z.y * 0.48, -0.16, 0.16) - 0.035
-	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8),
-		eye.origin + forward * 0.48 + Vector3.UP * height)
+	# Megan, Nov 10: at 0.48 m the shelf (and the bench's shapes) stood in front of the panel and cut through
+	# its buttons. Nearer, at the same apparent size, it stays in front of what is on the table.
+	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8 * MENU_DISTANCE / 0.48),
+		eye.origin + forward * MENU_DISTANCE + Vector3.UP * height * MENU_DISTANCE / 0.48)
 	_panel.visible = true
 	_show(&"menu")
 	Events.say("Point and pinch to keep playing, choose a game, or visit your room.")
@@ -291,10 +320,14 @@ func _process(delta: float) -> void:
 	_update_entry()
 	if _entry.visible:
 		var eye := App.head().global_transform
-		var toward := (_entry_frame * ENTRY_OFFSET - eye.origin).normalized()
-		_offscreen = _offscreen + delta if toward.dot(-eye.basis.z) < 0.17 else 0.0
-		if _offscreen > 0.8 or eye.origin.distance_to(_entry_frame.origin) > 0.35:
-			_anchor_entry()
+		var goal := eye * ENTRY_VIEW_OFFSET
+		var facing := Basis.looking_at(goal - eye.origin, Vector3.UP)   # its face (+z) toward the eye, kept level
+		if _offscreen < 0.0 or _entry_frame.origin.distance_to(goal) > 0.4:
+			_entry_frame = Transform3D(facing, goal)   # first frame, or a recentre: straight there
+		else:
+			var k := 1.0 - exp(-ENTRY_FOLLOW * delta)
+			_entry_frame = Transform3D(_entry_frame.basis.orthonormalized().slerp(facing, k), _entry_frame.origin.lerp(goal, k))
+		_offscreen = 0.0
 		var slot := App.player_menu_slot()
 		var in_header := slot != null
 		# Draw above the panel backing only while the button is in its header.
@@ -302,7 +335,7 @@ func _process(delta: float) -> void:
 			_entry_face.no_depth_test = in_header
 			for text: Label3D in _entry.find_children("*", "Label3D", false, false):
 				text.no_depth_test = in_header
-		_entry.global_transform = slot.global_transform if slot else _entry_frame.translated_local(ENTRY_OFFSET)
+		_entry.global_transform = slot.global_transform if slot else _entry_frame
 	if _preview: _preview.rotation.y += delta * 0.18
 	var near: Target
 	for side in [&"left", &"right"]:

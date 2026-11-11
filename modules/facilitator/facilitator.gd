@@ -134,6 +134,10 @@ func _activate() -> void:
 		Events.intro_jump_requested.emit(StringName(String(target.id).trim_prefix("fac_jump_")))
 		return
 	match target.id:
+		&"fac_mode":
+			PlayMode.toggle("staff tools")
+			(_pages[&"Tools"].get_node(^"fac_mode/Caption") as Label3D).text = "Mode: " + PlayMode.name()
+			print("ENTRY mode: ", PlayMode.name(), " (staff tools)")
 		&"fac_scenes":
 			_show(&"Scenes")
 		&"fac_easier":
@@ -325,6 +329,8 @@ func _build() -> void:
 		var part: String = parts[i]
 		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.041),
 			Vector2(-0.095 + 0.19 * (i % 2), 0.06 - 0.047 * floori(i / 2.0)), tools)
+	# Megan, Nov 10: the dev / play switch where the adult's other controls are (beside "Dots").
+	_button("fac_mode", "Mode: " + PlayMode.name(), Vector2(0.18, 0.041), Vector2(0.095, 0.06 - 0.047 * 4.0), tools)
 	_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
 	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022, -0.16), tools)
 	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127, -0.16), tools)

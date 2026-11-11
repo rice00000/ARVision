@@ -555,6 +555,54 @@ func test_under_the_test_runner_the_mode_is_dev_and_setup_is_skipped_by_default(
 	expect((app.get_node(^"Intro/Entry") as Entry).skip_setup, "tests skip setup unless they turn it on (the test hook)")
 
 
+func test_a_shape_can_be_taken_while_onion_invites() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	var reports := record(Events.reported)
+	await jump_to_intro_part(&"shelf")
+	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes")
+	var trial := App.session.trial
+	var thing: Target = (trial.get("_things") as Array)[0]
+	var at := thing.global_position
+	var along := (at - (App.head().global_position + Vector3.DOWN * 0.2)).normalized()
+	input.point(&"right", at - along * App.rig.pointer(&"right").tip_reach, at)
+	await frames(3)
+	input.press(&"right", &"trigger_click", true)
+	await frames(3)
+	expect(reports.any(func(a: Array) -> bool: return a[0] == &"taken"), "a hand takes a shape while Onion talks")
+	input.press(&"right", &"trigger_click", false)
+
+
+## On a laptop the mouse hand sits 45 cm out and the shapes are further: a click on one reaches it (Nov 10).
+func test_on_desktop_a_click_on_a_shape_takes_it() -> void:
+	get_window().size = Vector2i(1280, 800)   # headless windows start tiny
+	Input.use_accumulated_input = false
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	var reports := record(Events.reported)
+	await jump_to_intro_part(&"shelf")
+	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes")
+	var trial := App.session.trial
+	var thing: Target = (trial.get("_things") as Array)[0]
+	await frames(2)
+	var cursor := App.head().unproject_position(thing.global_position)
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	event.position = cursor
+	event.global_position = cursor
+	Input.parse_input_event(event)
+	await frames(3)
+	expect(App.head().global_position.distance_to(thing.global_position) > 0.5, "the shape is beyond the usual 45 cm (%.2f m)" % App.head().global_position.distance_to(thing.global_position))
+	expect(reports.any(func(a: Array) -> bool: return a[0] == &"taken"), "a mouse click on the shape takes it")
+	var up := event.duplicate() as InputEventMouseButton
+	up.pressed = false
+	Input.parse_input_event(up)
+	await frames(2)
+
+
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
 func shutdown() -> void:
 	await super.shutdown()
