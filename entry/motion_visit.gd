@@ -37,7 +37,6 @@ var _dev: EntryMotionDev
 
 
 func _ready() -> void:
-	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target))
 	Events.trial_ended.connect(_on_trial_ended)
 
@@ -223,11 +222,14 @@ func _choose() -> StringName:
 
 ## "More to sort": Wei's next shelf level (his own lines this time), then back to the choice.
 func _more_shelf() -> void:
+	var level := SHELF_TASK.levels[_shelf_level]
 	SceneMarker.show_text("Shelf, level %d" % (_shelf_level + 1))
 	Tidy.onion_voice = false
-	if _shelf_level < SHELF_TASK.levels.size():
-		await App.session.play(SHELF_TASK.levels[_shelf_level].plan)   # Wei: levels are TaskLevels (Nov 9)
-		_shelf_level += 1
+	await App.session.play(level.plan)
+	if App.session.won:
+		App.main.progress.complete(SHELF_TASK, level)
+	# After the last level, "More shapes" replays it for its configured repeat reward.
+	_shelf_level = mini(_shelf_level + 1, SHELF_TASK.levels.size() - 1)
 
 
 func _coherence_panel() -> void:
@@ -260,8 +262,6 @@ func _on_press(target: Target) -> void:
 	match target.id:
 		&"visit_more_shelf":
 			_choice = &"shelf"
-		&"visit_motion":
-			_choice = &"motion"
 		&"visit_end_session":
 			Events.report(&"session_ended", {by = "end_session_button"})
 			_clear_buttons()

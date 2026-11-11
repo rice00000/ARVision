@@ -225,13 +225,11 @@ func run() -> void:
 	# Onion moves while any line plays, Wei's too: one voice, one guide.
 	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
-	if &"announce_table" in App.reality:
-		App.reality.announce_table = false
+	App.reality.announce_table = false
 	if not App.reality.is_settled:
 		await App.reality.settled
 	tools_ready = true
 	show_sim_props(false)
-	_ask_for_room_scan()
 	await _setup()
 	# The room is planned from where the child sits when Start (or a jump) is pressed, not from the
 	# headset's pose in the first seconds after launch (the adult putting it on): headset run, Oct 31.
@@ -286,9 +284,9 @@ func _plan_and_build() -> void:
 	_plan_head = App.head().global_transform
 	_planned = true
 	_ahead = Vector3(-_plan_head.basis.z.x, 0.0, -_plan_head.basis.z.z).normalized()
-	_on_table = await _cauldron_on_table()
 	_table = App.reality.work_surface()
-	_pin_table()
+	_on_table = await _cauldron_on_table()
+	App.reality.select_table(_table)
 	# Wei's shelf (here and in the first visit) stands where the plan put the bench, not where the head is.
 	ShelfCopy.shelf_frame = _layout.bench
 	ShelfCopy.shelf_below = _layout.bench_below
@@ -307,27 +305,10 @@ func _head() -> Transform3D:
 	return _plan_head if _planned else App.head().global_transform
 
 
-## Locks the table the plan used (a real one, or the pretend patch frozen where it is now), and stops
-## Reality asking for hands on the table: a table found later must not move the shelf.
-func _pin_table() -> void:
-	var table := App.reality.work_surface()
-	if not App.reality.surfaces(&"table").has(table):   # the pretend patch: freeze it as a table
-		table = Surface.new(&"table", table.transform, table.size)
-	App.reality.select_table(table)   # Wei's hook (Nov 7): replaces the old _pinned workaround
-	if &"_hands_asked" in App.reality:
-		App.reality._hands_asked = false
-
-
-## The Quest's room scan (Space Setup) needs this permission at run time.
-func _ask_for_room_scan() -> void:
-	if OS.get_name() == "Android":
-		OS.request_permission("com.oculus.permission.USE_SCENE")
-
-
 ## One line that says where everything was placed from, for headset runs (adb logcat | grep ENTRY).
 func _placement_summary() -> void:
 	var table := App.reality.work_surface()
-	var real := App.reality.surfaces(&"table").has(table)
+	var real := _layout.real_table
 	var eye := _plan_head.origin
 	var to_table := table.transform.origin - eye
 	var table_yaw := rad_to_deg(Vector2(_ahead.x, _ahead.z).angle_to(Vector2(to_table.x, to_table.z)))
@@ -1186,9 +1167,8 @@ func toggle_zones() -> void:
 ## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
 ## finds the height by depth). A coroutine: the search runs on a worker thread.
 func _cauldron_on_table() -> Variant:
-	var table := App.reality.work_surface()
-	var real := App.reality.surfaces(&"table").has(table)
-	_layout = _new_layout(table, real, _reach_measured)
+	var real := App.reality.surfaces(&"table").has(_table)
+	_layout = _new_layout(_table, real, _reach_measured)
 	# The plan is a search that takes a second or more on the headset: off the main thread, the scene
 	# keeps drawing meanwhile (the layout holds numbers only, no nodes).
 	var started := Time.get_ticks_msec()
@@ -1548,7 +1528,7 @@ func _cauldron_spot() -> Vector3:
 			print("ENTRY spot: real table by depth, ", _away(flat), " m away, ", snappedf(eye.y - (flat as Vector3).y, 0.01), " m below the eyes")
 			return flat
 		await _wait(0.25)
-	if App.reality.surfaces(&"table").has(_table):
+	if _layout.real_table:
 		spot.y = _table.transform.origin.y
 		print("ENTRY spot: at the table's height (depth saw no flat patch there), ", _away(spot), " m away")
 	else:

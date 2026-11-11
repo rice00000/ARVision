@@ -1,5 +1,5 @@
 {
-  "fingerprint": "3aecd360756a577444561187827e3fcc5829b647af99db09d406d665068d740c",
+  "fingerprint": "1769d34094ca651729b026ee5eb0858b7a3186f678ef279c98a0dd4c03e711a2",
   "clips": {
     "0": "res://content/voice/generated/89e11fe5c6b05d702fe71160.ogg",
     "1": "res://content/voice/generated/e03341765602c2c5374a4524.ogg",
@@ -108,8 +108,8 @@
     "is on your": "res://content/voice/generated/47f94b8bed987670616400cd.ogg",
     "it fits": "res://content/voice/generated/587da407116db3e6277145ed.ogg",
     "it fits let's find places for the others": "res://content/voice/generated/92cb9bf77cd5a0344babfa85.ogg",
-    "it's been lovely having you here": "res://content/voice/generated/b695389c51d9321908bdbd53.ogg",
     "it is yours": "res://content/voice/generated/0f1b701cb24c6e195ccfbe75.ogg",
+    "it's been lovely having you here": "res://content/voice/generated/b695389c51d9321908bdbd53.ogg",
     "keyboard": "res://content/voice/generated/c5e4b889e0709e1542a7dd27.ogg",
     "kite": "res://content/voice/generated/b0b18b65016b6835230a70ef.ogg",
     "knife": "res://content/voice/generated/78b5cb414bf9e05a6312f0fa.ogg",
@@ -145,11 +145,11 @@
     "now some dots go the other way sweep with the bigger group": "res://content/voice/generated/04db8dca1ec2a39a54600a94.ogg",
     "now watch the dots sweep your hand the way most of them go": "res://content/voice/generated/fac879268a2ab3711b9eceb6.ogg",
     "now you only see the edges of things": "res://content/voice/generated/53c4695a7c45d87eed1c2d8a.ogg",
-    "oh and they're here": "res://content/voice/generated/9d4754f5ab75f951493bb651.ogg",
     "odd color": "res://content/voice/generated/6e160d9d998cc28de6186b41.ogg",
     "odd color level 1": "res://content/voice/generated/213bca3bef411adaa6babbe8.ogg",
     "odd color level 2": "res://content/voice/generated/1e3e510d66bbba4a77bb272e.ogg",
     "odd color level 3": "res://content/voice/generated/48a95b1d9568a1f4ae9d2b0e.ogg",
+    "oh and they're here": "res://content/voice/generated/9d4754f5ab75f951493bb651.ogg",
     "oh hello there": "res://content/voice/generated/cd44ff5774c5484637e2cf22.ogg",
     "oh i'd nearly forgotten about these": "res://content/voice/generated/35c220142eae71d34fcaae03.ogg",
     "on your": "res://content/voice/generated/56095db4fe7e520890129ecd.ogg",
@@ -284,8 +284,8 @@
     "you earned one magic stone": "res://content/voice/generated/ce8715474ef729f9e81b6926.ogg",
     "your bag is empty point at the chair and pinch to visit the shop": "res://content/voice/generated/43e465079f10f803aace5e2e.ogg",
     "your home point and pinch to choose furniture rooms or decorating": "res://content/voice/generated/a0b30b6bb7e10b9dc5cdc060.ogg",
-    "your turn": "res://content/voice/generated/1927125dc0b9e4042c666826.ogg",
     "your pet likes you more it will find magic stones faster": "res://content/voice/generated/097f3e6bed5dc3349033c7cd.ogg",
+    "your turn": "res://content/voice/generated/1927125dc0b9e4042c666826.ogg",
     "zebra": "res://content/voice/generated/fcc8f345056f8e71b2fdc5b2.ogg"
   }
 }

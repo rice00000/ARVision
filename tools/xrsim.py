@@ -143,6 +143,7 @@ def run(room_json, seconds=8.0, name="run"):
             _wait_for_port(server, SES_PORT)
         frames = int(seconds * 72)  # the simulated Quest 3 runs at 72 Hz
         done = subprocess.run([str(godot.executable(console=True)), "--path", str(godot.ROOT), "--xr-mode", "on",
+                               "--audio-driver", "Dummy",
                                "--quit-after", str(frames), "--", "--profile=test_xrsim"],
                               env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=seconds + 60)

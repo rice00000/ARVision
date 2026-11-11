@@ -1854,7 +1854,7 @@ func test_the_motion_choice_is_chosen_by_a_pinch_aimed_at_it() -> void:
 	expect_eq(chosen.size(), 1, "and only once")
 
 
-func test_the_motion_choice_is_chosen_by_a_mouse_click_at_any_hand_depth() -> void:
+func test_the_motion_choice_is_chosen_by_an_aimed_mouse_click() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
@@ -1864,40 +1864,33 @@ func test_the_motion_choice_is_chosen_by_a_mouse_click_at_any_hand_depth() -> vo
 		if sibling is DesktopDriver:
 			driver = sibling
 	expect(driver != null, "the mouse driver is there")
-	for depth: float in [0.2, 0.45, 0.9]:
-		choice._open = true
-		driver.depth = depth
-		driver._place_hand(App.rig.head.unproject_position(choice.global_position))
-		await frames(2)
-		input.press(&"right", &"trigger_click", true)
-		await frames(2)
-		input.press(&"right", &"trigger_click", false)
-		await frames(2)
-	expect_eq(chosen.size(), 3, "a click chooses it at every hand depth")
-	choice._open = true
-	driver.depth = 0.9
+	driver.depth = 0.2
 	driver._place_hand(App.rig.head.unproject_position(choice.global_position + App.head().global_basis.x * 0.3))
 	await frames(2)
 	input.press(&"right", &"trigger_click", true)
 	await frames(2)
 	input.press(&"right", &"trigger_click", false)
 	await frames(2)
-	expect_eq(chosen.size(), 3, "a click a hand's width beside it does not")
+	expect(chosen.is_empty(), "a click beside the disc leaves the choice open")
+	driver._place_hand(App.rig.head.unproject_position(choice.global_position))
+	await frames(2)
+	input.click(&"right", &"trigger_click")
+	await frames(2)
+	expect_eq(chosen.size(), 1, "a click aimed at the disc chooses it")
 
 
-func test_the_motion_choice_is_chosen_by_a_fingertip_touching_it() -> void:
+func test_touching_the_motion_choice_leaves_it_open() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
 	await _until_open(choice)
-	var eye := App.head().global_position
 	var back := choice.global_position + Vector3(0.0, 0.0, 0.3)
 	var along := (choice.global_position - back).normalized()
 	input.point(&"right", back - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
 	await frames(3)
 	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position)   # the fingertip goes in
 	await frames(4)
-	expect_eq(chosen.size(), 1, "a fingertip going into it chooses it")
+	expect(chosen.is_empty() and choice.is_open(), "a fingertip going into it does not press the button")
 
 
 func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it() -> void:
@@ -1920,7 +1913,7 @@ func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it
 	expect(choice.is_open(), "and it stays on offer")
 
 
-func test_a_press_on_it_before_it_is_offered_or_after_it_is_closed_does_nothing_and_a_fingertip_lifts_it() -> void:
+func test_the_motion_choice_highlights_on_aim_and_only_accepts_presses_while_open() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
@@ -1928,11 +1921,10 @@ func test_a_press_on_it_before_it_is_offered_or_after_it_is_closed_does_nothing_
 	expect(chosen.is_empty(), "not before it is offered")
 	await _until_open(choice)
 	var at := choice.global_position
-	var along := Vector3.FORWARD
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.06) - along * App.rig.pointer(&"right").tip_reach, at + Vector3(0.0, 0.0, -0.3))   # a fingertip close in front
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at)
 	await frames(3)
-	expect(choice._look.position.z > 0.005, "a fingertip close in front lifts it toward the hand")
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.5), at)
+	expect(choice._look.position.z > 0.005, "aiming at the disc lifts it")
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at + Vector3.RIGHT)
 	await frames(3)
 	expect(choice._look.position.z == 0.0, "and it settles when the hand goes")
 	choice.close()

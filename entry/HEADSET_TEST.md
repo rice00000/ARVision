@@ -4,7 +4,6 @@ For Megan, in the Quest 3, seated at a real table, the way a child would sit. On
 what you should **see** and **hear** (the lines are the story's own words, as the build speaks them now), what to
 **judge or measure**, and a box to tick. Mark anything odd in "Notes"; a phone photo of the room helps.
 
-**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 5), with `entry-layout-6` on top if it is merged.
 **Not built yet** is marked ⚠ so you don't test what isn't there.
 
 What changed in round 6: there is NO plate any more. The socket is a flat recessed ring in the table top (a dark rim, a
@@ -26,8 +25,7 @@ What changed since the first sheet (round 3): Onion now moves for each beat (bes
 gear, lifted for the reveal); the teaching hand is the real hand (translucent, scale 0.6); the story's lines and staging
 were revised (Hello has a search, a knock and a startled hop; "Nearly ready." without "Uh..."); the gear glows softly while
 the pinch is shown; the pop sound is A only (no audition button); the cauldron is HIDDEN during the first shelf level; on a
-desktop the simulated room's loose props are hidden; Onion floats only a few millimetres and no longer turns by itself;
-setup is skipped by default.
+desktop the simulated room's loose props are hidden; Onion floats only a few millimetres and no longer turns by itself.
 
 Before you start:
 
@@ -44,9 +42,7 @@ Point and pinch **Menu → Staff tools**. Choose a chapter to jump to it. **Zone
 
 ## 1. Setup (for the grown-up)
 
-`SKIP_SETUP` is on by default: the app goes straight to **"All set"** with a green **Start** (the panel only says "All set";
-there are no checks). To test the four setup steps, set `SKIP_SETUP := false` in `entry/entry.gd` first.
-Without the setup steps the layout uses the usual reach (60 cm); on your real table it still uses the table the headset found.
+Both modes run setup. Dev mode offers **Skip setup** to go straight to **Start** with the default reach of 60 cm.
 
 **See:** a dark panel just above eye level, straight ahead: a sage bar "SETUP · for the grown-up", "Step N of 4" and
 dots, a title, one or two lines, check lines with dots, buttons. At the foot: "To press: aim the hand ray at a button, then pinch."

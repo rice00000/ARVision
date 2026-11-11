@@ -127,5 +127,3 @@ func _press(id: StringName) -> void:
 		pin(coherence() - STEP)
 	elif text.begins_with("dev_coh_"):
 		pin(float(text.trim_prefix("dev_coh_")))
-
-

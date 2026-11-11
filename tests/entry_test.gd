@@ -505,6 +505,23 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
+	var more: UITarget
+	if not await until(func() -> bool: return app.find_child("visit_more_shelf", true, false) != null, 20.0):
+		expect(false, "the child can choose to play more shapes")
+		return
+	more = app.find_child("visit_more_shelf", true, false) as UITarget
+	var next_level := task.levels[1]
+	await select(more.global_position)
+	for block: Block in next_level.plan.blocks:
+		for round_index in block.rounds:
+			if not await until(func() -> bool:
+				var trial := App.session.trial
+				return App.session.block == block and trial != null and trial.is_running() and trial.condition.round_index == round_index):
+				expect(false, "the next shelf level starts round %d" % round_index)
+				return
+			App.session.trial.finish(true)
+	expect(await until(func() -> bool: return App.main.progress.is_done(task, next_level)), "More shapes saves the completed level")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3 + next_level.first_reward, "More shapes grants the first reward")
 
 
 func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_talk() -> void:
