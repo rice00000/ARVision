@@ -8,18 +8,17 @@ const TUTORIAL_LEVEL := &"shadow"
 
 ## DEV jump: &"motion" starts straight at the motion route (the shelf level is skipped). Single use.
 static var start_with: StringName = &""
-## Set by the opening (entry.gd) when the shelf follows the reveal: Onion notices the shapes and invites
-## the child HERE, with the shelf level already running, so the child can pick shapes up and sort while
-## Onion talks (Megan, Nov 10). Picking one up ends the talk (the line being said finishes). Single use.
+## Set by the opening (entry.gd) when the shelf follows the reveal: Onion welcomes the child, notices the
+## shapes and invites them HERE, with the shelf level already running from the moment the ripple has shown
+## it, so the child can pick shapes up and sort while Onion talks (Megan, Nov 10 and 11). Picking one up
+## ends the talk (the line being said finishes); finishing the level cuts it. Single use.
 static var invite := false
 
 ## Seconds of quiet at the very end of scene one.
 const QUIET_END := 4.0
-const BREATH := 0.25
 
 var _fits_said := false
 var _started := false      # the child picked a shape up or placed one: the invitation is over
-var _speaking := false     # one line at a time: a later line waits, it never cuts an earlier one off
 var _rounds_won := 0
 var _rounds_ended := 0
 var _onion: Workshop
@@ -88,6 +87,8 @@ func _invitation() -> void:
 		if spot != Vector3.INF:
 			_onion.float_to(spot, 1.0)   # closer to the shapes (layout chat's invite spot), clear of them
 	if not _started:
+		await say("Welcome to the workshop.")
+	if not _started:
 		await say("Oh! I'd nearly forgotten about these.")
 	if not _started:
 		await say("They've come quite a long way.")
@@ -131,6 +132,10 @@ func _play() -> void:
 	await App.session.play(_reminder.prepare(level.plan), false)
 	if App.session.won:
 		App.main.progress.complete(SHELF_TASK, level)
+	_started = true   # done before Onion finished talking: no more of the invitation, and no waiting for it
+	var voice := App.module(&"Voice")
+	if voice != null and voice.has_method(&"skip"):
+		voice.skip()
 	await _closing()
 
 
@@ -158,7 +163,10 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 		_started = true
 	if what == &"put" and data.get("correct", false) and not _fits_said:
 		_fits_said = true
-		await say("It fits. Let's find places for the others.")   # the first placement only
+		var ended := _rounds_ended
+		await get_tree().process_frame
+		if _rounds_ended == ended:   # not when that placement finished the round: there are no others
+			await say("It fits. Let's find places for the others.")   # the first placement only
 
 
 func _exit_tree() -> void:
@@ -167,35 +175,6 @@ func _exit_tree() -> void:
 	Entry.show_sim_props(true)
 
 
-## Speaks [param text] (baked audio + subtitle) and waits for the voice to finish it, then a breath.
+## Speaks [param text] as Onion (baked audio and subtitle) and waits for it; see [method Onion.line].
 func say(text: String) -> void:
-	while _speaking:
-		await get_tree().process_frame
-	_speaking = true
-	await _say(text)
-	_speaking = false
-
-
-func _say(text: String) -> void:
-	var voice := App.module(&"Voice")
-	if voice == null or not voice.has_signal(&"line_finished"):
-		Events.say(text)
-		await get_tree().create_timer(maxf(1.5, text.length() * 0.07 + 0.6), false).timeout
-		return
-	var done := {finished = false, completed = true}
-	var on_finished := func(spoken: String, completed: bool) -> void:
-		if spoken == text:
-			done.finished = true
-			done.completed = completed
-	voice.line_finished.connect(on_finished)
-	Events.say(text)
-	var waited := 0.0
-	var limit := maxf(6.0, text.length() * 0.2)
-	while not done.finished and waited < limit:
-		await get_tree().process_frame
-		if get_tree().paused: continue
-		waited += get_process_delta_time()
-	voice.line_finished.disconnect(on_finished)
-	if not done.completed:
-		return   # cut short (the child pressed Onion): on at once, with no breath
-	await get_tree().create_timer(BREATH, false).timeout
+	await Onion.line(text, self)

@@ -26,7 +26,7 @@ func _ready() -> void:
 	await _save("3_landed")
 	await get_tree().create_timer(2.6).timeout
 	await _save("4_docked")
-	entry._actions.mark(entry._runner, "!")
+	entry._orb.actions.mark(entry._runner, "!")
 	await get_tree().create_timer(0.5).timeout
 	await _save("5_mark")
 	get_tree().quit()

@@ -12,6 +12,8 @@ The opening ("scene one") is `entry/` in Wei's ARVision (Godot 4.7.2, Quest 3). 
 | `entry/setup_panel.gd`, `entry_button.gd` | the setup panel and its buttons (ray / pinch / hover, forgiving hit boxes) |
 | `entry/part_runner.gd` | everything a part waits on lives on one runner; a jump button frees it to cancel the part |
 | `entry/workshop.gd` | what survives the scene switch: Onion, cauldron, panel, gear (it becomes the shelf scene's guide) |
+| `entry/onion.gd` (`Onion`) | Onion's body, glow, halo, float, facing, talking; `Onion.line()` speaks one line at a time. Used by the opening, the workshop and the room intro |
+| `entry/room_intro.gd` | Onion's room intro (buy one thing, place it), under Main; replay: Staff tools → Tools → Room intro |
 | `entry/gear_spin.gd` | turns the gear's parts at steady speeds, for ever |
 | `entry/carry.gd`, `entry/demo_hand.gd` | the seam between the two chats: STUBS with the agreed API |
 | `tests/entry_test.gd` | the opening's tests (20) |

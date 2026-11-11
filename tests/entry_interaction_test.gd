@@ -940,7 +940,7 @@ func _opening_at_start() -> Entry:
 func test_a_click_on_the_cauldron_registers_every_time_a_click_beside_it_does_not() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting for a tap")
 	var driver: DesktopDriver = entry._desktop_driver()
 	var camera := App.rig.head
 	var target: Target = entry.get("_cauldron_target")
@@ -1484,7 +1484,7 @@ func test_losing_the_hand_joints_in_a_headset_lets_the_gear_go_after_a_blink_and
 func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_finger_does_not() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting for a tap")
 	_headset_on()   # from here the hand is a real one
 	_fake_hand(&"right")
 	var pot: Target = entry.get("_cauldron_target")
@@ -1499,7 +1499,7 @@ func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_
 	await wait(0.5)
 	expect_eq(taps.size(), after_first, "and resting in there does not tap again")
 	entry.set("_tap_open", false)
-	entry.set("_cue", false)
+	(entry.get("_orb") as Onion).cue = false
 	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.0, 0.4))
 	await wait(0.3)
 	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.08, 0.04))
@@ -1510,7 +1510,7 @@ func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_
 func test_in_a_headset_the_desktop_click_and_keys_stay_out_of_the_way() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting")
 	_headset_on()
 	var taps := record(entry._runner.cauldron_touched)
 	var target: Target = entry.get("_cauldron_target")

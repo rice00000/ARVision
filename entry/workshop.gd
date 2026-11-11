@@ -11,44 +11,30 @@ extends Node3D
 ## Seconds the piano takes to fade out after the handoff.
 const MUSIC_FADE := 3.0
 
-var _onion: Node3D            # Onion's holder: moves around
-var _model: Node3D            # the wisp model, turned to face the child; it bobs
-var _face := Vector3.FORWARD  # which way its eyes look, in the holder's space
-var _model_rest_y := 0.0
-var _glow: OmniLight3D
-var _halo: StandardMaterial3D
+## Onion, the guide.
+var onion: Onion
 var _rest := Vector3.ZERO     # where Onion waits beside the shelf
 var _guide: Guide
 var _guiding := false
-var _clock := 0.0
-var _talk_until := 0.0
 var _switches := 0
 var _cauldron: Node3D
-var _attention: Variant = null   # a Node3D or a position to look at instead of the child
-var _cheer_until := 0.0
 var _gear: Node3D
 var _mechanism: Node3D
 var _mouth := Vector3.ZERO
 var _sounds: Sounds
-var _tilt := 0.0
 ## The opening's zone map (EntryLayout), for the motion route's layout (EntryMotionLayout); may be null.
 var layout: EntryLayout
 
 
-## Takes over from the opening. [param parts]: onion (holder), model, face, rest_y, glow, halo,
-## cauldron, rest (where Onion waits), music (or null). Call after adding this to Main.
+## Takes over from the opening. [param parts]: onion, cauldron, rest (where Onion waits), music (or null),
+## mechanism, gear, mouth, sounds, layout. Call after adding this to Main.
 func take(parts: Dictionary) -> void:
 	add_to_group(&"activity_scenery")
 	name = "Workshop"
-	_onion = parts.onion
-	(_onion.get_node(^"OnionTouch") as OnionTouch).minimum_y = -INF
-	_model = parts.model
-	_face = parts.face
-	_model_rest_y = parts.rest_y
-	_glow = parts.glow
-	_halo = parts.halo
+	onion = parts.onion
+	onion.touch.minimum_y = -INF
 	_rest = parts.rest
-	_onion.reparent(self)
+	onion.reparent(self)
 	_cauldron = parts.cauldron as Node3D
 	_cauldron.reparent(self)
 	for key in ["mechanism", "gear"]:   # the installed mechanism stays, turning
@@ -69,25 +55,24 @@ func take(parts: Dictionary) -> void:
 		var fade := create_tween()
 		fade.tween_property(music, "volume_db", -60.0, MUSIC_FADE)
 		fade.tween_callback(music.queue_free)
-	create_tween().tween_property(_onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
-	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
+	create_tween().tween_property(onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
 	Events.scene_changing.connect(_on_scene_changing)
 	Events.reported.connect(_on_reported)
 
 
 ## Onion looks at [param what] (a Node3D or a position) instead of the child; null: back to the child.
 func attend(what: Variant) -> void:
-	_attention = what
+	onion.attend(what)
 
 
 ## Onion floats to [param where] over [param seconds].
 func float_to(where: Vector3, seconds := 1.0) -> void:
-	create_tween().tween_property(_onion, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
+	create_tween().tween_property(onion, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
 
 
 ## Where Onion is now.
 func onion_position() -> Vector3:
-	return _onion.global_position
+	return onion.global_position
 
 
 # --- The closing (story chat: approved motion ending and closing) ------------------------
@@ -144,7 +129,7 @@ func rattle() -> void:
 
 ## A sheepish sideways tilt of Onion's body ([param on]), or straight again.
 func tilt(on: bool) -> void:
-	create_tween().tween_property(self, "_tilt", 0.28 if on else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
+	create_tween().tween_property(onion, "tilt", 0.28 if on else 0.0, 0.35).set_trans(Tween.TRANS_SINE)
 
 
 ## A gentle goodbye bob, then Onion ducks into the cauldron and is gone.
@@ -153,9 +138,9 @@ func goodbye() -> void:
 	await get_tree().create_timer(1.2, false).timeout
 	attend(null)
 	var tween := create_tween()
-	tween.tween_property(_onion, "global_position", _mouth + Vector3.UP * 0.06, 0.8).set_trans(Tween.TRANS_SINE)
-	tween.tween_property(_onion, "global_position", _mouth + Vector3.DOWN * 0.12, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(func() -> void: _onion.visible = false)
+	tween.tween_property(onion, "global_position", _mouth + Vector3.UP * 0.06, 0.8).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(onion, "global_position", _mouth + Vector3.DOWN * 0.12, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void: onion.visible = false)
 	await tween.finished
 
 
@@ -166,7 +151,7 @@ func mouth() -> Vector3:
 
 ## A small satisfied bob.
 func cheer() -> void:
-	_cheer_until = _clock + 1.2
+	onion.cheer()
 
 
 func _on_scene_changing() -> void:
@@ -194,33 +179,13 @@ func _become_guide() -> void:
 	for child in App.world.get_children():
 		if child is Guide:
 			_guide = child
-			_guide.body = _onion
+			_guide.body = onion
 	print("WORKSHOP Onion is the guide: ", _guide != null)
 
 
-func _process(delta: float) -> void:
-	_clock += delta
-	if App.rig == null or _onion == null:
+func _process(_delta: float) -> void:
+	if not is_instance_valid(_guide):
 		return
-	if is_instance_valid(_guide):
-		if _guiding and not _guide.visible:   # the child found the place: back beside the shelf
-			create_tween().tween_property(_onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
-		_guiding = _guide.visible
-	var talking := _clock < _talk_until
-	var bob := sin(_clock * 7.0) * 0.006 if talking else sin(_clock * 1.5) * 0.002
-	if _clock < _cheer_until:
-		bob += sin((_cheer_until - _clock) / 1.2 * PI * 2.0) * 0.012
-	_model.position.y = lerpf(_model.position.y, _model_rest_y + bob, minf(1.0, delta * 10.0))
-	_halo.albedo_color.a = 0.3 if talking else 0.22
-	_glow.light_energy = 0.6 + (0.35 * (0.5 + 0.5 * sin(_clock * 9.0)) if talking else 0.0)
-	var look_at: Vector3 = App.head().global_position
-	if _attention is Node3D and is_instance_valid(_attention):
-		look_at = (_attention as Node3D).global_position
-	elif _attention is Vector3:
-		look_at = _attention
-	var to_child := look_at - _onion.global_position
-	to_child.y = 0.0
-	if to_child.length() < 0.01:
-		return
-	_onion.global_rotation.y = -(atan2(_face.x, _face.z) - atan2(to_child.x, to_child.z))
-	_model.rotation.z = lerpf(_model.rotation.z, _tilt, minf(1.0, delta * 8.0))   # the sheepish tilt
+	if _guiding and not _guide.visible:   # the child found the place: back beside the shelf
+		create_tween().tween_property(onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
+	_guiding = _guide.visible

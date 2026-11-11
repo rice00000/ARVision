@@ -100,10 +100,12 @@ func _press(onion_ratio: float, rival_ratio: float) -> void:
 	skip()
 
 
-## Onion's middle (the holder the opening and the workshop both move), or INF.
+## The middle of the Onion in view (the opening's, the workshop's or the room intro's), or INF.
 func _onion() -> Vector3:
-	var holder := get_tree().get_first_node_in_group(&"onion_holder") as Node3D
-	return holder.global_position if holder != null and holder.is_inside_tree() else Vector3.INF
+	for holder: Node3D in get_tree().get_nodes_in_group(&"onion_holder"):
+		if holder.is_visible_in_tree():
+			return holder.global_position
+	return Vector3.INF
 
 
 func _now() -> float:

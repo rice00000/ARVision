@@ -39,7 +39,7 @@ const RADIUS := 0.0085
 ## child, so thumb and finger are seen from the side, not end-on.
 const YAW := 1.3
 
-enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE, SWEEP }
+enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE, SWEEP, AIM_PINCH }
 ## The tap's own times: the hand is down on the rim from TAP_DOWN to TAP_UP, back up at TAP_BACK, and
 ## the loop is TAP_LOOP long. The GLB's "tap" clip (0 -> press at 0.5 -> back at 1) is scrubbed to match.
 const TAP_DOWN := 0.8
@@ -63,6 +63,7 @@ const RING_ALPHA := 0.6
 var _mode := Mode.NONE
 var _gesture := Mode.NONE      # the gesture last started: it keeps its look while it fades out after stop()
 var _sweep_way := Vector3.FORWARD   # the way an open hand sweeps (level, unit): its fingers lead
+var _aim_at: Node3D             # what an aiming hand points at (a button or a piece of furniture out of reach)
 var _t := 0.0
 var _fade := 0.0
 var _keys: Array = []           # [seconds, up, back, open]: where the pinch point is, and how open
@@ -156,6 +157,30 @@ func sweep(from: Vector3, to: Vector3) -> void:
 	], func() -> Vector3: return from.lerp(to, smoothstep(SWEEP_START, SWEEP_END, _t)), -0.1, true, [from, to])
 
 
+## Points at [param target] from where a seated child's right hand rests (it is out of reach: a menu button
+## or a piece of furniture) and pinches, looping until [method stop]: the room's point-and-pinch.
+func aim_pinch(target: Node3D) -> void:
+	_aim_at = target
+	_start(Mode.AIM_PINCH, [
+		[0.0, 0.0, 0.03, 1.0],
+		[0.8, 0.0, 0.0, 1.0],
+		[1.2, 0.0, 0.0, 0.0],
+		[1.8, 0.0, 0.0, 0.0],
+		[2.2, 0.0, 0.0, 1.0],
+		[3.0, 0.0, 0.03, 1.0],
+	], _aim_anchor, 0.0, false, target)
+
+
+## Where the aiming hand's pinch point rests: 30 cm out toward the target, a little right and below the eyes.
+func _aim_anchor() -> Vector3:
+	if not is_instance_valid(_aim_at) or not _aim_at.is_inside_tree():
+		return Vector3.INF
+	var eye := App.head().global_position
+	var toward := (_aim_at.global_position - eye).normalized()
+	var right := toward.cross(Vector3.UP).normalized()
+	return eye + toward * 0.3 + right * 0.06 + Vector3.DOWN * 0.12
+
+
 ## Takes the hand away (soon, softly).
 func stop() -> void:
 	_mode = Mode.NONE
@@ -225,8 +250,13 @@ func _pose(seconds: float) -> void:
 	forward = forward.rotated(Vector3.UP, YAW)
 	if _gesture == Mode.SWEEP:
 		forward = _sweep_way   # an open hand sweeping: its fingers lead the way
-	global_position = anchor + Vector3.UP * up - forward * back
-	global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
+	if _gesture == Mode.AIM_PINCH:
+		var aim := (_aim_at.global_position - anchor).normalized()   # the fingers point straight at it
+		global_position = anchor + Vector3.UP * up - aim * back
+		global_basis = Basis.looking_at(aim, Vector3.UP)
+	else:
+		global_position = anchor + Vector3.UP * up - forward * back
+		global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
 	_show_fingers(open, seconds)
 	_show_ring(anchor, seconds)
 	var rounds := 1.0

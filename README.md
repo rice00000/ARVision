@@ -11,7 +11,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Menu → Staff tools** opens the facilitator panel on **Tools** for Intro jumps, layout zones, restart and exit. **Scenes**, **Training** and **Saves** are tabs on the same panel. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps saved progress and leaves interrupted rounds unscored.
+**Menu → Staff tools** opens the facilitator panel on **Tools** for Intro jumps, the room intro, layout zones, restart and exit. **Scenes**, **Training** and **Saves** are tabs on the same panel. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps saved progress and leaves interrupted rounds unscored.
 
 **Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 

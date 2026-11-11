@@ -44,6 +44,9 @@ func _ready() -> void:
 	Events.selected.connect(_select)
 	Events.scene_changing.connect(close)
 	Events.player_menu_requested.connect(open)
+	Events.room_requested.connect(func() -> void:
+		open()
+		if is_open: _show(&"room"))
 	Events.facilitator_toggled.connect(func(open: bool) -> void:
 		if open: close()
 		_update_entry())

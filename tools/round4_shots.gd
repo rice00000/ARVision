@@ -105,7 +105,7 @@ func _visit() -> void:
 		middle += thing.global_position
 	middle /= maxf(things.size(), 1)
 	var shelf := trial.get("_shelf") as Node3D
-	var onion: Node3D = App.main.get_node(^"Workshop").get("_onion")
+	var onion: Node3D = (App.main.get_node(^"Workshop") as Workshop).onion
 	var layout: EntryLayout = _entry.get("_layout") if is_instance_valid(_entry) else null
 	for setting: Array in [[25.0, 20.0, "now"], [36.0, 12.0, "proposed"]]:
 		voice.above_gaze = setting[0]

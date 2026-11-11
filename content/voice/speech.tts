@@ -51,7 +51,14 @@
     "10",
     "11",
     "12",
-    "See the pets. A pet brings you magic stones."
+    "See the pets. A pet brings you magic stones.",
+    "Pinch Shop to see what you can buy.",
+    "Pinch the arrow to see more things.",
+    "You can buy this one. Pinch Buy.",
+    "Pinch the check mark to buy it.",
+    "Pinch Furniture to see the furniture.",
+    "Pinch the arrow to go back to your room.",
+    "Now pinch it, move your hand, and let go where you see the tick."
   ],
   "say_sources": [
     "core",
