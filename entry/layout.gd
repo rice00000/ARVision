@@ -37,7 +37,7 @@ const CAULDRON_RIM := 0.12
 ## plus 2 mm), which is what the teaching hand must stay clear of.
 const ONION := 0.13
 const ONION_BODY := 0.036
-const ONION_HEIGHT := 0.11
+const ONION_HEIGHT := Onion.HEIGHT
 ## The table panel (width, thickness, depth) and the room a hand needs over the socket.
 ## The socket's footprint (entry.gd PANEL): no plate any more (round 6), a recessed ring (r 6.8 cm) with the little cog
 ## turning just behind it: 14.4 x 18.8 cm, flat (2 mm). The node's middle is between them; the socket is SOCKET_Z toward the child.

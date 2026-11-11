@@ -12,10 +12,13 @@ const ENTRY_VIEW_OFFSET := Vector3(-0.22, 0.13, -0.5)
 const ENTRY_FOLLOW := 6.0
 ## How far in front of the eyes the menu panel opens, metres (was 0.48; the panel scales to look the same size).
 const MENU_DISTANCE := 0.34
-## Each browsing page and the page that confirms its purchase.
-const TITLES := {&"room": "MY ROOM", &"shop": "FURNITURE", &"rooms": "ROOMS", &"pets": "PETS", &"bag": "MY THINGS",
-	&"confirm_item": "BUY?", &"confirm_room": "BUY?", &"confirm_pet": "BUY?"}
+## Each shop page and the page that confirms its purchase.
 const CONFIRM := {&"shop": &"confirm_item", &"rooms": &"confirm_room", &"pets": &"confirm_pet"}
+## The shop's pages, always on show along its top: page, caption, speech, icon.
+const TABS := [
+	[&"shop", "Furniture", "Shop for furniture.", "chair"],
+	[&"pets", "Pets", "See the pets. A pet brings you magic stones.", "pet"],
+	[&"rooms", "Rooms", "See rooms. You can buy a new room or visit one you own.", "door"]]
 
 var is_open := false
 var page := &"menu"
@@ -55,6 +58,9 @@ func _ready() -> void:
 	Events.selected.connect(_select)
 	Events.scene_changing.connect(close)
 	Events.player_menu_requested.connect(open)
+	Events.room_requested.connect(func() -> void:
+		open()
+		if is_open: _show(&"room"))
 	Events.facilitator_toggled.connect(func(open: bool) -> void:
 		if open: close()
 		_update_entry())
@@ -141,12 +147,20 @@ func _activate() -> void:
 			Events.say("Choose a game. Finish it to earn magic stones.")
 		&"menu_room":
 			_show(&"room")
-			Events.say("Your home. Point and pinch to choose furniture, rooms, or decorating.")
-		&"home_back": _show(&"room")
+			Events.say("Pinch to move furniture. Let go to place it. Hold it and point at the box with your other hand, then pinch to put it away.")
 		&"home_shop": _index = 0; _show(&"shop")
-		&"home_rooms": _index = 0; _show(&"rooms")
-		&"home_pets": _index = 0; _show(&"pets")
-		&"home_bag": _index = 0; _show(&"bag")
+		&"home_tab_shop", &"home_tab_pets", &"home_tab_rooms":
+			_index = 0
+			_show(StringName(String(id).trim_prefix("home_tab_")))
+		&"home_back": _show(&"room")
+		&"home_box":
+			# A held piece goes into the box; an empty hand opens it.
+			var decor := App.module(&"Decor")
+			if decor and decor.held:
+				Events.furniture_store_requested.emit()
+			else:
+				_index = 0
+				_show(&"bag")
 		&"home_prev", &"home_next":
 			_index = posmod(_index + (-1 if id == &"home_prev" else 1), _catalogue().size())
 			_build(); _speak_item()
@@ -159,18 +173,20 @@ func _activate() -> void:
 			App.module(&"Inventory").buy(item.id)
 			Events.say("It is yours!")
 			Events.feedback.emit(&"good", _panel.global_position)
-			_show(CONFIRM.find_key(page))
+			if item.kind == ItemDef.Kind.ROOM:
+				_show(CONFIRM.find_key(page))
+			else:
+				# New furniture and pets go straight into the room.
+				_show(&"room")
+				if item.kind == ItemDef.Kind.FURNITURE: Events.furniture_requested.emit(item.id)
 		&"home_use_room":
 			App.module(&"Rooms").choose(_item().id)
 			Events.say("Welcome to your room.")
 			_build()
 		&"home_place":
 			var id_to_place := _item().id
-			_show(&"decorate")
+			_show(&"room")
 			Events.furniture_requested.emit(id_to_place)
-		&"home_decorate": _show(&"decorate")
-		&"home_store": Events.furniture_store_requested.emit()
-		&"home_turn": Events.furniture_turn_requested.emit()
 		&"menu_game_find_object", &"menu_game_global_motion":
 			App.main.change_scene(StringName(String(id).trim_prefix("menu_game_")))
 
@@ -178,10 +194,9 @@ func _activate() -> void:
 func _show(next: StringName) -> void:
 	page = next
 	_set_room(page not in [&"menu", &"games"])
-	if _in_room: Events.furniture_editing.emit(page == &"decorate")
+	if _in_room: Events.furniture_editing.emit(page == &"room")
 	_build()
 	if page in [&"shop", &"rooms", &"pets", &"bag"]: _speak_item()
-	if page == &"decorate": Events.say("Pinch to move furniture. Let go to place it. Hold it and point at the box with your other hand, then pinch to put it away.")
 
 
 func _set_room(on: bool) -> void:
@@ -215,7 +230,7 @@ func _item() -> ItemDef:
 
 func _speak_item() -> void:
 	if _catalogue().is_empty():
-		Events.say("Your bag is empty. Point at the chair and pinch to visit the shop.")
+		Events.say("Your box is empty.")
 		return
 	var item := _item()
 	var missing: int = item.price - App.module(&"Inventory").count(&"magic_stone")
@@ -238,20 +253,27 @@ func _clear_panel() -> void:
 func _build() -> void:
 	if not is_open: return
 	_clear_panel()
-	if page == &"decorate":
-		# Move the controls to the side; the centre stays clear for furniture.
-		HomeUI.button(_panel, &"home_back", "My room", "Back to the home menu.", Vector3(-0.27, 0.16, 0), "house")
-		HomeUI.button(_panel, &"home_store", "Put away", "Hold the furniture, aim at this box with your other hand, and pinch.", Vector3(0.27, 0.12, 0), "bag")
-		HomeUI.button(_panel, &"home_turn", "Turn", "Turn the furniture.", Vector3(0.27, -0.07, 0), "↻")
-		HomeUI.button(_panel, &"home_bag", "My things", "Choose furniture from your bag.", Vector3(-0.27, -0.05, 0), "chair")
+	if page == &"room":
+		# One bar above the view; the room and its furniture stay clear.
+		HomeUI.box(_panel, Vector3(0.68, 0.2, 0.025), Vector3(0, 0.185, -0.05), HomeUI.INK)
+		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.24, 0.2, 0), "back")
+		HomeUI.button(_panel, &"menu_resume", "Practice", "Return to your game.", Vector3(-0.08, 0.2, 0), "▶")
+		HomeUI.button(_panel, &"home_shop", "Shop", "Shop. Spend your magic stones here.", Vector3(0.08, 0.2, 0), "stone")
+		HomeUI.button(_panel, &"home_box", "My things", "Your things. Pinch to open the box. Hold furniture and pinch here to put it away.", Vector3(0.24, 0.2, 0), "box")
 		return
-	HomeUI.box(_panel, Vector3(0.68, 0.53, 0.025), Vector3(0, 0, -0.05), HomeUI.INK)
+	# The shop is taller: its pages run along the top.
+	var tall := 0.085 if page in CONFIRM else 0.0
+	HomeUI.box(_panel, Vector3(0.68, 0.53 + tall, 0.025), Vector3(0, tall * 0.5, -0.05), HomeUI.INK)
 	if page == &"menu":
 		HomeUI.label(_panel, "MENU", Vector3(0, 0.10, 0), 44)
-		HomeUI.button(_panel, &"menu_resume", "Keep playing", "Return to your game.", Vector3(-0.22, 0, 0.02), "▶")
-		HomeUI.button(_panel, &"menu_games", "Games", "Choose a game. Finish it to earn magic stones.", Vector3(0, 0, 0.02), "◎")
+		var buttons := [
+			[&"menu_resume", "Practice", "Return to your game.", "▶"],
+			[&"menu_games", "Games", "Choose a game. Finish it to earn magic stones.", "◎"]]
 		if App.module(&"Inventory") and App.module(&"Rooms"):
-			HomeUI.button(_panel, &"menu_room", "My room", "Visit your room and shop.", Vector3(0.22, 0, 0.02), "house")
+			buttons.append([&"menu_room", "My room", "Visit your room and shop.", "house"])
+		for i in buttons.size():
+			var entry: Array = buttons[i]
+			HomeUI.button(_panel, entry[0], entry[1], entry[2], Vector3((i - (buttons.size() - 1) * 0.5) * 0.22, 0, 0.02), entry[3])
 		if App.module(&"Facilitator"):
 			HomeUI.button(_panel, &"menu_staff_tools", "Staff tools", "Open the staff tools.", Vector3(0, -0.17, 0.02))
 		return
@@ -269,27 +291,25 @@ func _build() -> void:
 		return
 	var inventory := App.module(&"Inventory")
 	var balance: int = inventory.count(&"magic_stone")
-	HomeUI.label(_panel, TITLES[page], Vector3(-0.04, 0.225, 0), 32)
-	HomeUI.stones(_panel, balance, Vector3(0.12, 0.225, 0))
-	if page == &"room":
-		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.265, 0.21, 0), "back")
-		HomeUI.button(_panel, &"menu_resume", "Resume", "Return to your game.", Vector3(0.265, 0.21, 0), "▶")
-		var pets := App.module(&"Pets") != null
-		HomeUI.button(_panel, &"home_shop", "Furniture", "Shop for furniture.", Vector3(-0.21 if pets else -0.15, 0.08, 0.02), "chair")
-		if pets:
-			HomeUI.button(_panel, &"home_pets", "Pets", "See the pets. A pet brings you magic stones.", Vector3(0, 0.08, 0.02), "pet")
-		HomeUI.button(_panel, &"home_rooms", "Rooms", "See rooms. You can buy a new room or visit one you own.", Vector3(0.21 if pets else 0.15, 0.08, 0.02), "house")
-		HomeUI.button(_panel, &"home_bag", "My things", "Put your furniture in your room.", Vector3(-0.15, -0.12, 0.02), "bag")
-		HomeUI.button(_panel, &"home_decorate", "Decorate", "Move the furniture in your room.", Vector3(0.15, -0.12, 0.02), "↔")
-		return
-	if page in CONFIRM.values():
+	if page in CONFIRM:
+		HomeUI.button(_panel, &"home_back", "My room", "Back to your room.", Vector3(-0.265, 0.28, 0), "back")
+		HomeUI.stones(_panel, balance, Vector3(-0.25, 0.15, 0))
+		var column := 0
+		for tab: Array in TABS:
+			if tab[0] == &"pets" and App.module(&"Pets") == null: continue
+			var button := HomeUI.button(_panel, StringName("home_tab_" + tab[0]), tab[1], tab[2], Vector3(-0.07 + column * 0.16, 0.28, 0.02), tab[3])
+			# A gold frame marks the page that is open.
+			if tab[0] == page: HomeUI.box(button, Vector3(0.139, 0.129, 0.012), Vector3(0, 0, -0.008), HomeUI.GOLD)
+			column += 1
+	elif page == &"bag":
+		HomeUI.label(_panel, "MY THINGS", Vector3(0, 0.225, 0), 32)
+		HomeUI.button(_panel, &"home_back", "My room", "Back to your room.", Vector3(-0.265, 0.21, 0), "back")
+		if _catalogue().is_empty(): return
+	else:
+		HomeUI.label(_panel, "BUY?", Vector3(-0.04, 0.225, 0), 32)
+		HomeUI.stones(_panel, balance, Vector3(0.12, 0.225, 0))
 		HomeUI.button(_panel, &"home_confirm", "Buy", "Confirm this purchase.", Vector3(0.19, -0.19, 0.03), "check")
 		HomeUI.button(_panel, &"home_cancel", "Cancel", "Go back without buying.", Vector3(-0.19, -0.19, 0.03), "cross")
-	else:
-		HomeUI.button(_panel, &"home_back", "My room", "Back to the home menu.", Vector3(-0.265, 0.21, 0), "house")
-	if _catalogue().is_empty():
-		HomeUI.button(_panel, &"home_shop", "Furniture", "Shop for furniture.", Vector3(0, 0, 0.02), "chair")
-		return
 	_index = mini(_index, _catalogue().size() - 1)
 	var item := _item()
 	_preview = HomeUI.preview(_panel, item, Vector3(0, 0.065, 0.06), 0.19)
@@ -300,17 +320,17 @@ func _build() -> void:
 	HomeUI.button(_panel, &"home_prev", "Previous", "See the previous one.", Vector3(-0.25, 0.02, 0.04), "left")
 	HomeUI.button(_panel, &"home_next", "Next", "See the next one.", Vector3(0.25, 0.02, 0.04), "right")
 	if page == &"bag":
-		HomeUI.button(_panel, &"home_place", "Place", "Take this furniture out of your bag.", Vector3(0, -0.19, 0.04), "↓")
+		HomeUI.button(_panel, &"home_place", "Place", "Take this furniture out of your box.", Vector3(0, -0.19, 0.04), "↓")
 	elif not _for_sale(item):
 		if item.kind == ItemDef.Kind.ROOM:
-			HomeUI.button(_panel, &"home_use_room", "Visit", "Visit this room.", Vector3(0, -0.19, 0.04), "house")
+			HomeUI.button(_panel, &"home_use_room", "Visit", "Visit this room.", Vector3(0, -0.19, 0.04), "door")
 		else:
 			HomeUI.check(_panel, Vector3(0, -0.15, 0.04), 1.2, HomeUI.GOLD)
 	elif balance >= item.price:
-		HomeUI.button(_panel, &"home_buy", "Buy", "Preview the purchase.", Vector3(0, -0.19, 0.04), "bag")
+		HomeUI.button(_panel, &"home_buy", "Buy", "Preview the purchase.", Vector3(0, -0.19, 0.04), "stone")
 
 
-## Not in the bag, and not a room or pet the child already has.
+## Not in the box, and not a room or pet the child already has.
 func _for_sale(item: ItemDef) -> bool:
 	return page != &"bag" and (item.kind == ItemDef.Kind.FURNITURE or App.module(&"Inventory").count(item.id) == 0)
 

@@ -52,15 +52,33 @@ func test_every_thing_has_its_sticker_and_all_are_in_reach() -> void:
 		expect_eq(keys.count(trial.get("_key")[thing]), 1, "one sticker for %s" % thing.id)
 	expect(trial.get("_key").values().has("egg") and trial.get("_key").values().has("drum"), "look-alikes at six")
 	var eye := App.head().global_position
-	var reach := TRIAL.SNAP + 0.4 * (eye.y - App.rig.global_position.y)
-	for point: Vector3 in (trial.get("_cell_point") as Array) + things.map(func(thing: Target) -> Vector3: return thing.global_position):
+	var reach := 0.05 + 0.4 * (eye.y - App.rig.global_position.y)
+	var toward_child: Vector3 = (trial.get("_frame") as Transform3D).basis.z * TRIAL.DEPTH * 0.5
+	var mouths := (trial.get("_cell_point") as Array).map(func(point: Vector3) -> Vector3: return point + toward_child)
+	for point: Vector3 in mouths + things.map(func(thing: Target) -> Vector3: return thing.global_position):
 		var shoulder := eye + Vector3.DOWN * 0.2
 		expect(point.distance_to(shoulder + Vector3.RIGHT * 0.13) < reach or point.distance_to(shoulder + Vector3.LEFT * 0.13) < reach,
 			"within easy reach: %s" % point)
 		expect(point.y < eye.y - 0.1, "below the eyes: %s" % point)
 
 
-func test_the_right_thing_clicks_in_and_the_round_ends_when_all_are_back() -> void:
+func test_a_thing_let_go_anywhere_in_its_cubby_drops_onto_the_board_right_there() -> void:
+	var trial := await _start()
+	var thing: Target = trial.get("_things")[0]
+	var cell := _cell(trial, trial.get("_key")[thing])
+	var frame: Transform3D = trial.get("_frame")
+	var stands: Vector3 = trial.get("_cell_point")[cell] + frame.basis.x * 0.01
+	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15))
+	await _tip_to(thing.global_position)
+	input.press(&"right", &"trigger_click", true)
+	await _tip_to(stands + frame.basis.y * 0.03)
+	input.press(&"right", &"trigger_click", false)
+	await wait(TRIAL.RELEASE_DELAY + 0.4)
+	expect(trial.get("_placed").has(thing), "anywhere inside the cubby counts")
+	expect(thing.global_position.distance_to(stands) < 0.002, "it drops straight down onto the board, not to the middle")
+
+
+func test_the_right_thing_drops_in_and_the_round_ends_when_all_are_back() -> void:
 	var trial := await _start()
 	var feedback := record(Events.feedback)
 	var picked := record(Events.picked)
@@ -99,7 +117,7 @@ func test_a_wrong_thing_does_not_fit_and_goes_back() -> void:
 	expect(thing.global_position.distance_to(home) < 0.01, "back on the bench")
 
 
-func test_holding_still_away_from_stickers_keeps_it_in_the_hand() -> void:
+func test_holding_still_away_from_the_cubbies_keeps_it_in_the_hand() -> void:
 	var trial := await _start()
 	var thing: Target = trial.get("_things")[0]
 	await _tip_to(App.head().global_position + Vector3(0.0, -0.25, -0.15))
@@ -142,7 +160,7 @@ func test_carry_keeps_the_contact_point_and_turns_with_the_hand() -> void:
 	expect(thing.global_transform.is_equal_approx(pointer.grip() * offset), "position and rotation follow the same contact point")
 
 
-func test_only_releasing_at_a_sticker_places_the_thing() -> void:
+func test_only_releasing_in_a_cubby_places_the_thing() -> void:
 	var trial := await _start()
 	var thing: Target = trial.get("_things")[0]
 	var cell := _cell(trial, trial.get("_key")[thing])
@@ -150,7 +168,7 @@ func test_only_releasing_at_a_sticker_places_the_thing() -> void:
 	input.press(&"right", &"trigger_click", true)
 	await _tip_to(trial.get("_cell_point")[cell])
 	await wait(0.8)
-	expect(not trial.get("_placed").has(thing), "holding near its sticker never steals it out of the hand")
+	expect(not trial.get("_placed").has(thing), "holding it in its cubby never steals it out of the hand")
 	input.press(&"right", &"trigger_click", false)
 	await wait(TRIAL.RELEASE_DELAY * 0.4)
 	input.press(&"right", &"trigger_click", true)

@@ -45,22 +45,24 @@ func run() -> void:
 	_offer_replay()
 
 
-## Plays [param session_plan] once, every round as [method level] says.
-func play(session_plan: SessionPlan) -> void:
+## Plays [param session_plan] once. A story can provide its own announcements.
+func play(session_plan: SessionPlan, announce_plan := true) -> void:
 	plan = session_plan
 	pinned = NAN
 	running = true
 	won = not plan.blocks.is_empty()
-	await _announce(plan.greeting)
+	if announce_plan:
+		await _announce(plan.greeting)
 	if not App.reality.is_settled:
 		await App.reality.settled # toys placed before the table is known land on the lap
 	for index in plan.blocks.size():
 		block_index = index
 		block = plan.blocks[index]
-		await _run_block()
+		await _run_block(announce_plan)
 	block = null
 	running = false
-	await _announce(plan.farewell)
+	if announce_plan:
+		await _announce(plan.farewell)
 	Events.session_finished.emit()
 
 
@@ -89,8 +91,13 @@ func level() -> float:
 
 ## Pins the level [param delta] away from now, for the rest of the session.
 func nudge(delta: float) -> void:
-	pinned = clampf(level() + delta, 0.0, 1.0)
-	Events.report(&"level_pinned", {level = pinned})
+	pin(level() + delta)
+
+
+## Uses a fixed level from the next round until this play ends.
+func pin(at_level: float, details: Dictionary = {}) -> void:
+	pinned = clampf(at_level, 0.0, 1.0)
+	Events.report(&"level_pinned", details.merged({level = pinned}, true))
 
 
 ## Back to the staircase.
@@ -107,7 +114,7 @@ func skip_block() -> void:
 		trial.abandon()
 
 
-func _run_block() -> void:
+func _run_block(announce_plan: bool) -> void:
 	var def := block.trial
 	var missing := def.requires.filter(func(module_name: StringName) -> bool: return App.module(module_name) == null)
 	if not missing.is_empty():
@@ -120,7 +127,8 @@ func _run_block() -> void:
 	trial.def = def
 	trial.grab = not block.ray
 	App.stage.add_child(trial)
-	await _announce(block.intro)
+	if announce_plan:
+		await _announce(block.intro)
 	for round_index in block.rounds:
 		if _skip:
 			break

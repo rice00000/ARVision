@@ -28,6 +28,8 @@ signal work_surface_reset
 var view := View.new()
 ## Until true, [method work_surface] may still change; the session waits for [signal settled].
 var is_settled := true
+## Whether the discovery of a work surface is announced. Intro has its own setup prompts.
+var announce_table := true
 
 var _surfaces: Array[Surface] = []
 var _selected_table: Surface

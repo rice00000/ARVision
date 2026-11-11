@@ -136,6 +136,7 @@ func _start_scene() -> void:
 
 func _clear_scene() -> void:
 	Events.scene_changing.emit()
+	SceneMarker.clear()
 	var trial := App.session.trial
 	_scene.free() # stop the awaiting Session / World / Entry before ending a round
 	App.session = null

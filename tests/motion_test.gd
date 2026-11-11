@@ -358,7 +358,7 @@ func test_shader_gets_the_round_exactly() -> void:
 		expect_eq(material.get_shader_parameter(&"competing_flow"), def == COMPETING, "%s noise model" % def.id)
 		expect_eq(material.get_shader_parameter(&"signal_count"), roundi(roundi(condition.value(&"coherence") * 200.0) / 200.0 * 328.0), "%s exact signal share" % def.id)
 		expect_eq(material.get_shader_parameter(&"dot_count"), 328, "%s dots, shell included" % def.id)
-		expect(is_equal_approx(material.get_shader_parameter(&"margin"), MotionTrial.MARGIN), "%s fading shell" % def.id)
+		expect(is_equal_approx(material.get_shader_parameter(&"margin"), MotionCloud.MARGIN), "%s fading shell" % def.id)
 		expect_eq(material.get_shader_parameter(&"trial_seed"), condition.value(&"seed"), "%s seed" % def.id)
 		expect(is_equal_approx(material.get_shader_parameter(&"speed"), 0.3), "%s speed" % def.id)
 		expect(is_equal_approx(material.get_shader_parameter(&"dot_lifetime"), 0.8), "%s lifetime" % def.id)

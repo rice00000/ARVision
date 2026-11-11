@@ -19,6 +19,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	(App.rig.head as Camera3D).fov = 80.0
 	_entry = app.get_node(^"Intro/Entry")
+	_entry.plan_at_start = false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--reach="):   # a measured reach (setup step 3 is skipped): the layout and the shelf's push follow it
 			var reach := float(arg.trim_prefix("--reach="))
@@ -104,7 +105,7 @@ func _visit() -> void:
 		middle += thing.global_position
 	middle /= maxf(things.size(), 1)
 	var shelf := trial.get("_shelf") as Node3D
-	var onion: Node3D = App.main.get_node(^"Workshop").get("_onion")
+	var onion: Node3D = (App.main.get_node(^"Workshop") as Workshop).onion
 	var layout: EntryLayout = _entry.get("_layout") if is_instance_valid(_entry) else null
 	for setting: Array in [[25.0, 20.0, "now"], [36.0, 12.0, "proposed"]]:
 		voice.above_gaze = setting[0]
@@ -149,21 +150,22 @@ func _save(name: String, look := Vector3.INF) -> void:
 ## drawn as a wireframe so its place against the table and shelf shows). In build/round4/wall_*.png.
 func _wall() -> void:
 	var layout: EntryLayout = _entry.get("_layout")
-	_press(&"entry_part_shelf")
+	_entry.jump_to(&"shelf")
 	await _pause(4.0)
 	var eye := App.head().global_position
 	var ahead := Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
-	var motion := EntryMotionLayout.new(layout)
+	var def := preload("res://trials/motion/motion.tres")
+	var condition := def.condition(0.0, 0, false)
 	var box := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
-	mesh.size = EntryMotionLayout.DOTS_HALF * 2.0
+	mesh.size = MotionCloud.half_size(condition) * 2.0
 	var material := StandardMaterial3D.new()
 	material.albedo_color = Color(0.2, 0.7, 1.0, 0.18)
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mesh.material = material
 	box.mesh = mesh
 	get_tree().root.add_child(box)
-	box.global_position = motion.dots_centre()
+	box.global_position = layout.eye + layout.ahead * MotionCloud.distance(condition)
 	box.global_rotation = Vector3(0.0, atan2(-ahead.x, -ahead.z), 0.0)
 	await _save("wall_0_dots_box_seated", Vector3.ZERO)
 	box.queue_free()

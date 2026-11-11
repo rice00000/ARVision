@@ -26,10 +26,6 @@ const PEEK_LIFT := 0.06
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
 const CAULDRON_WIDTH := 0.22
-## The guide: "Onion the Wisp" by Edvin Borkovskij, CC BY 4.0 (credit in entry/assets/CREDITS.md).
-const ONION := preload("res://entry/assets/onion_the_wisp.glb")
-## How tall Onion is, metres.
-const ONION_HEIGHT := 0.11
 ## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md).
 const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
 ## Music volume, decibels: well under the voice.
@@ -59,22 +55,10 @@ const CAULDRON_SINK := 0.6
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
 const TEST_SPEED := 1.0
-## TESTING: before the opening, show where the table was found and ask to confirm it
-## (or point at the real table and pinch).
-const CONFIRM_TABLE := true
-## The build chat's first guess at Onion's waiting behaviour in the Tap beat (gaze to the rim and
-## back). Megan did not like it; off until the story chat decides the staging.
-const TAP_STAGING := false
-## The first round's things appear WITH the shelf at the ripple (made now by Wei's own code, hidden), rise this
-## far as they arrive (metres), and the first visit makes the same things from the same seed. False: as before
-## (only the shelf appears; Wei's things drop in when the first visit starts).
-const FIRST_THINGS := true
+## How far the seeded shapes rise when they appear with the shelf.
 const FIRST_THINGS_RISE := 0.04
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", motion = "Motion", dots = "Dots"}
-## The interaction chat's Carry is not real yet: until it is (set this), a stand-in plays the child
-## picking the gear up and setting it in.
-const USE_REAL_CARRY := true
 ## Tests set this: a pretend child picks the gear up and sets it in (a headset has no tests).
 var simulate_child := false
 ## Setup has four steps: hands, table, reach, sound and room.
@@ -90,14 +74,9 @@ var _mouth := Vector3.ZERO          # centre of the opening (the brew's surface)
 var _mouth_radius := 0.05           # radius of the opening, metres (measured)
 var _left := Vector3.LEFT           # the child's left, flat (set when the cauldron is placed)
 var _music := AudioStreamPlayer.new()
-var _orb := Node3D.new()            # holds Onion and its glow; moves around
-var _onion: Node3D                  # the wisp model, turned to face the child
-var _face := Vector3.FORWARD        # which way Onion's eyes point, in its own space
-var _glow: OmniLight3D              # Onion's light; pulses while it talks
-var _talk_until := 0.0              # seconds (game time) until Onion stops "talking"
-var _cue := false                   # the cauldron glows slowly: "something here"
+var _orb := Onion.new()             # Onion (the guide); moves around
+var _handed_over := false           # the workshop has Onion and the cauldron now
 var _clock := 0.0
-var _onion_rest_y := 0.0            # Onion's height in its holder when still
 var _gear: Node3D                   # the planetary gear: origin at the middle of its base
 var _gear_spin: GearSpin
 var _carry: Carry                   # the child picks up the gear and sets it in (interaction chat)
@@ -126,9 +105,6 @@ signal _part_over(how: StringName)   # a part &"finished", or a jump button &"in
 signal _confirm_pressed(id: StringName)
 ## TESTING: a Start or jump button: which part (&"all" for Start).
 signal _part_pressed(part: StringName)
-## DEBUG: Onion's soft halo.
-var _halo: StandardMaterial3D
-
 var _real := 0.0                    # seconds that pass at normal speed, whatever TEST_SPEED is
 var _cauldron_target: Target
 var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's reach
@@ -152,7 +128,6 @@ var plan_at_start := true
 var _plan_head := Transform3D.IDENTITY   # the head pose the room was planned from (at Start)
 var _planned := false
 var _sounds: Sounds
-var _actions: OnionActions          # where Onion looks, its hop and lean, the ? and ! marks
 var _tapped := false               # the child has tapped the cauldron (it counts from when Onion is up)
 var _tap_open := false             # a tap on the cauldron counts now, even before it is asked for
 var _rattle_amp := 0.0             # how much the cauldron trembles, radians
@@ -201,7 +176,7 @@ class ShelfCopy extends "res://trials/tidy/tidy_trial.gd":
 
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
-	if _onion != null:   # not handed over to the first visit: the shelf goes back to Wei's place
+	if not _handed_over:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.shelf_frame = Transform3D.IDENTITY
 		show_sim_props(true)
 	for node in [_orb, _box, _music]:
@@ -222,16 +197,12 @@ func run() -> void:
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _direction: Vector3) -> void: _on_target(target))
 	Events.intro_jump_requested.connect(jump_to)
 	Events.intro_zones_requested.connect(toggle_zones)
-	# Onion moves while any line plays, Wei's too: one voice, one guide.
-	Events.said.connect(func(text: String) -> void: _talk_until = _clock + maxf(1.5, text.length() * 0.065))
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
-	if &"announce_table" in App.reality:
-		App.reality.announce_table = false
+	App.reality.announce_table = false
 	if not App.reality.is_settled:
 		await App.reality.settled
 	tools_ready = true
 	show_sim_props(false)
-	_ask_for_room_scan()
 	await _setup()
 	# The room is planned from where the child sits when Start (or a jump) is pressed, not from the
 	# headset's pose in the first seconds after launch (the adult putting it on): headset run, Oct 31.
@@ -286,9 +257,9 @@ func _plan_and_build() -> void:
 	_plan_head = App.head().global_transform
 	_planned = true
 	_ahead = Vector3(-_plan_head.basis.z.x, 0.0, -_plan_head.basis.z.z).normalized()
-	_on_table = await _cauldron_on_table()
 	_table = App.reality.work_surface()
-	_pin_table()
+	_on_table = await _cauldron_on_table()
+	App.reality.select_table(_table)
 	# Wei's shelf (here and in the first visit) stands where the plan put the bench, not where the head is.
 	ShelfCopy.shelf_frame = _layout.bench
 	ShelfCopy.shelf_below = _layout.bench_below
@@ -307,27 +278,10 @@ func _head() -> Transform3D:
 	return _plan_head if _planned else App.head().global_transform
 
 
-## Locks the table the plan used (a real one, or the pretend patch frozen where it is now), and stops
-## Reality asking for hands on the table: a table found later must not move the shelf.
-func _pin_table() -> void:
-	var table := App.reality.work_surface()
-	if not App.reality.surfaces(&"table").has(table):   # the pretend patch: freeze it as a table
-		table = Surface.new(&"table", table.transform, table.size)
-	App.reality.select_table(table)   # Wei's hook (Nov 7): replaces the old _pinned workaround
-	if &"_hands_asked" in App.reality:
-		App.reality._hands_asked = false
-
-
-## The Quest's room scan (Space Setup) needs this permission at run time.
-func _ask_for_room_scan() -> void:
-	if OS.get_name() == "Android":
-		OS.request_permission("com.oculus.permission.USE_SCENE")
-
-
 ## One line that says where everything was placed from, for headset runs (adb logcat | grep ENTRY).
 func _placement_summary() -> void:
 	var table := App.reality.work_surface()
-	var real := App.reality.surfaces(&"table").has(table)
+	var real := _layout.real_table
 	var eye := _plan_head.origin
 	var to_table := table.transform.origin - eye
 	var table_yaw := rad_to_deg(Vector2(_ahead.x, _ahead.z).angle_to(Vector2(to_table.x, to_table.z)))
@@ -352,13 +306,13 @@ func _play(part: StringName, fast: bool, runner: PartRunner) -> void:
 			await _out()
 			await _pickup()
 			await _place()
-			await _reveal(false)
+			await _reveal()
 		&"hello": await _hello(fast)
 		&"touch": await _touch()
 		&"emerge": await _out()
 		&"pickup": await _pickup()
 		&"place": await _place()
-		&"reveal": await _reveal(fast)
+		&"reveal": await _reveal()
 	if runner == _runner and _part_running:
 		_part_over.emit(&"finished")
 
@@ -372,7 +326,7 @@ func _interrupt(part: StringName) -> void:
 	_runner = PartRunner.new()
 	add_child(_runner)
 	get_tree().call_group(&"entry_transient", "queue_free")   # rings and glints left by the old part
-	_cue = false
+	_orb.cue = false
 	_part_over.emit(&"interrupted")
 
 
@@ -396,21 +350,21 @@ func _hello(fast := false) -> void:
 	# it away; a startled hop and an angled peek; "nearly ready" is a sheepish correction to the
 	# child, said while still half over the cauldron; then it straightens up and faces the child.
 	_attend(_peer_point())
-	_actions.lean_in(_runner, true)
+	_orb.actions.lean_in(_runner, true)
 	_search()   # one or two small searching movements, while it speaks
 	await say("I was getting things ready.")
 	await _knock()   # the gear shifts against the cauldron's inside
-	_actions.hop(_runner)   # a small startled hop
+	_orb.actions.hop(_runner)   # a small startled hop
 	await _wait(0.5)   # then an angled peek into the opening
 	_attend(null)   # a glance back at the child, still leaning over the cauldron
 	await say("Nearly ready.")
-	_actions.lean_in(_runner, false)   # straightens up
+	_orb.actions.lean_in(_runner, false)   # straightens up
 	await _wait(0.4)
 	await say("I'm Onion, by the way.")
 	_attend(_peer_point())   # turns to the cauldron, glances back
 	await _wait(0.5)
 	_attend(null)
-	_actions.mark(_runner, "?", 2.4)
+	_orb.actions.mark(_runner, "?", 2.4)
 	await say("Could you help me with something?")
 
 
@@ -422,25 +376,25 @@ func _touch() -> void:
 	if _rattle_amp < 0.006:
 		_rattle(0.006)   # (a jump straight here) the faint rattle goes on until the tap
 	if not _tapped:
-		_cue = true   # the cauldron glows slowly
+		_orb.cue = true   # the cauldron glows slowly
 		_tap_cycle()   # the hand shows the tap twice, then rests; the interval and one slow straighten
 		# During the instruction Onion moves beside the mouth (the hand keeps the rim to itself),
 		# turns toward the rim and leans a little toward the contact point.
 		_attend(_rim_point())
-		_actions.lean_to(_runner, 0.2, 0.7)
+		_orb.actions.lean_to(_runner, 0.2, 0.7)
 		_move(_orb, _beside_mouth(), 0.7)
 		await say("Give the cauldron a little tap.")
 		if not _tapped:
 			await _runner.cauldron_touched
 		_demo.stop()
-	_cue = false
+	_orb.cue = false
 	_rattle(0.0)   # an accepted touch stops the rattle
-	_actions.lift(_runner, -0.012, 0.6)   # a small dip, as if listening
+	_orb.actions.lift(_runner, -0.012, 0.6)   # a small dip, as if listening
 	# No line here any more (Megan cut it): Onion peers into the opening for a moment, listening.
 	_attend(_peer_point())
-	_actions.lean_to(_runner, 0.35, 0.4)
+	_orb.actions.lean_to(_runner, 0.35, 0.4)
 	await _wait(1.0)
-	_actions.lean_to(_runner, 0.0, 0.5)   # then straightens; _out drifts it aside (0.8 s) before the launch
+	_orb.actions.lean_to(_runner, 0.0, 0.5)   # then straightens; _out drifts it aside (0.8 s) before the launch
 	_attend(null)
 
 
@@ -462,7 +416,7 @@ func _tap_cycle() -> void:
 		if not straightened and not _tapped and runner == _runner and is_instance_valid(runner):
 			straightened = true
 			_attend(null)
-			_actions.lean_to(runner, 0.0, 0.8)   # once, slowly, then it stays still
+			_orb.actions.lean_to(runner, 0.0, 0.8)   # once, slowly, then it stays still
 			await runner.wait(0.9)
 
 
@@ -487,17 +441,16 @@ func _out() -> void:
 	_beat("3: the gear comes out")
 	await _onion_aside()   # beside the cauldron, watching its mouth (0.8 s, clear of the opening)
 	_attend(_mouth)
-	_actions.lean_to(_runner, -0.15, 0.4)   # one slight backward lean as the rattle builds
+	_orb.actions.lean_to(_runner, -0.15, 0.4)   # one slight backward lean as the rattle builds
 	_rattle(0.03)   # the device's rattle: heavier than Onion's, still playful
 	_sounds.play(&"device_rattle", _box.global_position)
 	await _wait(0.9)
 	_rattle(0.0)
 	await _emerge_gear()   # at launch _surprise: the small backward hop and the !
-	_actions.lean_to(_runner, 0.0, 0.5)
+	_orb.actions.lean_to(_runner, 0.0, 0.5)
 	await _wait(0.3)
 	_attend(_gear)   # the settled gear
-	if USE_REAL_CARRY:
-		_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
+	_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
 	# (No look at the socket yet: the story moved that cue to placement, so the child can examine the gear first.)
 	await say("There it is! The table's missing piece.")
 	_attend(null)   # turns back to the child (Megan cut "I've been looking for that.")
@@ -506,22 +459,22 @@ func _out() -> void:
 ## 4. Asks the child to pick the gear up, with a hand that shows the pinch; ends when it is held.
 func _pickup() -> void:
 	_beat("4: pick it up")
-	if USE_REAL_CARRY and not _carry.enabled:
+	if not _carry.enabled:
 		_carry.begin(_gear, _socket_at)   # a jump straight here: the child may grab during the ask, as in the full flow
-	var already := USE_REAL_CARRY and _carry.has_been_picked_up()   # the child did it before being asked
+	var already := _carry.has_been_picked_up()
 	if not already:
 		_attend(_gear)   # looks at the gear with a small curious lean; the gear stays still
-		_actions.lean_to(_runner, 0.15, 0.5)
+		_orb.actions.lean_to(_runner, 0.15, 0.5)
 		_glow_gear(true)   # a soft, steady highlight on the casing while the hand shows it
 		await say("Would you pick it up for me?")   # picking it up is the child agreeing to help
-		if not (USE_REAL_CARRY and _carry.has_been_picked_up()):
+		if not _carry.has_been_picked_up():
 			_demo.pinch_lift(_gear)   # shows the gesture; the real gear stays where it is
 			await say("Pinch your fingers together, and keep them closed.")
 	await _child_picks_up()
 	_demo.stop()
 	_glow_gear(false)   # grabbed: the highlight goes
-	_actions.lean_to(_runner, 0.0, 0.4)
-	_actions.lift(_runner, 0.02, 0.6)   # a small pleased lift
+	_orb.actions.lean_to(_runner, 0.0, 0.4)
+	_orb.actions.lift(_runner, 0.02, 0.6)   # a small pleased lift
 	_attend(_gear)   # follows the held gear gently (the look is smoothed, so hand tremor is ignored)
 	# (no line: "Quite a little thing, isn't it?" was cut, Megan Nov 1) a moment with the gear in hand
 	await _wait(1.0)
@@ -556,20 +509,20 @@ func _glow_gear(on: bool) -> void:
 func _place() -> void:
 	_beat("5: set it in")
 	_glow_gear(false)
-	if USE_REAL_CARRY and not _carry.enabled:
+	if not _carry.enabled:
 		_carry.begin(_gear, _socket_at)   # a jump straight here: the child may act during the instruction
-	_actions.lean_to(_runner, 0.3, 0.8)   # moves beside the socket (0.8 s), looks down and holds
+	_orb.actions.lean_to(_runner, 0.3, 0.8)   # moves beside the socket (0.8 s), looks down and holds
 	_move(_orb, _beside_socket(), 0.8)   # genuinely beside the socket (EntryLayout.onion_socket), clear of the hand
 	_attend(_socket_at)
-	if not (USE_REAL_CARRY and _carry.has_docked()):   # a child who set it in while Onion talked is not asked to
+	if not _carry.has_docked():
 		_demo.lower_release(_socket_at)
 		await say("Set it in here, then open your fingers.")
 		await _child_sets_in()
 	_demo.stop()
 	_sounds.play(&"seat", _socket_at)   # once, on the completed seating
 	_dock_at_once()   # settled, upright, and now turning
-	_actions.lean_to(_runner, 0.0, 0.4)
-	_actions.lift(_runner, 0.02, 0.6)   # lifts slightly
+	_orb.actions.lean_to(_runner, 0.0, 0.4)
+	_orb.actions.lift(_runner, 0.02, 0.6)   # lifts slightly
 	_attend(_mechanism)   # and looks at the connected mechanism (no line: Megan cut "Ah. There we go.")
 	await _wait(1.2)
 	# Onion rises and turns to the room.
@@ -579,10 +532,10 @@ func _place() -> void:
 
 ## 6. The reveal: a gentle ripple from the socket shows the nearby workshop and shelf; Onion has
 ## been looking forward to it; a pause to enjoy the room; then it notices the scattered things.
-func _reveal(fast := false) -> void:
+func _reveal() -> void:
 	_beat("6: the reveal")
 	await _make_way()   # layout chat: what stands where the bench goes glides aside first
-	_actions.lean_to(_runner, 0.0, 0.5)
+	_orb.actions.lean_to(_runner, 0.0, 0.5)
 	_attend(_shelf)   # as the ripple spreads Onion straightens and turns to one revealed feature (the shelf)
 	# The cauldron's job is done (Megan). Where it stands in the bench's way it sinks as the ripple
 	# starts (layout chat: EntryLayout.ripple_overlaps); otherwise it has sunk away by the time the
@@ -600,15 +553,11 @@ func _reveal(fast := false) -> void:
 	# Onion rises slightly, takes in the room, then drifts aside (story chat, approved replacement).
 	_attend(_ahead * 1.5 + App.head().global_position + Vector3.UP * 0.2)
 	await _move(_orb, _orb.global_position + Vector3.UP * 0.04, 0.8)
-	_move(_orb, _aside_spot() + Vector3.UP * 0.1, 1.2)
+	_move(_orb, _aside_spot() + Vector3.UP * 0.1, 1.2)   # the workshop takes it on beside the shelf
 	_attend(null)
-	await say("Welcome to the workshop.")
-	if not fast:
-		await _wait(1.0)   # a short quiet pause (was 3 s: Megan)
-	# The shapes arrived with the shelf (the ripple showed them). Onion's noticing and invitation lines
-	# ("Oh! I'd nearly forgotten about these." ... "You could join me, if you like.") moved to
-	# first_visit.gd on Nov 10 (Megan): there the shelf level is already running, so the child can pick
-	# the shapes up and sort while Onion talks. Its float toward the shapes moved with them.
+	# The shapes arrived with the shelf (the ripple showed them). "Welcome to the workshop." and Onion's
+	# noticing and invitation lines are said in first_visit.gd (Megan, Nov 10 and 11): the shelf level
+	# is already running there, so the child can pick the shapes up and sort while Onion talks.
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
@@ -616,7 +565,7 @@ func _to_shelf(fast := false) -> void:
 	_beat("5: to the shelf")
 	if FirstVisit.start_with != &"motion":
 		FirstVisit.invite = true   # Onion notices the shapes and invites, with the level already running
-	if FIRST_THINGS and _first_seed != 0:   # the real trial makes the same things, already in place
+	if _first_seed != 0:   # the real trial makes the same things, already in place
 		ShelfCopy.seed_next = _first_seed
 		ShelfCopy.things_arrive = false
 	Engine.time_scale = 1.0   # Wei's World at normal speed
@@ -650,7 +599,7 @@ func _setup() -> void:
 		print("ENTRY setup: skipped (tests)")
 		return
 	var skipped := await _step_hands()
-	if not skipped and CONFIRM_TABLE:
+	if not skipped:
 		skipped = await _step_table()
 	if not skipped:
 		skipped = await _step_reach()
@@ -836,15 +785,14 @@ func _take_press(ids: Array) -> StringName:
 ## the table, the workshop hidden or shown. Same cauldron, Onion and shelf each time.
 func _set_up_for(part: StringName) -> void:
 	_make_way(0.0, part in [&"hello", &"touch", &"emerge", &"pickup", &"place", &"reveal"])   # layout chat: the cauldron and panel where this part finds them
-	_cue = false
+	_orb.cue = false
 	_tapped = false
 	_tap_open = false
 	_rattle_amp = 0.0
-	_actions.attention = null
-	_actions.hop_y = 0.0
-	_actions.lean = 0.0
-	if USE_REAL_CARRY:
-		_carry.reset()
+	_orb.actions.attention = null
+	_orb.actions.hop_y = 0.0
+	_orb.actions.lean = 0.0
+	_carry.reset()
 	_surface_points.clear()
 	_box.visible = part != &"shelf"   # back for every part but the shelf (it went after the ripple)
 	_box.scale = Vector3.ONE
@@ -891,12 +839,11 @@ func _show_detail(detail: Node3D, shown: bool) -> void:
 func _hand_over() -> void:
 	var workshop := Workshop.new()
 	App.main.add_child(workshop)
-	workshop.take({onion = _orb, model = _onion, face = _face, rest_y = _onion_rest_y, glow = _glow,
-			halo = _halo, cauldron = _box, rest = _beside_shelf(), music = _music, mechanism = _mechanism, gear = _gear,
-			mouth = _mouth, sounds = _sounds, layout = _layout})
+	workshop.take({onion = _orb, cauldron = _box, rest = _beside_shelf(), music = _music, mechanism = _mechanism,
+			gear = _gear, mouth = _mouth, sounds = _sounds, layout = _layout})
 	if is_instance_valid(_cauldron_target):
 		_cauldron_target.queue_free()   # nothing to touch there any more
-	_onion = null   # this opening's Onion code stops; the workshop looks after it
+	_handed_over = true   # this opening's cauldron code stops; the workshop looks after it
 
 
 ## Speaks [param text] (baked audio + subtitle) and waits for the voice to finish it, then a
@@ -956,7 +903,7 @@ func _on_target(target: Target) -> void:
 	if target != null and String(target.id).begins_with("entry_confirm"):
 		_confirm_pressed.emit(target.id)
 		return
-	if target == null or target.id != &"entry_cauldron" or not (_cue or _tap_open):
+	if target == null or target.id != &"entry_cauldron" or not (_orb.cue or _tap_open):
 		return
 	if PlayMode.is_dev():
 		print("ENTRY touched: ", target.id)
@@ -970,78 +917,6 @@ func _on_target(target: Target) -> void:
 func _beat(text: String) -> void:
 	beat = text
 	if PlayMode.is_dev(): print("ENTRY beat ", text)
-
-
-# --- DESKTOP: moving the head ------------------------------------------------
-
-## Metres a second the head moves with the keys (a seated child only leans a little),
-## and radians a second it turns.
-const HEAD_SPEED := 0.5
-const HEAD_TURN := 1.2
-var _head_start: Variant = null
-
-## Without a headset: W / S forward and back, A / D left and right, Q / E down and up; the
-## arrow keys look (left / right turn, up / down tilt); R puts everything back where it
-## started. (Right-drag looks too, but is hard on a trackpad.) The mouse hand moves with the
-## head, so the cursor stays on target.
-func _move_head(delta: float) -> void:
-	if App.xr != null or App.sim_input == null or App.rig == null:
-		return
-	var head := App.rig.head
-	if _head_start == null:
-		_head_start = head.global_position
-	if Input.is_physical_key_pressed(KEY_R):
-		head.global_position = _head_start
-		_look(Vector3.ZERO)
-		_hand_to_cursor()
-		return
-	var turned := _turn_head(delta)
-	var forward := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
-	var right := forward.cross(Vector3.UP)
-	var step := Vector3.ZERO
-	step += forward * (float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S)))
-	step += right * (float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)))
-	step += Vector3.UP * (float(Input.is_physical_key_pressed(KEY_E)) - float(Input.is_physical_key_pressed(KEY_Q)))
-	if step != Vector3.ZERO:
-		head.global_position += step.normalized() * HEAD_SPEED * delta / maxf(Engine.time_scale, 0.05)
-	if step != Vector3.ZERO or turned:
-		_hand_to_cursor()
-
-
-## The arrow keys turn and tilt the head. True while one is down.
-func _turn_head(delta: float) -> bool:
-	var turn := float(Input.is_physical_key_pressed(KEY_LEFT)) - float(Input.is_physical_key_pressed(KEY_RIGHT))
-	var tilt := float(Input.is_physical_key_pressed(KEY_UP)) - float(Input.is_physical_key_pressed(KEY_DOWN))
-	if turn == 0.0 and tilt == 0.0:
-		return false
-	var amount := HEAD_TURN * delta / maxf(Engine.time_scale, 0.05)
-	var head := App.rig.head
-	_look(Vector3(clampf(head.rotation.x + tilt * amount, -1.3, 1.3), head.rotation.y + turn * amount, 0.0))
-	return true
-
-
-## Points the head ([param angles]: tilt, turn) and tells the mouse driver, so its own
-## right-drag carries on from here instead of jumping back.
-func _look(angles: Vector3) -> void:
-	App.rig.head.rotation = angles
-	var driver := _mouse_driver()
-	if driver != null:
-		driver.set("_pitch", angles.x)
-		driver.set("_yaw", angles.y)
-
-
-func _mouse_driver() -> DesktopDriver:
-	for sibling in App.main.get_children():
-		if sibling is DesktopDriver:
-			return sibling as DesktopDriver
-	return null
-
-
-## Puts the mouse hand back under the cursor (it stays where it was in the room when the head moves).
-func _hand_to_cursor() -> void:
-	var driver := _mouse_driver()
-	if driver != null:
-		driver._place_hand(get_viewport().get_mouse_position())
 
 
 # --- Pressing -----------------------------------------------------------------
@@ -1076,7 +951,7 @@ func _poke_cauldron() -> void:
 		var inside: bool = tip != null and (tip as Vector3).distance_to(_cauldron_target.global_position) <= CAULDRON_WIDTH * 0.6
 		var was: bool = _in_cauldron.get(side, false)
 		_in_cauldron[side] = inside
-		if inside and not was and (_cue or _tap_open):
+		if inside and not was and (_orb.cue or _tap_open):
 			var ratio := (tip as Vector3).distance_to(_cauldron_target.global_position) / (CAULDRON_WIDTH * 0.6)
 			if not (is_instance_valid(_orb) and (tip as Vector3).distance_to(_orb.global_position) / LineSkip.RADIUS < ratio):   # poking Onion is no tap
 				_on_target(_cauldron_target)
@@ -1186,9 +1061,8 @@ func toggle_zones() -> void:
 ## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
 ## finds the height by depth). A coroutine: the search runs on a worker thread.
 func _cauldron_on_table() -> Variant:
-	var table := App.reality.work_surface()
-	var real := App.reality.surfaces(&"table").has(table)
-	_layout = _new_layout(table, real, _reach_measured)
+	var real := App.reality.surfaces(&"table").has(_table)
+	_layout = _new_layout(_table, real, _reach_measured)
 	# The plan is a search that takes a second or more on the headset: off the main thread, the scene
 	# keeps drawing meanwhile (the layout holds numbers only, no nodes).
 	var started := Time.get_ticks_msec()
@@ -1502,10 +1376,7 @@ func _preload_first_visit() -> void:
 ## the SAME ones from the same seed: [method _to_shelf]), hidden like the shelf until the ripple reaches each.
 ## So the ripple reveals the shelf and its things together and nothing is swapped when the shelf level starts.
 func _build_first_things() -> void:
-	var plan := load("res://entry/first_visit_plan.tres") as SessionPlan
-	if plan == null or plan.blocks.is_empty() or not FIRST_THINGS:
-		return
-	var block: Block = plan.blocks[0]
+	var block := FirstVisit.SHELF_TASK.level_by_id(FirstVisit.TUTORIAL_LEVEL).plan.blocks[0]
 	var condition := block.trial.condition(block.difficulty, 0, block.probe, block.pins)
 	_first_seed = (randi() % 2147483646) + 1
 	ShelfCopy.seed_next = _first_seed
@@ -1548,7 +1419,7 @@ func _cauldron_spot() -> Vector3:
 			print("ENTRY spot: real table by depth, ", _away(flat), " m away, ", snappedf(eye.y - (flat as Vector3).y, 0.01), " m below the eyes")
 			return flat
 		await _wait(0.25)
-	if App.reality.surfaces(&"table").has(_table):
+	if _layout.real_table:
 		spot.y = _table.transform.origin.y
 		print("ENTRY spot: at the table's height (depth saw no flat patch there), ", _away(spot), " m away")
 	else:
@@ -1599,92 +1470,21 @@ func _toward_child() -> Vector3:
 func _build_onion() -> void:
 	add_child(_orb)
 	_orb.global_position = _inside()
-	_onion = ONION.instantiate()
-	_orb.add_child(_onion)
-	# Scale Onion to ONION_HEIGHT and centre it on the holder.
-	var bounds := _bounds(_onion)
-	_onion.scale *= ONION_HEIGHT / bounds.size.y
-	bounds = _bounds(_onion)
-	_onion.global_position -= bounds.get_center() - _orb.global_position
-	_onion_rest_y = _onion.position.y
-	var touch := OnionTouch.new()
-	touch.setup(_onion)
-	touch.minimum_y = _mouth.y + ONION_HEIGHT * 0.3
-	_orb.add_child(touch)
-	# Which way the eyes look: from the body's centre to the eyes' centre.
-	for mesh: MeshInstance3D in _onion.find_children("*Eyes*", "MeshInstance3D", true, false):
-		var eyes := (mesh.global_transform * mesh.get_aabb()).get_center()
-		var towards := eyes - bounds.get_center()
-		_face = _orb.global_transform.basis.inverse() * Vector3(towards.x, 0, towards.z).normalized()
-	# A soft light around Onion, so it glows on the cauldron and table.
-	_glow = OmniLight3D.new()
-	_glow.light_color = Color(1.0, 0.85, 0.2)
-	_glow.omni_range = 0.6
-	_glow.light_energy = 0.6
-	_orb.add_child(_glow)
-	# A small, soft halo around Onion in its own body colour, always facing the child.
-	var halo := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * ONION_HEIGHT * 1.5
-	# Normal (mixed) blending: over passthrough, an added glow can vanish.
-	var tint := _body_colour()
-	tint.a = 0.22
+	_orb.touch.minimum_y = _mouth.y + Onion.HEIGHT * 0.3
 	_sounds = Sounds.new()
 	_sounds.name = "Sounds"
 	add_child(_sounds)
-	_actions = OnionActions.new()
-	_actions.name = "OnionActions"
-	add_child(_actions)
-	_actions.setup(_orb, ONION_HEIGHT)
-	_halo = _material(tint, true)
-	_halo.albedo_texture = _soft_dot()
-	_halo.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	quad.material = _halo
-	halo.mesh = quad
-	_orb.add_child(halo)
-
-
-## Onion's body colour: the average of its texture where the body's UVs fall
-## (light blue). If the texture can't be read on this device, the value measured on the desktop.
-func _body_colour() -> Color:
-	var measured := Color(0.57, 0.84, 0.91)
-	for mesh: MeshInstance3D in _onion.find_children("*", "MeshInstance3D", true, false):
-		if mesh.name.contains("Eye"):
-			continue
-		var material := mesh.mesh.surface_get_material(0) as BaseMaterial3D
-		if material == null or material.albedo_texture == null:
-			continue
-		var image := material.albedo_texture.get_image()
-		if image == null:
-			break
-		if image.is_compressed() and image.decompress() != OK:
-			break
-		var uvs: PackedVector2Array = mesh.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-		var sum := Color(0, 0, 0, 0)
-		var count := 0
-		for i in range(0, uvs.size(), 7):
-			var x := clampi(int(fposmod(uvs[i].x, 1.0) * image.get_width()), 0, image.get_width() - 1)
-			var y := clampi(int(fposmod(uvs[i].y, 1.0) * image.get_height()), 0, image.get_height() - 1)
-			sum += image.get_pixel(x, y)
-			count += 1
-		if count > 0:
-			print("ENTRY Onion's colour: ", sum / count)
-			return Color(sum.r / count, sum.g / count, sum.b / count)
-	print("ENTRY Onion's colour: measured value (texture not readable here)")
-	return measured
 
 
 ## Where Onion hides: under the brew, out of sight.
 func _inside() -> Vector3:
-	return _mouth + Vector3.DOWN * (ONION_HEIGHT * 0.5 + 0.02)
+	return _mouth + Vector3.DOWN * (Onion.HEIGHT * 0.5 + 0.02)
 
 
-## Onion faces the child; bobs and glows while talking. The cauldron's cue and the
-## workshop's motes move here too.
+## The cauldron's rattle and the workshop's motes (Onion moves itself).
 func _process(delta: float) -> void:
 	_clock += delta
 	_real += delta / maxf(Engine.time_scale, 0.05)
-	_move_head(delta)
 	if App.rig != null:
 		_poke_cauldron()
 	if PlayMode.is_dev() or _show_hands_now:
@@ -1695,27 +1495,9 @@ func _process(delta: float) -> void:
 		var mote := _motes[i]
 		var home: Vector3 = mote.get_meta(&"home")
 		mote.global_position = home + Vector3(sin(_clock * 0.3 + i), sin(_clock * 0.4 + i * 1.7) * 0.6, cos(_clock * 0.25 + i * 0.9)) * 0.03
-	if _onion == null or App.rig == null:
-		return
-	_box.rotation.x = sin(_clock * 31.0 + 1.0) * _rattle_amp * 0.6
-	_box.rotation.z = sin(_clock * 38.0) * _rattle_amp
-	var talking := _clock < _talk_until
-	var bob := sin(_clock * TAU / 4.5) * 0.0035   # story: only a gentle float, 5-8 mm over 4-5 s, talking or not
-	_onion.position.y = lerpf(_onion.position.y, _onion_rest_y + bob + _actions.hop_y, minf(1.0, delta * 10.0))
-	_onion.rotation.x = lerpf(_onion.rotation.x, _actions.lean, minf(1.0, delta * 8.0))
-	_halo.albedo_color.a = 0.3 if talking else 0.22
-	if talking:
-		_glow.light_energy = 0.6 + 0.35 * (0.5 + 0.5 * sin(_clock * 9.0))
-	elif _cue:
-		_glow.light_energy = 0.5 + 0.5 * (0.5 + 0.5 * sin(_clock * 2.0))   # slow: about 3 s a breath
-	else:
-		_glow.light_energy = 0.6
-	var to_look := _actions.look_point() - _orb.global_position
-	to_look.y = 0
-	if to_look.length() < 0.01:
-		return
-	var turn := atan2(_face.x, _face.z) - atan2(to_look.x, to_look.z)
-	_orb.global_rotation.y = lerp_angle(_orb.global_rotation.y, -turn, minf(1.0, delta * 9.0))
+	if not _handed_over:
+		_box.rotation.x = sin(_clock * 31.0 + 1.0) * _rattle_amp * 0.6
+		_box.rotation.z = sin(_clock * 38.0) * _rattle_amp
 
 
 ## Onion rises just over the rim.
@@ -2109,19 +1891,6 @@ func _gear_arc(k: float, from: Vector3, to: Vector3, height: float) -> void:
 	_gear.rotation = Vector3(sin(k * PI) * 0.35, 0.0, 0.0)
 
 
-## PLACEHOLDER (the child will carry it): the gear lifts and sets itself into the socket, then
-## the gears and the panel's cog start turning.
-func _dock_gear() -> void:
-	var from := _gear.global_position
-	var tween := _runner.create_tween()
-	tween.tween_method(func(k: float) -> void:
-		_gear.global_position = from.lerp(_seat_at(), k) + Vector3.UP * 0.05 * 4.0 * k * (1.0 - k)
-		_gear.scale = Vector3.ONE * GEAR_PLAY_SCALE, 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	await tween.finished
-	_dock_at_once()
-	Events.feedback.emit(&"hint", _socket_at)
-
-
 ## The gear in the socket, upright, turning; the panel's cog turning.
 func _dock_at_once() -> void:
 	_gear.visible = true
@@ -2167,29 +1936,6 @@ func _peer_point() -> Vector3:
 	return _mouth + Vector3.DOWN * 0.04 + away * 0.05 + side * 0.04
 
 
-## While the child has not tapped yet: Onion looks at the rim where the hand taps, then at the
-## child, over and over, leaning a little toward the rim; after a long wait a small hop and
-## a look at the rim ask again. Stops by itself when the tap comes (or the part is cut).
-func _watch_for_tap() -> void:
-	var runner := _runner
-	var at_rim := true
-	var waited := 0.0
-	var hopped := false
-	while not _tapped and runner == _runner and is_instance_valid(runner):
-		_attend(_rim_point() if at_rim else null)
-		_actions.lean_in(runner, at_rim)
-		var seconds := 2.2 if at_rim else 1.4
-		await runner.wait(seconds)
-		waited += seconds
-		at_rim = not at_rim
-		if waited > 10.0 and not hopped:
-			hopped = true
-			_actions.hop(runner)
-	if runner == _runner and is_instance_valid(runner):
-		_attend(null)
-		_actions.lean_in(runner, false)
-
-
 ## Onion shifts a little from side to side over the opening, twice: searching.
 func _search() -> void:
 	var rim := _peek_spot()
@@ -2201,7 +1947,7 @@ func _search() -> void:
 
 ## Onion looks at [param what] (a Node3D or a position), or at the child when null.
 func _attend(what: Variant) -> void:
-	_actions.attention = what
+	_orb.actions.attention = what
 
 
 ## The cauldron trembles by [param amount] radians (0: still).
@@ -2230,7 +1976,7 @@ func _pop() -> void:
 ## The gear is out: Onion hops with a surprised "!".
 func _surprise() -> void:
 	_recoil()   # a small backward hop (0.25 s), settling over 0.6 s
-	_actions.mark(_runner, "!")
+	_orb.actions.mark(_runner, "!")
 	_attend(_gear)   # follows the gear's flight with a smooth turn
 
 
@@ -2243,22 +1989,18 @@ func _recoil() -> void:
 	await _move(_orb, home, 0.6)
 
 
-## Waits for the child to pick the gear up. Until the interaction chat's Carry is real
-## (USE_REAL_CARRY), a stand-in plays the child doing it.
+## Waits for the child to pick the gear up.
 func _child_picks_up() -> void:
 	var runner := _runner
-	if USE_REAL_CARRY and _carry.has_been_picked_up():
+	if _carry.has_been_picked_up():
 		return
-	if USE_REAL_CARRY:
-		if not _carry.enabled:
-			_carry.begin(_gear, _socket_at)
-		_carry.picked_up.connect(func() -> void:
-			if is_instance_valid(runner):
-				runner.picked_up.emit(), CONNECT_ONE_SHOT)
-		if simulate_child:
-			_pretend_pick_up(runner)
-	else:
-		_stand_in_pickup(runner)
+	if not _carry.enabled:
+		_carry.begin(_gear, _socket_at)
+	_carry.picked_up.connect(func() -> void:
+		if is_instance_valid(runner):
+			runner.picked_up.emit(), CONNECT_ONE_SHOT)
+	if simulate_child:
+		_pretend_pick_up(runner)
 	await runner.picked_up
 
 
@@ -2268,33 +2010,19 @@ func _pretend_pick_up(runner: PartRunner) -> void:
 		_carry.picked_up.emit()
 
 
-func _stand_in_pickup(runner: PartRunner) -> void:
-	await runner.wait(1.5)
-	runner.picked_up.emit()
-
-
 ## Waits for the child to set the gear into the socket.
 func _child_sets_in() -> void:
 	var runner := _runner
-	if USE_REAL_CARRY and _carry.has_docked():
+	if _carry.has_docked():
 		return   # the child already set it in, while Onion talked
-	if USE_REAL_CARRY:
-		if not _carry.held:   # a jump straight to Set in: the child has to pick it up as well
-			_carry.begin(_gear, _socket_at)
-		_carry.docked.connect(func() -> void:
-			if is_instance_valid(runner):
-				runner.docked.emit(), CONNECT_ONE_SHOT)
-		if simulate_child:
-			_carry.simulate(0.3)
-	else:
-		_stand_in_set_in(runner)
+	if not _carry.held:   # a jump straight to Set in: the child has to pick it up as well
+		_carry.begin(_gear, _socket_at)
+	_carry.docked.connect(func() -> void:
+		if is_instance_valid(runner):
+			runner.docked.emit(), CONNECT_ONE_SHOT)
+	if simulate_child:
+		_carry.simulate(0.3)
 	await runner.docked
-
-
-func _stand_in_set_in(runner: PartRunner) -> void:
-	await runner.wait(1.2)
-	await _dock_gear()
-	runner.docked.emit()
 
 
 func _slab(size: Vector3, at: Vector3, material: Material) -> MeshInstance3D:
@@ -2404,7 +2132,7 @@ func _glint(at: Vector3, normal: Vector3) -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE * 0.12
 	var light := _material(Color(1.0, 0.85, 0.5, 0.0), true)
-	light.albedo_texture = _soft_dot()
+	light.albedo_texture = Onion.soft_dot()
 	quad.material = light
 	disc.mesh = quad
 	add_child(disc)
@@ -2416,21 +2144,6 @@ func _glint(at: Vector3, normal: Vector3) -> void:
 	fade.tween_property(light, "albedo_color:a", 0.3, 0.5)
 	fade.tween_property(light, "albedo_color:a", 0.0, 1.5)
 	fade.tween_callback(disc.queue_free)
-
-
-## A round, soft-edged dot, made once.
-var _dot: GradientTexture2D
-func _soft_dot() -> GradientTexture2D:
-	if _dot == null:
-		_dot = GradientTexture2D.new()
-		_dot.fill = GradientTexture2D.FILL_RADIAL
-		_dot.fill_from = Vector2(0.5, 0.5)
-		_dot.fill_to = Vector2(1.0, 0.5)
-		var fall := Gradient.new()
-		fall.set_color(0, Color(1, 1, 1, 1))
-		fall.set_color(1, Color(1, 1, 1, 0))
-		_dot.gradient = fall
-	return _dot
 
 
 ## PLACEHOLDER workshop around the seated child: Wei's shelf (built at the start),
@@ -2523,10 +2236,6 @@ func _configure_interaction() -> void:
 		_mechanism.rotation.y, _box.global_position, CAULDRON_WIDTH * 0.5 + 0.06)
 	_carry.follow(_box, _mechanism)   # they move at the reveal
 	Events.selected.connect(_on_desktop_click)
-	if App.xr == null and App.main.get_node_or_null(^"DesktopKeys") == null:   # the head keys must outlive the opening
-		var keys := DesktopKeys.new()
-		keys.name = "DesktopKeys"
-		App.main.add_child(keys)
 	_carry.remind_after = PICKUP_REMINDER_SECONDS
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)
@@ -2597,7 +2306,6 @@ func _desktop_driver() -> DesktopDriver:
 ## the tap while it is asked for, the pick-up while the gear glows and has not been taken, the set-in while the
 ## hand shows it and the gear is not in.
 func _configure_skip() -> void:
-	_orb.add_to_group(&"onion_holder")
 	var skip := App.main.get_node_or_null(^"LineSkip") as LineSkip
 	if skip == null:
 		skip = LineSkip.new()
@@ -2609,15 +2317,10 @@ func _configure_skip() -> void:
 	skip.rival_line = _rival_line
 	skip.rival_point = _rival_point
 	_carry.picked_up.connect(skip.took_something)
-	var voice := App.module(&"Voice")
-	if voice != null and voice.has_signal(&"line_finished"):
-		voice.line_finished.connect(func(_text: String, completed: bool) -> void:
-			if not completed:
-				_talk_until = _clock)   # a cut line: Onion stops "talking" with it
 
 
 func _tap_is_asked() -> bool:
-	return _cue and not _tapped
+	return _orb.cue and not _tapped
 
 
 func _pick_up_is_asked() -> bool:

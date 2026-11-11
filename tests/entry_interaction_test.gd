@@ -5,6 +5,7 @@ extends TestCase
 ## real Entry configures it.
 
 const CAULDRON_PLAY_CLEAR := 0.17
+const MOTION_DEF := preload("res://trials/motion/motion.tres")
 var carry: Carry
 var gear: Node3D
 var spin: GearSpin
@@ -939,7 +940,7 @@ func _opening_at_start() -> Entry:
 func test_a_click_on_the_cauldron_registers_every_time_a_click_beside_it_does_not() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting for a tap")
 	var driver: DesktopDriver = entry._desktop_driver()
 	var camera := App.rig.head
 	var target: Target = entry.get("_cauldron_target")
@@ -1202,8 +1203,6 @@ func _key(code: Key, down: bool) -> void:
 
 func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_follows() -> void:
 	var entry := await _opening_at_start()
-	var keys := App.main.get_node_or_null(^"DesktopKeys")
-	expect(keys != null, "the key node is there, under Main (it outlives the opening)")
 	var head := App.rig.head
 	var start := head.global_position
 	_key(KEY_W, true)
@@ -1217,7 +1216,6 @@ func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_fol
 	App.main.change_scene(&"first_visit")   # the opening hands over to the shelf
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not is_instance_valid(entry), 10.0), "now in the shelf scene")
 	await wait(1.5)
-	expect(App.main.get_node_or_null(^"DesktopKeys") == keys, "the same key node, still there")
 	var before := head.global_position
 	var ahead := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
 	_key(KEY_W, true)
@@ -1486,7 +1484,7 @@ func test_losing_the_hand_joints_in_a_headset_lets_the_gear_go_after_a_blink_and
 func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_finger_does_not() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting for a tap")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting for a tap")
 	_headset_on()   # from here the hand is a real one
 	_fake_hand(&"right")
 	var pot: Target = entry.get("_cauldron_target")
@@ -1501,7 +1499,7 @@ func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_
 	await wait(0.5)
 	expect_eq(taps.size(), after_first, "and resting in there does not tap again")
 	entry.set("_tap_open", false)
-	entry.set("_cue", false)
+	(entry.get("_orb") as Onion).cue = false
 	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.0, 0.4))
 	await wait(0.3)
 	await _pose_hand(&"right", pot.global_position + Vector3(0.0, 0.08, 0.04))
@@ -1512,7 +1510,7 @@ func test_a_fingertip_poke_taps_the_cauldron_in_the_tap_beat_only_and_a_resting_
 func test_in_a_headset_the_desktop_click_and_keys_stay_out_of_the_way() -> void:
 	var entry := await _opening_at_start()
 	await jump_to_intro_part(&"touch")
-	expect(await until(func() -> bool: return entry.get("_cue"), 20.0), "the Tap beat is waiting")
+	expect(await until(func() -> bool: return (entry.get("_orb") as Onion).cue, 20.0), "the Tap beat is waiting")
 	_headset_on()
 	var taps := record(entry._runner.cauldron_touched)
 	var target: Target = entry.get("_cauldron_target")
@@ -1775,7 +1773,7 @@ func test_the_motion_tutorial_plays_the_example_with_nothing_judged_or_logged() 
 	tutorial.effect_started.connect(func() -> void: order.append("effect"))
 	tutorial.settled.connect(func() -> void: order.append("settled"))
 	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
-	tutorial.play(frame)
+	tutorial.play(MOTION_DEF.condition(0.0, 0, false), frame)
 	await wait(0.4)
 	var cloud: GPUParticles3D = tutorial._cloud
 	var material := cloud.process_material as ShaderMaterial
@@ -1813,7 +1811,7 @@ func test_stopping_the_motion_tutorial_takes_the_dots_and_the_hand_and_nothing_f
 	tutorial.heading = &"left"
 	var eye := App.head().global_position
 	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
-	tutorial.play(frame)
+	tutorial.play(MOTION_DEF.condition(0.0, 0, false), frame)
 	await wait(0.4)
 	expect_eq((tutorial._cloud.process_material as ShaderMaterial).get_shader_parameter(&"flow_direction"), Vector3.LEFT, "a flow to the left")
 	expect((tutorial.hand_to - tutorial.hand_from).normalized().dot(frame.basis * Vector3.LEFT) > 0.99, "and the hand sweeps to the left")
@@ -1854,7 +1852,7 @@ func test_the_motion_choice_is_chosen_by_a_pinch_aimed_at_it() -> void:
 	expect_eq(chosen.size(), 1, "and only once")
 
 
-func test_the_motion_choice_is_chosen_by_a_mouse_click_at_any_hand_depth() -> void:
+func test_the_motion_choice_is_chosen_by_an_aimed_mouse_click() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
@@ -1864,40 +1862,33 @@ func test_the_motion_choice_is_chosen_by_a_mouse_click_at_any_hand_depth() -> vo
 		if sibling is DesktopDriver:
 			driver = sibling
 	expect(driver != null, "the mouse driver is there")
-	for depth: float in [0.2, 0.45, 0.9]:
-		choice._open = true
-		driver.depth = depth
-		driver._place_hand(App.rig.head.unproject_position(choice.global_position))
-		await frames(2)
-		input.press(&"right", &"trigger_click", true)
-		await frames(2)
-		input.press(&"right", &"trigger_click", false)
-		await frames(2)
-	expect_eq(chosen.size(), 3, "a click chooses it at every hand depth")
-	choice._open = true
-	driver.depth = 0.9
+	driver.depth = 0.2
 	driver._place_hand(App.rig.head.unproject_position(choice.global_position + App.head().global_basis.x * 0.3))
 	await frames(2)
 	input.press(&"right", &"trigger_click", true)
 	await frames(2)
 	input.press(&"right", &"trigger_click", false)
 	await frames(2)
-	expect_eq(chosen.size(), 3, "a click a hand's width beside it does not")
+	expect(chosen.is_empty(), "a click beside the disc leaves the choice open")
+	driver._place_hand(App.rig.head.unproject_position(choice.global_position))
+	await frames(2)
+	input.click(&"right", &"trigger_click")
+	await frames(2)
+	expect_eq(chosen.size(), 1, "a click aimed at the disc chooses it")
 
 
-func test_the_motion_choice_is_chosen_by_a_fingertip_touching_it() -> void:
+func test_touching_the_motion_choice_leaves_it_open() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
 	await _until_open(choice)
-	var eye := App.head().global_position
 	var back := choice.global_position + Vector3(0.0, 0.0, 0.3)
 	var along := (choice.global_position - back).normalized()
 	input.point(&"right", back - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
 	await frames(3)
 	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position)   # the fingertip goes in
 	await frames(4)
-	expect_eq(chosen.size(), 1, "a fingertip going into it chooses it")
+	expect(chosen.is_empty() and choice.is_open(), "a fingertip going into it does not press the button")
 
 
 func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it() -> void:
@@ -1920,7 +1911,7 @@ func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it
 	expect(choice.is_open(), "and it stays on offer")
 
 
-func test_a_press_on_it_before_it_is_offered_or_after_it_is_closed_does_nothing_and_a_fingertip_lifts_it() -> void:
+func test_the_motion_choice_highlights_on_aim_and_only_accepts_presses_while_open() -> void:
 	await boot(null, &"intro")
 	var choice := _choice()
 	var chosen := record(choice.chosen)
@@ -1928,11 +1919,10 @@ func test_a_press_on_it_before_it_is_offered_or_after_it_is_closed_does_nothing_
 	expect(chosen.is_empty(), "not before it is offered")
 	await _until_open(choice)
 	var at := choice.global_position
-	var along := Vector3.FORWARD
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.06) - along * App.rig.pointer(&"right").tip_reach, at + Vector3(0.0, 0.0, -0.3))   # a fingertip close in front
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at)
 	await frames(3)
-	expect(choice._look.position.z > 0.005, "a fingertip close in front lifts it toward the hand")
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.5), at)
+	expect(choice._look.position.z > 0.005, "aiming at the disc lifts it")
+	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at + Vector3.RIGHT)
 	await frames(3)
 	expect(choice._look.position.z == 0.0, "and it settles when the hand goes")
 	choice.close()

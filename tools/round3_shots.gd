@@ -59,7 +59,7 @@ func _subtitles() -> void:
 	for thing: Node3D in things:
 		middle += thing.global_position
 	middle /= maxf(things.size(), 1)
-	var onion: Node3D = App.main.get_node(^"Workshop").get("_onion")
+	var onion: Node3D = (App.main.get_node(^"Workshop") as Workshop).onion
 	for setting: Array in [[25.0, 20.0, "now_25_20"], [36.0, 12.0, "proposed_36_12"]]:
 		voice.above_gaze = setting[0]
 		voice.above_horizon = setting[1]

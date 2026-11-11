@@ -16,6 +16,7 @@ extends Reality
 
 const SceneAnchor := preload("res://reality/scene_anchor.tscn")
 const DimShader := preload("res://reality/dim_sphere.gdshader")
+const SCENE_PERMISSION := "com.oculus.permission.USE_SCENE"
 
 var _black_white := Gradient.new()
 var _dim := ShaderMaterial.new()
@@ -29,9 +30,6 @@ var _finder := TableFinder.new()
 ## The table found without the room scan (depth or hands); null while none.
 var _table: Surface
 var _rescan_after := 0
-## Say "Got it. That's your table." when depth finds the table. Off while something
-## else sets the table up quietly (the entry's own table check).
-var announce_table := true
 
 
 func kind() -> String:
@@ -60,16 +58,33 @@ func _ready() -> void:
 	App.rig.head.add_child(_sphere)
 	_scan.default_scene = SceneAnchor
 	_scan.scene_setup_method = &"setup_scene"
-	_scan.auto_create = true
+	_scan.auto_create = not OS.has_feature("android") or OS.request_permission(SCENE_PERMISSION)
 	_scan.openxr_fb_scene_data_missing.connect(note.bind(&"room_missing", {}))
 	App.rig.add_child(_scan)
 	App.rig.add_child(_depth)
 	for side in [&"left", &"right"]:
 		App.rig.tracked_hand(side).reveal_real_hand()
-	_camera = QuestCamera.new()
-	add_child(_camera)
+	if _scan.auto_create:
+		_start_camera()
+	else:
+		get_tree().on_request_permissions_result.connect(_on_scene_permission)
 	_apply()
 	get_tree().create_timer(ROOM_READY_AFTER).timeout.connect(_room_ready)
+
+
+func _on_scene_permission(permission: String, granted: bool) -> void:
+	if permission != SCENE_PERMISSION:
+		return
+	get_tree().on_request_permissions_result.disconnect(_on_scene_permission)
+	if granted:
+		_scan.auto_create = true
+		_scan.create_scene_anchors()
+	_start_camera()
+
+
+func _start_camera() -> void:
+	_camera = QuestCamera.new()
+	add_child(_camera)
 
 
 ## Seconds after start at which the room is summed up ("room_ready").
@@ -224,7 +239,7 @@ func _room_ready() -> void:
 
 
 func camera_frame() -> CameraFrame:
-	return _camera.frame()
+	return _camera.frame() if _camera else null
 
 
 func _apply() -> void:

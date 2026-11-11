@@ -1,41 +1,14 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://trials/motion/motion_trial.gd" id="1_motion"]
-[ext_resource type="Shader" path="res://trials/motion/motion_dots.gdshader" id="2_dots"]
+[ext_resource type="PackedScene" path="res://trials/motion/motion_cloud.tscn" id="2_cloud"]
 [ext_resource type="Script" path="res://trials/motion/sweep_trail.gd" id="3_trail"]
 [ext_resource type="AudioStream" uid="uid://bpt7sh7bt2vr4" path="res://trials/motion/sounds/dots_shimmer.ogg" id="4_shimmer"]
-
-[sub_resource type="ShaderMaterial" id="flow"]
-resource_local_to_scene = true
-shader = ExtResource("2_dots")
-
-[sub_resource type="StandardMaterial3D" id="dot_material"]
-transparency = 1
-shading_mode = 0
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.75, 0.95, 1, 1)
-
-[sub_resource type="SphereMesh" id="dot"]
-material = SubResource("dot_material")
-radius = 0.02
-height = 0.04
-radial_segments = 8
-rings = 4
 
 [node name="Motion" type="Node3D"]
 script = ExtResource("1_motion")
 
-[node name="Cloud" type="GPUParticles3D" parent="."]
-amount = 200
-lifetime = 1000.0
-explosiveness = 1.0
-fixed_fps = 0
-visibility_aabb = AABB(-1.1, -0.8, -1.1, 2.2, 1.6, 2.2)
-local_coords = true
-draw_order = 3
-process_material = SubResource("flow")
-draw_pass_1 = SubResource("dot")
-cast_shadow = 0
+[node name="Cloud" parent="." instance=ExtResource("2_cloud")]
 
 [node name="Shimmer" type="AudioStreamPlayer3D" parent="Cloud"]
 stream = ExtResource("4_shimmer")

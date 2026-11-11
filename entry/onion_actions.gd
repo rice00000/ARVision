@@ -29,7 +29,7 @@ func setup(holder: Node3D, height: float) -> void:
 
 ## Where Onion looks now, in the world.
 func look_point() -> Vector3:
-	if attention is Node3D and is_instance_valid(attention):
+	if is_instance_valid(attention) and attention is Node3D:
 		return (attention as Node3D).global_position
 	if attention is Vector3:
 		return attention

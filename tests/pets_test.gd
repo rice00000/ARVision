@@ -124,7 +124,6 @@ func test_pet_rests_on_a_cushion_and_gets_up_when_it_is_put_away() -> void:
 	var pet := _own(&"pet_panda")
 	var other := _own(&"pet_monkey")
 	await _room()
-	App.module(&"Home")._show(&"decorate")
 	Events.furniture_requested.emit(&"cushion")
 	var cushion: Vector3 = _pets().cushions()[0]
 	expect_eq(_pets().free_cushion(pet), cushion, "a free cushion")

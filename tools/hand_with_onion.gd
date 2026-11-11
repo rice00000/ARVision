@@ -37,7 +37,7 @@ func _gesture(entry: Entry, name: String, part: StringName, mode: DemoHand.Mode,
 		_report.append("%s: the hand was not showing (mode %s)" % [name, demo._mode])
 		return
 	var orb: Node3D = entry.get("_orb")
-	var onion: Node3D = entry.get("_onion")
+	var onion: Node3D = (entry.get("_orb") as Onion).model
 	var box: AABB = entry._bounds(onion)   # Onion's box, tail and all (world axes)
 	var camera := App.rig.head
 	demo.set_process(false)

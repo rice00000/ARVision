@@ -180,6 +180,10 @@ func _activate() -> void:
 			_close()
 			Events.intro_zones_requested.emit()
 			return
+		&"fac_room_intro":
+			_close()
+			Events.room_intro_requested.emit()
+			return
 		&"fac_restart", &"fac_exit":
 			_confirmed_action = target.id
 			_confirm_label.text = "Restart this scene?" if target.id == &"fac_restart" else "Exit ARVision?"
@@ -329,8 +333,11 @@ func _build() -> void:
 		var part: String = parts[i]
 		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.041),
 			Vector2(-0.095 + 0.19 * (i % 2), 0.06 - 0.047 * floori(i / 2.0)), tools)
-	# Megan, Nov 10: the dev / play switch where the adult's other controls are (beside "Dots").
-	_button("fac_mode", "Mode: " + PlayMode.name(), Vector2(0.18, 0.041), Vector2(0.095, 0.06 - 0.047 * 4.0), tools)
+	var next := parts.size()   # the room intro plays in any scene: it opens the room
+	# Merge Nov 11: Wei's Room intro and Megan's dev / play Mode switch (Nov 10) share the slot beside "Dots", half width each.
+	var slot := Vector2(-0.095 + 0.19 * (next % 2), 0.06 - 0.047 * floori(next / 2.0))
+	_button("fac_room_intro", "Room intro", Vector2(0.088, 0.041), slot + Vector2(-0.045, 0), tools)
+	_button("fac_mode", "Mode: " + PlayMode.name(), Vector2(0.088, 0.041), slot + Vector2(0.045, 0), tools)
 	_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
 	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022, -0.16), tools)
 	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127, -0.16), tools)

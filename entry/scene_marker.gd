@@ -29,6 +29,7 @@ static func show_text(text: String) -> void:
 		label.position = Vector3(-0.47, 0.28, -0.4)   # the top-left corner of the view
 		App.head().add_child(label)
 	label.text = "DEV · " + text
+	label.visible = true
 
 
 ## A longer second line under the marker for a while (dev only): what setup found, e.g. the
@@ -71,6 +72,14 @@ static func refresh() -> void:
 		detail.visible = false
 	var label := App.head().get_node_or_null(NodePath(NAME)) as Label3D
 	if label != null:
-		label.visible = dev
+		label.visible = dev and not _last.is_empty()
 	elif dev and _last != "":
 		show_text(_last)
+
+
+static func clear() -> void:
+	_last = ""
+	for id in [NAME, DETAIL]:
+		var label := App.head().get_node_or_null(NodePath(id)) as Label3D
+		if label:
+			label.hide()
