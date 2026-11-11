@@ -69,7 +69,7 @@ func test_the_visible_menu_opens_staff_tools_and_returns_to_the_same_round() -> 
 	expect(home.is_open and not facilitator.is_open and get_tree().paused, "Menu returns to the player menu while paused")
 	await wait(0.35)
 	await select((home.find_child("menu_resume", true, false) as Target).global_position)
-	expect(App.session.trial == trial and not get_tree().paused, "Practice resumes the same round")
+	expect(App.session.trial == trial and not get_tree().paused, "Close resumes the same round")
 
 
 func test_shared_ray_focus_feedback_and_tracking_loss_work_while_paused() -> void:

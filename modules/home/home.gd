@@ -228,7 +228,7 @@ func _build() -> void:
 		# One bar above the view; the room and its furniture stay clear.
 		HomeUI.box(_panel, Vector3(0.68, 0.2, 0.025), Vector3(0, 0.185, -0.05), HomeUI.INK)
 		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.24, 0.2, 0), "back")
-		HomeUI.button(_panel, &"menu_resume", "Practice", "Return to your game.", Vector3(-0.08, 0.2, 0), "▶")
+		HomeUI.button(_panel, &"menu_resume", "Close", "Return to your game.", Vector3(-0.08, 0.2, 0), "cross")
 		HomeUI.button(_panel, &"home_shop", "Shop", "Shop. Spend your magic stones here.", Vector3(0.08, 0.2, 0), "stone")
 		HomeUI.button(_panel, &"home_box", "My things", "Your things. Pinch to open the box. Hold furniture and pinch here to put it away.", Vector3(0.24, 0.2, 0), "box")
 		return
@@ -237,9 +237,8 @@ func _build() -> void:
 	HomeUI.box(_panel, Vector3(0.68, 0.53 + tall, 0.025), Vector3(0, tall * 0.5, -0.05), HomeUI.INK)
 	if page == &"menu":
 		HomeUI.label(_panel, "MENU", Vector3(0, 0.10, 0), 44)
-		var buttons := [
-			[&"menu_resume", "Practice", "Return to your game.", "▶"],
-			[&"menu_games", "Games", "Choose a game. Finish it to earn magic stones.", "◎"]]
+		HomeUI.button(_panel, &"menu_resume", "Close", "Return to your game.", Vector3(0.265, 0.17, 0), "cross")
+		var buttons := [[&"menu_games", "Games", "Choose a game. Finish it to earn magic stones.", "◎"]]
 		if App.module(&"Inventory") and App.module(&"Rooms"):
 			buttons.append([&"menu_room", "My room", "Visit your room and shop.", "house"])
 		for i in buttons.size():
