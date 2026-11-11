@@ -1,0 +1,119 @@
+class_name MotionChoice
+extends Node3D
+## The motion option is a disc with a still cluster of dots. Aim and pinch to choose it.
+
+## The child pressed it (once per [method open]).
+signal chosen
+
+const ID := &"motion_choice"
+## The disc's radius and what presses it (a little more generous than it looks), metres.
+const RADIUS := 0.05
+const REACH := 0.06
+const LIFT := 0.012
+
+var _target: UITarget
+var _look: Node3D
+var _open := false
+
+
+func _ready() -> void:
+	name = "MotionChoice"
+	_build()
+	visible = false
+	Events.selected.connect(_on_selected)
+
+
+## Stands it to the right of [param menu] (same height, same way it faces), clear of the menu's own [param half_width].
+func place_beside(menu: Node3D, half_width: float, gap := 0.05) -> void:
+	var at := menu.global_transform
+	global_transform = Transform3D(at.basis, at.origin + at.basis.x * (half_width + gap + RADIUS))
+
+
+## Shows it and lets it be pressed.
+func open() -> void:
+	visible = true
+	scale = Vector3.ONE * 0.05
+	var grow := create_tween()
+	grow.tween_property(self, ^"scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	grow.tween_callback(func() -> void:
+		_open = true
+		_target.collision_layer = Pointer.UI_LAYER)
+
+
+## Takes it away (another choice was made, or the time for choosing is over).
+func close() -> void:
+	_open = false
+	_target.collision_layer = 0
+	var fold := create_tween()
+	fold.tween_property(self, ^"scale", Vector3.ONE * 0.05, 0.2)
+	fold.tween_callback(func() -> void: visible = false)
+
+
+func is_open() -> bool:
+	return _open
+
+
+func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
+	if not _open or target != _target or get_tree().paused:
+		return
+	_open = false
+	_target.collision_layer = 0
+	chosen.emit()
+
+
+func _build() -> void:
+	_target = UITarget.new()
+	_target.collision_layer = 0
+	_target.id = ID
+	_target.name = String(ID)
+	var shape := CollisionShape3D.new()
+	var hit := BoxShape3D.new()
+	hit.size = Vector3(REACH * 2.0, REACH * 2.0, 0.03)
+	shape.shape = hit
+	_target.add_child(shape)
+	add_child(_target)
+	_look = Node3D.new()
+	_look.name = "Look"
+	_target.add_child(_look)
+	_target.hover_changed.connect(func(on: bool) -> void: _look.position.z = LIFT if on else 0.0)
+	var dark := _flat(Color(0.08, 0.09, 0.12), 0)
+	var disc := MeshInstance3D.new()
+	var plate := CylinderMesh.new()
+	plate.top_radius = RADIUS
+	plate.bottom_radius = RADIUS
+	plate.height = 0.012
+	plate.material = dark
+	disc.mesh = plate
+	disc.rotation.x = PI / 2.0   # its flat face toward the child
+	_look.add_child(disc)
+	var rim := MeshInstance3D.new()
+	var ring := TorusMesh.new()
+	ring.inner_radius = RADIUS - 0.004
+	ring.outer_radius = RADIUS + 0.004
+	ring.material = _flat(Color(0.95, 0.92, 0.8), 1)
+	rim.mesh = ring
+	rim.rotation.x = PI / 2.0
+	_look.add_child(rim)
+	# The dots: a still snapshot of a cloud, in the dots' own colour (bigger than a child's wrist would hide).
+	var dot := SphereMesh.new()
+	dot.radius = 0.0045
+	dot.height = 0.009
+	dot.radial_segments = 8
+	dot.rings = 4
+	dot.material = _flat(Color(0.75, 0.95, 1.0), 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11   # the same picture every time
+	for i in 22:
+		var spot := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * (RADIUS - 0.012)
+		var piece := MeshInstance3D.new()
+		piece.mesh = dot
+		piece.position = Vector3(spot.x, spot.y, 0.01)
+		_look.add_child(piece)
+
+
+func _flat(colour: Color, priority: int) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = colour
+	material.render_priority = priority
+	return material

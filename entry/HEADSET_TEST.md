@@ -4,7 +4,6 @@ For Megan, in the Quest 3, seated at a real table, the way a child would sit. On
 what you should **see** and **hear** (the lines are the story's own words, as the build speaks them now), what to
 **judge or measure**, and a box to tick. Mark anything odd in "Notes"; a phone photo of the room helps.
 
-**Build:** branch `megan-native-quest-AR` as merged on Oct 31 (round 5), with `entry-layout-6` on top if it is merged.
 **Not built yet** is marked ⚠ so you don't test what isn't there.
 
 What changed in round 6: there is NO plate any more. The socket is a flat recessed ring in the table top (a dark rim, a
@@ -26,8 +25,7 @@ What changed since the first sheet (round 3): Onion now moves for each beat (bes
 gear, lifted for the reveal); the teaching hand is the real hand (translucent, scale 0.6); the story's lines and staging
 were revised (Hello has a search, a knock and a startled hop; "Nearly ready." without "Uh..."); the gear glows softly while
 the pinch is shown; the pop sound is A only (no audition button); the cauldron is HIDDEN during the first shelf level; on a
-desktop the simulated room's loose props are hidden; Onion floats only a few millimetres and no longer turns by itself;
-setup is skipped by default.
+desktop the simulated room's loose props are hidden; Onion floats only a few millimetres and no longer turns by itself.
 
 Before you start:
 
@@ -44,9 +42,7 @@ Point and pinch **Menu → Staff tools**. Choose a chapter to jump to it. **Zone
 
 ## 1. Setup (for the grown-up)
 
-`SKIP_SETUP` is on by default: the app goes straight to **"All set"** with a green **Start** (the panel only says "All set";
-there are no checks). To test the four setup steps, set `SKIP_SETUP := false` in `entry/entry.gd` first.
-Without the setup steps the layout uses the usual reach (60 cm); on your real table it still uses the table the headset found.
+Both modes run setup. Dev mode offers **Skip setup** to go straight to **Start** with the default reach of 60 cm.
 
 **See:** a dark panel just above eye level, straight ahead: a sage bar "SETUP · for the grown-up", "Step N of 4" and
 dots, a title, one or two lines, check lines with dots, buttons. At the foot: "To press: aim the hand ray at a button, then pinch."
@@ -151,8 +147,8 @@ while the hand shows the pinch (it goes the moment you grab it). The teaching ha
 the gear and lifts it a little, looping (the real gear does not move). Pinch the real gear with thumb and finger: it follows your hand, stopped.
 If you wait about 14 seconds without touching it, the teaching hand comes back to show the pinch again.
 **Hear:** "Would you pick it up for me?" / "Pinch your fingers together, and keep them closed." / once you hold it:
-"Quite a little thing, isn't it?" ("There you go." was cut) then a quiet moment. Onion makes a small pleased lift and follows the
-"Quite a little thing, isn't it?" then a quiet moment. Onion makes a small pleased lift and follows the
+(no line: "There you go." and "Quite a little thing, isn't it?" were cut) a short quiet moment. Onion makes a small pleased lift and follows the
+(no line) a short quiet moment. Onion makes a small pleased lift and follows the
 held gear with its look.
 
 Judge:
@@ -161,7 +157,7 @@ Judge:
 - [ ] The teaching hand does not hide the gear: you still see most of it.
 - [ ] The glow is soft (not a flash) and clearly says "this one": ______. It disappears when you grab.
 - [ ] Holding it and turning it in your hand feels natural; it does not jump.
-- [ ] The quiet moment after "Quite a little thing" is long enough / too long / too short.
+- [ ] The quiet moment after the pickup (1 s) is long enough / too long / too short.
 
 Notes:
 
@@ -308,6 +304,36 @@ elsewhere, losing the hand or a pause sends it home, never counted as a try.
 
 **Desktop only (ignore in the headset):** the G key, the mouse click on the cauldron, W/A/S/D/Q/E and the arrow keys
 (the headset moves and turns with your head).
+
+Notes:
+
+---
+
+## 10. Motion: the example, the choice and your own sweep
+
+(Built from the story's motion brief; the dots' place and the choice's place are the layout chat's, the story's lines the organizer's.)
+
+**The example (`MotionTutorial`).** See: the dots, all going one way sideways; after a moment a see-through hand slides across in front of you, fingers leading, leaving a white streak; when it is across, ALL the dots go together and the wall effect plays once; then the dots fade. Nothing is asked of you and nothing counts.
+- [ ] You can tell, without a word, that the hand sweeps the SAME way the dots go. Left / right / unclear.
+- [ ] The hand sweeps where your own hand could comfortably do it, seated: at chest height in front, not up at the dots, not in your lap. Comfortable / too high / too low / too far.
+- [ ] The streak behind the hand looks like the streak your own sweep leaves.
+- [ ] The wall effect is gentle enough ("restrained"): too much / right / too little. (It is Wei's; the layout chat is measuring it.)
+- [ ] The dots really are gone when it ends.
+
+**The choice (`MotionChoice`).** See: a round dark disc with a cluster of still dots on it, next to the shelf-level buttons; nothing on it moves.
+- [ ] You know it is the dots game without being told. Yes / no.
+- [ ] Looking at it for a long time does nothing. Holding a hand near it, in front of it, does nothing (it lifts a little). Resting a fingertip on it as it appears does nothing.
+- [ ] Touching it with a fingertip chooses it, first time ______ of 5. A pinch aimed at it from afar chooses it, ______ of 5.
+- [ ] Reaching for a shelf-level button next to it never chooses it by accident: ______ times.
+
+**Your own sweep (Wei's detection, seated, one hand).** Do each, five times, with the hand you like; note how many the game saw (the white streak and the whoosh show a sweep was seen; the dots go together when it was the right way):
+- [ ] An ordinary sweep, about 30 cm in a second: ______ of 5.
+- [ ] A short sweep, about 15 cm: ______ of 5.
+- [ ] A slow, careful sweep, about 30 cm in two seconds: ______ of 5. (By simulation this is the one the old speed limit, 0.3 m/s, missed; the limit is now 0.2 m/s, Megan's OK: see the DEV_NOTES. If it is still missed here, tell us how slowly you moved.)
+- [ ] A sweep that rises a little on the way, or swings in an arc like a wrist: seen. ______
+- [ ] Sweeping with the other hand: same ______.
+- [ ] A hand resting or drifting slowly never makes a sweep by itself: false streaks ______.
+- [ ] Your hand is never asked to reach toward the dots. Right.
 
 Notes:
 

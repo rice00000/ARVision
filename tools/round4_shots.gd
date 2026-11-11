@@ -19,6 +19,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	(App.rig.head as Camera3D).fov = 80.0
 	_entry = app.get_node(^"Intro/Entry")
+	_entry.plan_at_start = false
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--reach="):   # a measured reach (setup step 3 is skipped): the layout and the shelf's push follow it
 			var reach := float(arg.trim_prefix("--reach="))
@@ -34,6 +35,8 @@ func _ready() -> void:
 		await _round5()
 	elif "--part=visit" in args:
 		await _visit()
+	elif "--part=wall" in args:
+		await _wall()
 	else:
 		await _hands("--zones" in args)
 	get_tree().quit()
@@ -141,3 +144,37 @@ func _save(name: String, look := Vector3.INF) -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(_out.path_join(name + ".png"))
 	print("SHOT ", name)
+
+
+## Motion round 1: the wall effect from the seated view, both looks, a few moments each (and the dots' box
+## drawn as a wireframe so its place against the table and shelf shows). In build/round4/wall_*.png.
+func _wall() -> void:
+	var layout: EntryLayout = _entry.get("_layout")
+	_entry.jump_to(&"shelf")
+	await _pause(4.0)
+	var eye := App.head().global_position
+	var ahead := Vector3(-App.head().global_basis.z.x, 0.0, -App.head().global_basis.z.z).normalized()
+	var def := preload("res://trials/motion/motion.tres")
+	var condition := def.condition(0.0, 0, false)
+	var box := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = MotionCloud.half_size(condition) * 2.0
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.2, 0.7, 1.0, 0.18)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh.material = material
+	box.mesh = mesh
+	get_tree().root.add_child(box)
+	box.global_position = layout.eye + layout.ahead * MotionCloud.distance(condition)
+	box.global_rotation = Vector3(0.0, atan2(-ahead.x, -ahead.z), 0.0)
+	await _save("wall_0_dots_box_seated", Vector3.ZERO)
+	box.queue_free()
+	for style: int in [WallBreak.Style.CRACK, WallBreak.Style.SPACE]:
+		var name := "crack" if style == WallBreak.Style.CRACK else "space"
+		WallBreak.burst(eye, ahead, Vector3.RIGHT, style as WallBreak.Style)
+		var clock := 0.0
+		for moment: float in [0.4, 1.0, 2.0, 3.5]:
+			await _pause(moment - clock)
+			clock = moment
+			await _save("wall_%s_%d" % [name, roundi(moment * 10.0)], Vector3.ZERO)
+		await _pause(6.0)

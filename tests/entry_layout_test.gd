@@ -165,6 +165,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up (the layout is planned on a worker thread: wait for 'All set')")
@@ -194,6 +195,7 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	await boot(null, &"intro")
 	app.autostart = true
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
@@ -233,6 +235,7 @@ func test_a_socket_that_must_move_rides_a_track_the_table_draws() -> void:
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.touch_cauldron_in_sim = true
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
@@ -257,8 +260,60 @@ func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.run()
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var path := String(Main.SCENES[&"first_visit"].path)
 	expect(await until(func() -> bool: return ResourceLoader.has_cached(path), 10.0), "the first visit's scene was requested at the start and is ready (it cost 56 ms in one frame when loaded at the switch)")
 	Engine.time_scale = 1.0
+
+
+# --- The motion route (EntryMotionLayout) -------------------------------------------
+
+func test_the_coherence_buttons_are_separate_and_within_reach() -> void:
+	var head := Transform3D(Basis.IDENTITY, Vector3(0, 1.2, 0))
+	for i in 5:
+		var spot := EntryMotionLayout.coherence_spot(head, 1, i, 5, EntryMotionLayout.COHERENCE_PRESET_WIDE)
+		expect(spot.distance_to(head.origin) < 0.62, "preset %d is within an arm's reach (%d cm)" % [i, roundi(spot.distance_to(head.origin) * 100)])
+		for j in range(i + 1, 5):
+			var other := EntryMotionLayout.coherence_spot(head, 1, j, 5, EntryMotionLayout.COHERENCE_PRESET_WIDE)
+			expect(spot.distance_to(other) > EntryMotionLayout.COHERENCE_PRESET_WIDE, "presets %d and %d do not touch" % [i, j])
+
+
+func test_the_motion_dev_controls_pin_the_same_coherence_axis_as_the_trial() -> void:
+	await boot(null, &"intro")
+	var task := preload("res://content/tasks/break_wall.tres")
+	var block := task.level_by_id(&"steady_flow").plan.blocks[0]
+	App.session.block = block
+	var dev := EntryMotionDev.new(block)
+	add_child(dev)
+	expect_eq(dev._buttons.size(), 7, "five presets and -5 / +5")
+	var reported := record(Events.reported)
+	await select((dev.find_child("dev_coh_50", true, false) as UITarget).global_position)
+	var condition := block.trial.condition(App.session.level(), 0, block.probe, block.pins)
+	expect(absf(condition.value(&"coherence") - 0.5) < 0.001, "the next round runs at 50 percent")
+	expect(reported.any(func(args: Array) -> bool: return args[0] == &"level_pinned" and args[1].source == &"dev_coherence"), "the pin is logged")
+	await select((dev.find_child("dev_coh_up", true, false) as UITarget).global_position)
+	expect(absf(dev.coherence() - 55.0) < 0.5, "+5 steps to 55 percent")
+	await select((dev.find_child("dev_coh_15", true, false) as UITarget).global_position)
+	expect(absf(dev.coherence() - 15.0) < 0.5, "the 15 percent preset")
+	dev.queue_free()
+
+
+func test_the_choice_row_is_on_the_table_in_reach_and_onion_stays_out_of_the_dots() -> void:
+	var def := preload("res://trials/motion/motion.tres")
+	var condition := def.condition(0.0, 0, false)
+	for size: Vector2 in [Vector2(1.0, 0.7), Vector2(1.6, 0.9)]:
+		for reach: float in [0.0, 0.5, 0.72]:
+			var layout := _layout(size, 0.3, 0.5, reach)
+			var motion := EntryMotionLayout.new(layout, condition)
+			for n in [2, 3]:
+				for i in n:
+					var spot := motion.choice_spot(i, n)
+					var label := "table %s reach %d, target %d of %d" % [size, roundi(reach * 100), i + 1, n]
+					expect(layout.away(spot) <= layout.reach_used(), "%s: within reach (%d cm)" % [label, roundi(layout.away(spot) * 100)])
+					expect(layout._inside_table(spot, 0.0), "%s: on the table" % label)
+					if i > 0:
+						expect(spot.distance_to(motion.choice_spot(i - 1, n)) >= EntryMotionLayout.CHOICE_WIDE, "%s: does not touch its neighbour" % label)
+				var onion := motion.onion_without_shelf(n)
+				expect(onion.gap >= EntryMotionLayout.ONION_VIEW_GAP, "table %s reach %d: Onion is out of the dots' view (%d degrees)" % [size, roundi(reach * 100), roundi(onion.gap)])

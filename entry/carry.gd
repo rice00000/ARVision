@@ -80,6 +80,8 @@ var _state := State.IDLE
 var _gear: Node3D
 var _spin: GearSpin
 var _socket_at := Vector3.ZERO
+## How far below the socket's surface point the docked gear's base sits (entry.gd SOCKET_SINK), metres.
+var seat_depth := 0.0
 var _side: StringName = &"right"
 var _offset := Transform3D.IDENTITY   # the gear in the pinch's own frame, at pick-up
 var _scale := Vector3.ONE
@@ -197,16 +199,9 @@ func has_docked() -> bool:
 	return _docked
 
 
-## STUB, kept for the story chat's tests: pretends the child picked it up and set it in. The gear
-## really aligns into the socket, like after a real release.
+## Tests simulate a child carrying the gear into the same docking sequence.
 func simulate(after := 1.0) -> void:
 	await get_tree().create_timer(after).timeout
-	if _gear == null:
-		picked_up.emit()
-		await get_tree().create_timer(after).timeout
-		released.emit(true)
-		docked.emit()
-		return
 	_picked = true
 	if _spin != null:
 		_spin.running = false
@@ -376,7 +371,7 @@ func _dock() -> void:
 	var size := from.basis.get_scale()
 	var high := maxf(from.origin.y - _socket_at.y - 0.08, 0.0)
 	var seconds := clampf(ALIGN_SECONDS + high * 2.0, ALIGN_SECONDS, 0.7)
-	var socket := _socket_at
+	var socket := _socket_at + Vector3.DOWN * seat_depth   # the gear goes down into the socket
 	_tween = create_tween()
 	_tween.tween_method(func(k: float) -> void:
 		if _gear_ok():

@@ -39,13 +39,17 @@ const RADIUS := 0.0085
 ## child, so thumb and finger are seen from the side, not end-on.
 const YAW := 1.3
 
-enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE }
+enum Mode { NONE, TAP, PINCH_LIFT, LOWER_RELEASE, SWEEP }
 ## The tap's own times: the hand is down on the rim from TAP_DOWN to TAP_UP, back up at TAP_BACK, and
 ## the loop is TAP_LOOP long. The GLB's "tap" clip (0 -> press at 0.5 -> back at 1) is scrubbed to match.
 const TAP_DOWN := 0.8
 const TAP_UP := 1.25
 const TAP_BACK := 2.0
 const TAP_LOOP := 3.0
+## The sweep's own times: it waits at the start until SWEEP_START, is across at SWEEP_END, and the loop is SWEEP_LOOP.
+const SWEEP_START := 0.5
+const SWEEP_END := 1.7
+const SWEEP_LOOP := 3.2
 ## The clip's press is small: the index finger bends this many times as far as the clip bends it.
 const TAP_PRESS_GAIN := 1.8
 ## The contact moment: a soft ring spreads from the rim where the fingertip lands (seconds, and how
@@ -58,6 +62,7 @@ const RING_ALPHA := 0.6
 
 var _mode := Mode.NONE
 var _gesture := Mode.NONE      # the gesture last started: it keeps its look while it fades out after stop()
+var _sweep_way := Vector3.FORWARD   # the way an open hand sweeps (level, unit): its fingers lead
 var _t := 0.0
 var _fade := 0.0
 var _keys: Array = []           # [seconds, up, back, open]: where the pinch point is, and how open
@@ -135,6 +140,22 @@ func lower_release(socket_at: Vector3) -> void:
 	], func() -> Vector3: return socket_at + Vector3.UP * 0.026, -0.3, true, socket_at)
 
 
+## Sweeps an open hand from [param from] to [param to] (world), fingers leading, looping until [method stop]:
+## it waits at the start, slides across, waits at the end, fades, and comes again. It only shows the gesture
+## (it is not tracked or judged, and moves nothing). The way is read level: a sweep never rises or falls.
+func sweep(from: Vector3, to: Vector3) -> void:
+	var way := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	if way.length() < 0.01:
+		return
+	_sweep_way = way.normalized()
+	_start(Mode.SWEEP, [
+		[0.0, 0.0, 0.0, 1.0],
+		[SWEEP_START, 0.0, 0.0, 1.0],
+		[SWEEP_END, 0.0, 0.0, 1.0],
+		[SWEEP_LOOP, 0.0, 0.0, 1.0],
+	], func() -> Vector3: return from.lerp(to, smoothstep(SWEEP_START, SWEEP_END, _t)), -0.1, true, [from, to])
+
+
 ## Takes the hand away (soon, softly).
 func stop() -> void:
 	_mode = Mode.NONE
@@ -202,6 +223,8 @@ func _pose(seconds: float) -> void:
 		if flat.length() > 0.01:
 			forward = flat.normalized()
 	forward = forward.rotated(Vector3.UP, YAW)
+	if _gesture == Mode.SWEEP:
+		forward = _sweep_way   # an open hand sweeping: its fingers lead the way
 	global_position = anchor + Vector3.UP * up - forward * back
 	global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
 	_show_fingers(open, seconds)

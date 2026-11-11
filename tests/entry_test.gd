@@ -6,6 +6,7 @@ extends TestCase
 
 const TIDY := preload("res://trials/tidy/tidy.tres")
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
+const Motion := preload("res://trials/motion/motion_trial.gd")
 const ADVENTURE := preload("res://content/adventure.tres")
 
 var entry: Entry
@@ -17,6 +18,7 @@ func _boot_entry() -> void:
 	await boot(null, &"intro")
 	app.autostart = true   # when the opening ends and switches scene, the next scene starts itself
 	entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.touch_cauldron_in_sim = true   # the tests tap the cauldron with a fingertip
 	entry.skip_setup = false   # the tests go through the four steps
 	entry.simulate_child = true   # a pretend child picks the gear up and sets it in
@@ -74,8 +76,8 @@ func _touch_cauldron() -> void:
 ## The gear stands in the socket and is turning.
 func _docked() -> bool:
 	var gear: Node3D = entry.get("_gear")
-	var socket: Vector3 = entry.get("_socket_at")
-	return gear.visible and gear.global_position.distance_to(socket) < 0.01 and (entry.get("_gear_spin") as GearSpin).running
+	var seat: Vector3 = entry.call("_seat_at")   # down in the socket (SOCKET_SINK, Nov 10)
+	return gear.visible and gear.global_position.distance_to(seat) < 0.01 and (entry.get("_gear_spin") as GearSpin).running
 
 
 func _shown(entry_details: Array) -> int:
@@ -170,8 +172,8 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	expect((entry.get("_gear") as Node3D).visible and not _docked(), "emerge: the gear is out on the table, waiting to be picked up")
 
 	# Pick up, then set in: the stand-in child does each, and the gear ends turning in its socket.
-	await jump_to_intro_part(&"pickup")
-	expect(await _until_said(said, "Quite a little thing, isn't it?", 30.0), "pickup: Onion goes on once it is held")
+	await jump_to_intro_part(&"pickup")   # Wei moved the jumps into the facilitator Tools (Nov 9)
+	expect(await until(func() -> bool: return entry.get("_part_running") == false, 30.0), "pickup: the beat ends once the gear is held")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "pickup: the panel comes back")
 	await jump_to_intro_part(&"place")
 	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 30.0), "place: the gear is seated (one click)")
@@ -503,12 +505,79 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
+	var more: UITarget
+	if not await until(func() -> bool: return app.find_child("visit_more_shelf", true, false) != null, 20.0):
+		expect(false, "the child can choose to play more shapes")
+		return
+	more = app.find_child("visit_more_shelf", true, false) as UITarget
+	var next_level := task.levels[1]
+	await select(more.global_position)
+	for block: Block in next_level.plan.blocks:
+		for round_index in block.rounds:
+			if not await until(func() -> bool:
+				var trial := App.session.trial
+				return App.session.block == block and trial != null and trial.is_running() and trial.condition.round_index == round_index):
+				expect(false, "the next shelf level starts round %d" % round_index)
+				return
+			App.session.trial.finish(true)
+	expect(await until(func() -> bool: return App.main.progress.is_done(task, next_level)), "More shapes saves the completed level")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3 + next_level.first_reward, "More shapes grants the first reward")
+
+
+func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_talk() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await jump_to_intro_part(&"shelf")
+	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes in the shelf part")
+	expect_eq(App.main.current_scene, &"first_visit", "the invitation plays in the shelf scene")
+	var trial := App.session.trial
+	expect(trial != null and trial.is_running(), "the shelf round is already running: shapes can be picked up while Onion talks")
+	Events.report(&"taken", {})   # the child picks a shape up
+	await wait(12.0)
+	expect(not _said_line(said, "You could join me, if you like."), "a pick-up ends the invitation")
+	expect(not _said_line(said, "The shapes on the shelf show where things go."), "and the rule (the child is already playing)")
+
+
+func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
+	expect(PlayMode.is_dev(), "the tests run in dev")
+	var reports := record(Events.reported)
+	await _boot_entry()
+	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "dev"),
+		"the session logs its mode")
+	expect(await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0), "setup runs (step 1)")
+	expect(_target(&"entry_mode") != null, "the setup panel has the Mode toggle")
+	expect(_target(&"entry_skip_setup") != null, "dev: and a Skip setup button")
+	await _press(&"entry_skip_setup")
+	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0), "Skip setup goes straight to Start")
+	await _press(&"entry_mode")
+	expect(not PlayMode.is_dev(), "the toggle switches to play")
+	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "play"),
+		"the switch is logged")
+	expect(await until(func() -> bool: return _target(&"entry_skip_setup") == null, 5.0), "play: no Skip setup")
+	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
+	expect(marker == null or not marker.visible, "play: no scene marker")
+	await _press(&"entry_mode")
+	expect(PlayMode.is_dev(), "and back to dev")
+	marker = App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
+	expect(marker != null and marker.visible, "dev: the scene marker is back")
+
+
+func test_under_the_test_runner_the_mode_is_dev_and_setup_is_skipped_by_default() -> void:
+	PlayMode.reset_for_tests()
+	expect(PlayMode.testing_now(), "the runner's --profile=test is seen")
+	expect(PlayMode.is_dev(), "tests are always dev")
+	expect_eq(PlayMode.source(), "tests", "whatever was saved on the device")
+	await boot(null, &"intro")
+	expect((app.get_node(^"Intro/Entry") as Entry).skip_setup, "tests skip setup unless they turn it on (the test hook)")
 
 
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
 func shutdown() -> void:
 	await super.shutdown()
+	PlayMode.set_dev(true, "tests")
 	Tidy.onion_voice = false
+	Motion.onion_voice = false
 	Engine.time_scale = 1.0
 
 
@@ -556,3 +625,66 @@ func test_the_first_visit_does_not_claim_success_after_a_time_out() -> void:
 	Engine.time_scale = 1.0
 	expect(not _said_line(said, "There. Everything's found its place."), "no claim that everything is in place")
 	expect(_said_line(said, "Thank you for helping."), "a neutral thank-you")
+
+
+func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await jump_to_intro_part(&"motion")   # Wei moved the jumps into the facilitator Tools (Nov 9)
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
+	expect(await _until_said(said, "Watch what happens when they move together.", 30.0), "Onion introduces the demonstration")
+	expect(await _until_said(said, "Your turn.", 30.0), "then the child's turn")
+	expect(await until(func() -> bool: return App.session.trial != null, 30.0), "Wei's motion round runs")
+	expect(Motion.onion_voice, "with Wei's own lines switched off")
+	await wait(1.0)
+	expect(not _said_line(said, "Which way do the dots go? Sweep your hand that way, then hold still."), "his round line is not said")
+	var task := preload("res://content/tasks/break_wall.tres")
+	var plan := task.level_by_id(&"steady_flow").plan
+	expect_eq(App.session.plan, plan, "Onion plays the same Steady Flow level as the menu")
+	expect(not _said_line(said, plan.blocks[0].intro), "Onion supplies the level introduction")
+
+
+func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_success_is_marked_once() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	var said := record(Events.said)
+	await jump_to_intro_part(&"motion")   # Wei moved the jumps into the facilitator Tools (Nov 9)
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
+	var visit := App.main.get_node(^"FirstVisit/Visit/Motion") as MotionVisit
+	visit.set("_in_motion", true)
+	Engine.time_scale = 4.0
+	Events.trial_ended.emit(&"motion", true, {})
+	Events.trial_ended.emit(&"motion", true, {})
+	expect(await _until_said(said, "There! You did that.", 40.0), "the first success gets its lines")
+	await wait(3.0)
+	expect(said.filter(func(a: Array) -> bool: return a[0] == "There! You did that.").size() == 1, "once")
+	await visit._ending()
+	Engine.time_scale = 1.0
+	expect(_said_line(said, "Thank you for trying that with me."), "the approved ending")
+	for line: String in ["It's been lovely having you here.", "I'll have everything ready for your next visit.", "Well. I'll do my best."]:
+		expect(_said_line(said, line), "the closing says: " + line)
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	expect(not (workshop.get("_gear") as Node3D).visible, "the gear went home into the cauldron")
+	expect((workshop.get("_cauldron") as Node3D).visible, "the cauldron is back for it")
+	expect(not (workshop.get("_onion") as Node3D).visible, "Onion ducked inside")
+	expect(visit.find_child("visit_end_session", true, false) != null, "the end-session control is shown")
+	expect(not Motion.onion_voice, "Wei's lines are back afterwards")
+
+
+func test_the_room_is_planned_when_start_is_pressed_from_where_the_child_sits() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	entry = app.get_node(^"Intro/Entry")
+	entry.touch_cauldron_in_sim = true
+	entry.simulate_child = true
+	entry.run()
+	await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0)
+	expect(entry.get("_layout") == null, "nothing is planned before Start (the headset may still be going on)")
+	App.rig.head.rotation.y = 0.3   # the child sits a little turned
+	await frames(2)
+	await _press(&"entry_part_all")
+	expect(await until(func() -> bool: return entry.get("_layout") != null, 20.0), "Start plans the room")
+	var planned: Transform3D = entry.get("_plan_head")
+	expect(absf(planned.basis.get_euler().y - 0.3) < 0.05, "from the head as it is when Start is pressed")
+	expect(Tidy.shelf_frame != Transform3D.IDENTITY, "and Wei's shelf will stand where the plan put the bench")

@@ -95,6 +95,7 @@ func test_progress_survives_scene_switches_and_the_headset_keeps_its_pause() -> 
 func test_leaving_intro_removes_its_music_and_waiting_story() -> void:
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # these tests look at the room before pressing anything
 	entry.run()
 	# The opening waits for the grown-up's setup; a jump button skips it and starts the story.
 	await jump_to_intro_part(&"hello")
