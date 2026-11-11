@@ -1,9 +1,10 @@
 extends Trial
 ## Tidy up: the alchemist's things fell off the shelf. Every
 ## cubby shows what belongs in it on a sticker: a black shadow, a black outline,
-## a shadow of its size, or a shadow in its colour. The child pinches a thing,
-## carries it to a sticker and lets go. The right thing
-## clicks in; a wrong one does not fit and goes back to the bench. The round is
+## a shadow of its size, or a shadow in its colour, upright on the cubby's back
+## wall. The child pinches a thing, carries it into a cubby and lets go. The right
+## thing drops onto the board where it was let go, in front of its sticker; a
+## wrong one does not fit and goes back to the bench. The round is
 ## done when everything is back. Trains matching shape, size and colour, and
 ## placing by sight (vision for action).
 ## In the odd-colour rounds only the different piece goes in the blank cubby.
@@ -65,13 +66,13 @@ const BENCH_LOWEST := 0.42
 const BENCH_NEAR := 0.11
 const PREFERRED_SETBACK := 0.08
 ## A cubby: width, height (taller, so the board above hides no sticker from eyes
-## looking down), depth; the shelf has COLUMNS x ROWS of them. Its card stands
-## CARD_IN in front of the back, tilted back to face the eyes, so a sticker shows
-## its shape unsquashed.
+## looking down), depth; the shelf has COLUMNS x ROWS of them. A card covers its
+## back wall; the sticker is on it, STICKER_UP above the board, so the thing that
+## stands in front covers it.
 const CELL := 0.12
 const CELL_HIGH := 0.14
 const DEPTH := 0.09
-const CARD_IN := 0.04
+const STICKER_UP := 0.012
 const COLUMNS := 3
 const ROWS := 2
 const BOARD := 0.012
@@ -80,8 +81,8 @@ const PLINTH := 0.015
 const THINGS_NEAR := 0.16
 const THINGS_FAR := 0.27
 const THINGS_WIDE := 0.48
-## A thing released within SNAP of a sticker is put there.
-const SNAP := 0.05
+## A thing let go with its middle inside a cubby, or this far short of its mouth, is put there.
+const MOUTH := 0.015
 ## Ignore brief pinch dropouts while the hand moves.
 const RELEASE_DELAY := 0.12
 ## After putting a thing, that hand takes nothing for this long: it passes over the others on the way back.
@@ -107,10 +108,10 @@ var _shelf: Node3D
 var _below := 0.0
 var _match := SHAPE
 var _outline := false
-## Per cubby (COLUMNS x ROWS, bottom row first): its card's frame in the
-## bench's frame and its material, what its sticker shows ("" = no sticker),
-## where its thing hangs, whether that is in.
-var _card_at: Array[Transform3D] = []
+## Per cubby (COLUMNS x ROWS, bottom row first): the middle of its floor in the
+## bench's frame, its card's material, what its sticker shows ("" = no sticker),
+## where its thing stands in the middle of it, whether that is in.
+var _floor: Array[Vector3] = []
 var _cards: Array[StandardMaterial3D] = []
 var _cell_key: Array[String] = []
 var _cell_point: Array[Vector3] = []
@@ -122,6 +123,8 @@ var _odd_found := false
 var _things: Array[Target] = []
 var _key: Dictionary[Target, String] = {}
 var _size: Dictionary[Target, float] = {}
+## Thing -> how big it is as it stands: width, height, depth.
+var _stands: Dictionary[Target, Vector3] = {}
 var _home: Dictionary[Target, Vector3] = {}
 ## Thing -> its cubby, once it is in.
 var _placed: Dictionary[Target, int] = {}
@@ -174,7 +177,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	for i in looks.size():
 		var thing := _make_thing(looks[i], "thing_%d_%s" % [i, looks[i].key])
 		add_child(thing)
-		_home[thing] = spots[i] + _frame.basis.y * _extent(looks[i].shape, looks[i].size).y * 0.5
+		_home[thing] = spots[i] + _frame.basis.y * _stands[thing].y * 0.5
 		if arrive:
 			thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
 			_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
@@ -381,7 +384,7 @@ func _notification(what: int) -> void:
 			_return(hand)
 
 
-## Away from a sticker, on tracking loss or pause: put it back without scoring.
+## Outside the cubbies, on tracking loss or pause: put it back without scoring.
 func _return(hand: StringName) -> void:
 	var thing := _carried[hand]
 	_let_go(hand)
@@ -395,18 +398,29 @@ func _let_go(hand: StringName) -> void:
 	_free_at[hand] = seconds() + TAKE_PAUSE
 
 
-## The free cubby with a sticker nearest [param point], within [constant SNAP]; -1 for none.
+## The free cubby with a sticker that [param point] (a thing's middle) is in, or within
+## [constant MOUTH] of its mouth; -1 for none.
 func _cell_at(point: Vector3) -> int:
-	var nearest := -1
+	var local := _frame.affine_inverse() * point
 	for cell in _cell_key.size():
-		if _cell_key[cell].is_empty() or _filled[cell] or point.distance_to(_cell_point[cell]) > SNAP:
-			continue
-		if nearest < 0 or point.distance_to(_cell_point[cell]) < point.distance_to(_cell_point[nearest]):
-			nearest = cell
-	return nearest
+		var from_floor := local - _floor[cell]
+		if not _cell_key[cell].is_empty() and not _filled[cell] and absf(from_floor.x) <= CELL * 0.5 \
+				and from_floor.y >= -BOARD and from_floor.y <= CELL_HIGH and absf(from_floor.z) <= DEPTH * 0.5 + MOUTH:
+			return cell
+	return -1
 
 
-## [param hand] lets go of its thing at [param cell]: it clicks in, or it does not fit and goes back.
+## Where [param thing] comes to stand in [param cell]: straight down onto the board from where it
+## was let go, kept inside the cubby's walls.
+func _rest(thing: Target, cell: int) -> Vector3:
+	var stands := _stands[thing]
+	var room_x := maxf((CELL - BOARD - stands.x) * 0.5, 0.0)
+	var room_z := maxf((DEPTH - stands.z) * 0.5, 0.0)
+	var from_floor := _frame.affine_inverse() * thing.global_position - _floor[cell]
+	return _frame * (_floor[cell] + Vector3(clampf(from_floor.x, -room_x, room_x), stands.y * 0.5, clampf(from_floor.z, -room_z, room_z)))
+
+
+## [param hand] lets go of its thing in [param cell]: it drops onto the board, or it does not fit and goes back.
 func _put(hand: StringName, cell: int) -> void:
 	var thing: Target = _carried[hand]
 	_let_go(hand)
@@ -429,8 +443,9 @@ func _put(hand: StringName, cell: int) -> void:
 		return
 	_placed[thing] = cell
 	_filled[cell] = true
-	_move(thing, _cell_point[cell], 0.15)
-	judge(&"good", _cell_point[cell])
+	var rest := _rest(thing, cell)
+	_move(thing, rest, 0.25).set_trans(Tween.TRANS_BOUNCE)
+	judge(&"good", rest)
 	_unhint()
 	if _match == ODD_COLOUR or _placed.size() == _things.size():
 		if _match == ODD_COLOUR:
@@ -546,9 +561,8 @@ func layout() -> Dictionary:
 			home = _home[thing], placed = _placed.has(thing), carried = hand})
 	var cells := []
 	for cell in _cell_key.size():
-		cells.append({id = "cell_%d" % cell, key = _cell_key[cell], position = _cell_point[cell], filled = _filled[cell],
-			card = _frame * _card_at[cell].origin})
-	return {match = _match, outline = _outline, things = things, cells = cells, snap = SNAP, release_delay = RELEASE_DELAY}
+		cells.append({id = "cell_%d" % cell, key = _cell_key[cell], position = _cell_point[cell], filled = _filled[cell]})
+	return {match = _match, outline = _outline, things = things, cells = cells, release_delay = RELEASE_DELAY}
 
 
 func _clear() -> void:
@@ -561,6 +575,7 @@ func _clear() -> void:
 	_junk.clear()
 	_key.clear()
 	_size.clear()
+	_stands.clear()
 	_home.clear()
 	_placed.clear()
 	_carried.clear()
@@ -576,7 +591,7 @@ func _clear() -> void:
 			_stickers[cell] = null
 		_cell_key[cell] = ""
 		_filled[cell] = false
-		_cell_point[cell] = _frame * _card_at[cell].origin
+		_cell_point[cell] = _frame * (_floor[cell] + Vector3.UP * CELL_HIGH * 0.5)
 
 
 ## Moves [param thing] to [param to] in [param seconds]; the tween, to shape it.
@@ -630,21 +645,21 @@ func _build_shelf() -> void:
 		_box(Vector3(BOARD, high - PLINTH, DEPTH), Vector3(x, -_below + PLINTH + (high - PLINTH) * 0.5, back + DEPTH * 0.5), WOOD)
 	_box(Vector3(wide, PLINTH, DEPTH), Vector3(0.0, -_below + PLINTH * 0.5, back + DEPTH * 0.5), WOOD.darkened(0.2))
 	for cell in COLUMNS * ROWS:
-		var centre := Vector3((cell % COLUMNS - (COLUMNS - 1) * 0.5) * CELL,
-			-_below + PLINTH + (cell / COLUMNS) * (CELL_HIGH + BOARD) + CELL_HIGH * 0.5, back + CARD_IN)
-		_card_at.append(Transform3D(Basis(Vector3.RIGHT, -atan2(-centre.y, -centre.z)), centre))
+		var floor_middle := Vector3((cell % COLUMNS - (COLUMNS - 1) * 0.5) * CELL,
+			-_below + PLINTH + (cell / COLUMNS) * (CELL_HIGH + BOARD), back + DEPTH * 0.5)
+		_floor.append(floor_middle)
 		var card := MeshInstance3D.new()
 		card.name = "Card_%d" % cell
 		var quad := QuadMesh.new()
-		quad.size = Vector2.ONE * (CELL - BOARD - 0.01)
+		quad.size = Vector2(CELL - BOARD, CELL_HIGH)
 		card.mesh = quad
 		var material := _flat(CARD)
 		card.material_override = material
-		card.transform = _card_at[cell]
+		card.position = Vector3(floor_middle.x, floor_middle.y + CELL_HIGH * 0.5, back + 0.001)
 		_shelf.add_child(card)
 		_cards.append(material)
 		_cell_key.append("")
-		_cell_point.append(_frame * centre)
+		_cell_point.append(_frame * (floor_middle + Vector3.UP * CELL_HIGH * 0.5))
 		_filled.append(false)
 		_stickers.append(null)
 	if _match == ODD_COLOUR:
@@ -654,7 +669,7 @@ func _build_shelf() -> void:
 		border.size = Vector2(CELL - BOARD - 0.024, 0.062)
 		_placement_outline.mesh = border
 		_placement_outline.material_override = _flat(SHINE)
-		_placement_outline.transform = _card_at[ODD_CELL].translated_local(Vector3(0.0, -0.012, 0.001))
+		_placement_outline.position = Vector3(_floor[ODD_CELL].x, _floor[ODD_CELL].y + STICKER_UP + border.size.y * 0.5, back + 0.002)
 		var inside := MeshInstance3D.new()
 		var centre := QuadMesh.new()
 		centre.size = border.size - Vector2.ONE * 0.012
@@ -668,17 +683,16 @@ func _build_shelf() -> void:
 
 func _set_cubby(cell: int, look: Dictionary) -> void:
 	_cell_key[cell] = look.key
-	var ahead := _extent(look.shape, look.size).z * 0.5 + 0.004
-	_cell_point[cell] = _frame * (_card_at[cell] * Vector3(0.0, 0.0, ahead))
+	_cell_point[cell] = _frame * (_floor[cell] + Vector3.UP * _extent(look.shape, look.size).y * 0.5)
 
 
-## The sticker of [param look] in the middle of [param cell]'s card, behind where the thing
-## hangs: from the child it shows the thing's outline as seen from the front.
+## The sticker of [param look] upright on [param cell]'s back wall, just above the board: the
+## thing's outline as seen from the front, behind where the thing stands.
 func _sticker(cell: int, look: Dictionary) -> void:
 	var sticker := Node3D.new()
 	sticker.name = "Sticker"
 	_shelf.add_child(sticker)
-	sticker.transform = _card_at[cell].translated_local(Vector3(0.0, 0.0, 0.002))
+	sticker.position = _floor[cell] + Vector3(0.0, STICKER_UP + _extent(look.shape, look.size).y * 0.5, -DEPTH * 0.5 + 0.002)
 	var ink: Color = look.colour if _match == COLOUR else INK
 	sticker.add_child(_flat_copy(look.shape, look.size, 1.0 + OUTLINE if _outline else 1.0, ink, 0.0))
 	if _outline:
@@ -721,6 +735,7 @@ func _make_thing(look: Dictionary, thing_id: String) -> Target:
 	_things.append(thing)
 	_key[thing] = look.key
 	_size[thing] = look.size
+	_stands[thing] = _extent(look.shape, look.size)
 	return thing
 
 

@@ -60,7 +60,6 @@ signal room_changed(id: StringName)
 signal furniture_requested(id: StringName)
 signal furniture_editing(active: bool)
 signal furniture_store_requested
-signal furniture_turn_requested
 
 # -- the rest -----------------------------------------------------------------
 

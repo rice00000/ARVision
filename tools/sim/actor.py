@@ -142,7 +142,7 @@ class Actor:
 
     def carry(self, side, point, radius, to, release_delay):
         """Tidy up: comes down onto the thing at `point` from above (passing over the others), so it
-        pinches it, takes it to `to` (where it hangs on a sticker), then lets go."""
+        pinches it, takes it to `to` (where it stands in its cubby), then lets go."""
         above = add(point, (0.0, radius + 0.06, 0.0))
         self.face(point)
         self.body.check_view(self.observe()["head"], point)

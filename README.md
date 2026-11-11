@@ -15,7 +15,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 
 **Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 
-Point and pinch **Menu** on the upper right. **Keep playing** resumes the same round. **Games** offers Find the object and Global motion. **My room** opens the room, shop and decorating. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
+Point and pinch **Menu** on the upper right. **Practice** resumes the same round. **Games** offers Find the object and Global motion. **My room** opens the room to arrange it; its **Shop** sells furniture, pets and rooms. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
 
 Run a fixed session with `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
 

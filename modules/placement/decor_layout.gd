@@ -29,7 +29,6 @@ func _ready() -> void:
 	Events.furniture_requested.connect(take_out)
 	Events.furniture_editing.connect(_edit)
 	Events.furniture_store_requested.connect(store_held)
-	Events.furniture_turn_requested.connect(turn_held)
 	Events.selected.connect(_select)
 	Events.button.connect(_button)
 	Events.hand_tracking.connect(func(side: StringName, tracked: bool) -> void:
@@ -158,11 +157,6 @@ func _release(commit: bool) -> void:
 	_capture()
 
 
-func turn_held() -> void:
-	if held:
-		_start_pose.basis = _start_pose.basis.rotated(Vector3.UP, TURN_STEP)
-
-
 func store_held() -> void:
 	if held == null: return
 	var inventory := App.module(&"Inventory")
@@ -174,7 +168,7 @@ func store_held() -> void:
 	inventory.add(id)
 	_capture()
 	Events.report(&"furniture_put_away", {item = id, room = current_room})
-	Events.say("Back in your bag.")
+	Events.say("Back in your box.")
 
 
 func _valid(node: Target) -> bool:

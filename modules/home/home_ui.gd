@@ -84,9 +84,17 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 	elif icon == "cross":
 		for turn in [PI / 4, -PI / 4]:
 			box(node, Vector3(0.08, 0.02, 0.02), Vector3(0, 0, 0.025), INK).rotation.z = turn
-	elif icon == "bag":
+	elif icon == "box":
 		box(node, Vector3(0.065, 0.045, 0.04), Vector3(0, -0.006, 0.035), GOLD)
 		box(node, Vector3(0.07, 0.014, 0.045), Vector3(0, 0.023, 0.035), INK)
+	elif icon == "door":
+		box(node, Vector3(0.046, 0.078, 0.02), Vector3(0, 0, 0.025), INK)
+		box(node, Vector3(0.011, 0.011, 0.012), Vector3(0.012, -0.004, 0.04), GOLD)
+	elif icon == "stone":
+		var gem: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+		gem.scale = Vector3.ONE * 0.65
+		gem.position = Vector3(0, -0.026, 0.04)
+		node.add_child(gem)
 	else:
 		var glyph := label(node, icon, Vector3(0, 0, 0.018), 68)
 		glyph.modulate = INK
