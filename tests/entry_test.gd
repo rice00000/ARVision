@@ -429,7 +429,7 @@ func test_the_workshop_survives_the_handoff_and_leaves_with_the_next_scene() -> 
 	if workshop == null:
 		return
 	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "with Onion (and its light)")
-	expect(workshop.find_children("*", "Target", true, false).filter(func(n: Target) -> bool: return n.collision_layer & Pointer.TARGET_LAYER != 0).is_empty(), "the cauldron cannot be touched any more; Onion only uses the reaction layer")
+	expect(workshop.find_children("*", "Target", true, false).filter(func(n: Target) -> bool: return n.collision_layer & Pointer.TARGET_LAYER != 0).is_empty(), "the workshop has no gameplay touch targets")
 	expect(App.world == null, "no World welcome or menu in the first visit")
 	await App.main.change_scene(&"global_motion")
 	await wait(0.5)
@@ -587,10 +587,26 @@ func test_under_the_test_runner_the_mode_is_dev_and_setup_is_skipped_by_default(
 	expect((app.get_node(^"Intro/Entry") as Entry).skip_setup, "tests skip setup unless they turn it on (the test hook)")
 
 
+func test_play_mode_frees_the_hand_outline_after_the_hands_check() -> void:
+	await _boot_entry()
+	await _press(&"entry_mode")
+	expect(not PlayMode.is_dev(), "the hands check is in Play mode")
+	# XR normally creates these nodes on the first tracked frame.
+	var outline := entry._new_hand()
+	entry._hand_lines[&"right"] = outline
+	await frames(2)
+	expect(is_instance_valid(outline[0]) and is_instance_valid(outline[2]), "the outline stays during the hands check")
+	Events.button.emit(&"right", &"trigger_click", true)
+	await _press(&"entry_step_next")
+	expect(_target(&"entry_confirm_yes") != null, "the table check follows the hands check")
+	expect(entry._hand_lines.is_empty(), "the hand check releases its references")
+	expect(not is_instance_valid(outline[0]) and not is_instance_valid(outline[2]), "the lines and dots are freed")
+
+
 ## The opening's shelf distance and Onion's voice are static: other suites must not inherit them.
 func shutdown() -> void:
-	await super.shutdown()
 	PlayMode.set_dev(true, "tests")
+	await super.shutdown()
 	Tidy.onion_voice = false
 	Motion.onion_voice = false
 	Engine.time_scale = 1.0

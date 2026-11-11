@@ -15,10 +15,10 @@ extends Node3D
 const TARGET_LAYER := 1
 ## Modal panels and their furniture; these own input while a menu is open.
 const MENU_LAYER := 4
-## Non-blocking touch reactions (e.g. Onion), excluded from pointing rays.
-const REACTION_LAYER := 8
 ## In-world UI (setup, level choices, replay), excluded by modal panels.
 const UI_LAYER := 16
+## Radius of the fingertip's contact area, metres.
+const TIP_RADIUS := 0.02
 ## How close the fingertip must be to a Target to grab it, metres.
 const GRAB_RADIUS := 0.07
 ## A hand rising or falling more steeply than this (the sine of 50 degrees) is not sweeping.
@@ -100,7 +100,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER | REACTION_LAYER
+	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER
 	_set_aim(cast() if tracked() else null)
 	_marker.visible = App.xr == null and tracked()
 	_draw_ui_ray()
@@ -311,7 +311,7 @@ func _build() -> void:
 	finger.collision_mask = TARGET_LAYER
 	var shape := CollisionShape3D.new()
 	shape.shape = SphereShape3D.new()
-	(shape.shape as SphereShape3D).radius = 0.02
+	(shape.shape as SphereShape3D).radius = TIP_RADIUS
 	finger.add_child(shape)
 	var ball := MeshInstance3D.new()
 	ball.mesh = SphereMesh.new()

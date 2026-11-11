@@ -91,7 +91,12 @@ func _ready() -> void:
 	touch.setup(onion)
 	holder.add_child(touch)
 	await shot("onion_rest")
-	Events.touched.emit(&"right", touch)
+	var at := touch.global_position
+	var away := at + Vector3.RIGHT * 0.2
+	var offset := Vector3.BACK * App.rig.pointer(&"right").tip_reach
+	App.sim_input.point(&"right", away + offset, away)
+	await _frames(3)
+	App.sim_input.point(&"right", at + offset, at)
 	await get_tree().create_timer(0.08).timeout
 	await shot("onion_touch")
 	await App.main.change_scene(&"intro")

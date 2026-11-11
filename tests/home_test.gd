@@ -21,6 +21,7 @@ func _press(id: String) -> void:
 
 func test_catalogue_has_ten_furniture_and_three_room_scenes() -> void:
 	await boot()
+	expect(ResourceLoader.has_cached("res://content/items/visuals/bed.tscn"), "item scenes stay loaded from startup")
 	expect_eq(ItemDef.all(ItemDef.Kind.FURNITURE).size(), 10, "all furniture ported")
 	expect_eq(ItemDef.all(ItemDef.Kind.ROOM).size(), 3, "three distinct rooms")
 	for kind in [ItemDef.Kind.FURNITURE, ItemDef.Kind.ROOM]:
