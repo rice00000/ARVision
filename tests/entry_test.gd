@@ -639,8 +639,10 @@ func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
 	expect(Motion.onion_voice, "with Wei's own lines switched off")
 	await wait(1.0)
 	expect(not _said_line(said, "Which way do the dots go? Sweep your hand that way, then hold still."), "his round line is not said")
-	var visit := App.main.get_node(^"FirstVisit/Motion") as MotionVisit
-	expect(absf(visit._coherence_at(visit.level_for(0.5)) - 0.5) < 0.01, "the DEV coherence control finds the level for 50 %")
+	var task := preload("res://content/tasks/break_wall.tres")
+	var plan := task.level_by_id(&"steady_flow").plan
+	expect_eq(App.session.plan, plan, "Onion plays the same Steady Flow level as the menu")
+	expect(not _said_line(said, plan.blocks[0].intro), "Onion supplies the level introduction")
 
 
 func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_success_is_marked_once() -> void:
@@ -649,7 +651,7 @@ func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_
 	var said := record(Events.said)
 	await jump_to_intro_part(&"motion")   # Wei moved the jumps into the facilitator Tools (Nov 9)
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
-	var visit := App.main.get_node(^"FirstVisit/Motion") as MotionVisit
+	var visit := App.main.get_node(^"FirstVisit/Visit/Motion") as MotionVisit
 	visit.set("_in_motion", true)
 	Engine.time_scale = 4.0
 	Events.trial_ended.emit(&"motion", true, {})

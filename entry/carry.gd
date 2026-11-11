@@ -199,16 +199,9 @@ func has_docked() -> bool:
 	return _docked
 
 
-## STUB, kept for the story chat's tests: pretends the child picked it up and set it in. The gear
-## really aligns into the socket, like after a real release.
+## Tests simulate a child carrying the gear into the same docking sequence.
 func simulate(after := 1.0) -> void:
 	await get_tree().create_timer(after).timeout
-	if _gear == null:
-		picked_up.emit()
-		await get_tree().create_timer(after).timeout
-		released.emit(true)
-		docked.emit()
-		return
 	_picked = true
 	if _spin != null:
 		_spin.running = false

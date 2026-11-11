@@ -6,26 +6,56 @@ extends Node
 ##   Right drag            look around
 ##   Left press / release  pinch / let go where the cursor points
 ##   Left drag             sweep the hand across the view (wheel: nearer / farther)
+##   WASD / Q / E          move the head; arrows turn and tilt; R resets it
 ##   H                     raise the left hand (help)
 ##   M                     left-hand menu pinch (facilitator panel)
 
+const SPEED := 0.5
+const TURN := 1.2
+
 ## How far in front of the eye the hand sits, metres.
 var depth := 0.45
+var _start := Vector3.ZERO
 var _yaw := 0.0
 var _pitch := 0.0
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_start = App.rig.head.global_position
+
+
+func _process(delta: float) -> void:
+	if App.xr != null or get_tree().paused:
+		return
+	var head := App.rig.head
+	if Input.is_physical_key_pressed(KEY_R):
+		head.global_position = _start
+		_look(0.0, 0.0)
+		_place_hand(get_viewport().get_mouse_position())
+		return
+	var seconds := delta / maxf(Engine.time_scale, 0.05)
+	var turn := float(Input.is_physical_key_pressed(KEY_LEFT)) - float(Input.is_physical_key_pressed(KEY_RIGHT))
+	var tilt := float(Input.is_physical_key_pressed(KEY_UP)) - float(Input.is_physical_key_pressed(KEY_DOWN))
+	if turn != 0.0 or tilt != 0.0:
+		_look(head.rotation.x + tilt * TURN * seconds, head.rotation.y + turn * TURN * seconds)
+	var forward := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
+	var right := forward.cross(Vector3.UP)
+	var step := Vector3.ZERO
+	step += forward * (float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S)))
+	step += right * (float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)))
+	step += Vector3.UP * (float(Input.is_physical_key_pressed(KEY_E)) - float(Input.is_physical_key_pressed(KEY_Q)))
+	if step != Vector3.ZERO:
+		head.global_position += step.normalized() * SPEED * seconds
+	if step != Vector3.ZERO or turn != 0.0 or tilt != 0.0:
+		_place_hand(get_viewport().get_mouse_position())
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	var input := App.sim_input
 	if event is InputEventMouseMotion:
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			_yaw -= event.relative.x * 0.004
-			_pitch = clampf(_pitch - event.relative.y * 0.004, -1.3, 1.3)
-			App.rig.head.rotation = Vector3(_pitch, _yaw, 0.0)
+			_look(_pitch - event.relative.y * 0.004, _yaw - event.relative.x * 0.004)
 		_place_hand(event.position)
 	elif event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -39,6 +69,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_raise_left_hand()
 		elif event.keycode == KEY_M:
 			input.menu()
+
+
+func _look(pitch: float, yaw: float) -> void:
+	_pitch = clampf(pitch, -1.3, 1.3)
+	_yaw = yaw
+	App.rig.head.rotation = Vector3(_pitch, _yaw, 0.0)
 
 
 func _raise_left_hand() -> void:

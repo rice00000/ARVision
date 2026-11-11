@@ -1,43 +1,23 @@
 class_name EntryMotionDev
 extends Node3D
-## DEV only (TESTING), for the motion route: a small head-locked marker at the top left of the view naming
-## the scene that is running ("Opening", "Tutorial", "Motion", "Shelf"), and a coherence control under the
-## DEV jump panel: a readout of the coherence the next round runs at and buttons that PIN it, exactly the way
-## Wei's facilitator panel does (Session.pinned plus a `level_pinned` event, so every pinned level is logged,
-## never an unlogged change).
-##
-## Where things stand is [EntryMotionLayout] (marker_spot, coherence_spot). Use:
-##   var dev := EntryMotionDev.new(); add_child(dev); dev.set_scene(&"Motion")
-## The scene that owns it frees it (or [method queue_free]) when it ends. Pressing works like the entry's own DEV
-## buttons: point and pinch (Wei's UITarget buttons, Nov 5).
+## Dev controls for the coherence of the next round.
 
-## Pressed: the coherence now pinned, percent.
-signal pinned(percent: float)
-
-const WORDS := {&"Opening": "Opening", &"Tutorial": "Tutorial", &"Motion": "Motion", &"Shelf": "Shelf"}
 const STEP := 5.0
 
-var _label: Label3D
+var _block: Block
+var _axis: TrialAxis
 var _readout: Label3D
 var _buttons: Array[EntryButton] = []
-var _clock := 0.0
 var _since_readout := 1.0
+
+
+func _init(block: Block) -> void:
+	_block = block
+	_axis = block.trial.axes.filter(func(axis: TrialAxis) -> bool: return axis.name == &"coherence")[0]
 
 
 func _ready() -> void:
 	var head := App.head().global_transform
-	# The marker rides on the head: top left, small, off the middle of the view.
-	_label = Label3D.new()
-	_label.font_size = 24
-	_label.pixel_size = 0.0006
-	_label.outline_size = 8
-	_label.modulate = Color(1, 1, 1, 0.85)
-	_label.no_depth_test = true
-	_label.render_priority = 10
-	App.head().add_child(_label)
-	_label.visible = false   # SceneMarker is the marker
-	_label.global_position = EntryMotionLayout.marker_spot(head)
-	_label.global_rotation = App.head().global_rotation
 	_readout = Label3D.new()
 	_readout.font_size = 26
 	_readout.pixel_size = 0.0006
@@ -55,42 +35,21 @@ func _ready() -> void:
 	_refresh()
 
 
-func _exit_tree() -> void:
-	if _label != null and is_instance_valid(_label):
-		_label.queue_free()
-	if Events.selected.is_connected(_on_selected):
-		Events.selected.disconnect(_on_selected)
-
-
-## Names the running scene in the marker. (Organizer: the one marker is SceneMarker, which rides on
-## the head across scenes; this panel's own label stays hidden so there are never two.)
-func set_scene(scene: StringName) -> void:
-	_label.visible = false
-	SceneMarker.show_text(String(WORDS.get(scene, scene)))
-
-
 ## The coherence (percent) the next round runs at.
 func coherence() -> float:
-	if App.session == null:
-		return 90.0
-	if not is_nan(App.session.pinned):
-		return EntryMotionLayout.percent_for(App.session.pinned)
-	return EntryMotionLayout.percent_for(App.session.level()) if App.session.block != null else 90.0
+	var level := App.session.level() if App.session.block != null else _block.difficulty
+	return _axis.resolve(level) * 100.0
 
 
-## Pins the coherence the way the facilitator's Easier/Harder do (logged as `level_pinned`).
+## Pins a percentage using the same difficulty axis as the round.
 func pin(percent: float) -> void:
-	if App.session == null:
-		return
-	var level := EntryMotionLayout.level_for(clampf(percent, 15.0, 90.0))
-	App.session.pinned = level
-	Events.report(&"level_pinned", {level = level, coherence = EntryMotionLayout.percent_for(level), source = &"dev_coherence"})
-	pinned.emit(EntryMotionLayout.percent_for(level))
+	var level := clampf(inverse_lerp(_axis.easy, _axis.hard, percent / 100.0), 0.0, 1.0)
+	App.session.pin(level, {coherence = _axis.resolve(level) * 100.0, source = &"dev_coherence"})
 	_refresh()
 
 
 func _refresh() -> void:
-	var on := App.session != null and not is_nan(App.session.pinned)
+	var on := not is_nan(App.session.pinned)
 	_readout.text = "DEV · coherence %d %% %s" % [roundi(coherence()), "(pinned, next round)" if on else "(auto)"]
 
 
@@ -106,12 +65,10 @@ func _button(text: String, at: Vector3, id: StringName, wide: float) -> void:
 
 
 func _process(delta: float) -> void:
-	_clock += delta
 	_since_readout += delta
 	if _since_readout > 0.3:
 		_since_readout = 0.0
 		_refresh()
-	# Wei's buttons (Nov 5) are aimed at and pinched; they light up on hover themselves.
 
 
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:

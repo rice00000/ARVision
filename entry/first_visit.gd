@@ -1,17 +1,10 @@
 class_name FirstVisit
 extends Node
-## Scene one's last part: Onion leads the first shelf level, the same level Wei's World offers,
-## but without the World's welcome, menu, announcements and closing (Onion speaks for them).
-## Wei's code is used as it is: Session.play(plan) with a copy of his level-1 plan.
-##
-## The brief (SCENE_ONE_CURRENT_BUILD_BRIEF.md, steps 13-15): the shelf rule, one short line at
-## the first correct placement, then, when the level is done, the closing, a bob and quiet.
+## Onion leads Shadow Match, then offers more shapes or the motion activity.
 
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
 const SHELF_TASK := preload("res://content/tasks/tidy_shelf.tres")
 const TUTORIAL_LEVEL := &"shadow"
-
-@export var plan: SessionPlan
 
 ## DEV jump: &"motion" starts straight at the motion route (the shelf level is skipped). Single use.
 static var start_with: StringName = &""
@@ -33,10 +26,22 @@ var _onion: Workshop
 var _shelf_spot := Vector3.INF
 var _reminder: ShelfReminder   # a hand that shows how to pick a shape up, if the child waits (interaction chat)
 
+@onready var _motion: MotionVisit = $Motion
+
 
 func run() -> void:
-	Tidy.onion_voice = true
 	_onion = App.main.get_node_or_null(^"Workshop") as Workshop
+	App.reality.apply_view(App.session.base_view)
+	if not App.reality.is_settled:
+		await App.reality.settled
+	if start_with == &"motion":
+		start_with = &""
+		Tidy.seed_next = 0
+		Tidy.things_arrive = true
+		await get_tree().create_timer(0.5, false).timeout
+		await _motion.run_motion()
+		return
+	Tidy.onion_voice = true
 	Events.reported.connect(_on_reported)
 	Events.trial_ended.connect(func(_skill: StringName, success: bool, _data: Dictionary) -> void:
 		_rounds_ended += 1
@@ -47,17 +52,6 @@ func run() -> void:
 	var skip := App.main.get_node_or_null(^"LineSkip") as LineSkip
 	if skip != null:   # the invitation is an instruction until the child has taken a shape
 		skip.guards.append(_invitation_open)
-	App.reality.apply_view(App.session.base_view)
-	if not App.reality.is_settled:
-		await App.reality.settled
-	if start_with == &"motion":
-		start_with = &""
-		Tidy.onion_voice = false
-		Tidy.seed_next = 0   # meant for the shelf level this jump skipped: not for "More shapes" later
-		Tidy.things_arrive = true
-		await get_tree().create_timer(0.5, false).timeout
-		await (get_node(^"../Motion") as MotionVisit).run_motion()
-		return
 	SceneMarker.show_text("Shelf")
 	_play()   # not awaited: Onion speaks while the first round sets up
 	for _frame in 30:
@@ -133,9 +127,10 @@ func _invitation_open() -> bool:
 
 
 func _play() -> void:
-	await App.session.play(_reminder.prepare(plan))   # Wei's first hint is held back so the reminder comes first
+	var level := SHELF_TASK.level_by_id(TUTORIAL_LEVEL)
+	await App.session.play(_reminder.prepare(level.plan), false)
 	if App.session.won:
-		App.main.progress.complete(SHELF_TASK, SHELF_TASK.level_by_id(TUTORIAL_LEVEL))
+		App.main.progress.complete(SHELF_TASK, level)
 	await _closing()
 
 
@@ -155,9 +150,7 @@ func _closing() -> void:
 	await get_tree().create_timer(QUIET_END, false).timeout
 	Tidy.onion_voice = false
 	Events.report(&"first_visit_done")
-	var motion := get_node_or_null(^"../Motion") as MotionVisit
-	if motion != null:
-		motion.run_after_shelf()   # "There's more to sort..." and the motion route (it runs on its own)
+	_motion.run_after_shelf()
 
 
 func _on_reported(what: StringName, data: Dictionary) -> void:

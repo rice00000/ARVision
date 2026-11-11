@@ -5,6 +5,7 @@ extends TestCase
 ## real Entry configures it.
 
 const CAULDRON_PLAY_CLEAR := 0.17
+const MOTION_DEF := preload("res://trials/motion/motion.tres")
 var carry: Carry
 var gear: Node3D
 var spin: GearSpin
@@ -1202,8 +1203,6 @@ func _key(code: Key, down: bool) -> void:
 
 func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_follows() -> void:
 	var entry := await _opening_at_start()
-	var keys := App.main.get_node_or_null(^"DesktopKeys")
-	expect(keys != null, "the key node is there, under Main (it outlives the opening)")
 	var head := App.rig.head
 	var start := head.global_position
 	_key(KEY_W, true)
@@ -1217,7 +1216,6 @@ func test_the_head_keys_work_in_the_opening_and_still_work_in_the_shelf_that_fol
 	App.main.change_scene(&"first_visit")   # the opening hands over to the shelf
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not is_instance_valid(entry), 10.0), "now in the shelf scene")
 	await wait(1.5)
-	expect(App.main.get_node_or_null(^"DesktopKeys") == keys, "the same key node, still there")
 	var before := head.global_position
 	var ahead := Vector3.FORWARD.rotated(Vector3.UP, head.global_rotation.y)
 	_key(KEY_W, true)
@@ -1775,7 +1773,7 @@ func test_the_motion_tutorial_plays_the_example_with_nothing_judged_or_logged() 
 	tutorial.effect_started.connect(func() -> void: order.append("effect"))
 	tutorial.settled.connect(func() -> void: order.append("settled"))
 	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
-	tutorial.play(frame)
+	tutorial.play(MOTION_DEF.condition(0.0, 0, false), frame)
 	await wait(0.4)
 	var cloud: GPUParticles3D = tutorial._cloud
 	var material := cloud.process_material as ShaderMaterial
@@ -1813,7 +1811,7 @@ func test_stopping_the_motion_tutorial_takes_the_dots_and_the_hand_and_nothing_f
 	tutorial.heading = &"left"
 	var eye := App.head().global_position
 	var frame := Transform3D(Basis.looking_at(_ahead()), eye + _ahead() * 1.0)
-	tutorial.play(frame)
+	tutorial.play(MOTION_DEF.condition(0.0, 0, false), frame)
 	await wait(0.4)
 	expect_eq((tutorial._cloud.process_material as ShaderMaterial).get_shader_parameter(&"flow_direction"), Vector3.LEFT, "a flow to the left")
 	expect((tutorial.hand_to - tutorial.hand_from).normalized().dot(frame.basis * Vector3.LEFT) > 0.99, "and the hand sweeps to the left")

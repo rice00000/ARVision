@@ -270,98 +270,49 @@ func test_the_first_visit_scene_is_loaded_in_the_background_so_the_handover_does
 
 # --- The motion route (EntryMotionLayout) -------------------------------------------
 
-func test_the_dots_numbers_match_weis_motion_def() -> void:
-	var def := load("res://trials/motion/motion.tres") as TrialDef
-	var condition := def.condition(0.0, 0, false, {})
-	expect(absf(condition.value(&"half_width") - EntryMotionLayout.DOTS_HALF.x) < 0.001, "half width")
-	expect(absf(condition.value(&"half_height") - EntryMotionLayout.DOTS_HALF.y) < 0.001, "half height")
-	expect(absf(condition.value(&"half_depth") - EntryMotionLayout.DOTS_HALF.z) < 0.001, "half depth")
-	expect(absf(condition.value(&"distance") - EntryMotionLayout.DOTS_DISTANCE) < 0.001, "distance")
-
-
-func test_the_dots_rise_from_behind_the_table_clear_of_the_bench_and_onion_stays_out_of_their_view() -> void:
-	var cases := 0
-	for size: Vector2 in [Vector2(1.0, 0.7), Vector2(1.2, 0.7), Vector2(1.6, 0.9)]:
-		for edge: float in [0.3, 0.4]:
-			for drop: float in [0.45, 0.55]:
-				for reach: float in [0.0, 0.5, 0.6, 0.72]:
-					if (reach if reach > 0.0 else EntryLayout.REACH_USUAL) - edge < 0.15:
-						continue
-					var layout := _layout(size, edge, drop, reach)
-					var motion := EntryMotionLayout.new(layout)
-					var label := "table %s edge %d drop %d reach %d" % [size, roundi(edge * 100), roundi(drop * 100), roundi(reach * 100)]
-					expect(motion.dots_near_face() >= EntryMotionLayout.DOTS_NEAR, "%s: the cloud's near face is %d cm out" % [label, roundi(motion.dots_near_face() * 100)])
-					expect_eq(motion.table_into_dots(), 0.0, "%s: the table's far edge does not reach into the cloud" % label)
-					var path := motion.entrance()
-					expect(path[0].y < layout.table.origin.y, "%s: the group starts below the table top, hidden by the table" % label)
-					var entrance := motion.entrance_zone()
-					for other: EntryLayout.Zone in [layout._bench_zone(), layout._shelf_zone(), layout._things_zone()]:
-						expect(EntryLayout.volume_gap(entrance, other) > 0.2, "%s: the entrance is clear of %s" % [label, other.name])
-					var onion := motion.onion_spot()
-					expect(onion.gap >= EntryMotionLayout.ONION_VIEW_GAP, "%s: Onion is %d degrees out of the dots' view" % [label, roundi(onion.gap)])
-					var to: Vector3 = onion.at - layout.eye
-					expect(absf(rad_to_deg(atan2(to.x, -to.z))) < 55.0, "%s: Onion is still in the child's view (within 55 degrees): %d, gap %d, moved %s" % [label, roundi(rad_to_deg(atan2(to.x, -to.z))), roundi(onion.gap), onion.moved])
-					cases += 1
-	expect_eq(cases, 42, "every case was tried")
-
-
-func test_the_subtitle_covers_the_dots_unless_it_is_raised() -> void:
-	var motion := EntryMotionLayout.new(EntryLayout.usual().plan())
-	expect(motion.subtitle_gap(20.0) < 0.0, "Voice's 20 degrees puts the line over the dots (a known cost of the motion part)")
-	expect(motion.subtitle_gap(12.0) < motion.subtitle_gap(20.0), "the proposed 12 degrees is worse for the dots")
-	expect(motion.subtitle_gap(32.0) >= 0.0, "32 degrees clears the dots")
-
-
-func test_the_coherence_control_maps_levels_like_weis_axis() -> void:
-	expect_eq(EntryMotionLayout.level_for(90.0), 0.0, "90 % is level 0")
-	expect_eq(EntryMotionLayout.level_for(15.0), 1.0, "15 % is level 1")
-	expect(absf(EntryMotionLayout.percent_for(EntryMotionLayout.level_for(50.0)) - 50.0) < 0.001, "50 % round-trips")
+func test_the_coherence_buttons_are_separate_and_within_reach() -> void:
 	var head := Transform3D(Basis.IDENTITY, Vector3(0, 1.2, 0))
-	var marker := EntryMotionLayout.marker_spot(head)
-	var yaw := rad_to_deg(atan2(marker.x - head.origin.x, -(marker.z - head.origin.z)))
-	expect(yaw < -25.0 or yaw > 25.0, "the marker is off the middle of the view (%d degrees)" % roundi(yaw))
-	expect(marker.y > head.origin.y, "the marker is above the horizon")
 	for i in 5:
 		var spot := EntryMotionLayout.coherence_spot(head, 1, i, 5, EntryMotionLayout.COHERENCE_PRESET_WIDE)
 		expect(spot.distance_to(head.origin) < 0.62, "preset %d is within an arm's reach (%d cm)" % [i, roundi(spot.distance_to(head.origin) * 100)])
 		for j in range(i + 1, 5):
 			var other := EntryMotionLayout.coherence_spot(head, 1, j, 5, EntryMotionLayout.COHERENCE_PRESET_WIDE)
 			expect(spot.distance_to(other) > EntryMotionLayout.COHERENCE_PRESET_WIDE, "presets %d and %d do not touch" % [i, j])
-	# Clear of the jump buttons above (the lowest row of the jump panel ends about 17 cm under its middle).
-	expect(EntryMotionLayout.coherence_row(head, 0).y < EntryMotionLayout.dev_anchor(head).y - 0.2, "the readout sits under the old jump panel's spot")
 
 
-func test_the_motion_dev_marker_and_coherence_control_build_and_pin_like_the_facilitator() -> void:
+func test_the_motion_dev_controls_pin_the_same_coherence_axis_as_the_trial() -> void:
 	await boot(null, &"intro")
-	var dev := EntryMotionDev.new()
+	var task := preload("res://content/tasks/break_wall.tres")
+	var block := task.level_by_id(&"steady_flow").plan.blocks[0]
+	App.session.block = block
+	var dev := EntryMotionDev.new(block)
 	add_child(dev)
-	dev.set_scene(&"Motion")
-	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
-	expect(marker != null and marker.text.ends_with("Motion"), "the (one) marker names the scene")
 	expect_eq(dev._buttons.size(), 7, "five presets and -5 / +5")
-	var session := Session.new()
-	add_child(session)
-	dev.pin(50.0)
-	expect(absf(App.session.pinned - EntryMotionLayout.level_for(50.0)) < 0.001, "50 %% pinned as a level, the way Easier/Harder pin: %s" % App.session.pinned)
-	dev._press(&"dev_coh_up")
-	expect(absf(dev.coherence() - 55.0) < 0.5, "+5 steps to 55 %%, got %s" % dev.coherence())
-	dev._press(&"dev_coh_15")
-	expect(absf(dev.coherence() - 15.0) < 0.5, "the 15 preset")
+	var reported := record(Events.reported)
+	await select((dev.find_child("dev_coh_50", true, false) as UITarget).global_position)
+	var condition := block.trial.condition(App.session.level(), 0, block.probe, block.pins)
+	expect(absf(condition.value(&"coherence") - 0.5) < 0.001, "the next round runs at 50 percent")
+	expect(reported.any(func(args: Array) -> bool: return args[0] == &"level_pinned" and args[1].source == &"dev_coherence"), "the pin is logged")
+	await select((dev.find_child("dev_coh_up", true, false) as UITarget).global_position)
+	expect(absf(dev.coherence() - 55.0) < 0.5, "+5 steps to 55 percent")
+	await select((dev.find_child("dev_coh_15", true, false) as UITarget).global_position)
+	expect(absf(dev.coherence() - 15.0) < 0.5, "the 15 percent preset")
 	dev.queue_free()
-	session.queue_free()
 
 
 func test_the_choice_row_is_on_the_table_in_reach_and_onion_stays_out_of_the_dots() -> void:
+	var def := preload("res://trials/motion/motion.tres")
+	var condition := def.condition(0.0, 0, false)
 	for size: Vector2 in [Vector2(1.0, 0.7), Vector2(1.6, 0.9)]:
 		for reach: float in [0.0, 0.5, 0.72]:
 			var layout := _layout(size, 0.3, 0.5, reach)
-			var motion := EntryMotionLayout.new(layout)
+			var motion := EntryMotionLayout.new(layout, condition)
 			for n in [2, 3]:
 				for i in n:
 					var spot := motion.choice_spot(i, n)
 					var label := "table %s reach %d, target %d of %d" % [size, roundi(reach * 100), i + 1, n]
 					expect(layout.away(spot) <= layout.reach_used(), "%s: within reach (%d cm)" % [label, roundi(layout.away(spot) * 100)])
-					expect(layout.on_table(spot), "%s: on the table" % label) if layout.has_method("on_table") else null
+					expect(layout._inside_table(spot, 0.0), "%s: on the table" % label)
 					if i > 0:
 						expect(spot.distance_to(motion.choice_spot(i - 1, n)) >= EntryMotionLayout.CHOICE_WIDE, "%s: does not touch its neighbour" % label)
 				var onion := motion.onion_without_shelf(n)
