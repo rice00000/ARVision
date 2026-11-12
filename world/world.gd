@@ -24,6 +24,7 @@ var menu: TaskMenu
 var place: Place
 
 var _guide := Guide.new()
+var _menu_row := 0
 ## While true, facing a place other than [member place] for long enough sends [signal _picked].
 var _watching := false
 var _faced_for: Dictionary[Place, float] = {}
@@ -59,7 +60,9 @@ func run() -> void:
 		var task: Task = picked[0]
 		var level: TaskLevel = picked[1]
 		await App.session.play(level.plan)
-		if App.session.won:
+		if level.plan.is_endless():
+			Events.report(&"practice_ended", {task = task.id, level_id = level.id})
+		elif App.session.won:
 			await _complete(task, level)
 		else:
 			Events.report(&"task_unfinished", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
@@ -69,7 +72,7 @@ func run() -> void:
 ## Every level is open; this is just the one the menu lights up.
 func current(task: Task) -> TaskLevel:
 	for level in task.levels:
-		if not App.main.progress.is_done(task, level):
+		if not level.plan.is_endless() and not App.main.progress.is_done(task, level):
 			return level
 	return null
 
@@ -104,6 +107,7 @@ func _new_elsewhere() -> Place:
 
 func _enter(where: Place) -> void:
 	place = where
+	_menu_row = 0
 	_guide.stop()
 	Events.report(&"place_entered", {place = where.title})
 
@@ -140,7 +144,7 @@ func _facing(where: Place) -> bool:
 ## Unfolds [member place]'s menu, the guide pointing to anything new elsewhere,
 ## and waits for a task and level ([Task, TaskLevel]) or a turn to another place ([Place]).
 func _choose() -> Array:
-	menu = TaskMenu.new(place, self)
+	menu = TaskMenu.new(place, self, _menu_row)
 	App.stage.add_child(menu)
 	var eye := App.head().global_position
 	var to_place := position_of(place) - eye
@@ -160,6 +164,7 @@ func _choose() -> Array:
 		Events.say(place.arrive)
 	var picked: Array = await _watch()
 	_guide.stop()
+	_menu_row = menu.first_row
 	menu.fold()
 	menu = null
 	if picked.size() == 2:

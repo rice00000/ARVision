@@ -7,7 +7,8 @@ extends Trial
 ## wrong one does not fit and goes back to the bench. The round is
 ## done when everything is back. Trains matching shape, size and colour, and
 ## placing by sight (vision for action).
-## In the odd-colour rounds only the different piece goes in the blank cubby.
+## In fixed odd-colour rounds the different piece goes in the blank cubby.
+## Adaptive colour practice ends each round at the first colour choice.
 ##
 ## No table needed: a small virtual bench with the shelf on its back edge stands
 ## in front of the child, in easy reach, facing the work surface (the real table,
@@ -29,6 +30,7 @@ const SHAPE := 0
 const SIZE := 1
 const COLOUR := 2
 const ODD_COLOUR := 3
+const COLOUR_PRACTICE := 4
 const ODD_KEY := "odd"
 const ODD_CELL := 1 # bottom centre
 
@@ -160,9 +162,10 @@ func _setup(round_condition: TrialCondition) -> void:
 	_outline = round_condition.value(&"outline", 0.0) > 0.5
 	var size: float = round_condition.value(&"size", 0.06)
 	var looks: Array[Dictionary]
-	if _match == ODD_COLOUR:
+	if _match >= ODD_COLOUR:
 		looks = _odd_colour_looks(size)
-		_set_cubby(ODD_CELL, looks[0])
+		if _match == ODD_COLOUR:
+			_set_cubby(ODD_CELL, looks[0])
 	else:
 		looks = _looks(roundi(round_condition.value(&"things", 3.0)), size)
 		var cells := range(COLUMNS * ROWS)
@@ -178,7 +181,7 @@ func _setup(round_condition: TrialCondition) -> void:
 		var thing := _make_thing(looks[i], "thing_%d_%s" % [i, looks[i].key])
 		add_child(thing)
 		_home[thing] = spots[i] + _frame.basis.y * _stands[thing].y * 0.5
-		if arrive:
+		if arrive and _match != COLOUR_PRACTICE:
 			thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
 			_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
 		else:
@@ -194,6 +197,9 @@ func _setup(round_condition: TrialCondition) -> void:
 				say("Put each one on its colour!")
 			ODD_COLOUR:
 				say("Pinch the block with a different colour.")
+			COLOUR_PRACTICE:
+				if round_condition.round_index == 0:
+					say("Pinch the block with a different colour. To finish, open Menu and choose End practice.")
 			_:
 				say("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!")
 
@@ -207,7 +213,9 @@ func _spots(count: int) -> Array[Vector3]:
 	var zig := (THINGS_FAR - THINGS_NEAR) * 0.5 - 0.015
 	for i in count:
 		var x := (i + 0.5) * step - THINGS_WIDE * 0.5 + _rng.randf_range(-0.012, 0.012)
-		var z := middle + (zig if i % 2 == 0 else -zig) + _rng.randf_range(-0.012, 0.012)
+		var z := middle
+		if _match != COLOUR_PRACTICE:
+			z += (zig if i % 2 == 0 else -zig) + _rng.randf_range(-0.012, 0.012)
 		spots.append(_frame * Vector3(x, -_below, -z))
 	spots.shuffle()
 	return spots
@@ -290,9 +298,19 @@ func _looks(count: int, size: float) -> Array[Dictionary]:
 
 
 func _odd_colour_looks(size: float) -> Array[Dictionary]:
-	var other := ODD_COLOURS[int(condition.value(&"colour_step"))]
-	var odd := ODD_BLUE if _rng.randf() < 0.5 else other
-	var pair := other if odd == ODD_BLUE else ODD_BLUE
+	var blue := ODD_BLUE
+	var other: Color
+	if _match == COLOUR_PRACTICE:
+		var hue := _rng.randf_range(0.65, 0.72)
+		var gap := pow(2.0, condition.value(&"log2_colour_gap"))
+		blue = Color.from_ok_hsl(hue, 0.8, 0.65)
+		other = Color.from_ok_hsl(hue - gap, 0.8, 0.65)
+		condition.set_value(&"colour_gap", gap)
+	else:
+		other = ODD_COLOURS[int(condition.value(&"colour_step"))]
+	var blue_is_odd := _rng.randf() < 0.5
+	var odd := blue if blue_is_odd else other
+	var pair := other if blue_is_odd else blue
 	condition.set_value(&"odd_colour", odd.to_html(false))
 	condition.set_value(&"pair_colour", pair.to_html(false))
 	return [{key = ODD_KEY, shape = &"block", size = size, colour = odd},
@@ -329,9 +347,18 @@ func _on_button(hand: StringName, action: StringName, pressed: bool) -> void:
 
 ## Keep the contact point: a thing never jumps to the centre of the hand.
 func _take(hand: StringName, thing: Target) -> void:
-	if _match == ODD_COLOUR:
+	if _match >= ODD_COLOUR:
 		if not _odd_found:
 			pick(ODD_KEY, _key[thing])
+			if _match == COLOUR_PRACTICE:
+				var right := _key[thing] == ODD_KEY
+				judge(&"good" if right else &"bad", thing.global_position)
+				if not right:
+					count_try()
+					# Lift the answer briefly so the child can compare it with the pair.
+					_move(_things[0], _home[_things[0]] + _frame.basis.y * 0.04, 0.25)
+				finish(right)
+				return
 			if _key[thing] != ODD_KEY:
 				judge(&"bad", thing.global_position)
 				count_try()
@@ -462,7 +489,7 @@ func _put(hand: StringName, cell: int) -> void:
 
 
 func _hint(level: int) -> void:
-	if _match == ODD_COLOUR:
+	if _match >= ODD_COLOUR:
 		if _odd_found:
 			say("Put it in the marked cubby.")
 		else:
@@ -636,6 +663,8 @@ func _build_shelf() -> void:
 	var back := -(SHELF_AHEAD + DEPTH)
 	var near := BENCH_NEAR
 	_box(Vector3(THINGS_WIDE + 0.06, 0.012, -back - near + 0.01), Vector3(0.0, -_below - 0.006, (back - near) * 0.5), WOOD.lightened(0.15))
+	if _match == COLOUR_PRACTICE:
+		return
 	_box(Vector3(wide, high, 0.01), Vector3(0.0, -_below + high * 0.5, back - 0.005), WOOD)
 	for row in ROWS + 1:
 		var y := -_below + PLINTH + row * (CELL_HIGH + BOARD) - BOARD * 0.5
@@ -726,7 +755,7 @@ func _make_thing(look: Dictionary, thing_id: String) -> Target:
 	var thing := Target.sphere(StringName(thing_id), look.size * 0.7)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = look.colour
-	if _match == ODD_COLOUR:
+	if _match >= ODD_COLOUR:
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	thing.set_meta(&"material", material)
 	var mesh := _mesh(look.shape, look.size)

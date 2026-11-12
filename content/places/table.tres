@@ -8,5 +8,5 @@
 script = ExtResource("1_place")
 title = "Alchemy table"
 turn_to = "This way! Turn to your alchemy table."
-arrive = "Point and pinch a card to play. Match pieces, or put away the odd-coloured block."
+arrive = "Point and pinch a card to play. Pinch an arrow to see more levels."
 tasks = Array[ExtResource("3_task")]([ExtResource("2_tidy_shelf")])

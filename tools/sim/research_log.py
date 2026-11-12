@@ -67,8 +67,9 @@ def problems(lines, step=0.1):
                 found.append(f"line {number}: a probe round moved the level")
             if level["skill"] != last_end["skill"] or level["first_try"] != last_end["data"]["first_try"]:
                 found.append(f"line {number}: level report disagrees with its round's first_try")
-            expected = [max(0.0, level["before"] - step)] if not level["first_try"] \
-                else [level["before"], min(1.0, level["before"] + step)]
+            change = level.get("step", step)
+            expected = [max(0.0, level["before"] - change)] if not level["first_try"] \
+                else [level["before"], min(1.0, level["before"] + change)]
             if not any(abs(level["after"] - value) < 1e-6 for value in expected):
                 found.append(f"line {number}: level {level['before']} -> {level['after']} is not a 2-up / 1-down step")
     return found

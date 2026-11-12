@@ -111,7 +111,7 @@ var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's
 var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
 var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
 var _queued_part: StringName      # Start or a jump requested before playback
-var _show_hands_now := false        # the hands step shows the outlines even with SHOW_HANDS off
+var _show_hands_now := false        # the hands step shows the outlines in both modes
 ## Where things stand, degrees off straight ahead (shelf: to the right, cauldron: to the left).
 ## Variables so a picture or a test can try another layout; the constants are the defaults.
 var shelf_push := SHELF_PUSH
@@ -1489,6 +1489,11 @@ func _process(delta: float) -> void:
 		_poke_cauldron()
 	if PlayMode.is_dev() or _show_hands_now:
 		_draw_hands()
+	elif not _hand_lines.is_empty():
+		for hand: Array in _hand_lines.values():
+			hand[0].free()
+			hand[2].free()
+		_hand_lines.clear()
 	if _aiming:
 		_aim()
 	for i in _motes.size():

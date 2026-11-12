@@ -147,9 +147,51 @@ func test_the_menu_opens_during_its_intro_and_cards_are_silent() -> void:
 		expect((button.get_node(^"Look") as Node3D).position.z > 0.0, "lifted toward the hand")
 	expect(App.world.menu != null and not App.session.running, "hovering chooses nothing")
 	expect_eq(said, [[intro]], "hovering does not interrupt the line")
+	await select(_button("level_scroll_down").global_position)
 	await select(_button("task_tidy_shelf_odd_color_1").global_position)
 	expect(await until(func() -> bool: return started.size() == 1, 1.0), "choosing starts the round promptly")
 	expect_eq(said, [[intro], ["Pinch the block with a different colour."]], "only the menu intro and the round instruction")
+
+
+func test_drag_to_adaptive_practice_and_end_it_from_the_player_menu() -> void:
+	await boot()
+	var started := record(Events.trial_started)
+	var ended := record(Events.trial_ended)
+	var won := record(Events.level_won)
+	var ready := func() -> bool: return App.world.menu != null and App.world.menu.get("_open")
+	App.world.run()
+	expect(await until(ready, 15.0), "the level menu unfolds")
+	var menu := App.world.menu
+	var adaptive := _button("task_tidy_shelf_odd_color_adaptive")
+	var first := _button("task_tidy_shelf_shadow")
+	expect(not adaptive.visible and adaptive.collision_layer == 0, "offscreen cards cannot be pinched")
+	var thumb := _button("level_scroll_thumb")
+	var grip := thumb.global_position
+	var hand := grip + menu.global_basis.z * 0.35
+	input.point(&"right", hand, grip)
+	await frames(2)
+	input.press(&"right", &"trigger_click", true)
+	input.point(&"right", hand, grip - menu.global_basis.y * TaskMenu.DRAG_STEP * 3.0)
+	await frames(3)
+	expect_eq(menu.first_row, 2, "dragging down clamps at the last row")
+	expect(adaptive.visible and adaptive.collision_layer != 0, "the adaptive card scrolls into view")
+	expect(not first.visible and first.collision_layer == 0, "the first card scrolls out")
+	input.point(&"right", hand, adaptive.global_position)
+	input.press(&"right", &"trigger_click", false)
+	await frames(2)
+	expect(started.is_empty(), "releasing the drag over a card does not select it")
+	await select(adaptive.global_position)
+	expect(await until(func() -> bool: return started.size() == 1), "the adaptive level starts")
+	expect_eq(App.session.plan, TIDY.level_by_id(&"odd_color_adaptive").plan, "the adaptive plan")
+	await wait(0.25)
+	await select((App.rig.get_node(^"menu_open") as Target).global_position)
+	await wait(0.35)
+	var end := App.module(&"Home").find_child("menu_end_practice", true, false) as Target
+	await select(end.global_position)
+	expect(await until(ready), "End practice returns to the level menu")
+	expect_eq(App.world.menu.first_row, 2, "the list keeps its scroll position")
+	expect(ended.is_empty() and won.is_empty(), "leaving drops the round and pays no reward")
+	expect(not App.session.running and App.main.progress.done.is_empty(), "practice does not mark a level done")
 
 
 func test_motion_is_only_in_its_own_scene_and_needs_no_shelf_progress() -> void:

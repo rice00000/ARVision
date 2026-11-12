@@ -1,5 +1,5 @@
 class_name OnionTouch
-extends Target
+extends Node3D
 ## A reusable squash-and-spring touch reaction, using Godot's MIT-licensed Tween.
 ## Model scale only: story motion, facing and dialogue retain their own owners.
 ## No cooldown: every new touch (the finger left and came back) squashes again
@@ -16,6 +16,7 @@ var minimum_y := -INF
 var _model: Node3D
 var _rest := Vector3.ONE
 var _inside: Dictionary[StringName, bool] = {}
+var _last_tip: Dictionary[StringName, Vector3] = {}
 var _tween: Tween
 var _sound := AudioStreamPlayer3D.new()
 
@@ -26,24 +27,16 @@ func setup(model: Node3D) -> void:
 
 
 func _ready() -> void:
-	id = &"onion_touch"
 	name = "OnionTouch"
-	collision_layer = Pointer.REACTION_LAYER
-	var shape := CollisionShape3D.new()
-	shape.shape = SphereShape3D.new()
-	(shape.shape as SphereShape3D).radius = RADIUS
-	add_child(shape)
 	_sound.stream = SOUND
 	_sound.volume_db = SOUND_DB
 	_sound.max_db = SOUND_DB # the 3D player caps at +3 dB by default
 	_sound.max_polyphony = 4 # quick taps overlap instead of cutting each other off
 	_sound.max_distance = 3.0
 	add_child(_sound)
-	Events.touched.connect(_touch)
 
 
-func _touch(hand: StringName, target: Target) -> void:
-	if target != self or get_tree().paused or not is_visible_in_tree() or _inside.get(hand, false): return
+func _react(hand: StringName) -> void:
 	_inside[hand] = true
 	reactions += 1
 	if _tween: _tween.kill()
@@ -54,15 +47,30 @@ func _touch(hand: StringName, target: Target) -> void:
 	Events.report(&"onion_touched", {hand = hand})
 
 
-func _process(delta: float) -> void:
-	collision_layer = Pointer.REACTION_LAYER if global_position.y > minimum_y and is_visible_in_tree() else 0
-	for hand: StringName in _inside:
+## My room pauses physics, so sample tracked fingertips even there. The opening's Onion
+## inherits the activity's pause, and the room's Onion inherits the running room intro.
+func _physics_process(_delta: float) -> void:
+	var centre := global_position
+	var enabled := centre.y > minimum_y and is_visible_in_tree()
+	var reach := RADIUS * global_basis.get_scale().x + Pointer.TIP_RADIUS
+	for hand: StringName in [&"left", &"right"]:
 		var pointer := App.rig.pointer(hand)
-		if not pointer.tracked() or pointer.tip().distance_to(global_position) > REARM_DISTANCE:
-			_inside[hand] = false
+		if not pointer.tracked():
+			_last_tip.erase(hand)
+			_inside.erase(hand)
+			continue
+		var tip := pointer.tip()
+		var previous: Vector3 = _last_tip.get(hand, tip)
+		_last_tip[hand] = tip
+		var distance := tip.distance_to(centre)
+		if distance > REARM_DISTANCE:
+			_inside.erase(hand)
+		elif enabled and not _inside.has(hand) and not pointer.resting() and distance <= reach and previous.distance_to(centre) > reach:
+			_react(hand)
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED and _model:
+		_last_tip.clear()
 		if _tween: _tween.kill()
 		_model.scale = _rest

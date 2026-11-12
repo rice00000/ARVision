@@ -105,11 +105,16 @@ static func world() -> Dictionary:
 	if world.menu and world.menu.is_inside_tree():
 		var buttons := []
 		for button: Target in world.menu.find_children("task_*", "Target", false, false):
+			if not button.visible:
+				continue
 			var entry: Array = world.menu.get("_buttons")[button]
 			buttons.append({id = button.id, position = button.global_position, normal = button.global_basis.z,
 				current = entry[1] == world.current(entry[0]), done = App.main.progress.is_done(entry[0], entry[1]),
 				title = (button.get_node(^"Look/Title") as Label3D).text, reward = App.main.progress.reward(entry[0], entry[1])})
-		result.menu = {open = world.menu.get("_open"), buttons = buttons}
+		var scroll := []
+		for control: UITarget in world.menu.find_children("level_scroll_*", "UITarget", false, false):
+			scroll.append({id = control.id, position = control.global_position, enabled = control.collision_layer != 0})
+		result.menu = {open = world.menu.get("_open"), buttons = buttons, scroll = scroll, first_row = world.menu.first_row}
 	return result
 
 

@@ -80,6 +80,25 @@ func test_leaving_the_room_stops_it_and_the_next_visit_starts_again() -> void:
 	expect(_intro().running, "the next room visit starts it again")
 
 
+func test_fingertip_touch_plays_onions_sound_during_the_room_intro() -> void:
+	await boot()
+	_intro().automatic = true
+	await _into_room()
+	var onion := _onion()
+	var sound := onion.touch.get_child(onion.touch.get_child_count() - 1) as AudioStreamPlayer3D
+	expect(get_tree().paused, "My room pauses the activity")
+	await wait(0.5) # Onion finishes appearing.
+	var at := onion.global_position
+	var away := at + Vector3.RIGHT * 0.2
+	var offset := Vector3.BACK * App.rig.pointer(&"right").tip_reach
+	input.point(&"right", away + offset, away)
+	await frames(3)
+	input.point(&"right", at + offset, at)
+	await frames(3)
+	expect_eq(onion.touch.reactions, 1, "a fingertip touch reacts in the paused room")
+	expect(sound.playing, "the shared touch sound is playing")
+
+
 func test_the_teaching_hand_points_at_the_button_when_the_child_waits() -> void:
 	await boot()
 	_intro().automatic = true

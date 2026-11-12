@@ -189,8 +189,9 @@ class InTheRoom(SimCase):
         toys = sim.observe()["stimuli"]["targets"]
         far = [t for t in toys if math.dist(actor.body.shoulder("right"), t["centre"]) > BODIES["small"].arm_length + 0.1]
         self.assertTrue(far, "ten toys on the table: some lie beyond a small arm")
+        before = sim.events("touched")
         self.refused("reach", actor.touch, "right", tuple(far[0]["centre"]), far[0]["radius"])
-        self.assertEqual(sim.events("touched"), [])
+        self.assertEqual(sim.events("touched"), before, "the refused reach sends no new touch")
         self.assertLess(math.dist(sim.observe()["hands"]["right"]["position"], actor.body.rest("right")), 1e-5)
         actor.point("right", tuple(far[0]["centre"]))
         expected = first_hit(actor.body.ready("right"), tuple(far[0]["centre"]), toys)

@@ -30,6 +30,7 @@ func _enter_tree() -> void:
 	App.main = self
 	App.session = null
 	App.world = null
+	ItemDef.warm_up()
 
 
 func _ready() -> void:
