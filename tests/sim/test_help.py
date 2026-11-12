@@ -44,8 +44,9 @@ class Help(SimCase):
         child = Child(sim, seed=2)
         started = sim.run_until("trial_started")
         child.play_round(started, ["wait:2", "wrong", "freeze"])
-        wrong = next(e for e in sim.events("feedback", since=started["seq"]) if e["kind"] == "bad")
         hint = sim.events("reported", "hint", since=started["seq"])[0]
+        wrong = next(e for e in reversed(sim.events("feedback", since=started["seq"]))
+                     if e["kind"] == "bad" and e["seq"] < hint["seq"])
         self.assertTrue(2.0 < wrong["t"] - started["t"] < 7.0, "wrong before the first hint was due")
         self.assert_close(hint["t"] - wrong["t"], 7.0, 2 * FRAME, "a child who tries is not stuck")
 

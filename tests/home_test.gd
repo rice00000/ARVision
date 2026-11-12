@@ -89,8 +89,9 @@ func test_the_level_picker_waits_behind_player_and_staff_menus() -> void:
 	var card := menu.get_node(^"task_tidy_shelf_similar_shadows") as Target
 	var at := card.global_position
 	var half_panel := (back.mesh as QuadMesh).size * 0.5
-	var half_button := ((entry.get_child(0) as CollisionShape3D).shape as BoxShape3D).size * 0.5
-	var local := menu.to_local(entry.global_position)
+	var in_menu := menu.global_transform.affine_inverse() * entry.global_transform
+	var half_button := ((entry.get_child(0) as CollisionShape3D).shape as BoxShape3D).size * 0.5 * in_menu.basis.get_scale()
+	var local := in_menu.origin
 	expect(local.x - half_button.x > half_panel.x * 0.5 and local.x + half_button.x < half_panel.x,
 		"the Menu button fits the right of the header while looking left")
 	expect(local.y - half_button.y > card.position.y + TaskMenu.CARD.y * 0.5 and local.y + half_button.y < half_panel.y,

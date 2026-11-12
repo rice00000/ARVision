@@ -6,6 +6,7 @@
 [ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="4_tidy"]
 
 [ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
+[ext_resource type="Resource" path="res://trials/tidy/odd_color_adaptive.tres" id="6_colour_adaptive"]
 
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
@@ -149,6 +150,20 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_hard")])
 
+[sub_resource type="Resource" id="odd_colour_adaptive_block"]
+script = ExtResource("3_block")
+trial = ExtResource("6_colour_adaptive")
+rounds = -1
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="odd_colour_adaptive_plan"]
+script = ExtResource("2_plan")
+title = "Odd Color Adaptive"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_adaptive_block")])
+
 [sub_resource type="Resource" id="shadow"]
 script = ExtResource("5_level")
 id = &"shadow"
@@ -224,7 +239,16 @@ project = &"odd_color"
 title = "Odd Color"
 plan = SubResource("odd_colour_plan_3")
 
+[sub_resource type="Resource" id="odd_color_adaptive"]
+script = ExtResource("5_level")
+id = &"odd_color_adaptive"
+project = &"odd_color"
+title = "Odd Color Adaptive"
+first_reward = 0
+repeat_reward = 0
+plan = SubResource("odd_colour_adaptive_plan")
+
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3")])
+levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3"), SubResource("odd_color_adaptive")])

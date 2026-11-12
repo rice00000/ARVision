@@ -310,3 +310,37 @@ func test_odd_colour_scores_the_choice_before_placement_and_only_once_after_succ
 	expect(not ended[0][2].first_try, "the first choice was wrong")
 	await until(func() -> bool: return trial.is_running())
 	expect(not cue.visible, "the next round starts with the outline hidden")
+
+
+func test_adaptive_colour_adjusts_from_the_first_unaided_choice() -> void:
+	var plan := SHELF_TASK.level_by_id(&"odd_color_adaptive").plan
+	await boot(plan)
+	var ended := record(Events.trial_ended)
+	App.session.play(plan)
+	var levels := [0.3, 0.3, 0.45, 0.3, 0.3, 0.45, 0.3, 0.15]
+	for i in levels.size():
+		var active := func() -> bool:
+			var trial := App.session.trial
+			return trial != null and trial.is_running() and trial.condition.round_index == i
+		expect(await until(active), "round %d starts" % i)
+		var trial := App.session.trial
+		expect(is_equal_approx(trial.condition.level, levels[i]), "round %d uses the adapted difficulty" % i)
+		if i == levels.size() - 1:
+			break
+		if i == 5:
+			await raise_hand(&"left")
+			expect_eq(trial.hint_level, 1, "the child can ask for help")
+		var thing := _thing(trial, "same" if i in [2, 6] else "odd")
+		await _tip_to(thing.global_position)
+		input.click(&"right", &"trigger_click")
+		expect_eq(ended.size(), i + 1, "one pinch ends each round")
+	expect_eq(ended.map(func(args: Array) -> bool: return args[2].first_try),
+		[true, true, false, true, true, false, false], "wrong and assisted picks both step down")
+	expect(ended[2][2].values.colour_gap < ended[1][2].values.colour_gap, "higher difficulty narrows the hue gap")
+	expect(is_equal_approx(ended[3][2].values.colour_gap, ended[1][2].values.colour_gap), "a miss widens it again")
+	var skill: StringName = plan.blocks[0].trial.skill
+	App.session.skip_block()
+	expect_eq(ended.size(), 7, "abandoning the live round is unscored")
+	Save.write()
+	Save.reload()
+	expect(is_equal_approx(Profile.level(skill), 0.15), "the child's difficulty persists")

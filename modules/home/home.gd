@@ -111,6 +111,9 @@ func _activate() -> void:
 	match id:
 		&"menu_open": open()
 		&"menu_resume": close()
+		&"menu_end_practice":
+			close()
+			App.session.skip_block()
 		&"menu_back": _show(&"menu")
 		&"menu_staff_tools": Events.staff_tools_requested.emit()
 		&"menu_games":
@@ -244,8 +247,11 @@ func _build() -> void:
 		for i in buttons.size():
 			var entry: Array = buttons[i]
 			HomeUI.button(_panel, entry[0], entry[1], entry[2], Vector3((i - (buttons.size() - 1) * 0.5) * 0.22, 0, 0.02), entry[3])
+		var practicing := App.session.block != null and App.session.block.rounds < 0
+		if practicing:
+			HomeUI.button(_panel, &"menu_end_practice", "End practice", "End practice and return to the levels.", Vector3(-0.14, -0.17, 0.02))
 		if App.module(&"Facilitator"):
-			HomeUI.button(_panel, &"menu_staff_tools", "Staff tools", "Open the staff tools.", Vector3(0, -0.17, 0.02))
+			HomeUI.button(_panel, &"menu_staff_tools", "Staff tools", "Open the staff tools.", Vector3(0.14 if practicing else 0.0, -0.17, 0.02))
 		return
 	if page == &"games":
 		HomeUI.label(_panel, "GAMES", Vector3(0, 0.10, 0), 44)

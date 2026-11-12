@@ -50,7 +50,7 @@ func play(session_plan: SessionPlan, announce_plan := true) -> void:
 	plan = session_plan
 	pinned = NAN
 	running = true
-	won = not plan.blocks.is_empty()
+	won = not plan.blocks.is_empty() and not plan.is_endless()
 	if announce_plan:
 		await _announce(plan.greeting)
 	if not App.reality.is_settled:
@@ -129,9 +129,8 @@ func _run_block(announce_plan: bool) -> void:
 	App.stage.add_child(trial)
 	if announce_plan:
 		await _announce(block.intro)
-	for round_index in block.rounds:
-		if _skip:
-			break
+	var round_index := 0
+	while not _skip and (block.rounds < 0 or round_index < block.rounds):
 		var condition := def.condition(level(), round_index, block.probe, block.pins)
 		condition.view = App.reality.view.to_log()
 		trial.begin(condition)
@@ -140,8 +139,9 @@ func _run_block(announce_plan: bool) -> void:
 		if result[1] and not block.probe and block.difficulty < 0.0 and is_nan(pinned):
 			var first_try: bool = result[0] and trial.tries == 0 and trial.hint_level == 0
 			var before := Profile.level(def.skill)
-			Events.report(&"level", {skill = def.skill, first_try = first_try, before = before,
+			Events.report(&"level", {skill = def.skill, first_try = first_try, before = before, step = def.step,
 				after = Profile.adapt(def.skill, first_try, def.up_after, def.step)})
+		round_index += 1
 		if not _skip:
 			await get_tree().create_timer(block.pause_between, false).timeout
 	trial.queue_free()

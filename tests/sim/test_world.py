@@ -10,7 +10,7 @@ from support import Actor, Child, Facilitator, SimCase
 class Adventure(SimCase):
     def button(self, sim, button_id):
         menu = sim.observe()["world"]["menu"]
-        return next(b for b in menu["buttons"] if b["id"] == button_id)
+        return next(b for b in menu["buttons"] + menu["scroll"] if b["id"] == button_id)
 
     def menu_at(self, sim, place, timeout=15.0):
         """Waits until `place`'s menu is open; returns the world observation."""
@@ -54,12 +54,10 @@ class Adventure(SimCase):
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
                          [(f"task_tidy_shelf_{name}", name == "shadow") for name in
-                          ("shadow", "similar_shadows", "outline", "size", "color", "clutter",
-                           "odd_color_1", "odd_color_2", "odd_color_3")], "the table's own list")
+                          ("shadow", "similar_shadows", "outline", "size", "color", "clutter")], "the first three rows")
         self.assertEqual([(b["title"], b["reward"]) for b in world["menu"]["buttons"]],
                          [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Outline Match L1", 3),
-                          ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3),
-                          ("Odd Color L1", 3), ("Odd Color L2", 3), ("Odd Color L3", 3)])
+                          ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3)])
         self.press(sim, actor, "task_tidy_shelf_shadow")
         self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1, "level_id": "shadow"})
         Child(sim, seed=3).play()
@@ -81,7 +79,7 @@ class Adventure(SimCase):
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "motion lives in another scene")
         self.assertEqual(world["menu"]["buttons"][0]["reward"], 2, "the completed card shows the replay reward")
-        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 7,
+        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 4,
                          "level 2 lights up")
 
         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
@@ -115,15 +113,30 @@ class Adventure(SimCase):
                 actor = Actor(sim, body)
                 for place, scene in (("Alchemy table", "find_object"), ("Spell wall", "global_motion")):
                     if scene == "global_motion":
+                        actor.look_at(tuple(sim.observe()["work_surface"]["position"]))
                         self.switch_scene(sim, scene)
                     menu = self.menu_at(sim, place)["menu"]
-                    points = [tuple(button["position"]) for button in menu["buttons"]]
-                    actor.look_at(tuple(sum(axis) / len(points) for axis in zip(*points)))
-                    for button, point in zip(menu["buttons"], points):
-                        side = "left" if actor.body.local(point)[0] < 0 else "right"
-                        actor.body.check_view(sim.observe()["head"], point)
-                        actor.move_hand(side, actor.body.ready(side), at=point)
-                        self.assertEqual(sim.observe()["hands"][side]["aimed"], button["id"])
+                    reached = set()
+                    while True:
+                        points = [tuple(button["position"]) for button in menu["buttons"]]
+                        actor.look_at(tuple(sum(axis) / len(points) for axis in zip(*points)))
+                        for button, point in zip(menu["buttons"], points):
+                            side = "left" if actor.body.local(point)[0] < 0 else "right"
+                            actor.body.check_view(sim.observe()["head"], point)
+                            actor.move_hand(side, actor.body.ready(side), at=point)
+                            self.assertEqual(sim.observe()["hands"][side]["aimed"], button["id"])
+                            reached.add(button["id"])
+                        if not any(b["id"] == "level_scroll_down" and b["enabled"] for b in menu["scroll"]):
+                            break
+                        self.press(sim, actor, "level_scroll_down")
+                        next_menu = sim.observe()["world"]["menu"]
+                        self.assertEqual(next_menu["first_row"], menu["first_row"] + 1, "one row per pinch")
+                        menu = next_menu
+                    self.assertEqual(len(reached), 10 if scene == "find_object" else 2)
+                    if scene == "find_object":
+                        self.assertIn("task_tidy_shelf_odd_color_adaptive", reached)
+                        self.press(sim, actor, "level_scroll_up")
+                        self.assertEqual(sim.observe()["world"]["menu"]["first_row"], 1)
                 sim.close()
 
 

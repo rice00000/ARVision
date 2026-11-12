@@ -3,6 +3,7 @@ extends Resource
 ## A run of rounds of one trial, under one view of the real world.
 
 @export var trial: TrialDef
+## -1 repeats until the player or facilitator ends the block.
 @export var rounds := 5
 ## Unscored check-in: no help, the staircase does not move. Run the same probe
 ## before and after training for a pre / post comparison.
