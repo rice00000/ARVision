@@ -36,3 +36,8 @@ desktop.ini
 addons/yolo/android/build/
 addons/yolo/android/.gradle/
 addons/yolo/android/local.properties
+
+# Mac screenshots dropped into the project, and stray git bundles
+Screenshot *.png
+Screenshot *.png.import
+*.bundle
