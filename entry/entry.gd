@@ -2058,35 +2058,28 @@ func _lit(colour: Color, metallic := 0.0) -> StandardMaterial3D:
 
 # --- The reveal --------------------------------------------------------------
 
-## A slow, soft ring of light spreads from the cauldron across the play circle. As it
-## passes each spot, that part of the workshop appears, and where it meets a real
-## surface (depth) a faint glint shows on it: the ripple travels over the real room.
-## No flash, no camera movement.
+## A slow, soft front of light leaves the socket and travels ON the table (and, where the room
+## scan has them, on over the floor and walls): [RevealFx], Effects chat. As it passes each spot,
+## that part of the workshop is drawn up by a line of light, and where it meets a real surface
+## (depth) a faint glint shows on it. No flash, no camera movement. Returns after 7 s, as before.
 func _ripple() -> void:
 	_sounds.play(&"reveal", _ripple_origin)
 	_surface_points.clear()
 	_sample_room()
 	var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)
-	for wave in 3:   # three rings, a second apart, each fainter
-		var ring := MeshInstance3D.new()
-		var torus := TorusMesh.new()
-		torus.inner_radius = 0.96
-		torus.outer_radius = 1.0
-		torus.rings = 96
-		var light := StandardMaterial3D.new()
-		light.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		light.albedo_color = Color(1.0, 0.85, 0.5, 0.35 - wave * 0.1)
-		torus.material = light
-		ring.mesh = torus
-		add_child(ring)
-		ring.add_to_group(&"entry_transient")
-		ring.global_position = _ripple_origin + Vector3.UP * 0.004
-		var spread := _runner.create_tween()
-		spread.tween_method(_spread.bind(ring, light, reach, light.albedo_color.a, wave == 0), 0.0, 1.0, RIPPLE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		spread.tween_callback(ring.queue_free)
-		await _wait(1.0)
-	await _wait(RIPPLE_SECONDS - 1.0)
+	var fx := RevealFx.new()
+	add_child(fx)
+	fx.add_to_group(&"entry_transient")
+	fx.play(_ripple_origin, reach, RIPPLE_SECONDS, func(table_radius: float, room_radius: float) -> void:
+		for point in _surface_points:
+			if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= room_radius:
+				point.shown = true
+				_glint(point.position, point.normal)
+		for detail in _details:
+			if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_ripple_origin) <= table_radius:
+				detail.set_meta(&"shown", true)
+				fx.arrive(detail, detail.get_meta(&"size", Vector3.ONE)))
+	await _wait(RIPPLE_SECONDS + 2.0)
 
 
 ## One step of a ring: its radius grows, it fades; the first ring shows what it passes.
