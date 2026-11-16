@@ -6,6 +6,8 @@ extends Node
 ## room and the desktop driver moves the hands (see SimReality, DesktopDriver).
 
 const PLAYER_MENU_SLOT := &"player_menu_slot"
+## Where a subtitle goes while a panel is open (a Marker3D just above the panel; see Voice._place).
+const SUBTITLE_SLOT := &"subtitle_slot"
 
 ## The OpenXR interface, or null when there is no runtime.
 var xr: OpenXRInterface
@@ -57,6 +59,12 @@ func head() -> XRCamera3D:
 ## The pose of the player Menu button, when a panel reserves space for it.
 func player_menu_slot() -> Marker3D:
 	return get_tree().get_first_node_in_group(PLAYER_MENU_SLOT) as Marker3D
+
+
+## The open panel's subtitle spot, or null when no panel reserves one.
+func subtitle_slot() -> Marker3D:
+	var slot := get_tree().get_first_node_in_group(SUBTITLE_SLOT) as Marker3D
+	return slot if slot and slot.is_visible_in_tree() else null
 
 
 func menu_active() -> bool:

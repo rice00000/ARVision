@@ -76,10 +76,13 @@ func _update_wallet() -> void:
 	var inventory := App.module(&"Inventory")
 	if inventory == null:
 		return
+	# Polish V4: a dark plate and a thick outline, so the count reads on light walls and in passthrough.
+	HomeUI.box(_wallet, Vector3(0.11, 0.06, 0.008), Vector3(0.03, 0.0, -0.012), HomeUI.INK)
 	HomeUI.stones(_wallet, inventory.count(&"magic_stone"), Vector3(0.03, 0.0, 0.0))
 	for text: Label3D in _wallet.find_children("*", "Label3D", true, false):
 		text.no_depth_test = true   # readable over whatever is behind it
 		text.render_priority = 20
+		text.outline_size = 18
 
 
 func _anchor_entry() -> void:
@@ -247,6 +250,15 @@ func _speak_item() -> void:
 		Events.say("%s. %d magic stones. You can buy it." % [item.title, item.price])
 
 
+## Polish V2: the subtitle shows just above the panel's top edge ([param top], panel units), not on its title.
+func _subtitle_slot(top: float) -> void:
+	var slot := Marker3D.new()
+	slot.name = "SubtitleSlot"
+	slot.position = Vector3(0, top + 0.07, 0)
+	slot.add_to_group(App.SUBTITLE_SLOT)
+	_panel.add_child(slot)
+
+
 func _clear_panel() -> void:
 	_hover = null
 	_preview = null
@@ -259,6 +271,7 @@ func _build() -> void:
 	if page == &"room":
 		# One bar above the view; the room and its furniture stay clear.
 		HomeUI.box(_panel, Vector3(0.68, 0.2, 0.025), Vector3(0, 0.185, -0.05), HomeUI.INK)
+		_subtitle_slot(0.285)
 		HomeUI.button(_panel, &"menu_back", "Menu", "Back to the game menu.", Vector3(-0.24, 0.2, 0), "back")
 		HomeUI.button(_panel, &"menu_resume", "Close", "Return to your game.", Vector3(-0.08, 0.2, 0), "cross")
 		HomeUI.button(_panel, &"home_shop", "Shop", "Shop. Spend your magic stones here.", Vector3(0.08, 0.2, 0), "stone")
@@ -267,6 +280,7 @@ func _build() -> void:
 	# The shop is taller: its pages run along the top.
 	var tall := 0.085 if page in CONFIRM else 0.0
 	HomeUI.box(_panel, Vector3(0.68, 0.53 + tall, 0.025), Vector3(0, tall * 0.5, -0.05), HomeUI.INK)
+	_subtitle_slot(0.265 + tall)
 	if page == &"menu":
 		HomeUI.label(_panel, "MENU", Vector3(0, 0.10, 0), 44)
 		HomeUI.button(_panel, &"menu_resume", "Close", "Return to your game.", Vector3(0.265, 0.17, 0), "cross")
@@ -379,7 +393,9 @@ func _process(delta: float) -> void:
 
 
 func _update_entry() -> void:
-	var available := not App.menu_active() and not App.main.switching
+	# Polish V1: not during the grown-up's setup and the story opening (the "intro" scene: setup, gear,
+	# reveal). Staff still reach their tools there with the left-palm pinch (M on the laptop).
+	var available := not App.menu_active() and not App.main.switching and App.main.current_scene != &"intro"
 	if _entry.visible == available: return
 	_entry.visible = available
 	_entry.collision_layer = Pointer.UI_LAYER if available else 0

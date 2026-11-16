@@ -15,8 +15,9 @@ enum Backend { AUTO, SIM, REMOTE, HEADSET }
 ## YOLO11n (Ultralytics, COCO), exported to ONNX at 640 px; run by the headset backend.
 const MODEL := "res://modules/cv/yolo11n.onnx"
 
-## Debug builds on a Quest keep the frames they send, at most this many per run,
-## in user://frames/<start time>/ (tools/frames.py pulls and checks them).
+## Debug builds on a Quest in DEV mode keep the frames they send, at most this many per run,
+## in user://frames/<start time>/ (tools/frames.py pulls and checks them). Never in play mode:
+## a session with a child stores no pictures of their room (polish B4).
 const RECORD_LIMIT := 240
 
 @export var backend := Backend.AUTO
@@ -95,7 +96,7 @@ func _send_frame() -> void:
 	if _frame == null:
 		return
 	_record_path = ""
-	if OS.is_debug_build() and App.reality.kind() == "passthrough" and _recorded < RECORD_LIMIT:
+	if OS.is_debug_build() and PlayMode.is_dev() and App.reality.kind() == "passthrough" and _recorded < RECORD_LIMIT:
 		_record(_frame)
 	_waiting = true
 	var jpeg := _frame.jpeg()

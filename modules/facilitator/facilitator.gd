@@ -20,6 +20,8 @@ const KEY_COLUMNS := 9
 const NAME_LENGTH := 20
 const WIDTH := 0.44
 const HEIGHT := 0.42
+## Polish V6: the whole staff panel 20 % bigger (its text was ~1.1 deg tall at 0.55 m; now ~1.4 deg).
+const PANEL_SCALE := 1.2
 
 ## Presets "Next view" cycles through.
 @export var views: Array[View] = []
@@ -90,7 +92,8 @@ func _open(from_menu: bool) -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	add_child(_panel)
-	_panel.global_transform = Transform3D(Basis.looking_at(forward), eye.origin + forward * 0.55 + Vector3.DOWN * 0.12)
+	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * PANEL_SCALE),
+		eye.origin + forward * 0.55 + Vector3.DOWN * 0.08)   # polish V6: a little higher, so the bigger panel fits the view
 	_refresh()
 
 

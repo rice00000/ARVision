@@ -80,6 +80,11 @@ func _process(_delta: float) -> void:
 
 
 func _place() -> void:
+	var slot := App.subtitle_slot()
+	if slot:   # a panel is open: just above its top edge, at the usual distance (polish V2: never over a title)
+		var from := App.head().global_position
+		_label.global_position = from + (slot.global_position - from).normalized() * distance
+		return
 	var eye := App.head().global_transform
 	var gaze := -eye.basis.z
 	var ahead := Vector3(gaze.x, 0.0, gaze.z).normalized()
