@@ -69,6 +69,8 @@ reality_dim={
 [xr]
 
 openxr/enabled=true
+openxr/foveation_level=2
+openxr/foveation_dynamic=true
 openxr/startup_alert=false
 openxr/extensions/hand_tracking=true
 openxr/extensions/hand_interaction_profile=true
@@ -78,5 +80,3 @@ openxr/extensions/meta/scene_api=true
 openxr/extensions/meta/hand_tracking_aim=true
 openxr/extensions/meta/hand_tracking_mesh=true
 openxr/extensions/meta/environment_depth=true
-openxr/foveation_level=2
-openxr/foveation_dynamic=true
