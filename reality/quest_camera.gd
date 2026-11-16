@@ -12,6 +12,11 @@ extends SubViewport
 ## (adb shell dumpsys media.camera, camera 50 on a Quest 3): tilted 11 degrees
 ## down from the head, 3 cm left, 2 cm down and 6 cm ahead of it; focal length
 ## 864.6 px on the 1280 x 1280 sensor, which 640 x 480 crops to 1280 x 960 and halves.
+##
+## On a laptop (no feed "50"), the first camera found is used instead (the webcam),
+## so the CV can be built and tested without a headset (Nov 15). Its pose is the
+## head's when a rig exists, otherwise a fixed pose; its picture keeps the
+## webcam's shape (640 wide), and the Quest calibration above doesn't apply to it.
 
 const PERMISSION := "horizonos.permission.HEADSET_CAMERA"
 ## The left passthrough camera's feed name starts with its Camera2 id.
@@ -45,7 +50,10 @@ func _ready() -> void:
 	size = SIZE
 	render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	CameraServer.camera_feeds_updated.connect(_open_feed)
-	if OS.request_permission(PERMISSION):
+	# The Quest's camera permission only exists on the headset (Android). Elsewhere (a
+	# laptop) asking for it can come back "no", which used to stop the webcam from ever
+	# being looked for (Nov 15): there, start looking straight away.
+	if OS.get_name() != "Android" or OS.request_permission(PERMISSION):
 		CameraServer.monitoring_feeds = true
 	else: # asked now; feeds appear once the child (or facilitator) allows it
 		get_tree().on_request_permissions_result.connect(func(permission: String, granted: bool) -> void:
@@ -57,7 +65,8 @@ func _ready() -> void:
 func frame() -> CameraFrame:
 	if _feed == null:
 		return null
-	return CameraFrame.new(get_texture().get_image(), App.head().global_transform * IN_HEAD, FOV_Y)
+	var head := App.rig.head.global_transform if App.rig else Transform3D.IDENTITY # no rig: a lab scene
+	return CameraFrame.new(get_texture().get_image(), head * IN_HEAD, FOV_Y)
 
 
 func _process(_delta: float) -> void:
@@ -71,11 +80,20 @@ func _open_feed() -> void:
 	for feed in CameraServer.feeds():
 		if feed.get_name().begins_with(LEFT_CAMERA):
 			_feed = feed
+	if _feed == null and OS.get_name() != "Android" and not CameraServer.feeds().is_empty():
+		_feed = CameraServer.feeds()[0] # a laptop: its webcam stands in for the Quest camera
+		print("QuestCamera: no Quest camera; using \"%s\"" % _feed.get_name())
 	if _feed == null:
 		return
 	var formats := _feed.get_formats()
-	_feed.set_format(maxi(0, formats.find_custom(func(format: Dictionary) -> bool:
-		return format.width == SIZE.x and format.height == SIZE.y)), {})
+	var pick := formats.find_custom(func(format: Dictionary) -> bool:
+		return format.get("width") == SIZE.x and format.get("height") == SIZE.y)
+	if pick < 0 and not formats.is_empty(): # a webcam without 640 x 480: keep its shape, 640 wide
+		pick = 0
+		var shape: Dictionary = formats[0]
+		if shape.has("width") and shape.has("height"):
+			size = Vector2i(SIZE.x, roundi(SIZE.x * float(shape.height) / shape.width))
+	_feed.set_format(maxi(0, pick), {})
 	_feed.feed_is_active = true
 	_material.shader = Shader.new()
 	_material.shader.code = YCBCR

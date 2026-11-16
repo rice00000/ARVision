@@ -117,3 +117,20 @@ func test_crop_box_is_clipped_to_the_picture() -> void:
 	var image := _cup_picture("right")
 	var gray := ShapeCV.small_gray(image, Rect2i(-20, -20, 100, 100))
 	expect_eq(gray.get_size(), Vector2i(ShapeCV.SMALL, ShapeCV.SMALL), "always SMALL × SMALL")
+
+
+func test_outline_is_the_border_of_the_shape() -> void:
+	var m := PackedByteArray()
+	m.resize(10 * 10)
+	for y in range(2, 8):
+		for x in range(2, 8):
+			m[y * 10 + x] = 1 # a 6 × 6 square
+	var line := ShapeCV.outline(m, 10, 10)
+	var count := 0
+	for v in line:
+		count += v
+	expect_eq(count, 20, "a 6 × 6 square has 20 border pixels")
+	expect_eq(line[5 * 10 + 5], 0, "the inside is not outline")
+	expect_eq(line[2 * 10 + 2], 1, "a corner is outline")
+	var thick := ShapeCV.outline(m, 10, 10, 2)
+	expect_eq(thick[3 * 10 + 3], 1, "thickness 2 reaches one pixel further in")

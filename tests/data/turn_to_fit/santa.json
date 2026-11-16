@@ -1,0 +1,29 @@
+{
+ "note": "YOLO11n cup boxes (pixels, x0 y0 x1 y1) and MobileSAM masks for Megan's mug, phone photos shrunk to 640x480 (Nov 11).",
+ "boxes": {
+  "left": [
+   245,
+   273,
+   401,
+   420
+  ],
+  "right": [
+   274,
+   246,
+   437,
+   401
+  ],
+  "toward": [
+   274,
+   257,
+   390,
+   428
+  ],
+  "away": [
+   255,
+   264,
+   381,
+   432
+  ]
+ }
+}

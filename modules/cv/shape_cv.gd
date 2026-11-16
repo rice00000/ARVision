@@ -105,25 +105,41 @@ static func largest_blob(m: PackedByteArray, width: int, height: int) -> Diction
 	var best_label := 0
 	var best_area := 0
 	var next := 0
+	# the to-do list, made once at full size (a list that grows and shrinks for every
+	# pixel was the slowest part: Nov 15 timing)
 	var stack := PackedInt32Array()
+	stack.resize(m.size())
 	for start in m.size():
 		if m[start] == 0 or label[start] != 0:
 			continue
 		next += 1
 		var area := 0
-		stack.append(start)
+		var top := 0
+		stack[top] = start
+		top += 1
 		label[start] = next
-		while not stack.is_empty():
-			var i: int = stack[stack.size() - 1]
-			stack.resize(stack.size() - 1)
+		while top > 0:
+			top -= 1
+			var i: int = stack[top]
 			area += 1
 			var x := i % width
-			var y := i / width
-			for n: int in [i - 1 if x > 0 else -1, i + 1 if x < width - 1 else -1,
-					i - width if y > 0 else -1, i + width if y < height - 1 else -1]:
-				if n >= 0 and m[n] == 1 and label[n] == 0:
-					label[n] = next
-					stack.append(n)
+			# the four neighbours: left, right, up, down (each only if inside the picture)
+			if x > 0 and m[i - 1] == 1 and label[i - 1] == 0:
+				label[i - 1] = next
+				stack[top] = i - 1
+				top += 1
+			if x < width - 1 and m[i + 1] == 1 and label[i + 1] == 0:
+				label[i + 1] = next
+				stack[top] = i + 1
+				top += 1
+			if i >= width and m[i - width] == 1 and label[i - width] == 0:
+				label[i - width] = next
+				stack[top] = i - width
+				top += 1
+			if i < m.size() - width and m[i + width] == 1 and label[i + width] == 0:
+				label[i + width] = next
+				stack[top] = i + width
+				top += 1
 		if area > best_area:
 			best_area = area
 			best_label = next
@@ -223,3 +239,207 @@ static func to_image(m: PackedByteArray, width: int, height: int) -> Image:
 	for i in m.size():
 		bytes[i] = 255 * m[i]
 	return Image.create_from_data(width, height, false, Image.FORMAT_L8, bytes)
+
+
+# --- v2 (Nov 15): live tracking by the cup's own colours ------------------------------
+# Brightness alone (above) fails on a real table: anything else in the crop joins the
+# "cup". Instead, at capture we learn which colours belong to THIS cup (from SAM's exact
+# outline) and which belong to its surroundings. Live, every pixel inside YOLO's box asks
+# "is my colour more cup than surroundings?". Cheap (one table lookup per pixel), and it
+# works for patterned cups, because a pattern is just more cup colours.
+# Benchmarked in claude/CV_SEGMENTATION_BENCH.md: ~1 ms per frame, 0.92-0.97 vs SAM.
+
+## Colours are sorted into BINS_H × BINS_S × BINS_V boxes (hue, saturation, value).
+const BINS_H := 18
+const BINS_S := 8
+const BINS_V := 8
+## The tracked area is shrunk so its longer side is at most this many pixels.
+const TRACK_SIZE := 96
+
+
+## [param box] grown by [param by] (0.1 = 10 % on every side), kept inside [param size].
+static func grow(box: Rect2i, by: float, size: Vector2i) -> Rect2i:
+	var pad := Vector2i(roundi(box.size.x * by), roundi(box.size.y * by))
+	return Rect2i(box.position - pad, box.size + pad * 2).intersection(Rect2i(Vector2i.ZERO, size))
+
+
+## Which colour box a pixel falls in (0 .. BINS_H*BINS_S*BINS_V - 1).
+static func colour_bin(c: Color) -> int:
+	var h := mini(int(c.h * BINS_H), BINS_H - 1)
+	var s := mini(int(c.s * BINS_S), BINS_S - 1)
+	var v := mini(int(c.v * BINS_V), BINS_V - 1)
+	return (h * BINS_S + s) * BINS_V + v
+
+
+## The area around [param box] (grown by [param by]), shrunk so its longer side is at most
+## TRACK_SIZE. Returns the area (camera pixels) and the scale used. Targets and live frames
+## both go through this, so their shapes are drawn with the same pixel size.
+static func track_area(box: Rect2i, by: float, size: Vector2i) -> Dictionary:
+	var area := grow(box, by, size)
+	var scale := minf(1.0, float(TRACK_SIZE) / maxi(1, maxi(area.size.x, area.size.y)))
+	return {area = area, size = Vector2i(maxi(1, roundi(area.size.x * scale)), maxi(1, roundi(area.size.y * scale)))}
+
+
+## Capture, part 1: learn the cup's colours. [param image] is the camera frame,
+## [param cup] SAM's outline for it (same size, white = cup), [param box] YOLO's box.
+## Returns, for every possible colour, the chance that a pixel of that colour is cup (0..1),
+## as a table (see [method colour_table]).
+static func learn_colours(image: Image, cup: Image, box: Rect2i) -> PackedFloat32Array:
+	var t := track_area(box, 0.25, image.get_size()) # a wider ring, to see more surroundings
+	var pic := image.get_region(t.area)
+	pic.convert(Image.FORMAT_RGB8)
+	pic.resize(t.size.x, t.size.y, Image.INTERPOLATE_BILINEAR)
+	var m := cup.get_region(t.area)
+	m.convert(Image.FORMAT_L8)
+	m.resize(t.size.x, t.size.y, Image.INTERPOLATE_NEAREST)
+	var bins := BINS_H * BINS_S * BINS_V
+	var on_cup := PackedFloat32Array()
+	var around := PackedFloat32Array()
+	on_cup.resize(bins)
+	around.resize(bins)
+	var px := pic.get_data()
+	var mk := m.get_data()
+	for i in mk.size():
+		var b := colour_bin(Color8(px[3 * i], px[3 * i + 1], px[3 * i + 2]))
+		if mk[i] > 127:
+			on_cup[b] += 1.0
+		else:
+			around[b] += 1.0
+	# turn counts into shares, then into "chance this colour is cup"; +0.5 so an unseen
+	# colour comes out at 0.5 (undecided) instead of dividing by zero
+	var cup_total := 0.0
+	var around_total := 0.0
+	for b in bins:
+		cup_total += on_cup[b]
+		around_total += around[b]
+	var model := PackedFloat32Array()
+	model.resize(bins)
+	for b in bins:
+		var p_cup := (on_cup[b] + 0.5) / (cup_total + 0.5 * bins)
+		var p_around := (around[b] + 0.5) / (around_total + 0.5 * bins)
+		model[b] = p_cup / (p_cup + p_around)
+	return colour_table(model)
+
+
+## The colour boxes, unrolled into a table with one entry per possible colour (each of
+## red, green, blue cut to 32 levels: 32 × 32 × 32 = 32,768 entries). Built once at capture,
+## so live tracking needs no colour maths: a pixel's entry is found straight from its bytes
+## (see [method table_index]). This made the lookup ~6× faster (Nov 15 timing).
+static func colour_table(model: PackedFloat32Array) -> PackedFloat32Array:
+	var table := PackedFloat32Array()
+	table.resize(32768)
+	for i in table.size():
+		# the middle of this colour's little cube of 8 × 8 × 8 shades
+		var c := Color8(((i >> 10) & 31) * 8 + 4, ((i >> 5) & 31) * 8 + 4, (i & 31) * 8 + 4)
+		table[i] = model[colour_bin(c)]
+	return table
+
+
+## Where a pixel's colour sits in [method colour_table]: the top 5 bits of red, green, blue.
+static func table_index(r: int, g: int, b: int) -> int:
+	return ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
+
+
+## Live: find the cup inside [param box] (YOLO's) by colour, using the table from
+## [method learn_colours]. Returns the same kind of
+## Dictionary as [method analyse]: ok, why, small (blob mask), width, height, shape, area.
+static func track(image: Image, box: Rect2i, model: PackedFloat32Array) -> Dictionary:
+	var t := track_area(box, 0.10, image.get_size())
+	var w: int = t.size.x
+	var h: int = t.size.y
+	var pic := image.get_region(t.area)
+	pic.convert(Image.FORMAT_RGB8)
+	pic.resize(w, h, Image.INTERPOLATE_BILINEAR)
+	var px := pic.get_data()
+	# each pixel's chance of being cup, as a grey picture (0 = surroundings, 255 = cup)
+	var chance := PackedByteArray()
+	chance.resize(w * h)
+	for i in chance.size():
+		chance[i] = int(255.0 * model[table_index(px[3 * i], px[3 * i + 1], px[3 * i + 2])])
+	# neighbours vote (removes single-pixel speckle): shrinking to half and back is a
+	# blur, and the engine does it in C++ (~100× faster than a GDScript 3×3 loop)
+	var votes := Image.create_from_data(w, h, false, Image.FORMAT_L8, chance)
+	votes.resize(maxi(1, w / 2), maxi(1, h / 2), Image.INTERPOLATE_BILINEAR)
+	votes.resize(w, h, Image.INTERPOLATE_BILINEAR)
+	var voted := votes.get_data()
+	var m := PackedByteArray()
+	m.resize(voted.size())
+	for i in voted.size():
+		m[i] = int(voted[i] > 127)
+	return _shape_result(m, w, h)
+
+
+## Capture, part 2: a target shape from SAM's outline, drawn at the same pixel size as
+## [method track] uses, so live shapes and targets compare fairly.
+static func target_from_mask(cup: Image, box: Rect2i) -> Dictionary:
+	var t := track_area(box, 0.10, cup.get_size())
+	var m := cup.get_region(t.area)
+	m.convert(Image.FORMAT_L8)
+	m.resize(t.size.x, t.size.y, Image.INTERPOLATE_NEAREST)
+	var bytes := m.get_data()
+	var out := PackedByteArray()
+	out.resize(bytes.size())
+	for i in bytes.size():
+		out[i] = int(bytes[i] > 127)
+	return _shape_result(out, t.size.x, t.size.y)
+
+
+static func _shape_result(m: PackedByteArray, w: int, h: int) -> Dictionary:
+	var blob := largest_blob(m, w, h)
+	var area := float(blob.area) / (w * h)
+	var result := {ok = false, why = "", small = blob.mask, width = w, height = h, shape = PackedByteArray(), area = area}
+	if area < MIN_AREA:
+		result.why = "nothing"
+		return result
+	result.shape = normalise(blob.mask, w, blob.box)
+	result.ok = true
+	return result
+
+
+## 3 × 3 average (each pixel becomes the mean of itself and its neighbours).
+static func _blur3(values: PackedFloat32Array, w: int, h: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(values.size())
+	for y in h:
+		for x in w:
+			var sum := 0.0
+			var n := 0
+			for dy in range(-1, 2):
+				var yy := y + dy
+				if yy < 0 or yy >= h:
+					continue
+				for dx in range(-1, 2):
+					var xx := x + dx
+					if xx < 0 or xx >= w:
+						continue
+					sum += values[yy * w + xx]
+					n += 1
+			out[y * w + x] = sum / n
+	return out
+
+
+## The contour of a mask: object pixels with a background neighbour (left, right, up or
+## down) or on the picture's edge. [param thickness] > 1 widens the line, for a panel
+## seen at low acuity (CV_HANDOFF's outline ladder). Same layout as the mask.
+static func outline(m: PackedByteArray, width: int, height: int, thickness := 1) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(m.size())
+	for i in m.size():
+		if m[i] == 0:
+			continue
+		var x := i % width
+		var y := i / width
+		if x == 0 or y == 0 or x == width - 1 or y == height - 1 \
+				or m[i - 1] == 0 or m[i + 1] == 0 or m[i - width] == 0 or m[i + width] == 0:
+			out[i] = 1
+	for pass_index in thickness - 1: # grow the line by one pixel per pass
+		var grown := out.duplicate()
+		for i in out.size():
+			if out[i] == 1:
+				var x := i % width
+				if x > 0: grown[i - 1] = 1
+				if x < width - 1: grown[i + 1] = 1
+				if i >= width: grown[i - width] = 1
+				if i < out.size() - width: grown[i + width] = 1
+		out = grown
+	return out

@@ -4,6 +4,11 @@ POST /detect with a JPEG body. Reply:
     {"detections": [{"label": "cup", "confidence": 0.91, "box": [x0, y0, x1, y1]}]}
 Box corners run 0..1 from the image's top left; labels are COCO class names.
 
+POST /segment?box=x0,y0,x1,y1 with a JPEG body (box in pixels, e.g. YOLO's cup box).
+Reply: a PNG mask the size of the picture, white = the object (MobileSAM, box prompt).
+Used for Turn to fit's capture step (claude/CV_TURN_TO_FIT_BUILD.md). The MobileSAM
+weights (40 MB) download once, into build/models/ (ignored by Git).
+
     pip install ultralytics onnxruntime
     python tools/cv_server.py                 # the headset's YOLO11n on 127.0.0.1:8765
     adb reverse tcp:8765 tcp:8765             # a USB-connected Quest reaches it as 127.0.0.1
@@ -16,6 +21,7 @@ import io
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 ## The model the headset runs (modules/cv/detector.gd), so both give the same answers.
 MODEL = str(Path(__file__).resolve().parents[1] / "modules" / "cv" / "yolo11n.onnx")
@@ -37,29 +43,80 @@ def yolo(weights):
     return detect
 
 
+## MobileSAM's weights; Ultralytics downloads them here the first time.
+SAM_WEIGHTS = Path(__file__).resolve().parents[1] / "build" / "models" / "mobile_sam.pt"
+
+
+def sam():
+    """The capture step: outline the object inside a box. Loaded on first use."""
+    from PIL import Image
+    from ultralytics import SAM
+    import numpy as np
+
+    SAM_WEIGHTS.parent.mkdir(parents=True, exist_ok=True)
+    model = SAM(str(SAM_WEIGHTS))
+
+    def segment(jpeg, box):
+        picture = Image.open(io.BytesIO(jpeg)).convert("RGB")
+        result = model(picture, bboxes=[box], verbose=False)[0]
+        mask = (result.masks.data[0].cpu().numpy() > 0.5).astype(np.uint8) * 255
+        out = io.BytesIO()
+        Image.fromarray(mask, mode="L").save(out, format="PNG")
+        return out.getvalue()
+
+    return segment
+
+
+def fake_segment(jpeg, box):
+    """--fake: a filled box as the 'outline', for tests without a model."""
+    from PIL import Image, ImageDraw
+
+    picture = Image.open(io.BytesIO(jpeg))
+    mask = Image.new("L", picture.size, 0)
+    ImageDraw.Draw(mask).rectangle(box, fill=255)
+    out = io.BytesIO()
+    mask.save(out, format="PNG")
+    return out.getvalue()
+
+
 def fake(_jpeg):
     return [{"label": "cup", "confidence": 0.9, "box": [0.45, 0.45, 0.55, 0.55]}]
 
 
-def serve(detect, host, port):
+def serve(detect, host, port, make_segment=None):
+    segmenters = []  # MobileSAM loads on the first /segment, so /detect starts fast
+
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
-            if self.path != "/detect":
-                self.send_error(404)
-                return
+            url = urlparse(self.path)
             jpeg = self.rfile.read(int(self.headers["Content-Length"]))
-            reply = json.dumps({"detections": detect(jpeg)}).encode()
+            if url.path == "/detect":
+                self._reply("application/json", json.dumps({"detections": detect(jpeg)}).encode())
+            elif url.path == "/segment" and make_segment:
+                try:
+                    box = [float(v) for v in parse_qs(url.query)["box"][0].split(",")]
+                except (KeyError, ValueError):
+                    self.send_error(400, "needs ?box=x0,y0,x1,y1 (pixels)")
+                    return
+                if not segmenters:
+                    segmenters.append(make_segment())
+                self._reply("image/png", segmenters[0](jpeg, box))
+            else:
+                self.send_error(404)
+
+        def _reply(self, kind, body):
             self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(reply)))
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(reply)
+            self.wfile.write(body)
 
         def log_message(self, *_args):
             pass
 
     server = ThreadingHTTPServer((host, port), Handler)
-    print(f"CV server on http://{host}:{server.server_port}/detect", flush=True)
+    print(f"CV server on http://{host}:{server.server_port}/detect"
+          + (" and /segment" if make_segment else ""), flush=True)
     server.serve_forever()
 
 
@@ -70,7 +127,8 @@ def main():
     parser.add_argument("--model", default=MODEL)
     parser.add_argument("--fake", action="store_true")
     args = parser.parse_args()
-    serve(fake if args.fake else yolo(args.model), args.host, args.port)
+    serve(fake if args.fake else yolo(args.model), args.host, args.port,
+          (lambda: fake_segment) if args.fake else sam)
 
 
 if __name__ == "__main__":
