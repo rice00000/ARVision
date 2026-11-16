@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="PackedScene" path="res://trials/butterfly/butterfly_swarm.tscn" id="3_scene"]
+
+[sub_resource type="Resource" id="coherence"]
+script = ExtResource("2_axis")
+name = &"coherence"
+easy = 0.9
+hard = 0.2
+driven = true
+fixed = nan
+
+[sub_resource type="Resource" id="butterflies"]
+script = ExtResource("2_axis")
+name = &"butterflies"
+easy = 90.0
+fixed = nan
+
+[sub_resource type="Resource" id="speed"]
+script = ExtResource("2_axis")
+name = &"speed"
+easy = 0.2
+fixed = nan
+
+[sub_resource type="Resource" id="radius"]
+script = ExtResource("2_axis")
+name = &"radius"
+easy = 0.72
+fixed = nan
+
+[sub_resource type="Resource" id="tolerance"]
+script = ExtResource("2_axis")
+name = &"tolerance"
+easy = 60.0
+fixed = nan
+
+[resource]
+script = ExtResource("1_def")
+title = "Butterfly swarm"
+scene = ExtResource("3_scene")
+skill = &"butterfly_swarm"
+axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("butterflies"), SubResource("speed"), SubResource("radius"), SubResource("tolerance")])
+notes = "Global motion with butterflies: coherence is the driven axis, the share of the swarm flying round with the flow; the rest fly every way, and who is who keeps changing. One judged swing through the swarm per answer: against the flow wins the round, with it is a try once the net stops (a wind-up turned straight into the right way is forgiven). Unlike the dots, each butterfly also faces its way and they circle the child, so this is its own skill. Help only when asked: all follow the flow."
+hint_after = 0.0
+hint_fade = 0.0
+max_hint = 1
+time_limit = 30.0

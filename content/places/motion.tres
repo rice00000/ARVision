@@ -3,10 +3,11 @@
 [ext_resource type="Script" path="res://world/place.gd" id="1_place"]
 [ext_resource type="Resource" path="res://content/tasks/break_wall.tres" id="2_wall"]
 [ext_resource type="Script" path="res://world/task.gd" id="3_task"]
+[ext_resource type="Resource" path="res://content/tasks/catch_butterflies.tres" id="4_butterflies"]
 
 [resource]
 script = ExtResource("1_place")
 title = "Spell wall"
 turn_to = "This way! Turn to your alchemy table."
 arrive = "A spell wall! Point and pinch a card to play."
-tasks = Array[ExtResource("3_task")]([ExtResource("2_wall")])
+tasks = Array[ExtResource("3_task")]([ExtResource("2_wall"), ExtResource("4_butterflies")])

@@ -8,6 +8,7 @@ What the team is likely to try (design doc, team sketch) and what the framework 
 | **Tidy up:** put each thing back on its shadow, outline, size or colour sticker | shape matching, vision for action | `trials/tidy` ([tidy up](tidy.md)) | ready (sim); headset unverified |
 | **Real objects:** point at the real cup the camera sees | recognition, real world | `trials/point_real`, Detector | ready (sim); Quest camera unverified |
 | **Global motion (RDK in 3D):** sweep in the dots' direction | motion perception | `trials/motion` (Megan's trial) | ready (sim); headset unverified |
+| **Catch the butterflies:** swing a net to meet butterflies circling the child | motion direction, vision for action | `trials/butterfly` ([butterflies](butterflies.md)) | ready (sim); headset unverified |
 | **Passthrough filter A/B:** same trial under normal vs high contrast / greyscale / B&W / edges | visual function, contrast | `Block.view`, `content/views/` | ready |
 | **Less information:** dim the room, spotlight the work area | attention, clutter | `View.dim`, `focus_radius`, `Trial.focus_point()` | ready |
 | **Help that fades:** motion, glow, voice; logged per round | all | `Trial._hint`, `TrialDef.hint_after / hint_fade` | ready |

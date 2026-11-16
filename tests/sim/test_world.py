@@ -132,7 +132,7 @@ class Adventure(SimCase):
                         next_menu = sim.observe()["world"]["menu"]
                         self.assertEqual(next_menu["first_row"], menu["first_row"] + 1, "one row per pinch")
                         menu = next_menu
-                    self.assertEqual(len(reached), 10 if scene == "find_object" else 2)
+                    self.assertEqual(len(reached), 10 if scene == "find_object" else 6)
                     if scene == "find_object":
                         self.assertIn("task_tidy_shelf_odd_color_adaptive", reached)
                         self.press(sim, actor, "level_scroll_up")

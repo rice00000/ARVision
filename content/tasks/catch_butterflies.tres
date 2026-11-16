@@ -1,0 +1,114 @@
+[gd_resource type="Resource" script_class="Task" format=3]
+
+[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" path="res://trials/butterfly/butterfly.tres" id="4_catch"]
+[ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
+[ext_resource type="Resource" path="res://trials/butterfly/butterfly_swarm.tres" id="6_swarm"]
+
+[sub_resource type="Resource" id="circle_1"]
+script = ExtResource("3_block")
+trial = ExtResource("4_catch")
+rounds = 1
+difficulty = 0.0
+intro = "Butterflies are flying all around you! Catch them with your net. Swing to meet them, not after them."
+ray = false
+pause_between = 3.0
+
+[sub_resource type="Resource" id="level_1"]
+script = ExtResource("2_plan")
+title = "Catch the butterflies, level 1"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("circle_1")])
+
+[sub_resource type="Resource" id="circle_2"]
+script = ExtResource("3_block")
+trial = ExtResource("4_catch")
+rounds = 1
+difficulty = 0.3
+pins = Dictionary[StringName, float]({&"butterflies": 12.0, &"rings": 2.0})
+intro = "Now they fly both ways! Watch which way each one goes, then swing to meet it."
+ray = false
+pause_between = 3.0
+
+[sub_resource type="Resource" id="level_2"]
+script = ExtResource("2_plan")
+title = "Catch the butterflies, level 2"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("circle_2")])
+
+[sub_resource type="Resource" id="swarm_1"]
+script = ExtResource("3_block")
+trial = ExtResource("6_swarm")
+rounds = 3
+difficulty = 0.0
+intro = "A whole swarm! Most of them fly the same way round you. Swing your net to meet them."
+ray = false
+pause_between = 3.0
+
+[sub_resource type="Resource" id="level_3"]
+script = ExtResource("2_plan")
+title = "Catch the butterflies, level 3"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("swarm_1")])
+
+[sub_resource type="Resource" id="swarm_2"]
+script = ExtResource("3_block")
+trial = ExtResource("6_swarm")
+rounds = 3
+difficulty = 0.4
+intro = "A whole swarm! Most of them fly the same way round you. Swing your net to meet them."
+ray = false
+pause_between = 3.0
+
+[sub_resource type="Resource" id="level_4"]
+script = ExtResource("2_plan")
+title = "Catch the butterflies, level 4"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("swarm_2")])
+
+[sub_resource type="Resource" id="one_way"]
+script = ExtResource("5_level")
+id = &"one_way"
+project = &"butterflies"
+title = "Butterfly Circle"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_1")
+
+[sub_resource type="Resource" id="both_ways"]
+script = ExtResource("5_level")
+id = &"both_ways"
+project = &"butterflies"
+title = "Both Ways"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_2")
+
+[sub_resource type="Resource" id="swarm"]
+script = ExtResource("5_level")
+id = &"swarm"
+project = &"butterflies"
+title = "Butterfly Swarm"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_3")
+
+[sub_resource type="Resource" id="busy_swarm"]
+script = ExtResource("5_level")
+id = &"busy_swarm"
+project = &"butterflies"
+title = "Busy Swarm"
+first_reward = 3
+repeat_reward = 2
+plan = SubResource("level_4")
+
+[resource]
+script = ExtResource("1_task")
+title = "Catch the butterflies"
+levels = Array[ExtResource("5_level")]([SubResource("one_way"), SubResource("both_ways"), SubResource("swarm"), SubResource("busy_swarm")])
