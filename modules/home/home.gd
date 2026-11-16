@@ -10,7 +10,9 @@ const ENTRY_OFFSET := Vector3(0.30, 0.09, -0.49)
 const ENTRY_VIEW_OFFSET := Vector3(-0.22, 0.13, -0.5)
 ## Polish (Nov 16): the same spot as ENTRY_VIEW_OFFSET (24 deg left, 13 deg over the gaze, 0.56 m), but never
 ## below the horizon: looking down at the shelf no longer pulls the Menu and stones over its cubbies.
-const ENTRY_LEFT_DEG := 24.0
+const ENTRY_LEFT_DEG := 30.0   # Megan, Nov 16: a bit more to the side (was 24)
+## Megan, Nov 16: smaller, so it takes less of the view (its panel-header spot keeps full size).
+const ENTRY_SCALE := 0.75
 const ENTRY_ABOVE_GAZE_DEG := 13.0
 const ENTRY_MIN_ELEVATION_DEG := 0.0
 const ENTRY_DISTANCE := 0.56
@@ -380,7 +382,7 @@ func _process(delta: float) -> void:
 			_entry_face.no_depth_test = in_header
 			for text: Label3D in _entry.find_children("*", "Label3D", false, false):
 				text.no_depth_test = in_header
-		_entry.global_transform = slot.global_transform if slot else _entry_frame
+		_entry.global_transform = slot.global_transform if slot else Transform3D(_entry_frame.basis.scaled(Vector3.ONE * ENTRY_SCALE), _entry_frame.origin)
 	if _preview: _preview.rotation.y += delta * 0.18
 	var near: Target
 	for side in [&"left", &"right"]:
@@ -410,14 +412,13 @@ func _entry_goal(eye: Transform3D) -> Vector3:
 
 
 func _update_entry() -> void:
-	# Polish V1: in PLAY mode, not during the grown-up's setup and the story opening (the "intro" scene:
-	# setup, gear, reveal); a child shouldn't leave the story from there. DEV keeps it, so a tester
-	# always has a way out (Megan got stuck at the Tap beat without it, Nov 15). Staff tools also open
-	# with the left-palm pinch (M on the laptop).
+	# Polish V1: hidden only while the grown-up's setup panel shows. In the story opening it stays, in
+	# play mode too (Megan, Nov 16: the Menu must be reachable in play). Staff tools also open with the
+	# left-palm pinch (M on the laptop).
 	var available := not App.menu_active() and not App.main.switching
 	if available:   # (never asks the scene mid-switch, when it may be gone)
 		var entry := App.main.intro()
-		available = entry == null or not (entry.setting_up() or not PlayMode.is_dev())   # dev: hidden only during setup
+		available = entry == null or not entry.setting_up()
 	if _entry.visible == available: return
 	_entry.visible = available
 	_entry.collision_layer = Pointer.UI_LAYER if available else 0
