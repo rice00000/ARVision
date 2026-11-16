@@ -88,20 +88,9 @@ func _invitation() -> void:
 			_onion.float_to(spot, 1.0)   # closer to the shapes (layout chat's invite spot), clear of them
 	if not _started:
 		await say("Welcome to the workshop.")
-	if not _started:
-		await say("Oh! I'd nearly forgotten about these.")
-	if not _started:
-		await say("They've come quite a long way.")
-	if _onion != null and _shelf_spot != Vector3.INF:
-		_onion.attend(_shelf_spot)   # looks across the shapes, then toward the shelf
-	if not _started:
-		await say("The house is very good at bringing things here.")
-	if not _started:
-		await say("But finding their place is usually my job.")
-	if _onion != null:
-		_onion.attend(null)   # turns toward the child
-	if not _started:
-		await say("You could join me, if you like.")
+	# Megan, Nov 16: the story lines that followed (nearly forgotten / a long way / the house brings
+	# things / finding their place is my job / join me) are cut: 22 s of listening before the child was
+	# told what to do. The two instructions below now come straight after the welcome.
 
 
 ## The middle of the shapes on the bench (the layout's plan, as the reveal used), or INF.

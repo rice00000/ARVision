@@ -529,13 +529,13 @@ func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_t
 	await _to_setup_panel()
 	var said := record(Events.said)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes in the shelf part")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child in the shelf part")
 	expect_eq(App.main.current_scene, &"first_visit", "the invitation plays in the shelf scene")
 	var trial := App.session.trial
 	expect(trial != null and trial.is_running(), "the shelf round is already running: shapes can be picked up while Onion talks")
 	Events.report(&"taken", {})   # the child picks a shape up
 	await wait(12.0)
-	expect(not _said_line(said, "You could join me, if you like."), "a pick-up ends the invitation")
+	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "a pick-up ends the invitation")
 	expect(not _said_line(said, "The shapes on the shelf show where things go."), "and the rule (the child is already playing)")
 
 
@@ -551,7 +551,7 @@ func test_a_shelf_finished_while_onion_still_talks_goes_straight_to_the_closing(
 			return trial != null and trial.is_running() and trial.condition.round_index == round_index), "round %d runs" % round_index)
 		App.session.trial.finish(true)
 	expect(await _until_said(said, "Thank you for helping.", 15.0), "the closing comes at once")
-	expect(not _said_line(said, "You could join me, if you like."), "the rest of the invitation is not said")
+	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "the rest of the invitation is not said")
 
 
 func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
@@ -593,7 +593,7 @@ func test_a_shape_can_be_taken_while_onion_invites() -> void:
 	var said := record(Events.said)
 	var reports := record(Events.reported)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child")
 	var trial := App.session.trial
 	var thing: Target = (trial.get("_things") as Array)[0]
 	var at := thing.global_position
@@ -615,7 +615,7 @@ func test_on_desktop_a_click_on_a_shape_takes_it() -> void:
 	var said := record(Events.said)
 	var reports := record(Events.reported)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Oh! I'd nearly forgotten about these.", 60.0), "Onion notices the shapes")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child")
 	var trial := App.session.trial
 	var thing: Target = (trial.get("_things") as Array)[0]
 	await frames(2)
