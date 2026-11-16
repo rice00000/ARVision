@@ -11,13 +11,13 @@ extends Node3D
 ## the bar, and one line at the foot on how to press, for a grown-up new to the headset.
 
 const SIZE := Vector2(0.46, 0.34)
-const SAGE := Color(0.62, 0.74, 0.6)
-const SLATE := Color(0.13, 0.15, 0.19)   # opaque: a see-through plate gets drawn over the words
+const SAGE := UIStyle.STAFF_HEADER
+const SLATE := UIStyle.STAFF_PANEL   # opaque: a see-through plate gets drawn over the words
 const GOOD := Color(0.4, 0.85, 0.5)
 const WARN := Color(1.0, 0.65, 0.25)
 const WAIT := Color(0.55, 0.58, 0.62)
-const GREEN := Color(0.25, 0.65, 0.35)
-const GREY := Color(0.38, 0.4, 0.45)
+const GREEN := UIStyle.STAFF_PRIMARY
+const GREY := UIStyle.STAFF_BUTTON   # polish V5: same as staff tools
 
 ## The buttons on the panel now.
 var buttons: Array[EntryButton] = []

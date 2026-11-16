@@ -47,8 +47,8 @@ var _disabled: Dictionary[Target, bool] = {}
 var _view_index := 0
 var _saves_page := 0
 var _typed := ""
-var _face := _material(Color(0.25, 0.3, 0.42))
-var _greyed := _material(Color(0.16, 0.17, 0.2))
+var _face := _material(UIStyle.STAFF_BUTTON)   # polish V5: the grown-up look (core/ui_style.gd)
+var _greyed := _material(UIStyle.STAFF_DISABLED)
 
 
 func _ready() -> void:
@@ -284,7 +284,7 @@ func _build() -> void:
 	var back := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(WIDTH, HEIGHT)
-	quad.material = _material(Color(0.08, 0.09, 0.12), 20)
+	quad.material = _material(UIStyle.STAFF_PANEL, 20)
 	back.mesh = quad
 	back.position = Vector3(0.0, 0.0, -0.012)
 	_panel.add_child(back)
