@@ -12,6 +12,7 @@ const SCENES := {
 	&"find_object": {title = "Find the object", path = "res://scenes/find_object.tscn"},
 	&"first_visit": {title = "First visit (Onion)", path = "res://scenes/first_visit.tscn"},
 	&"global_motion": {title = "Global motion", path = "res://scenes/global_motion.tscn"},
+	&"turn_to_fit": {title = "Turn to fit (real cup)", path = "res://scenes/turn_to_fit.tscn"},
 }
 
 @export var sim_room: PackedScene
@@ -131,6 +132,8 @@ func _start_scene() -> void:
 		_scene.get_node(^"Entry").run()
 	elif current_scene == &"first_visit":
 		_scene.get_node(^"Visit").run()
+	elif current_scene == &"turn_to_fit":
+		_scene.get_node(^"Fit").run()
 	else:
 		App.world.run()
 

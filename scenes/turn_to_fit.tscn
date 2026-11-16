@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://trials/session.gd" id="1_session"]
+[ext_resource type="Script" path="res://turn_to_fit/turn_to_fit.gd" id="2_fit"]
+
+[node name="TurnToFit" type="Node3D"]
+
+[node name="Session" type="Node" parent="."]
+script = ExtResource("1_session")
+
+[node name="Fit" type="Node3D" parent="."]
+script = ExtResource("2_fit")
