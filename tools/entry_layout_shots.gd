@@ -1,7 +1,7 @@
 extends Node
 ## Pictures of the layout (no headset), from a seated child's eyes looking about 40 degrees down at
 ## the table, to build/layout/: setup with the dev columns, the opening (gear landed, Onion aside),
-## after the reveal, and the shelf scene with the task menu and a subtitle. With the zone map on
+## after the reveal, and the first visit's shelf with Onion and a subtitle. With the zone map on
 ## where the opening has one ("Zones"). Software rendering is fine:
 ##   xvfb-run -a -s "-screen 0 1280x800x24" godot --rendering-driver opengl3 --xr-mode off --path . \
 ##       res://tools/entry_layout_shots.tscn -- --profile=test_capture [--prefix=name] [--zones]
@@ -52,15 +52,17 @@ func _ready() -> void:
 	await _save("4b_revealed_no_zones")
 	await _until(func() -> bool: return _entry.find_child("entry_part_all", true, false) != null)
 	_entry.jump_to(&"shelf")
-	await _until(func() -> bool: return App.main.current_scene == &"find_object" and not App.main.switching, 600)
+	# Since Nov 10 the shelf runs in Megan's first visit (Onion leads level 1; no World menu), not find_object.
+	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 600)
 	await _pause(2.5)
 	_look(-0.7)
-	await _save("5_shelf_scene_greeting")
-	await _until(func() -> bool: return App.world != null and App.world.menu != null, 900)
-	await _pause(1.2)
-	await _save("6_shelf_scene_menu")
+	await _save("5_first_visit_shelf")
+	var voice := App.module(&"Voice")
+	await _until(func() -> bool: return voice != null and voice.speaking() != "", 300)
+	await _pause(0.5)
+	await _save("6_first_visit_subtitle")
 	_look(-0.7, false, 0.35)
-	await _save("6b_shelf_scene_menu_turned")
+	await _save("6b_first_visit_turned")
 	get_tree().quit()
 
 

@@ -8,6 +8,12 @@ const ENTRY_OFFSET := Vector3(0.30, 0.09, -0.49)
 ## 15 deg up, 0.5 m away), following the head gently instead of being left in the room and re-placed.
 ## It is still well above the work surface, so a ray at a table object misses it.
 const ENTRY_VIEW_OFFSET := Vector3(-0.22, 0.13, -0.5)
+## Polish (Nov 16): the same spot as ENTRY_VIEW_OFFSET (24 deg left, 13 deg over the gaze, 0.56 m), but never
+## below the horizon: looking down at the shelf no longer pulls the Menu and stones over its cubbies.
+const ENTRY_LEFT_DEG := 24.0
+const ENTRY_ABOVE_GAZE_DEG := 13.0
+const ENTRY_MIN_ELEVATION_DEG := 0.0
+const ENTRY_DISTANCE := 0.56
 ## How quickly it catches up with the head (1/s); a big jump (a recentre) snaps.
 const ENTRY_FOLLOW := 6.0
 ## How far in front of the eyes the menu panel opens, metres (was 0.48; the panel scales to look the same size).
@@ -359,7 +365,7 @@ func _process(delta: float) -> void:
 	_update_entry()
 	if _entry.visible:
 		var eye := App.head().global_transform
-		var goal := eye * ENTRY_VIEW_OFFSET
+		var goal := _entry_goal(eye)
 		var facing := Basis.looking_at(goal - eye.origin, Vector3.UP)   # its face (+z) toward the eye, kept level
 		if _offscreen < 0.0 or _entry_frame.origin.distance_to(goal) > 0.4:
 			_entry_frame = Transform3D(facing, goal)   # first frame, or a recentre: straight there
@@ -392,10 +398,24 @@ func _process(delta: float) -> void:
 		if before < 0.6 and _hover_seconds >= 0.6: Events.say(near.get_meta(&"speech"))
 
 
+## Where the Menu button wants to be: left of the gaze and a little above it, never below the horizon.
+func _entry_goal(eye: Transform3D) -> Vector3:
+	var gaze := -eye.basis.z
+	var ahead := Vector3(gaze.x, 0.0, gaze.z)
+	if ahead.length_squared() < 0.0001:   # looking straight up or down: the head's up points ahead
+		ahead = Vector3(eye.basis.y.x, 0.0, eye.basis.y.z) * (1.0 if gaze.y < 0.0 else -1.0)
+	ahead = ahead.normalized().rotated(Vector3.UP, deg_to_rad(ENTRY_LEFT_DEG))
+	var lift := maxf(asin(clampf(gaze.y, -1.0, 1.0)) + deg_to_rad(ENTRY_ABOVE_GAZE_DEG), deg_to_rad(ENTRY_MIN_ELEVATION_DEG))
+	return eye.origin + (ahead * cos(lift) + Vector3.UP * sin(lift)) * ENTRY_DISTANCE
+
+
 func _update_entry() -> void:
-	# Polish V1: not during the grown-up's setup and the story opening (the "intro" scene: setup, gear,
-	# reveal). Staff still reach their tools there with the left-palm pinch (M on the laptop).
-	var available := not App.menu_active() and not App.main.switching and App.main.current_scene != &"intro"
+	# Polish V1: in PLAY mode, not during the grown-up's setup and the story opening (the "intro" scene:
+	# setup, gear, reveal); a child shouldn't leave the story from there. DEV keeps it, so a tester
+	# always has a way out (Megan got stuck at the Tap beat without it, Nov 15). Staff tools also open
+	# with the left-palm pinch (M on the laptop).
+	var in_story := App.main.current_scene == &"intro" and not PlayMode.is_dev()
+	var available := not App.menu_active() and not App.main.switching and not in_story
 	if _entry.visible == available: return
 	_entry.visible = available
 	_entry.collision_layer = Pointer.UI_LAYER if available else 0

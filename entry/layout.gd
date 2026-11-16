@@ -1398,7 +1398,7 @@ func subtitle_zone(at: Vector3, above_gaze := 25.0, above_horizon := 20.0, dista
 	var d := at - eye
 	var flat := Vector3(d.x, 0.0, d.z).normalized()
 	var pitch := rad_to_deg(atan2(d.y, Vector2(d.x, d.z).length()))
-	var up := deg_to_rad(minf(above_horizon, pitch + above_gaze))
+	var up := deg_to_rad(clampf(pitch + above_gaze, -3.0, above_horizon))   # Voice.min_elevation (polish)
 	var middle := eye + (flat * cos(up) + Vector3.UP * sin(up)) * distance
 	var zone := _rect(&"subtitle", Vector3(middle.x, middle.y - 0.03, middle.z), Vector2(0.27, 0.01), atan2(-flat.x, -flat.z), 0.06, SHELF, "Onion's subtitles")
 	zone.kind = Kind.PANEL

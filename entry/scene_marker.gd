@@ -29,6 +29,8 @@ static func show_text(text: String) -> void:
 		label.position = Vector3(-0.47, 0.28, -0.4)   # the top-left corner of the view
 		App.head().add_child(label)
 	label.text = "DEV · " + text
+	if App.xr == null:   # polish: the laptop controls, so a tester is never stuck (Megan, Nov 15)
+		label.text += "\nclick = pinch / tap · right-drag = look · M = staff tools (jumps)"
 	label.visible = true
 
 

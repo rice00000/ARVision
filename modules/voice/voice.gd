@@ -15,6 +15,9 @@ extends Module
 @export var seconds_per_char := 0.065
 @export var above_horizon := 20.0
 @export var above_gaze := 25.0
+## Never lower than this (degrees from the horizon): looking down at the shelf no longer pulls the
+## subtitle across its top row (polish, Nov 16). Higher than the shelf top seen from a seated child.
+@export var min_elevation := -3.0
 @export var distance := 0.75
 
 ## A line ended: its [param text], and whether it played to the end ([param completed]); false
@@ -89,7 +92,7 @@ func _place() -> void:
 	var gaze := -eye.basis.z
 	var ahead := Vector3(gaze.x, 0.0, gaze.z).normalized()
 	var pitch := rad_to_deg(asin(gaze.y))
-	var elevation := deg_to_rad(minf(above_horizon, pitch + above_gaze))
+	var elevation := deg_to_rad(clampf(pitch + above_gaze, min_elevation, above_horizon))
 	_label.global_position = eye.origin + (ahead * cos(elevation) + Vector3.UP * sin(elevation)) * distance
 
 
