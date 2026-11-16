@@ -414,8 +414,10 @@ func _update_entry() -> void:
 	# setup, gear, reveal); a child shouldn't leave the story from there. DEV keeps it, so a tester
 	# always has a way out (Megan got stuck at the Tap beat without it, Nov 15). Staff tools also open
 	# with the left-palm pinch (M on the laptop).
-	var in_story := App.main.current_scene == &"intro" and not PlayMode.is_dev()
-	var available := not App.menu_active() and not App.main.switching and not in_story
+	var available := not App.menu_active() and not App.main.switching
+	if available:   # (never asks the scene mid-switch, when it may be gone)
+		var entry := App.main.intro()
+		available = entry == null or not (entry.setting_up() or not PlayMode.is_dev())   # dev: hidden only during setup
 	if _entry.visible == available: return
 	_entry.visible = available
 	_entry.collision_layer = Pointer.UI_LAYER if available else 0

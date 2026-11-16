@@ -30,7 +30,7 @@ static func show_text(text: String) -> void:
 		App.head().add_child(label)
 	label.text = "DEV · " + text
 	if App.xr == null:   # polish: the laptop controls, so a tester is never stuck (Megan, Nov 15)
-		label.text += "\nclick = pinch / tap · right-drag = look · M = staff tools (jumps)"
+		label.text += "\nclick = tap / pinch\nright-drag = look\nM = staff tools"   # short lines: clear of the setup panel
 	label.visible = true
 
 

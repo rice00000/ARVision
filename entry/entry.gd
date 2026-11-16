@@ -109,6 +109,7 @@ var _real := 0.0                    # seconds that pass at normal speed, whateve
 var _cauldron_target: Target
 var _in_cauldron: Dictionary = {}   # side -> its fingertip is in the cauldron's reach
 var _panel: SetupPanel              # the setup panel (see setup_panel.gd)
+var _setting_up := false            # the grown-up's setup steps are on screen (Home hides its Menu then)
 var _presses: Array[StringName] = []   # ids of buttons pressed since a step last looked
 var _queued_part: StringName      # Start or a jump requested before playback
 var _show_hands_now := false        # the hands step shows the outlines in both modes
@@ -589,6 +590,11 @@ func _to_dots() -> void:
 ## The pre-game setup: hands, table, reach, sound and room, one after another on the setup
 ## panel. Each step returns true when a jump button was pressed (the rest is skipped).
 ## Ends with the panel hidden; [method _choose_part] then shows "All set".
+## True while the grown-up's setup steps are on screen.
+func setting_up() -> bool:
+	return _setting_up or (is_instance_valid(_panel) and _panel.is_visible_in_tree())   # also via jump buttons
+
+
 func _setup() -> void:
 	_panel = SetupPanel.new()
 	add_child(_panel)
@@ -598,6 +604,7 @@ func _setup() -> void:
 		_panel.hide_all()
 		print("ENTRY setup: skipped (tests)")
 		return
+	_setting_up = true
 	var skipped := await _step_hands()
 	if not skipped:
 		skipped = await _step_table()
@@ -605,6 +612,7 @@ func _setup() -> void:
 		skipped = await _step_reach()
 	if not skipped:
 		skipped = await _step_sound_and_room()
+	_setting_up = false
 	_panel.hide_all()
 	print("ENTRY setup: ", "skipped by a jump button" if skipped else "all four steps done")
 
