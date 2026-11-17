@@ -1,7 +1,8 @@
 extends TestCase
-## Scene 1, Hello (Megan's scene review, Nov 17): bubbles on Onion's pop and a cog nudge during
-## the rattle (entry/fx/hello_fx.gd); subtitles bigger, on a dark plate, kept in the room above
-## the action and re-centred only when the head turns far (modules/voice/voice.gd).
+## Scene 1, Hello (Megan's scene review, Nov 17): the opening calls Effects' HelloFx (bubbles on
+## Onion's pop, the cog ticking with the rattle; their own tests: tests/fx/hello_fx_test.gd);
+## subtitles bigger, on a dark plate, kept in the room above the action and re-centred only when
+## the head turns far (modules/voice/voice.gd).
 
 
 func _voice() -> Node:
@@ -20,33 +21,7 @@ func _look(degrees: float, pitch := -10.0) -> void:
 	await frames(3)
 
 
-func test_bubbles_rise_fade_and_go() -> void:
-	await boot()
-	var mouth := App.head().global_position + Vector3(0.0, -0.4, -0.5)
-	var fx := HelloFx.bubbles(App.stage, mouth, 0.04)
-	await wait(0.5)
-	expect(is_instance_valid(fx) and fx.showing() >= 3, "a few bubbles show")
-	var risen := fx.get_children().filter(func(n: Node) -> bool: return (n as Node3D).visible and (n as Node3D).global_position.y > mouth.y + 0.02)
-	expect(risen.size() >= 1, "they rise out of the opening")
-	for b: Dictionary in fx.get("_bubbles"):
-		expect(float((b.material as ShaderMaterial).get_shader_parameter(&"alpha")) <= HelloFx.PEAK + 0.001, "soft: never past the peak alpha")
-	expect(fx.is_in_group(&"entry_transient"), "a jump clears them")
-	var ref: WeakRef = weakref(fx)
-	fx = null
-	expect(await until(func() -> bool: return ref.get_ref() == null, 3.0), "gone after about two seconds")
-
-
-func test_the_cog_nudge_is_one_small_turn() -> void:
-	await boot()
-	var cog := Node3D.new()
-	App.stage.add_child(cog)
-	var tween := HelloFx.nudge(cog, 14.0)
-	await tween.finished
-	var turned := rad_to_deg(cog.rotation.y)
-	expect(turned > 5.0 and turned < 14.5, "a small turn that settles a little back (%.1f deg)" % turned)
-
-
-func test_in_the_opening_the_rattle_nudges_the_cog_and_the_pop_lets_bubbles_out() -> void:
+func test_in_the_opening_the_rattle_ticks_the_cog_and_the_pop_lets_bubbles_out() -> void:
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	app.autostart = true
@@ -57,8 +32,10 @@ func test_in_the_opening_the_rattle_nudges_the_cog_and_the_pop_lets_bubbles_out(
 	var cog: Node3D = entry.get("_cog")
 	var before := cog.rotation.y
 	entry.jump_to(&"hello")
-	expect(await until(func() -> bool: return absf(cog.rotation.y - before) > deg_to_rad(3.0), 10.0), "the cog turns a notch with the rattle")
-	expect(await until(func() -> bool: return entry.find_child("hello_bubbles", true, false) != null, 10.0), "bubbles when Onion pops up")
+	expect(await until(func() -> bool: return absf(cog.rotation.y - before) > deg_to_rad(3.0), 10.0), "the cog ticks with the rattle")
+	expect(await until(func() -> bool: return entry.find_child("pop_burst", true, false) != null, 10.0), "bubbles when Onion pops up")
+	var burst := entry.find_child("pop_burst", true, false)
+	expect(burst.is_in_group(&"entry_transient"), "a jump clears them")
 
 
 func test_the_subtitle_stays_in_the_room_until_the_head_turns_far() -> void:
