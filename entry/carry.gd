@@ -37,6 +37,9 @@ var enabled := false
 var held := false
 ## Seconds the gear may wait, in view and untouched, before [signal reminder_due]; 0 = never.
 var remind_after := 0.0
+## Docking sends Wei's generic hint (sound and mark). The opening turns it off: it plays its own
+## "found its place" signal at the socket (PlaceSignal, Megan's scene review, Nov 17).
+var dock_feedback := true
 
 ## How near the pinch point must be to the gear's middle, metres ("about 9 cm").
 const GRAB_RADIUS := 0.09
@@ -388,7 +391,8 @@ func _finish_dock(token: int, to_q: Quaternion, size: Vector3, socket: Vector3) 
 	_gear.global_transform = Transform3D(Basis(to_q) * Basis.from_scale(size), socket)
 	_state = State.DOCKED
 	_docked = true
-	Events.feedback.emit(&"hint", socket)
+	if dock_feedback:
+		Events.feedback.emit(&"hint", socket)
 	released.emit(true)
 	docked.emit()
 

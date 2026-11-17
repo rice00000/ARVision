@@ -525,12 +525,16 @@ func _place() -> void:
 		await say("Set it in here, then open your fingers.")
 		await _child_sets_in()
 	_demo.stop()
-	_sounds.play(&"seat", _socket_at)   # once, on the completed seating
 	_dock_at_once()   # settled, upright, and now turning
+	# "Found its place" (Megan's scene review, Nov 17): one soft ring and the click, the same signal as a
+	# shape fitting its cubby and the gear going home. The only feedback here (Carry's hint is off).
+	_sounds.play(&"seat", _socket_at)   # the click, once (PlaceSignal's own click is this same sound)
+	PlaceSignal.play(self, _socket_at, Vector3.UP, 0.08, false).add_to_group(&"entry_transient")
 	_orb.actions.lean_to(_runner, 0.0, 0.4)
 	_orb.actions.lift(_runner, 0.02, 0.6)   # lifts slightly
 	_attend(_mechanism)   # and looks at the connected mechanism (no line: Megan cut "Ah. There we go.")
-	await _wait(1.2)
+	await _wait(PlaceSignal.SECONDS)   # the ring plays out; then ~1 s (Onion's rise) before the reveal's light
+	# (was 1.2 s + the rise: 2.2 s)
 	# Onion rises and turns to the room.
 	_attend(_ahead * 1.5 + App.head().global_position)
 	await _move(_orb, _lifted_spot(), 1.0)
@@ -2307,6 +2311,7 @@ func _configure_interaction() -> void:
 	_carry.follow(_box, _mechanism)   # they move at the reveal
 	Events.selected.connect(_on_desktop_click)
 	_carry.remind_after = PICKUP_REMINDER_SECONDS
+	_carry.dock_feedback = false   # the opening's own "found its place" signal instead (Scene 5)
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)
 	_carry.docked.connect(_demo.stop)
