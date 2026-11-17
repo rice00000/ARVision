@@ -22,6 +22,8 @@ signal picked_up
 signal released(docked: bool)
 ## The gear is in the socket (after the auto-align and the click).
 signal docked
+## A gear let go away from the socket has floated down and landed on the table (the quiet set-down).
+signal settled
 ## [method reset] was called (a jump button, the story starting a part over): whatever was showing the
 ## child how to carry (a highlight, the teaching hand) should go. No other signal comes with it.
 signal was_reset
@@ -412,6 +414,7 @@ func _settle() -> void:
 func _finish_settle(token: int) -> void:
 	if token == _token and _state == State.SETTLING:
 		_state = State.IDLE
+		settled.emit()
 
 
 ## The table spot for a gear let go at [param p]: the one nearest straight below it that is within

@@ -2293,7 +2293,7 @@ func _start_music() -> void:
 
 ## THE delay: how long the gear waits in view, untouched, before the teaching hand shows how to pick it
 ## up (seconds; 0 = never). Only the gesture shows, on the gear itself: never a place, never an answer.
-const PICKUP_REMINDER_SECONDS := 14.0
+const PICKUP_REMINDER_SECONDS := 10.0   # was 14 (Megan's scene review, Nov 17)
 ## DEBUG: this key puts the gear out on the table and turns Carry on, so a click-hold, a drag and
 ## a release (the mouse hand) try the whole pick-up and set-in without the story.
 const TRY_CARRY_KEY := KEY_G
@@ -2310,6 +2310,10 @@ func _configure_interaction() -> void:
 	_carry.reminder_due.connect(func() -> void: _demo.pinch_lift(_gear))
 	_carry.picked_up.connect(_demo.stop)
 	_carry.docked.connect(_demo.stop)
+	# Scene 4: a soft sound as the gear is lifted, another as it lands away from the socket (from the gear,
+	# under the voice). Docking has its own click and nothing else.
+	_carry.picked_up.connect(func() -> void: _sounds.play(&"gear_lift", _gear.global_position))
+	_carry.settled.connect(func() -> void: _sounds.play(&"gear_drop", _gear.global_position))
 	# The pick-up highlight goes the moment the gear is grabbed (not when the story's line ends), and on
 	# every reset (a jump button), together with the teaching hand: neither may outlive its part.
 	_configure_skip()

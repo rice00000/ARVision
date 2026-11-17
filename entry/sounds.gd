@@ -23,9 +23,12 @@ const LEVEL := {pre_rattle = -1.0, device_rattle = 8.0, seat = -16.0, pop_a = -1
 ## high soft pop for the dots, a bright click for the cup. Placeholders until real files are chosen.
 const BORROWS := {knock = {file = &"seat", pitch = 0.5, db = -14.0}, rattle_soft = {file = &"pre_rattle", pitch = 1.0, db = -9.0},
 		impression_shelf = {file = &"seat", pitch = 0.55, db = -12.0}, impression_dots = {file = &"pop_a", pitch = 1.5, db = -12.0},
-		impression_turn_to_fit = {file = &"seat", pitch = 1.8, db = -14.0}, place = {file = &"seat", pitch = 1.0, db = -16.0}}
+		impression_turn_to_fit = {file = &"seat", pitch = 1.8, db = -14.0}, place = {file = &"seat", pitch = 1.0, db = -16.0},
+		# Scene 4 (Megan's scene review, Nov 17): the gear lifted, and the gear set down away from the socket.
+		# They differ, and the set-down is never the seating click (a drop must not sound like success).
+		gear_lift = {file = &"pop_a", pitch = 1.3, db = -18.0}, gear_drop = {file = &"pop_c", pitch = 0.6, db = -16.0}}
 ## Seconds of lead-in to skip, so the sound lands when the thing happens (pop C has ~0.8 s before its pop).
-const START := {pop_c = 0.8}
+const START := {pop_c = 0.8, gear_drop = 0.8}
 ## The reveal pad is 5 s long; this fades it out after about this long.
 const REVEAL_SECONDS := 3.0
 
