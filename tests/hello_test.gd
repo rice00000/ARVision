@@ -79,3 +79,24 @@ func test_the_subtitle_is_bigger_on_a_dark_plate() -> void:
 	var size: Vector2 = _voice().plate_size()
 	expect(size.x > 0.15 and size.y > 0.03, "the plate fits the text (%s m)" % size)
 	expect(size.x <= _label().width * _label().pixel_size + 0.05, "and no wider than a line")
+
+
+func test_the_pop_bubbles_are_not_hidden_inside_onion() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false
+	entry.run()
+	await until(func() -> bool: return entry.tools_ready, 20.0)
+	entry.jump_to(&"hello")
+	expect(await until(func() -> bool: return entry.find_child("pop_burst", true, false) != null, 10.0), "the pop")
+	await wait(0.35)
+	var burst := entry.find_child("pop_burst", true, false) as Node3D
+	var onion := (entry.get("_orb") as Node3D).global_position
+	var clear := 0
+	for bubble: Node3D in burst.get_children():
+		var flat := Vector2(bubble.global_position.x - onion.x, bubble.global_position.z - onion.z).length()
+		if flat > 0.05 or bubble.global_position.y > onion.y + 0.05:
+			clear += 1
+	expect(clear >= PopBurst.COUNT - 1, "the bubbles are out beside or above Onion (%d of %d clear)" % [clear, PopBurst.COUNT])

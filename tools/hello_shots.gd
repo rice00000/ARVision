@@ -32,9 +32,12 @@ func _ready() -> void:
 	var box: Node3D = entry.get("_box")
 	var pot := box.global_position + Vector3.UP * 0.1
 	App.sim_input.look_at(pot)
+	await _until(func() -> bool: return entry.find_child("pop_burst", true, false) != null or said.has("Oh! Hello there."))
+	await get_tree().create_timer(0.45).timeout   # 0.45 s into the pop: the bubbles clear of Onion
+	await _shot("1_pop")
 	await _until(func() -> bool: return said.has("Oh! Hello there."))
 	await get_tree().create_timer(0.05).timeout
-	await _shot("1_pop")
+	await _shot("1b_first_line")
 	var eye := App.head().global_position
 	var ahead := (pot - eye)
 	var turned := ahead.rotated(Vector3.UP, deg_to_rad(-20.0))
