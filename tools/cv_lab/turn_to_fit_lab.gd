@@ -22,15 +22,11 @@ extends Control
 ##                the first capture also teaches the cup's colours
 ##   every 0.2 s  ShapeCV.track finds the cup by colour in the box (Layer 1, here)
 ##                → FitMatcher: fits once it holds 0.5 s → FitGame: the round's rules
+## The camera side (box, captures, tracking) is FitTracker (modules/cv/fit_tracker.gd), shared with the game scene.
 
-const SERVER := "http://127.0.0.1:8765"
 const TARGETS := ["left", "right", "toward"]
-const TRACK_EVERY := 0.2
-const DETECT_EVERY := 0.5
-## Without a cup for this long, the box is dropped.
-const BOX_TIMEOUT := 1.5
 const PHOTOS := "res://tests/data/turn_to_fit/"
-const PANEL_SCALE := 5 # the 64 × 48 shape drawn 5× bigger
+const PANEL_SCALE := FitTracker.PICTURE_SCALE
 const GOLD := Color(0.95, 0.75, 0.2)
 const GREEN := Color(0.35, 0.85, 0.45)
 ## Seconds a round's answer stays up before the next round starts.
@@ -41,7 +37,7 @@ const NOTE_TIME := 1.5
 var _camera := QuestCamera.new()
 var _photos: Array[Image] = []
 var _photo_index := 0
-var _model := PackedFloat32Array()     # the cup's colours (from the first capture)
+var _cv := FitTracker.new()            # camera → cup box → captures → live shape (shared with the game)
 var _shapes := {}                      # target name → normalised shape
 var _matcher := FitMatcher.new()
 var _game := FitGame.new(_matcher)
@@ -51,21 +47,8 @@ var _reveal := 0.0                     # seconds left of the reveal
 var _note := ""
 var _note_left := 0.0
 var _thumbs := {}                      # target name → its card picture
-var _box := Rect2i()                   # YOLO's cup box, camera pixels (empty = none)
-var _box_age := 0.0
-var _since_track := 0.0
-var _since_detect := 0.0
-var _detecting := false
-var _capturing := ""                   # target name waiting for /segment, or ""
-var _capture_image: Image
-var _capture_box := Rect2i()
-var _last_live := {}
-var _track_ms := 0.0
-var _server_ok := true
 var _demo_step := -1
 
-var _detect_http := HTTPRequest.new()
-var _segment_http := HTTPRequest.new()
 var _view := TextureRect.new()
 var _box_layer := Control.new()
 var _panel := TextureRect.new()
@@ -81,10 +64,11 @@ func _ready() -> void:
 		var photo := Image.load_from_file(PHOTOS + "santa_%s.jpg" % view)
 		if photo:
 			_photos.append(photo)
-	add_child(_detect_http)
-	add_child(_segment_http)
-	_detect_http.request_completed.connect(_on_detected)
-	_segment_http.request_completed.connect(_on_segmented)
+	_cv.source = _grab
+	_cv.stepped.connect(_step)
+	_cv.captured.connect(_on_captured)
+	_cv.capture_failed.connect(func(_target: String, why: String) -> void: _status.text = why)
+	add_child(_cv)
 	_build_ui()
 	_matcher.fitted.connect(func(_index: int, target: String) -> void: print("TURN TO FIT: fits ", target))
 	_game.finished.connect(_on_round)
@@ -93,17 +77,6 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_box_age += delta
-	if _box_age > BOX_TIMEOUT:
-		_box = Rect2i()
-	_since_detect += delta
-	if _since_detect >= DETECT_EVERY and not _detecting:
-		_since_detect = 0.0
-		_detect()
-	_since_track += delta
-	if _since_track >= TRACK_EVERY:
-		_step(_since_track)
-		_since_track = 0.0
 	_note_left -= delta
 	if _reveal > 0.0:
 		_reveal -= delta
@@ -125,7 +98,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_capture(TARGETS[key.keycode - KEY_1])
 		KEY_C:
 			if _session == "":
-				_model = PackedFloat32Array()
+				_cv.clear()
 				_shapes.clear()
 				_thumbs.clear()
 				_rebuild_matcher()
@@ -144,7 +117,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_LEFT, KEY_RIGHT:
 			if not _photos.is_empty():
 				_photo_index = (_photo_index + (1 if key.keycode == KEY_RIGHT else -1) + _photos.size()) % _photos.size()
-				_box = Rect2i() # a new picture: wait for YOLO again
+				_cv.box = Rect2i() # a new picture: wait for YOLO again
 
 
 # --- the camera -------------------------------------------------------------------------
@@ -161,73 +134,16 @@ func _using_webcam() -> bool:
 	return _camera.frame() != null
 
 
-# --- Layer 2 on the laptop: YOLO finds the box, SAM outlines a capture -------------------
-
-func _detect() -> void:
-	var image := _grab()
-	if image == null:
-		return
-	_detecting = true
-	var size := image.get_size()
-	var error := _detect_http.request_raw(SERVER + "/detect", PackedStringArray(["Content-Type: image/jpeg"]),
-		HTTPClient.METHOD_POST, image.save_jpg_to_buffer(0.85))
-	if error != OK:
-		_detecting = false
-	_detect_http.set_meta(&"size", size)
-
-
-func _on_detected(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	_detecting = false
-	_server_ok = result == HTTPRequest.RESULT_SUCCESS and code == 200
-	if not _server_ok:
-		return
-	var size: Vector2i = _detect_http.get_meta(&"size")
-	var best := {}
-	for found: Dictionary in JSON.parse_string(body.get_string_from_utf8()).detections:
-		if found.label == "cup" and found.confidence > best.get("confidence", 0.3):
-			best = found
-	if best.is_empty():
-		return
-	var b: Array = best.box # 0..1 corners
-	_box = Rect2i(Vector2i(roundi(b[0] * size.x), roundi(b[1] * size.y)),
-		Vector2i(roundi((b[2] - b[0]) * size.x), roundi((b[3] - b[1]) * size.y)))
-	_box_age = 0.0
-
+# --- Layer 2 on the laptop (FitTracker): YOLO finds the box, SAM outlines a capture ---------
 
 func _capture(target: String) -> void:
-	if _capturing != "":
-		return
-	var image := _grab()
-	if image == null or _box.size == Vector2i.ZERO:
-		_status.text = "No cup found yet: is the CV server running and the cup in view?"
-		return
-	_capturing = target
-	_capture_image = image.duplicate()
-	_capture_box = _box
-	var query := "%s/segment?box=%d,%d,%d,%d" % [SERVER, _box.position.x, _box.position.y, _box.end.x, _box.end.y]
-	_segment_http.request_raw(query, PackedStringArray(["Content-Type: image/jpeg"]), HTTPClient.METHOD_POST,
-		_capture_image.save_jpg_to_buffer(0.9))
-	_status.text = "Capturing \"%s\"… (SAM takes a few seconds the first time)" % target
+	if _cv.capture(target):
+		_status.text = "Capturing \"%s\"… (SAM takes a few seconds the first time)" % target
 
 
-func _on_segmented(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	var target := _capturing
-	_capturing = ""
-	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		_status.text = "Capture failed (server reply %d)" % code
-		return
-	var mask := Image.new()
-	if mask.load_png_from_buffer(body) != OK:
-		_status.text = "Capture failed: the reply wasn't a picture"
-		return
-	if _model.is_empty(): # the first capture teaches the tracker this cup's colours
-		_model = ShapeCV.learn_colours(_capture_image, mask, _capture_box)
-	var shape := ShapeCV.target_from_mask(mask, _capture_box)
-	if not shape.ok:
-		_status.text = "Capture of \"%s\" found no cup outline" % target
-		return
-	_shapes[target] = shape.shape
-	_thumbs[target] = ImageTexture.create_from_image(_shape_picture(shape.shape, PackedByteArray(), GOLD, 2))
+func _on_captured(target: String, shape: PackedByteArray) -> void:
+	_shapes[target] = shape
+	_thumbs[target] = ImageTexture.create_from_image(FitTracker.picture(shape, PackedByteArray(), GOLD, 2))
 	_rebuild_matcher()
 	_status.text = "Captured \"%s\"." % target
 
@@ -321,20 +237,14 @@ func _game_line() -> String:
 
 # --- Layer 1, every 0.2 s: track → match ---------------------------------------------------
 
-func _step(dt: float) -> void:
+func _step(shape: PackedByteArray, dt: float) -> void:
 	var image := _grab()
 	if image == null:
 		_status.text = "No camera and no photos found."
 		return
 	if not _using_webcam():
 		_view.texture = ImageTexture.create_from_image(image)
-	var live := {}
-	if not _model.is_empty() and _box.size != Vector2i.ZERO:
-		var start := Time.get_ticks_usec()
-		live = ShapeCV.track(image, _box, _model)
-		_track_ms = (Time.get_ticks_usec() - start) / 1000.0
-	_last_live = live
-	var fit := _matcher.update(live.shape if live.get("ok", false) else PackedByteArray(), dt)
+	var fit := _matcher.update(shape, dt)
 	_game.update(dt)
 	_show(fit, image.get_size())
 
@@ -349,15 +259,15 @@ func _show(fit: int, image_size: Vector2i) -> void:
 	for i in _matcher.scores.size():
 		if near < 0 or _matcher.scores[i] > _matcher.scores[near]:
 			near = i
-	var live_shape: PackedByteArray = _last_live.get("shape", PackedByteArray())
+	var live_shape: PackedByteArray = _cv.live.get("shape", PackedByteArray())
 	var target: PackedByteArray = _matcher.targets[near] if near >= 0 else PackedByteArray()
-	_panel.texture = ImageTexture.create_from_image(_shape_picture(target, live_shape, GREEN if fit >= 0 else GOLD, 1))
+	_panel.texture = ImageTexture.create_from_image(FitTracker.picture(target, live_shape, GREEN if fit >= 0 else GOLD, 1))
 	for i in _matcher.names.size():
 		var row: Dictionary = _rows[_matcher.names[i]]
 		row.bar.value = _matcher.scores[i] * 100.0
 		row.label.text = "%s  %.2f" % [_matcher.names[i], _matcher.scores[i]]
-	if _capturing == "":
-		if _model.is_empty():
+	if _cv.capturing == "":
+		if _cv.model.is_empty():
 			_status.text = "Show the cup, then press 1, 2 or 3 to capture a target."
 		elif fit >= 0:
 			_status.text = "FITS: %s ✓" % _matcher.names[fit]
@@ -373,7 +283,7 @@ func _show(fit: int, image_size: Vector2i) -> void:
 
 ## Playing: the card, and the live shadow only when the help (or the reveal) allows it.
 func _show_game() -> void:
-	var live: PackedByteArray = _last_live.get("shape", PackedByteArray())
+	var live: PackedByteArray = _cv.live.get("shape", PackedByteArray())
 	var revealing := not _result.is_empty()
 	var line := PackedByteArray()
 	var fill := PackedByteArray()
@@ -388,7 +298,7 @@ func _show_game() -> void:
 		line = _matcher.targets[_game.card]
 		fill = live
 		colour = GREEN if _result.result == "match" else GOLD
-	_panel.texture = ImageTexture.create_from_image(_shape_picture(line, fill, colour, 2))
+	_panel.texture = ImageTexture.create_from_image(FitTracker.picture(line, fill, colour, 2))
 	_status.text = _game_line()
 
 
@@ -400,8 +310,8 @@ func _draw_info(image_size: Vector2i) -> void:
 		playing = "which is mine? · round %d" % (_game.rounds.size() + 1)
 	_info.text = "%s · server %s · box %s · track %.1f ms\n%s" % [
 		"webcam" if _using_webcam() else "photo %d/%d (← →)" % [_photo_index + 1, _photos.size()],
-		"OK" if _server_ok else "NOT RUNNING: python3 tools/cv_server.py",
-		"yes" if _box.size != Vector2i.ZERO else "none", _track_ms, playing]
+		"OK" if _cv.server_ok else "NOT RUNNING: python3 tools/cv_server.py",
+		"yes" if _cv.box.size != Vector2i.ZERO else "none", _cv.track_ms, playing]
 	_box_layer.set_meta(&"image_size", image_size)
 	_box_layer.queue_redraw()
 
@@ -423,23 +333,6 @@ func _show_rows() -> void:
 			if not _shapes.has(TARGETS[i]):
 				row.label.text = "%d · %s (not captured)" % [i + 1, TARGETS[i]]
 				row.bar.value = 0.0
-
-
-## A 64 × 48 shape picture, PANEL_SCALE× bigger: [param fill] in light grey, the contour
-## of [param line] in [param colour] (thickness in shape pixels).
-func _shape_picture(line: PackedByteArray, fill: PackedByteArray, colour: Color, thickness: int) -> Image:
-	var w := ShapeCV.NORM_W
-	var h := ShapeCV.NORM_H
-	var picture := Image.create(w, h, false, Image.FORMAT_RGB8)
-	picture.fill(Color(0.12, 0.12, 0.14))
-	var edge := ShapeCV.outline(line, w, h, thickness) if not line.is_empty() else PackedByteArray()
-	for i in w * h:
-		if not fill.is_empty() and fill[i] == 1:
-			picture.set_pixel(i % w, i / w, Color(0.8, 0.8, 0.8))
-		if not edge.is_empty() and edge[i] == 1:
-			picture.set_pixel(i % w, i / w, colour)
-	picture.resize(w * PANEL_SCALE, h * PANEL_SCALE, Image.INTERPOLATE_NEAREST)
-	return picture
 
 
 # --- the window ---------------------------------------------------------------------------
@@ -507,13 +400,13 @@ func _heading(text: String) -> Label:
 
 
 func _draw_box() -> void:
-	if _box.size == Vector2i.ZERO or not _box_layer.has_meta(&"image_size"):
+	if _cv.box.size == Vector2i.ZERO or not _box_layer.has_meta(&"image_size"):
 		return
 	var image_size: Vector2 = _box_layer.get_meta(&"image_size")
 	var area := _box_layer.size
 	var scale := minf(area.x / image_size.x, area.y / image_size.y) # the picture is centred, aspect kept
 	var offset := (area - image_size * scale) * 0.5
-	_box_layer.draw_rect(Rect2(offset + Vector2(_box.position) * scale, Vector2(_box.size) * scale), GREEN, false, 2.0)
+	_box_layer.draw_rect(Rect2(offset + Vector2(_cv.box.position) * scale, Vector2(_cv.box.size) * scale), GREEN, false, 2.0)
 
 
 # --- --demo: capture from the photos by itself, then check each photo (also a self-test) --
@@ -522,16 +415,16 @@ var _demo_wait := 0.0
 
 func _demo(delta: float) -> void:
 	_demo_wait += delta
-	if _demo_wait < 2.0 or _capturing != "":
+	if _demo_wait < 2.0 or _cv.capturing != "":
 		return
 	_demo_wait = 0.0
 	var plan := [[0, "left"], [1, "right"], [2, "toward"]]
 	if _demo_step < plan.size():
 		if _photo_index != plan[_demo_step][0]:
 			_photo_index = plan[_demo_step][0]
-			_box = Rect2i()
+			_cv.box = Rect2i()
 			return
-		if _box.size == Vector2i.ZERO:
+		if _cv.box.size == Vector2i.ZERO:
 			return
 		_capture(plan[_demo_step][1])
 		_demo_step += 1
@@ -543,7 +436,7 @@ func _demo(delta: float) -> void:
 		return
 	if _photo_index != check:
 		_photo_index = check
-		_box = Rect2i()
+		_cv.box = Rect2i()
 		return
 	var shot := get_viewport().get_texture().get_image()
 	shot.save_png("user://turn_to_fit_demo_%d.png" % check)
@@ -558,7 +451,7 @@ func _demo_play(step: int) -> void:
 		0:
 			_begin("pick")
 			_photo_index = 1
-			_box = Rect2i()
+			_cv.box = Rect2i()
 		1:
 			var slot := _game.cards.find(_matcher.names.find("right"))
 			print("TURN TO FIT DEMO: which is mine (right photo, card %d) → %s" % [slot + 1, _game.pick(slot)])
@@ -567,7 +460,7 @@ func _demo_play(step: int) -> void:
 			_game.set_help(FitGame.Help.BLIND)
 			_begin("turn")
 			_photo_index = TARGETS.find(_matcher.names[_game.card])
-			_box = Rect2i()
+			_cv.box = Rect2i()
 		3:
 			print("TURN TO FIT DEMO: blind turn to fit (card %s, its photo) → %s" % [_matcher.names[_game.card], _game.commit()])
 		4:
