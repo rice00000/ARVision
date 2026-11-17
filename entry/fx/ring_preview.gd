@@ -42,32 +42,38 @@ func _ready() -> void:
 	var toward := Vector3(real_eye.x - mouth.x, 0.0, real_eye.z - mouth.z).normalized()
 	var eye := mouth + toward * 0.7 + Vector3.UP * 0.4
 	_view = [eye, mouth + Vector3.UP * (ImpressionRing.ABOVE_RIM + 0.05)]
-	var made: Array[Impression] = []
-	for kind: StringName in [&"shelf", &"dots", &"turn_to_fit"]:
-		made.append(Impression.make(kind))
-	var ring := ImpressionRing.make(self, made, Vector3(mouth.x, mouth.y + ImpressionRing.ABOVE_RIM, mouth.z), eye)
+	var middle := Vector3(mouth.x, mouth.y + ImpressionRing.ABOVE_RIM, mouth.z)
+	# 1. First visit: only the shelf (hidden, not sealed).
+	var shelf := Impression.make(&"shelf")
+	var ring := ImpressionRing.make(self, [shelf] as Array[Impression], middle, eye)
 	await _pause(0.3)
-	await _save("ring_1_waiting")
-	var cup := made[2]
-	var at := cup.target.global_position
-	App.sim_input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
+	await _save("ring_1_first_visit")
+	# 2. After the first shelf: the dots rise out of the cauldron and come to the front.
+	var dots := Impression.make(&"dots")
+	ring.add(dots, mouth)
+	await _pause(ImpressionRing.RISE_SECONDS * 0.45)
+	await _save("ring_2_dots_rising")
+	await _pause(ImpressionRing.RISE_SECONDS * 0.55 + 0.3)
+	await _save("ring_3_dots_in_front")
+	# 3. Turn to fit can run: the cup joins too.
+	var cup := Impression.make(&"turn_to_fit")
+	ring.add(cup, mouth)
+	await _pause(ImpressionRing.RISE_SECONDS + 0.3)
+	await _save("ring_4_three")
+	# 4. The hand aims at the shelf (left, half size): it lights softly.
+	var at := shelf.target.global_position
+	App.sim_input.point(&"right", real_eye + (at - real_eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
 	await _pause(0.2)
-	await _save("ring_2_aim_at_cup")
-	ring.press(cup)
-	await _pause(ImpressionRing.TURN_SECONDS * 0.5)
-	await _save("ring_3_turning")
-	await _pause(ImpressionRing.TURN_SECONDS * 0.5 + 0.3)
-	var away := eye + Vector3(0.5, -0.4, -0.3)
-	App.sim_input.point(&"right", eye + (away - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, away)
+	await _save("ring_5_aim_at_shelf")
+	# 5. Pinched: the arc slides it to the front and stops.
+	ring.press(shelf)
+	await _pause(0.6)
+	await _save("ring_6_sliding")
+	await _pause(1.0)
+	var away := real_eye + Vector3(0.5, -0.4, -0.3)
+	App.sim_input.point(&"right", real_eye + (away - real_eye).normalized() * 0.25 + Vector3.DOWN * 0.05, away)
 	await _pause(0.2)
-	await _save("ring_4_cup_in_front")
-	# First visit: only the shelf open, the dots sealed (no cup: Turn to fit not set up).
-	ring.queue_free()
-	var first: Array[Impression] = [Impression.make(&"shelf"), Impression.make(&"dots")]
-	ImpressionRing.make(self, first, Vector3(mouth.x, mouth.y + ImpressionRing.ABOVE_RIM, mouth.z), eye)
-	first[1].set_sealed(true)
-	await _pause(0.3)
-	await _save("ring_0_first_visit")
+	await _save("ring_7_shelf_in_front")
 	get_tree().quit()
 
 

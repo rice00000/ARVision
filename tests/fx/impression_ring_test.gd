@@ -1,7 +1,8 @@
 extends TestCase
-## The hub's ring of choices above the cauldron (entry/fx/impression_ring.gd; Megan, Nov 17): still unless
-## asked, steps a pressed side choice to the front, chooses only the front one, lights what the hand aims
-## at, goes dark before a task. The cup has no base.
+## The hub's carousel arc of choices above the cauldron (entry/fx/impression_ring.gd; Megan, Nov 17): still
+## unless asked, steps a pressed side choice to the front, chooses only the front one, side ones at half
+## size and apart, a new one rises into the arc, lights what the hand aims at, goes dark before a task.
+## The cup has no base.
 
 const KINDS: Array[StringName] = [&"shelf", &"dots", &"turn_to_fit"]
 
@@ -29,7 +30,9 @@ func test_the_front_choice_faces_the_child_full_size_and_the_ring_holds_still() 
 			expect(Vector2(front.global_position.x - eye.x, front.global_position.z - eye.z).length()
 					< Vector2(impression.global_position.x - eye.x, impression.global_position.z - eye.z).length(),
 					"the front one is nearest the child (%s)" % impression.kind)
-			expect(impression.scale.x < front.scale.x, "%s sits smaller round the ring" % impression.kind)
+			expect(is_equal_approx(impression.scale.x, ImpressionRing.SIDE_SCALE), "%s sits at half size beside it" % impression.kind)
+			expect(Vector2(impression.global_position.x - front.global_position.x, impression.global_position.z - front.global_position.z).length() > 0.15,
+					"%s is well apart from the front one" % impression.kind)
 	expect(front._halo.visible, "the front one has the waiting halo")
 	var before: Array[Vector3] = []
 	for impression in ring.impressions:
@@ -45,7 +48,7 @@ func test_pressing_a_side_choice_turns_it_to_the_front_and_only_the_front_one_is
 	var cup := ring.impressions[2]
 	expect_eq(ring.press(cup), &"turned", "a side choice turns, it isn't chosen")
 	expect_eq(ring.press(ring.impressions[1]), &"busy", "no second turn while it turns")
-	await wait(ImpressionRing.TURN_SECONDS + 0.2)
+	await wait(ImpressionRing.TURN_SECONDS + 0.6)
 	expect(ring.front() == cup, "the cup is in front now")
 	expect(cup._halo.visible and not ring.impressions[0]._halo_light.albedo_color.a > 0.3, "the halo moved with it")
 	expect_eq(ring.press(cup), &"chosen", "pressing the front one chooses it")
@@ -65,7 +68,10 @@ func test_aiming_at_a_side_choice_lights_it() -> void:
 	var side := ring.impressions[1]
 	var eye := App.head().global_position
 	var at := side.target.global_position
-	await frames(2)
+	var far := eye + Vector3(0.6, -0.3, -0.4)
+	input.point(&"right", eye + (far - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, far)
+	input.point(&"left", eye + Vector3(-0.3, -0.5, 0.1), eye + Vector3(-0.6, -0.8, 0.2))
+	await frames(3)
 	var dark := side._halo_light.albedo_color.a if side._halo.visible else 0.0
 	input.point(&"right", eye + (at - eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
 	await frames(3)
@@ -96,3 +102,18 @@ func test_the_cup_has_no_base() -> void:
 		if mesh.mesh is CylinderMesh:
 			widest = maxf(widest, (mesh.mesh as CylinderMesh).bottom_radius)
 	expect(widest <= 0.06, "no wide base under the cup (widest round part %.3f m)" % widest)
+
+
+func test_a_new_choice_rises_into_the_arc_and_comes_to_the_front() -> void:
+	await boot(null, &"intro")
+	var shelf := Impression.make(&"shelf")
+	var eye := App.head().global_position
+	var middle := eye + Vector3(-0.3, -0.35, -0.55)
+	var ring := ImpressionRing.make(app, [shelf] as Array[Impression], middle, eye)
+	var dots := Impression.make(&"dots")
+	ring.add(dots, middle + Vector3.DOWN * 0.15)
+	expect_eq(ring.press(shelf), &"busy", "nothing is chosen while it rises")
+	await wait(ImpressionRing.RISE_SECONDS + 0.2)
+	expect(ring.front() == dots, "the new one is in front")
+	expect(dots._halo.visible, "with the halo")
+	expect(is_equal_approx(shelf.scale.x, ImpressionRing.SIDE_SCALE), "the shelf moved aside, at half size")
