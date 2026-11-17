@@ -140,6 +140,9 @@ var _layout: EntryLayout            # WHERE everything stands (entry/layout.gd),
 var _zones: EntryZoneOverlay        # DEV: the zone map drawn on the table (the "Zones" button)
 var _made_way := false              # the cauldron and the panel stand at their spots for the revealed room
 var _cauldron_gone := false         # the cauldron has sunk away (or is sinking)
+var _puff: CauldronPuff             # the cauldron's answer to the reveal's light (Scene 6), while it plays
+var _puffed := false                # this reveal's puff has started
+var _band_done := false             # this reveal's band has spread as far as it goes
 var _first_seed := 0                # the seed the first round's things were made from (the first visit makes the same)
 var _runner: PartRunner             # what the playing part waits on; freed to cancel it
 var _part_running := false          # a part is playing (a jump button cuts in on it)
@@ -546,18 +549,28 @@ func _reveal() -> void:
 	_beat("6: the reveal")
 	await _make_way()   # layout chat: what stands where the bench goes glides aside first
 	_orb.actions.lean_to(_runner, 0.0, 0.5)
-	_attend(_shelf)   # as the ripple spreads Onion straightens and turns to one revealed feature (the shelf)
-	# The cauldron's job is done (Megan). Where it stands in the bench's way it sinks as the ripple
-	# starts (layout chat: EntryLayout.ripple_overlaps); otherwise it has sunk away by the time the
-	# first ring reaches it.
-	if _layout != null and not _layout.ripple_overlaps().is_empty():
-		_cauldron_away()
-	else:
-		var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
-		var reach := PLAY_RADIUS * 1.6 + _away(_ripple_origin)   # as _ripple works it out
-		var hits := RIPPLE_SECONDS * asin(clampf(to_pot / reach, 0.0, 1.0)) * 2.0 / PI   # the ring's ease is a sine
-		_later(maxf(0.0, hits - CAULDRON_SINK), _cauldron_away)
-	await _ripple()
+	# Scene 6 (Megan's scene review, Nov 17): table only, no shelf; the cauldron stays (the layout keeps it
+	# clear of Wei's bench in every phase) and answers the light with a warm puff when the band reaches it
+	# (CauldronPuff, from _ripple). Onion watches it, says its line as the puff fades, and then the shelf
+	# pops out of the cauldron like the gear did (_shelf_from_cauldron).
+	_attend(_box.global_position + Vector3.UP * (_rim + 0.1))
+	_puff = null
+	_puffed = false
+	_band_done = false
+	var rippling := {on = true}
+	var light := func() -> void:
+		await _ripple()
+		rippling.on = false
+	light.call()
+	while rippling.on and not (_puffed and not is_instance_valid(_puff)):
+		if not _puffed and _band_done:
+			break   # no puff (the cauldron sank, or the band has gone past it): the line after the band
+		await _runner.tick
+	_attend(null)
+	await say(REVEAL_LINE)   # SCRIPT.md, approved Nov 17 (subtitle only until the voice is baked)
+	await _shelf_from_cauldron()   # at once: the light's last fade carries on meanwhile (the intro is slow)
+	while rippling.on:
+		await _runner.tick
 	_attend(null)   # turns toward the child
 	await _wait(0.3)   # ("I've been looking forward to showing you this." was cut: Megan)
 	# Onion rises slightly, takes in the room, then drifts aside (story chat, approved replacement).
@@ -568,6 +581,66 @@ func _reveal() -> void:
 	# The shapes arrived with the shelf (the ripple showed them). "Welcome to the workshop." and Onion's
 	# noticing and invitation lines are said in first_visit.gd (Megan, Nov 10 and 11): the shelf level
 	# is already running there, so the child can pick the shapes up and sort while Onion talks.
+
+
+## How big the shelf's impression is as it pops through the brew, and at the bench (it grows as it arcs).
+const SHELF_OUT_SCALE := 0.45
+## Seconds of the shelf's arc from the rim to the bench, and the arc's height over the straight line.
+const SHELF_ARC_SECONDS := 1.1
+const SHELF_ARC_HEIGHT := 0.08
+
+
+## After the reveal (Megan, Nov 17: "pop from the cauldron, like the gear"): a small shelf, the shelf's
+## impression, pops up through the brew with a little overshoot, clears the rim, arcs over to the bench
+## growing as it goes, and lands with its own knock. Then the shelf rises out of the table there at full
+## width with the line of light (SummonFx.grow), and Wei's first shapes rise after it. Small while it
+## moves, full size only where it stands: nothing big sweeps across the view. Until the hub's ring and the
+## child's pinch come in (Scene 7), it comes out by itself.
+func _shelf_from_cauldron() -> void:
+	if _shelf == null or not is_instance_valid(_shelf):
+		return
+	var pivot := _shelf.shelf().get_parent() as Node3D   # under the bench's middle (_build_shelf)
+	if pivot.visible and pivot.scale.y > 0.5:
+		return   # already out (a jump, or the old reveal showed it)
+	var impression := Impression.make(&"shelf")
+	impression.name = "shelf_impression"
+	add_child(impression)
+	impression.add_to_group(&"entry_transient")
+	var land := pivot.global_position
+	var eye := App.head().global_position
+	impression.global_position = _mouth + Vector3.DOWN * 0.02
+	impression.scale = Vector3.ONE * SHELF_OUT_SCALE
+	impression.look_at(Vector3(eye.x, impression.global_position.y, eye.z), Vector3.UP, true)
+	var clear := Vector3(_mouth.x, _box.global_position.y + _rim + 0.05, _mouth.z)
+	_attend(impression)
+	_sounds.play_pop(_mouth)
+	var hop := _runner.create_tween()
+	hop.tween_property(impression, "global_position", clear, 0.8).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	hop.tween_method(func(k: float) -> void:
+		if is_instance_valid(impression):
+			impression.global_position = clear.lerp(land, k) + Vector3.UP * SHELF_ARC_HEIGHT * 4.0 * k * (1.0 - k)
+			impression.scale = Vector3.ONE * lerpf(SHELF_OUT_SCALE, 1.0, k)
+			impression.look_at(Vector3(eye.x, impression.global_position.y, eye.z), Vector3.UP, true), 0.0, 1.0, SHELF_ARC_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await hop.finished
+	_sounds.play(&"impression_shelf", land)
+	_attend(pivot.global_position + Vector3.UP * 0.1)
+	pivot.set_meta(&"fx_size", pivot.get_meta(&"size", Vector3.ONE))
+	pivot.set_meta(&"shown", true)
+	await SummonFx.grow(impression, pivot, pivot.global_transform, 1.2)
+	impression.queue_free()
+	var riser := RevealFx.new()   # Wei's first shapes rise after the shelf, a little apart
+	add_child(riser)
+	riser.add_to_group(&"entry_transient")
+	for detail in _details:
+		if is_instance_valid(detail) and detail != pivot and not detail.get_meta(&"shown", false):
+			detail.set_meta(&"shown", true)
+			riser.arrive(detail, detail.get_meta(&"size", Vector3.ONE))
+			await _wait(0.15)
+	await _wait(1.0)
+
+
+## Onion's line after the cauldron's puff (Scene 6; SCRIPT.md, approved Nov 17).
+const REVEAL_LINE := "It hasn't done that in ages!"
 
 
 ## 5. Into the shelf activity, inside the revealed workshop. Onion stays.
@@ -2135,10 +2208,18 @@ func _ripple() -> void:
 	add_child(fx)
 	fx.add_to_group(&"entry_transient")
 	fx.play(_ripple_origin, reach, RIPPLE_SECONDS, func(table_radius: float, room_radius: float) -> void:
+		if table_radius >= reach - 0.001:
+			_band_done = true
 		for point in _surface_points:
 			if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= room_radius:
 				point.shown = true
 				_glint(point.position, point.normal)
+		if not _puffed and not _cauldron_gone and _box.visible:
+			var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
+			if to_pot <= table_radius:   # the band reaches the cauldron: it answers (Scene 6)
+				_puffed = true
+				_puff = CauldronPuff.play(self, _mouth, _mouth_radius)
+				_puff.add_to_group(&"entry_transient")
 		if not RevealFx.shows_workshop:   # v0.3: the shelf comes from the cauldron later (Hub chat)
 			return
 		for detail in _details:

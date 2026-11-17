@@ -444,15 +444,14 @@ func test_the_shelf_stands_back_along_the_table_not_in_front_of_the_player() -> 
 	var bench: Transform3D = entry.get("_bench")
 	expect_eq(Tidy.shelf_frame, bench, "the opening hands the first visit its planned shelf position")
 	var away := Vector2(bench.origin.x - eye.x, bench.origin.z - eye.z).length()
-	expect(absf(away - Entry.SHELF_PUSH) < 0.01, "the whole play set is that far along the table from the eyes, got %s" % away)
+	# At least that far back (it may stand further where the plan turns it to fit the table: Scene 6's layout).
+	expect(away > Entry.SHELF_PUSH - 0.01, "the whole play set stands back along the table from the eyes, got %s" % away)
 	var cauldron: Node3D = entry.get("_box")
 	var shelf_frame: Transform3D = bench
 	var local := shelf_frame.affine_inverse() * cauldron.global_position
-	# Where the panel stays put the cauldron may stand in the bench's way (EntryLayout.ripple_overlaps); it then sinks
-	# as the ripple starts, before the bench grows in.
-	var layout: EntryLayout = entry.get("_layout")
-	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0 or not layout.ripple_overlaps().is_empty(),
-			"the cauldron does not stand inside the shelf's footprint, or it sinks as the ripple starts")
+	# The cauldron stays for the whole visit (Scene 6): the plan keeps it out of the shelf's footprint.
+	expect(absf(local.x) > (0.48 + 0.06) * 0.5 or -local.z > 0.41 + 0.11 or local.z > 0.0,
+			"the cauldron does not stand inside the shelf's footprint")
 
 
 func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:

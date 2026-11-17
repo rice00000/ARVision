@@ -115,11 +115,13 @@ func test_the_opening_reveal_shows_the_whole_workshop_and_leaves_no_light_behind
 	entry.jump_to(&"reveal")
 	expect(await until(func() -> bool: return entry.find_child("reveal_light_table", true, false) != null, 20.0),
 			"the reveal draws its light on the table")
+	# Scene 6: the light shows no shelf; the shelf then pops out of the cauldron and Wei's shapes rise after it.
 	var details: Array = entry.get("_details")
-	expect(await until(func() -> bool: return details.all(func(d: Node3D) -> bool: return d.visible), 20.0),
+	expect(await until(func() -> bool: return details.all(func(d: Node3D) -> bool: return d.visible), 40.0),
 			"every part of the workshop is shown")
 	expect(await until(func() -> bool: return entry.find_children("reveal_light_*", "", true, false).is_empty(), 15.0),
 			"the light is gone once it has faded")
+	expect(await until(func() -> bool: return not bool(entry.get("_part_running")), 20.0), "the reveal part ends")
 	for detail: Node3D in details:
 		expect(detail.scale.is_equal_approx(detail.get_meta(&"size", Vector3.ONE)), "%s ends at its full size" % detail.name)
 

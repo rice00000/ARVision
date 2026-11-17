@@ -421,7 +421,9 @@ func _plan(way: bool) -> float:
 				bench = bench_frame(angle)
 				_place_mechanism()
 				var cauldron_view := absf(bearing_left) + rad_to_deg(atan2(CAULDRON_WIDTH * 0.5, out)) - VIEW_WIDE * 0.5
-				var quick := _mech_score - maxf(cauldron_view, 0.0) * 0.3 - angle * 0.02 - absf(bearing_left - CAULDRON_ANGLE) * 0.01
+				var pot := _circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, 0.0)
+				var clash := maxf(GAP - minf(gap(pot, _bench_zone()), gap(pot, _things_zone())), 0.0)   # the cauldron stays: clear of the bench
+				var quick := _mech_score - maxf(cauldron_view, 0.0) * 0.3 - angle * 0.02 - absf(bearing_left - CAULDRON_ANGLE) * 0.01 - clash * 300.0
 				candidates.append({q = quick, cauldron = cauldron, angle = angle, mechanism = mechanism})
 	candidates.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.q > y.q)
 	var best := {}
@@ -465,7 +467,7 @@ var _mech_score := 0.0
 ## limit; the gear is set in once).
 static var socket_stretch := 0.05
 const SHELF_ANGLES := [0.0, 10.0, 20.0, 30.0]
-const CAULDRON_BEARINGS := [30.0, 0.0, -20.0, 50.0]
+const CAULDRON_BEARINGS := [30.0, 40.0, 50.0, 60.0, 0.0, -20.0]
 
 
 ## Minus how bad the plan is: overlaps, things out of view or out of reach (0: none).
@@ -635,14 +637,14 @@ func _shelf_angle() -> float:
 			var box := in_view(z)
 			view += maxf(maxf(-VIEW_WIDE * 0.5 - box.position.x, box.end.x - VIEW_WIDE * 0.5), 0.0)
 		var clash := maxf(-gap(_bench_zone(), pot), 0.0) + maxf(-gap(_things_zone(), pot), 0.0)
-		var score := -view * 2.0 - (2.0 if view > 0.0 else 0.0) - clash * (5.0 if make_way else 50.0) - absf(angle) * 0.02
+		var score := -view * 2.0 - (2.0 if view > 0.0 else 0.0) - clash * 50.0 - absf(angle) * 0.02   # the cauldron stays: never in the bench's way
 		if score > best_score:
 			best_score = score
 			best = angle
 	return best
 
 
-func _bench_zone(phases := REVEAL | SHELF) -> Zone:
+func _bench_zone(phases := SHELF) -> Zone:   # no shelf at the reveal (Megan, Nov 17: Scene 6)
 	var middle := bench * Vector3(0, 0, -(BENCH_NEAR + BENCH_FAR) * 0.5)
 	var top := eye.y - bench_below
 	middle.y = minf(table_y(), top - 0.012)
@@ -651,7 +653,7 @@ func _bench_zone(phases := REVEAL | SHELF) -> Zone:
 	return z
 
 
-func _shelf_zone(phases := REVEAL | SHELF) -> Zone:
+func _shelf_zone(phases := SHELF) -> Zone:   # no shelf at the reveal (Scene 6)
 	var middle := bench * Vector3(0, -bench_below, -(SHELF_NEAR + SHELF_FAR) * 0.5)
 	var z := _rect(&"shelf", middle, Vector2(SHELF_HALF, (SHELF_FAR - SHELF_NEAR) * 0.5), _yaw_of(bench), SHELF_HIGH, phases, "the cubbies with the shapes")
 	z.may_overlap = [&"bench", &"things"]   # Wei's: the things lie just in front of it
@@ -1005,10 +1007,10 @@ static func _yaw_of(frame: Transform3D) -> float:
 func _zones() -> Array[Zone]:
 	var all: Array[Zone] = []
 	var after := REVEAL | SHELF
-	# The cauldron is there for the opening only; it sinks away right after the ripple. While the ripple
-	# passes (REVEAL) it may still stand where the bench grows in: see [method ripple_overlaps], which
-	# lists that (information, not an error: a second or two, then it is gone).
-	var c_phases := OPENING
+	# The cauldron stays for the whole visit (Megan, Nov 17: Scene 6, and WORKSHOP_SPEC_v0.3_REVIEW decision
+	# 1): it is the hub, so it must be clear of the bench, the shelf and the things from the start.
+	# (Taken from the decision chat's hub draft; the draft's impression row is left for Scene 7.)
+	var c_phases := OPENING | REVEAL | SHELF
 	all.append(_circle(&"cauldron", cauldron, CAULDRON_WIDTH * 0.5, rim + 0.09, c_phases, "Onion peeks out, the child taps it"))
 	if cauldron_moves():
 		var moved := _circle(&"cauldron_after", cauldron_after, CAULDRON_WIDTH * 0.5, rim + 0.09, REVEAL, "the cauldron, moved aside for the bench (gone after the ripple)")

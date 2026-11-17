@@ -23,8 +23,9 @@ const RISE := preload("res://entry/fx/rise_line.gdshader")
 ## the staff tools later and for tuning on the headset.
 static var room_strength := 0.0   # table only (Megan, Nov 17); 0.6 was the Nov 16 headset start
 ## Whether the reveal still shows Wei's shelf and the first things. v0.3: no, the shelf comes from the
-## cauldron later. The Hub chat sets this to false in the commit where the shelf becomes summoned.
-static var shows_workshop := true
+## cauldron later. False since Scene 6 (Megan, Nov 17): the shelf pops out of the cauldron after the
+## reveal (Entry._shelf_from_cauldron).
+static var shows_workshop := false
 ## Room-scan kinds the light spills over (Meta's semantic labels, lower case).
 const ROOM_KINDS: Array[StringName] = [&"floor", &"wall_face", &"wall"]
 ## Walls: no light higher than this over the floor (furniture in front of a wall is not in the scan).
