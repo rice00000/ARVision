@@ -5,6 +5,8 @@ extends Node3D
 ##   slowly (one breath in 4 s), gone by itself after a few seconds;
 ## * C, [method offer]: each impression on a still pool of light while it waits; the pool brightens as a
 ##   hand comes near ([method near]). It doubles as the "you can touch this" cue.
+## (Nov 17: in the hub the choices float in an [ImpressionRing], which lights its own front one;
+## [method offer] stays for choices standing on the table.)
 ## Rule: nothing of it is lit while a task runs. The Hub calls [code]await HubGlow.quiet_all()[/code]
 ## before every activity starts; tests check that it leaves nothing lit.
 
@@ -35,13 +37,18 @@ static func quiet_all(seconds := 0.8) -> void:
 	var glows := _alive.duplicate()
 	for glow: HubGlow in glows:
 		glow.quiet(seconds)
-	if not glows.is_empty():
-		await (glows[0] as Node).get_tree().create_timer(seconds + 0.05).timeout
+	var rings := ImpressionRing.alive.duplicate()
+	for ring: ImpressionRing in rings:   # the hub's ring of choices: its halos too
+		ring.quiet(seconds)
+	var any: Node = glows[0] if not glows.is_empty() else (rings[0] if not rings.is_empty() else null)
+	if any:
+		await any.get_tree().create_timer(seconds + 0.05).timeout
 
 
 ## True while any glow is lit (for tests and the Hub's checks).
 static func any_lit() -> bool:
-	return _alive.any(func(glow: HubGlow) -> bool: return glow.is_lit())
+	return _alive.any(func(glow: HubGlow) -> bool: return glow.is_lit()) \
+			or ImpressionRing.alive.any(func(ring: ImpressionRing) -> bool: return ring.is_lit())
 
 
 ## Glow A: a breathing pool round [param socket] for [param seconds], then it fades and frees itself.
@@ -80,6 +87,9 @@ func quiet(seconds := 0.8) -> void:
 	if _quieting:
 		return
 	_quieting = true
+	for impression in _impressions:
+		if is_instance_valid(impression):
+			impression.set_near(0.0)
 	var start := _pool_light.albedo_color.a if _pool_light else 0.0
 	var tween := create_tween()
 	tween.tween_method(func(f: float) -> void:

@@ -1,7 +1,8 @@
 class_name SummonFx
 extends RefCounted
 ## Summon and fold (Effects chat, Nov 17): how an activity comes out of its impression and goes back.
-## * [method grow]: the impression lifts a little, glides to the workspace, and the activity rises out
+## * [method grow] (1.6 s: from the ring above the cauldron down to the table, Megan Nov 17): the
+##   impression lifts a little, glides to the workspace, and the activity rises out
 ##   of the table there at full width with a line of light on its top (the reveal's "drawn up" look);
 ##   the impression is hidden meanwhile.
 ## * [method fold]: the reverse: the activity sinks into its base, and the impression comes back at its
@@ -12,7 +13,7 @@ const LIFT := 0.04
 
 
 ## Grows [param activity] out of [param impression] at [param workspace]; returns when it has arrived.
-static func grow(impression: Impression, activity: Node3D, workspace: Transform3D, seconds := 1.2) -> void:
+static func grow(impression: Impression, activity: Node3D, workspace: Transform3D, seconds := 1.6) -> void:
 	if not activity.has_meta(&"fx_size"):
 		activity.set_meta(&"fx_size", activity.scale)
 	var size: Vector3 = activity.get_meta(&"fx_size")

@@ -5,7 +5,9 @@ extends Node3D
 ## telling them apart is never a vision test: the shelf is a square frame, the dots token a round disc,
 ## the cup a cup with a handle. Their sounds differ too (see [method touched]).
 ##
-## The Hub chat asks for one through [method make] from [code]Summonable.make_impression()[/code].
+## The hub asks for one through [method make] from [code]Summonable.make_impression()[/code]. In the
+## hub they float in a ring above the cauldron ([ImpressionRing], Megan Nov 17): a soft halo behind the
+## front one (waiting), a softer one on any the hand aims at or comes near ([method set_near]).
 
 ## &"shelf", &"dots" or &"turn_to_fit".
 var kind := &""
@@ -22,6 +24,9 @@ var _sounds: Sounds
 var _halo: MeshInstance3D
 var _halo_light: StandardMaterial3D
 var _body: Node3D
+## What a pinch or touch hits: id [code]impression_<kind>[/code] (the hub hears it through
+## [signal Events.selected] / [signal Events.touched] and passes it to [method ImpressionRing.press]).
+var target: Target
 
 const OUTLINE := Color(0.06, 0.05, 0.05)
 const WOOD := Color(0.42, 0.25, 0.12)
@@ -29,7 +34,6 @@ const CREAM := Color(0.97, 0.93, 0.82)
 const NAVY := Color(0.10, 0.14, 0.34)
 const CUP := Color(0.96, 0.95, 0.92)   # near-white: the orange first tried had the table's brightness (lost without colour)
 const CUP_INSIDE := Color(0.86, 0.42, 0.22)
-const BASE := Color(0.33, 0.5, 0.38)   # sage, darker than the cup
 const GLOW := Color(1.0, 0.86, 0.55)
 
 
@@ -48,6 +52,9 @@ static func make(of_kind: StringName) -> Impression:
 		&"turn_to_fit":
 			impression._cup()
 	impression._make_halo()
+	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
+	impression.target.position.y = 0.075
+	impression.add_child(impression.target)
 	return impression
 
 
@@ -59,28 +66,34 @@ static func footprint(of_kind: StringName) -> Vector2:
 		&"dots":
 			return Vector2(0.15, 0.05)
 		&"turn_to_fit":
-			return Vector2(0.16, 0.16)
+			return Vector2(0.16, 0.12)
 	return Vector2(0.16, 0.16)
 
 
-## The soft pool of light under it while it waits to be chosen (glow C); 0 = off.
+## The soft halo behind it while it waits to be chosen (the ring's front one); 0 = off.
 func set_waiting(strength: float) -> void:
 	_waiting = clampf(strength, 0.0, 1.0)
 	_update_halo()
 
 
-## 0..1 as a hand comes close: the pool brightens (the "that one" cue). Choosing stays a press.
+## 0..1 as the hand aims at it or comes close (the "that one" cue): a softer halo, on any choice,
+## side ones too. Choosing stays a press.
 func set_near(amount: float) -> void:
 	_near = clampf(amount, 0.0, 1.0)
 	_update_halo()
 
 
-## The child touched it: its own sound and a short warm pulse, the "I heard you" acknowledgement.
-func touched() -> void:
+## Just its own sound (the ring plays it when a turn brings this one to the front).
+func sound() -> void:
 	if _sounds == null:
 		_sounds = Sounds.new()
 		add_child(_sounds)
 	_sounds.play(StringName("impression_%s" % kind), global_position)
+
+
+## The child chose it: its own sound and a short warm pulse, the "I heard you" acknowledgement.
+func touched() -> void:
+	sound()
 	var pulse := create_tween()
 	pulse.tween_property(_body, "scale", Vector3.ONE * 1.08, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	pulse.tween_property(_body, "scale", Vector3.ONE, 0.25).set_trans(Tween.TRANS_SINE)
@@ -126,7 +139,7 @@ func _update_halo() -> void:
 	if sealed:
 		_halo.visible = false
 		return
-	var alpha := 0.5 * _waiting + 0.35 * _near * _waiting
+	var alpha := 0.5 * _waiting + 0.3 * _near
 	_halo.visible = alpha > 0.0
 	_halo_light.albedo_color.a = alpha
 
@@ -164,21 +177,20 @@ func _dots() -> void:
 
 
 func _cup() -> void:
-	# A white cup with a handle on a round sage base: "the game", never mistaken for the real cup
-	# that stands on the table while Turn to fit is offered (Megan's default, Nov 17).
-	_mesh(_cylinder(0.075, 0.08, 0.022), BASE).position.y = 0.011
-	_mesh(_cylinder(0.05, 0.04, 0.10), CUP).position.y = 0.022 + 0.05
-	var inside := _mesh(_cylinder(0.043, 0.043, 0.004), CUP_INSIDE, false)
-	inside.position.y = 0.022 + 0.099
+	# A white cup with a handle, orange inside. No base (Megan, Nov 17): floating in the ring above the
+	# cauldron it can't be taken for the real cup on the table.
+	_mesh(_cylinder(0.06, 0.048, 0.12), CUP).position.y = 0.06   # as big as the others without its base
+	var inside := _mesh(_cylinder(0.052, 0.052, 0.004), CUP_INSIDE, false)
+	inside.position.y = 0.119
 	var handle := MeshInstance3D.new()
 	var torus := TorusMesh.new()
-	torus.inner_radius = 0.018
-	torus.outer_radius = 0.03
+	torus.inner_radius = 0.022
+	torus.outer_radius = 0.036
 	handle.mesh = torus
 	handle.material_override = _lit(CUP, true)
 	handle.rotation = Vector3(PI * 0.5, 0, 0)
 	handle.rotation.y = PI * 0.5
-	handle.position = Vector3(0.055, 0.022 + 0.055, 0)
+	handle.position = Vector3(0.066, 0.065, 0)
 	handle.scale = Vector3(1.0, 1.0, 1.3)
 	_body.add_child(handle)
 
@@ -186,16 +198,16 @@ func _cup() -> void:
 func _make_halo() -> void:
 	_halo = MeshInstance3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * 0.26
-	quad.orientation = PlaneMesh.FACE_Y
+	quad.size = Vector2.ONE * 0.3
 	_halo_light = StandardMaterial3D.new()
+	_halo_light.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	_halo_light.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_halo_light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_halo_light.albedo_color = Color(GLOW, 0.0)
 	_halo_light.albedo_texture = Onion.soft_dot()
 	quad.material = _halo_light
 	_halo.mesh = quad
-	_halo.position.y = 0.002
+	_halo.position = Vector3(0.0, 0.075, -0.06)   # behind its middle: it glows round the edges
 	_halo.visible = false
 	add_child(_halo)
 
