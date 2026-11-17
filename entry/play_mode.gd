@@ -5,9 +5,9 @@ class_name PlayMode
 ## * **Both modes** run setup (hands, table, reach, sound and room): that is how the table and
 ##   surface detection get checked. Wei's facilitator panel (the adult's menu) stays in both.
 ## * **Dev** adds what a tester needs: what setup found (the chosen table's outline plus the other
-##   tables, and the `ENTRY PLACEMENT:` line on screen), a "Skip setup" button on the setup panel,
+##   tables, and the `ENTRY PLACEMENT:` line on screen),
 ##   the top-left scene marker, hand outlines, the DEV coherence panel and the try-carry key.
-## * **Play** shows none of those.
+## * **Play** shows none of those. "Skip setup" is on the setup panel in both modes (Nov 17).
 ##
 ## Which one: a launch flag `-- --mode=play` / `-- --mode=dev` wins; tests (`--profile=test`) are
 ## always dev; otherwise the last choice made with the "Mode" button on the setup panel (saved on

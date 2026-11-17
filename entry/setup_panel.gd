@@ -33,7 +33,7 @@ var _step_words: Label3D
 var _shown := false
 var _clock := 0.0
 var _mode_button: EntryButton   # the adult's dev / play toggle, above the plate (both modes)
-var _skip_button: EntryButton   # dev only: "Skip setup", above the plate
+var _skip_button: EntryButton   # "Skip setup", above the plate (dev and play: Megan, Nov 17)
 
 ## The line at the foot of the plate.
 const HOW_TO_PRESS := "To press: aim the hand ray at a button, then pinch."
@@ -184,7 +184,8 @@ func check_state(index: int) -> StringName:
 
 
 ## Recolours the button with [param id], if it is on the panel.
-## The small row above the plate: "Mode: dev / play" (press to switch) and, in dev, "Skip setup".
+## The small row above the plate: "Mode: dev / play" (press to switch) and "Skip setup" (both
+## modes since Megan's scene review, Nov 17: the grown-up may already know the room is fine).
 ## Not part of the step's own buttons, so the steps' layouts stay as they were.
 func show_mode(mode_name: String, dev: bool) -> void:
 	var y := SIZE.y * 0.5 + 0.03
@@ -196,14 +197,16 @@ func show_mode(mode_name: String, dev: bool) -> void:
 	else:
 		_mode_button.set_text("Mode: " + mode_name)
 	_mode_button.set_colour(Color(0.55, 0.42, 0.2) if dev else GREY)
-	if dev and (_skip_button == null or not is_instance_valid(_skip_button)):
+	if _skip_button == null or not is_instance_valid(_skip_button):
 		_skip_button = EntryButton.new()
 		_skip_button.position = Vector3(SIZE.x * 0.5 - 0.075, y, 0.012)
 		add_child(_skip_button)
 		_skip_button.setup("Skip setup", &"entry_skip_setup", GREY, Vector2(0.15, 0.04), 0.01)
-	elif not dev and _skip_button != null and is_instance_valid(_skip_button):
-		_skip_button.queue_free()
-		_skip_button = null
+
+
+## Replaces the "Step n of m" words (the "same table as last time" screen is not one of the steps).
+func set_step_words(words: String) -> void:
+	_step_words.text = words
 
 
 func set_button_colour(id: StringName, colour: Color) -> void:

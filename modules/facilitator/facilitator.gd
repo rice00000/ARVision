@@ -187,15 +187,24 @@ func _activate() -> void:
 			_close()
 			Events.room_intro_requested.emit()
 			return
-		&"fac_restart", &"fac_exit":
+		&"fac_restart", &"fac_exit", &"fac_redo_setup":
 			_confirmed_action = target.id
-			_confirm_label.text = "Restart this scene?" if target.id == &"fac_restart" else "Exit ARVision?"
+			_confirm_label.text = {fac_restart = "Restart this scene?", fac_exit = "Exit ARVision?",
+					fac_redo_setup = "Redo setup?\nThe opening starts again."}[String(target.id)]
 			_show(&"Confirm")
 		&"fac_confirm_tool":
 			Save.write()
 			if _confirmed_action == &"fac_restart":
 				_view_index = 0
 				App.main.restart()
+			elif _confirmed_action == &"fac_redo_setup":   # Megan, Nov 17: the layout turned out bad mid-session
+				_view_index = 0
+				_close()
+				Entry.redo_next = true
+				if App.main.current_scene == &"intro":
+					App.main.restart()
+				else:
+					App.main.change_scene(&"intro")
 			else:
 				get_tree().quit()
 			return
@@ -341,9 +350,10 @@ func _build() -> void:
 	var slot := Vector2(-0.095 + 0.19 * (next % 2), 0.06 - 0.047 * floori(next / 2.0))
 	_button("fac_room_intro", "Room intro", Vector2(0.088, 0.041), slot + Vector2(-0.045, 0), tools)
 	_button("fac_mode", "Mode: " + PlayMode.name(), Vector2(0.088, 0.041), slot + Vector2(0.045, 0), tools)
-	_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
-	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022, -0.16), tools)
-	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127, -0.16), tools)
+	_button("fac_zones", "Zones", Vector2(0.07, 0.045), Vector2(-0.165, -0.16), tools)
+	_button("fac_restart", "Restart", Vector2(0.095, 0.045), Vector2(-0.077, -0.16), tools)   # it asks "Restart this scene?"
+	_button("fac_redo_setup", "Redo setup", Vector2(0.12, 0.045), Vector2(0.038, -0.16), tools)   # scene review, Nov 17
+	_button("fac_exit", "Exit app", Vector2(0.095, 0.045), Vector2(0.152, -0.16), tools)
 
 	var confirm := _page(&"Confirm")
 	_text(_confirm_label, Vector2(0, 0.06), confirm)

@@ -122,7 +122,10 @@ var _reach_seen := 0.0              # the farthest the hand slid out along the t
 ## straight to the Start screen. Setup runs in both modes (Megan, Nov 8): only the tests skip it by
 ## default (a test hook; the entry tests turn it back on), and a dev tester can press "Skip setup".
 var skip_setup := PlayMode.testing_now()
-var _skip_rest_of_setup := false    # dev: "Skip setup" was pressed
+var _skip_rest_of_setup := false    # "Skip setup" was pressed (dev and play: Megan, Nov 17)
+## "Redo setup" (staff tools): the next opening runs all four steps, without offering the last setup.
+static var redo_next := false
+var _table_scanned := false         # step 2 confirmed a table the room scan found (only those are kept)
 ## Plan the room when Start (or a jump) is pressed: the child is seated then. Tests that look at the room
 ## before pressing anything turn it off.
 var plan_at_start := true
@@ -599,12 +602,22 @@ func _setup() -> void:
 	_panel = SetupPanel.new()
 	add_child(_panel)
 	_panel.place(App.head().global_transform)
-	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())   # the adult's Mode toggle; dev adds "Skip setup"
-	if skip_setup:
+	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())   # the adult's Mode toggle and "Skip setup"
+	var redo := redo_next
+	redo_next = false
+	if skip_setup and not redo:   # "Redo setup" is the grown-up asking: it runs even where setup is skipped
 		_panel.hide_all()
 		print("ENTRY setup: skipped (tests)")
 		return
 	_setting_up = true
+	_table_scanned = false
+	if not redo:
+		var reused := await _offer_last_setup()
+		if reused != &"no":
+			_setting_up = false
+			_panel.hide_all()
+			print("ENTRY setup: ", "the last table and reach, reused" if reused == &"yes" else "skipped")
+			return
 	var skipped := await _step_hands()
 	if not skipped:
 		skipped = await _step_table()
@@ -615,6 +628,43 @@ func _setup() -> void:
 	_setting_up = false
 	_panel.hide_all()
 	print("ENTRY setup: ", "skipped by a jump button" if skipped else "all four steps done")
+	if not skipped and _table_scanned:
+		SetupMemory.remember(App.reality.work_surface(), _reach_measured)
+
+
+## Scene 0 (Megan, Nov 17): when the room scan still finds the table from last time, one press
+## reuses it and the reach, straight to "All set". Returns &"yes" (reused), &"skip" (Skip setup or
+## a jump) or &"no" (nothing to reuse, or "Set up again": the four steps follow).
+func _offer_last_setup() -> StringName:
+	var kept := SetupMemory.last()
+	var table := SetupMemory.match_in(App.reality.surfaces(&"table"))
+	if table == null:
+		if not kept.is_empty():
+			print("ENTRY setup: the last table was not found again: setup as usual")
+		return &"no"
+	_presses.clear()
+	_beat("setup: same table as last time?")
+	var reach: float = kept.reach
+	_panel.show_step(0, SETUP_STEPS, "Same table as last time", "The headset found the table from last time. Use the same table and reach?",
+			[["Table found again (%d cm away)" % roundi(_away(table.transform.origin) * 100.0), &"good"],
+			["Reach: %d cm from the eyes" % roundi(reach * 100.0) if reach > 0.0 else "Reach: the usual spot", &"good"]],
+			[["Use last setup", &"entry_reuse_yes", SetupPanel.GREEN], ["Set up again", &"entry_reuse_no", SetupPanel.GREY]])
+	_panel.set_step_words("Last time")
+	var outline := _outline(table, true)
+	var pressed := &""
+	while pressed == &"":
+		pressed = _take_press([&"entry_reuse_yes", &"entry_reuse_no"])
+		if pressed == &"":
+			await get_tree().process_frame
+	outline.queue_free()
+	if pressed == &"skip":
+		return &"skip"
+	if pressed == &"entry_reuse_no":
+		return &"no"
+	App.reality.select_table(table)
+	_use_reach(reach)
+	Events.report(&"setup_reused", {reach = snappedf(reach, 0.01)})
+	return &"yes"
 
 
 ## Step 1: both hands seen and a pinch. The outlines show for this step.
@@ -703,15 +753,20 @@ func _step_reach() -> bool:
 		if pressed == &"entry_step_alt":
 			break
 		await get_tree().process_frame
-	_reach_measured = _reach_seen if used else 0.0
+	_use_reach(_reach_seen if used else 0.0)
+	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ",
+			snappedf(_cauldron_distance, 0.01), " m out, the shelf stands ", snappedf(shelf_push, 0.01), " m back")
+	return false
+
+
+## Sets the layout's reach: [param measured] metres from the eyes, or 0 for the usual spot.
+func _use_reach(measured: float) -> void:
+	_reach_measured = measured
 	_cauldron_distance = EntryLayout.cauldron_out(_reach_measured)
 	# The shelf's back (its farthest cubby, SHELF_BACK from the play set's start) stands at about
 	# 90% of the easy reach: at least 10 cm back (Wei's things then never lie under the chin or
 	# wider than the view), never more than 30 cm. See EntryLayout.shelf_push.
 	shelf_push = EntryLayout.shelf_push(_reach_measured)
-	print("ENTRY reach: ", snappedf(_reach_seen, 0.01) if used else "not measured", " m; the cauldron goes ",
-			snappedf(_cauldron_distance, 0.01), " m out, the shelf stands ", snappedf(shelf_push, 0.01), " m back")
-	return false
 
 
 ## Step 4: a soft chime (the same sound as a touch) and the room scan, shown honestly:
@@ -893,7 +948,7 @@ func _on_target(target: Target) -> void:
 			_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
 		print("ENTRY mode: ", PlayMode.name(), " (toggle)")
 		return
-	if target != null and target.id == &"entry_skip_setup":   # dev: straight to Start
+	if target != null and target.id == &"entry_skip_setup":   # straight to Start (dev and play)
 		(target.get_parent() as EntryButton).flash()
 		_skip_rest_of_setup = true
 		print("ENTRY setup: skip pressed")
@@ -1150,6 +1205,7 @@ func _step_table() -> bool:
 	if pressed == &"entry_confirm_yes":
 		if real:
 			App.reality.select_table(table)
+			_table_scanned = true
 		print("ENTRY table: confirmed")
 		return false
 	_panel.show_step(2, SETUP_STEPS, "Point at the table", "Point at the tabletop: the dot turns green. Then pinch.", [], [])

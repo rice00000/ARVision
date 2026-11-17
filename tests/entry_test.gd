@@ -554,7 +554,7 @@ func test_a_shelf_finished_while_onion_still_talks_goes_straight_to_the_closing(
 	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "the rest of the invitation is not said")
 
 
-func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
+func test_setup_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
 	expect(PlayMode.is_dev(), "the tests run in dev")
 	var reports := record(Events.reported)
 	await _boot_entry()
@@ -569,7 +569,7 @@ func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> v
 	expect(not PlayMode.is_dev(), "the toggle switches to play")
 	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "play"),
 		"the switch is logged")
-	expect(await until(func() -> bool: return _target(&"entry_skip_setup") == null, 5.0), "play: no Skip setup")
+	expect(_target(&"entry_skip_setup") != null, "play: Skip setup stays (Megan, Nov 17)")
 	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
 	expect(marker == null or not marker.visible, "play: no scene marker")
 	await _press(&"entry_mode")
