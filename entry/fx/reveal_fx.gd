@@ -21,7 +21,10 @@ const RISE := preload("res://entry/fx/rise_line.gdshader")
 
 ## How bright the walls and floor get, 0..1 of the table's light (0 = table only). One knob, for
 ## the staff tools later and for tuning on the headset.
-static var room_strength := 0.6
+static var room_strength := 0.0   # table only (Megan, Nov 17); 0.6 was the Nov 16 headset start
+## Whether the reveal still shows Wei's shelf and the first things. v0.3: no, the shelf comes from the
+## cauldron later. The Hub chat sets this to false in the commit where the shelf becomes summoned.
+static var shows_workshop := true
 ## Room-scan kinds the light spills over (Meta's semantic labels, lower case).
 const ROOM_KINDS: Array[StringName] = [&"floor", &"wall_face", &"wall"]
 ## Walls: no light higher than this over the floor (furniture in front of a wall is not in the scan).
@@ -47,6 +50,7 @@ var _table_materials: Array[ShaderMaterial] = []
 var _room_materials: Array[ShaderMaterial] = []
 var _on_radius := Callable()
 var _arriving := {}   # GeometryInstance3D -> its previous material_overlay
+var _held: Array = []   # [body, its process mode], out of the physics world while something rises
 
 
 ## Starts the light from [param origin]: the table front reaches [param reach] metres in
@@ -165,6 +169,10 @@ func arrive(detail: Node3D, size: Vector3, seconds := 1.2) -> void:
 		_arriving[shape] = shape.material_overlay
 		shape.material_overlay = line
 		shape.transparency = 1.0
+	# Physics bodies (Wei's things) can't take the height-only scale while it rises (Jolt): they leave
+	# the physics world meanwhile and come back when it has arrived.
+	var held := hold_physics(detail)
+	_held.append_array(held)
 	var tween := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_method(func(y: float) -> void: line.set_shader_parameter(&"line_y", y),
 			box.position.y - 0.01, box.end.y + 0.01, seconds)
@@ -180,10 +188,13 @@ func arrive(detail: Node3D, size: Vector3, seconds := 1.2) -> void:
 		detail.scale = Vector3(size.x, size.y * 0.02, size.z)
 		tween.tween_property(detail, "scale", size, seconds)
 	tween.chain().tween_method(func(f: float) -> void: line.set_shader_parameter(&"fade", f), 1.0, 0.0, 0.4)
-	tween.chain().tween_callback(_settled.bind(shapes))
+	tween.chain().tween_callback(_settled.bind(shapes, held))
 
 
-func _settled(shapes: Array[GeometryInstance3D]) -> void:
+func _settled(shapes: Array[GeometryInstance3D], held: Array = []) -> void:
+	release_physics(held)
+	for entry in held:
+		_held.erase(entry)
 	for shape in shapes:
 		if is_instance_valid(shape) and _arriving.has(shape):
 			shape.material_overlay = _arriving[shape]
@@ -194,6 +205,8 @@ func _settled(shapes: Array[GeometryInstance3D]) -> void:
 ## Cut short (a jump button, a scene change): nothing is left half see-through or still lined.
 func _exit_tree() -> void:
 	_settled(Array(_arriving.keys(), TYPE_OBJECT, &"GeometryInstance3D", null))
+	release_physics(_held)
+	_held.clear()
 
 
 static func _world_box(shapes: Array[GeometryInstance3D]) -> AABB:
@@ -207,3 +220,24 @@ static func _world_box(shapes: Array[GeometryInstance3D]) -> AABB:
 		box = world if first else box.merge(world)
 		first = false
 	return box
+
+
+
+## Takes every physics body under [param node] out of the physics world (it keeps its place in the
+## tree): Jolt can't scale shapes by height only. Returns what [method release_physics] puts back.
+static func hold_physics(node: Node) -> Array:
+	var held := []
+	for body: CollisionObject3D in node.find_children("*", "CollisionObject3D", true, false):
+		if body.process_mode != Node.PROCESS_MODE_DISABLED:
+			held.append([body, body.process_mode, body.disable_mode])
+			body.disable_mode = CollisionObject3D.DISABLE_MODE_REMOVE
+			body.process_mode = Node.PROCESS_MODE_DISABLED
+	return held
+
+
+static func release_physics(held: Array) -> void:
+	for entry: Array in held:
+		var body := entry[0] as CollisionObject3D
+		if is_instance_valid(body):
+			body.process_mode = entry[1]
+			body.disable_mode = entry[2]

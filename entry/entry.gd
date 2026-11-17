@@ -2058,8 +2058,9 @@ func _lit(colour: Color, metallic := 0.0) -> StandardMaterial3D:
 
 # --- The reveal --------------------------------------------------------------
 
-## A slow, soft front of light leaves the socket and travels ON the table (and, where the room
-## scan has them, on over the floor and walls): [RevealFx], Effects chat. As it passes each spot,
+## A slow, soft front of light leaves the socket and travels ON the table only (Megan, Nov 17; the
+## room part is off: [member RevealFx.room_strength]), then a short breathing afterglow round the gear
+## ([HubGlow]): Effects chat. As it passes each spot,
 ## that part of the workshop is drawn up by a line of light, and where it meets a real surface
 ## (depth) a faint glint shows on it. No flash, no camera movement. Returns after 7 s, as before.
 func _ripple() -> void:
@@ -2075,11 +2076,15 @@ func _ripple() -> void:
 			if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= room_radius:
 				point.shown = true
 				_glint(point.position, point.normal)
+		if not RevealFx.shows_workshop:   # v0.3: the shelf comes from the cauldron later (Hub chat)
+			return
 		for detail in _details:
 			if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_ripple_origin) <= table_radius:
 				detail.set_meta(&"shown", true)
 				fx.arrive(detail, detail.get_meta(&"size", Vector3.ONE)))
-	await _wait(RIPPLE_SECONDS + 2.0)
+	await _wait(RIPPLE_SECONDS)
+	HubGlow.afterglow(self, _socket_at).add_to_group(&"entry_transient")   # glow A: the gear's afterglow
+	await _wait(2.0)
 
 
 ## One step of a ring: its radius grows, it fades; the first ring shows what it passes.
