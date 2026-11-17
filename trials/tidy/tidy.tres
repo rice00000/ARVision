@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="TrialDef" format=3]
+[gd_resource type="Resource" script_class="TrialDef" format=3 uid="uid://bku6inhmruihs"]
 
-[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
-[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]
 [ext_resource type="PackedScene" path="res://trials/tidy/tidy.tscn" id="3_scene"]
 
 [sub_resource type="Resource" id="things"]
@@ -10,31 +10,33 @@ name = &"things"
 easy = 3.0
 hard = 6.0
 driven = true
+fixed = nan
 
 [sub_resource type="Resource" id="size"]
 script = ExtResource("2_axis")
 name = &"size"
 easy = 0.06
+fixed = nan
 
 [sub_resource type="Resource" id="match"]
 script = ExtResource("2_axis")
 name = &"match"
-easy = 0.0
+fixed = nan
 
 [sub_resource type="Resource" id="outline"]
 script = ExtResource("2_axis")
 name = &"outline"
-easy = 0.0
+fixed = nan
 
 [sub_resource type="Resource" id="clutter"]
 script = ExtResource("2_axis")
 name = &"clutter"
-easy = 0.0
+fixed = nan
 
 [sub_resource type="Resource" id="colour_step"]
 script = ExtResource("2_axis")
 name = &"colour_step"
-easy = 0.0
+fixed = nan
 
 [resource]
 script = ExtResource("1_def")
@@ -44,6 +46,4 @@ skill = &"visual_matching"
 axes = Array[ExtResource("2_axis")]([SubResource("things"), SubResource("size"), SubResource("match"), SubResource("outline"), SubResource("clutter"), SubResource("colour_step")])
 notes = "Things drives matching difficulty. Match: 0 shape, 1 size, 2 colour, 3 odd colour. Odd colour pins colour_step (0 to 2) and logs picks on pinch instead of placement."
 hint_after = 10.0
-hint_fade = 1.0
-max_hint = 2
 time_limit = 120.0

@@ -5,7 +5,7 @@ extends Module
 
 const RATE := 22050
 ## Notes (Hz) of each kind's sound, played one after another.
-const NOTES := {good = [660.0, 880.0], bad = [262.0, 220.0], hint = [523.0]}
+const NOTES := {good = [660.0, 880.0], bad = [262.0, 220.0], hint = [523.0], win = [523.25, 659.25, 783.99, 1046.50]}
 const COLOURS := {good = Color(0.3, 0.9, 0.4), bad = Color(0.95, 0.35, 0.3), hint = Color(1.0, 0.85, 0.3)}
 
 var _sounds: Dictionary[StringName, AudioStreamWAV] = {}
@@ -16,9 +16,19 @@ func _ready() -> void:
 	for kind: StringName in NOTES:
 		_sounds[kind] = _chime(NOTES[kind])
 	Events.feedback.connect(_on_feedback)
+	Events.level_won.connect(_play_fanfare)
 	Events.scene_changing.connect(func() -> void:
 		for node in get_children():
 			node.free())
+
+
+func _play_fanfare(_task: StringName, _level: int, _stones: int) -> void:
+	var player := AudioStreamPlayer.new()
+	player.stream = _sounds[&"win"]
+	player.volume_db = -8.0
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 func _on_feedback(kind: StringName, at: Vector3) -> void:

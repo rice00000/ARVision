@@ -1,14 +1,9 @@
 extends Module
-## Magic for the alchemist story: sparkles where a pick was right, and a bigger
-## puff in front of the child when a level is done. Only looks: nothing waits
-## for it. Delete the node to unplug it.
-##
-## Calm to look at: nothing flashes or flickers, sparkles drift up and fade.
+## Sparkles for right picks and a short celebration for completed levels.
 
 const GOLD := Color(1.0, 0.85, 0.4)
-## Where a level's puff shows: ahead of and below the eyes, metres.
-const AHEAD := 0.45
-const BELOW := 0.25
+const TROPHY := preload("res://modules/magic/trophy_winner.png")
+const CELEBRATION_SECONDS := 1.5
 
 
 func _ready() -> void:
@@ -18,9 +13,25 @@ func _ready() -> void:
 	Events.feedback.connect(func(kind: StringName, at: Vector3) -> void:
 		if kind == &"good":
 			sparkle(at, GOLD, 24))
-	Events.reported.connect(func(what: StringName, _data: Dictionary) -> void:
-		if what == &"task_done":
-			sparkle(_ahead(), GOLD, 32))
+	Events.level_won.connect(_celebrate)
+
+
+func _celebrate(_task: StringName, _level: int, _stones: int) -> void:
+	var clip := Sprite3D.new()
+	clip.name = "LevelCelebration"
+	clip.texture = TROPHY
+	clip.hframes = 6
+	clip.vframes = 6
+	clip.pixel_size = 0.0026
+	clip.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	clip.no_depth_test = true
+	clip.render_priority = 5 # Keep the guide's subtitles in front.
+	add_child(clip)
+	var eye := App.head().global_transform
+	clip.global_position = eye.origin - eye.basis.z * 0.8 + Vector3.DOWN * 0.035
+	var playback := clip.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	playback.tween_property(clip, ^"frame", clip.hframes * clip.vframes - 1, CELEBRATION_SECONDS)
+	playback.tween_callback(clip.queue_free)
 
 
 ## A puff of [param amount] sparkles at [param at] that drift up and fade.
@@ -60,9 +71,3 @@ func sparkle(at: Vector3, colour: Color, amount: int) -> CPUParticles3D:
 	puff.emitting = true
 	puff.finished.connect(puff.queue_free)
 	return puff
-
-
-func _ahead() -> Vector3:
-	var eye := App.head().global_transform
-	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	return eye.origin + forward * AHEAD + Vector3.DOWN * BELOW

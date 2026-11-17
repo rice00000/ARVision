@@ -1,13 +1,14 @@
-[gd_resource type="Resource" script_class="TrialDef" format=3]
+[gd_resource type="Resource" script_class="TrialDef" format=3 uid="uid://dpybbkc5dnhul"]
 
-[ext_resource type="Script" path="res://trials/trial_def.gd" id="1_def"]
-[ext_resource type="Script" path="res://trials/trial_axis.gd" id="2_axis"]
+[ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
+[ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]
 [ext_resource type="PackedScene" path="res://trials/tidy/tidy.tscn" id="3_scene"]
 
 [sub_resource type="Resource" id="match"]
 script = ExtResource("2_axis")
 name = &"match"
 easy = 4.0
+fixed = nan
 
 [sub_resource type="Resource" id="log2_colour_gap"]
 script = ExtResource("2_axis")
@@ -15,6 +16,7 @@ name = &"log2_colour_gap"
 easy = -2.25
 hard = -8.0
 driven = true
+fixed = nan
 
 [resource]
 script = ExtResource("1_def")

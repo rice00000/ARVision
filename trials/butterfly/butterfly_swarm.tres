@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TrialDef" format=3]
+[gd_resource type="Resource" script_class="TrialDef" format=3 uid="uid://bl6ej545ccb3k"]
 
 [ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
 [ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]

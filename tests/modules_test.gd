@@ -1,22 +1,24 @@
 extends TestCase
-## The optional story and data modules: Magic's sparkles, and the Picks CSV.
+## The optional story and data modules: Magic's effects, and the Picks CSV.
 
 const FIND := preload("res://trials/find/find.tres")
 
 
-func test_a_right_pick_and_a_level_done_sparkle() -> void:
+func test_a_right_pick_sparkles_and_a_level_win_plays_a_clip() -> void:
 	await boot()
 	var magic := App.module(&"Magic")
 	Events.feedback.emit(&"good", Vector3(0.0, 0.8, -0.4))
 	Events.feedback.emit(&"bad", Vector3(0.0, 0.8, -0.4))
 	expect_eq(magic.find_children("*", "CPUParticles3D", false, false).size(), 1, "sparkles for good only")
-	Events.report(&"task_done", {task = &"tidy_shelf", level = 1, colour = 1})
-	var puffs := magic.find_children("*", "CPUParticles3D", false, false)
-	expect_eq(puffs.size(), 2, "a level done: a puff")
-	var eye := App.head().global_position
-	var puff := puffs.back() as Node3D
-	expect(puff.global_position.y < eye.y and puff.global_position.distance_to(eye) < 0.6, "below the eyes, in front")
+	expect(not magic.has_node(^"LevelCelebration"), "a right pick alone does not start the celebration")
+	Events.level_won.emit(&"tidy_shelf", 1, 3)
+	var clip := magic.get_node(^"LevelCelebration") as Sprite3D
+	await wait(0.5)
+	expect(clip.frame > 0, "the celebration advances")
 	expect(await until(func() -> bool: return magic.get_child_count() == 0, 3.0), "it all goes by itself")
+	Events.level_won.emit(&"tidy_shelf", 1, 2)
+	Events.scene_changing.emit()
+	expect(not magic.has_node(^"LevelCelebration"), "leaving clears the celebration")
 
 
 func test_every_pick_is_a_csv_row_with_its_time_and_the_running_accuracy() -> void:

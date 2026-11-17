@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="Task" format=3]
+[gd_resource type="Resource" script_class="Task" format=3 uid="uid://dgdpd2o3v1uc4"]
 
-[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
-[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
-[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
-[ext_resource type="Resource" path="res://trials/butterfly/butterfly.tres" id="4_catch"]
-[ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
-[ext_resource type="Resource" path="res://trials/butterfly/butterfly_swarm.tres" id="6_swarm"]
+[ext_resource type="Script" uid="uid://btq5nanphne2n" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" uid="uid://c2uh7fjvtafom" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" uid="uid://b0nl06crubwd" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" uid="uid://jik7v0kuge8r" path="res://trials/butterfly/butterfly.tres" id="4_catch"]
+[ext_resource type="Script" uid="uid://r0plwybnwais" path="res://world/task_level.gd" id="5_level"]
+[ext_resource type="Resource" uid="uid://bl6ej545ccb3k" path="res://trials/butterfly/butterfly_swarm.tres" id="6_swarm"]
 
 [sub_resource type="Resource" id="circle_1"]
 script = ExtResource("3_block")
@@ -23,12 +23,22 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("circle_1")])
 
+[sub_resource type="Resource" id="one_way"]
+script = ExtResource("5_level")
+id = &"one_way"
+project = &"butterflies"
+title = "Butterfly Circle"
+plan = SubResource("level_1")
+
 [sub_resource type="Resource" id="circle_2"]
 script = ExtResource("3_block")
 trial = ExtResource("4_catch")
 rounds = 1
 difficulty = 0.3
-pins = Dictionary[StringName, float]({&"butterflies": 12.0, &"rings": 2.0})
+pins = Dictionary[StringName, float]({
+&"butterflies": 12.0,
+&"rings": 2.0
+})
 intro = "Now they fly both ways! Watch which way each one goes, then swing to meet it."
 ray = false
 pause_between = 3.0
@@ -39,6 +49,13 @@ title = "Catch the butterflies, level 2"
 greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("circle_2")])
+
+[sub_resource type="Resource" id="both_ways"]
+script = ExtResource("5_level")
+id = &"both_ways"
+project = &"butterflies"
+title = "Both Ways"
+plan = SubResource("level_2")
 
 [sub_resource type="Resource" id="swarm_1"]
 script = ExtResource("3_block")
@@ -57,6 +74,13 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("swarm_1")])
 
+[sub_resource type="Resource" id="swarm"]
+script = ExtResource("5_level")
+id = &"swarm"
+project = &"butterflies"
+title = "Butterfly Swarm"
+plan = SubResource("level_3")
+
 [sub_resource type="Resource" id="swarm_2"]
 script = ExtResource("3_block")
 trial = ExtResource("6_swarm")
@@ -74,40 +98,11 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("swarm_2")])
 
-[sub_resource type="Resource" id="one_way"]
-script = ExtResource("5_level")
-id = &"one_way"
-project = &"butterflies"
-title = "Butterfly Circle"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_1")
-
-[sub_resource type="Resource" id="both_ways"]
-script = ExtResource("5_level")
-id = &"both_ways"
-project = &"butterflies"
-title = "Both Ways"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_2")
-
-[sub_resource type="Resource" id="swarm"]
-script = ExtResource("5_level")
-id = &"swarm"
-project = &"butterflies"
-title = "Butterfly Swarm"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_3")
-
 [sub_resource type="Resource" id="busy_swarm"]
 script = ExtResource("5_level")
 id = &"busy_swarm"
 project = &"butterflies"
 title = "Busy Swarm"
-first_reward = 3
-repeat_reward = 2
 plan = SubResource("level_4")
 
 [resource]
