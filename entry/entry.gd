@@ -344,6 +344,8 @@ func _hello(fast := false) -> void:
 		await _wait(2.0)   # nothing rushes the child
 	_rattle(0.012)   # a soft rattle: something moves about in there
 	_sounds.play(&"pre_rattle", _box.global_position)
+	if is_instance_valid(_cog):
+		HelloFx.nudge(_cog)   # the panel's little cog turns a notch with it (scene review, Nov 17)
 	await _wait(0.6 if fast else 1.6)
 	await _pop()
 	_rattle(0.006)   # fainter, until the child taps the cauldron
@@ -2036,6 +2038,7 @@ func _knock() -> void:
 ## Onion pops up out of the cauldron: a rounded rise with a small overshoot, then settles.
 func _pop() -> void:
 	_sounds.play_pop(_peek_spot())
+	HelloFx.bubbles(self, _mouth, _mouth_radius)   # a few soft bubbles drift up and fade (scene review, Nov 17)
 	var tween := _runner.create_tween()
 	tween.tween_property(_orb, "global_position", _peek_spot() + Vector3.UP * 0.01, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_orb, "global_position", _peek_spot(), 0.2).set_trans(Tween.TRANS_SINE)
