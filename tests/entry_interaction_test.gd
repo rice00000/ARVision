@@ -1676,7 +1676,8 @@ func test_a_press_meant_for_the_cauldron_or_one_that_just_took_something_is_neve
 	Events.selected.emit(&"right", null, eye, (onion - eye).normalized())
 	await wait(0.2)
 	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), "a press that took something is not a skip")
-	await wait(0.4)
+	# LineSkip's input window uses wall time even in a fixed-FPS test.
+	OS.delay_msec(ceili(LineSkip.TOOK_WINDOW * 1000.0) + 1)
 	Events.selected.emit(&"right", null, eye, (onion - eye).normalized())
 	expect(await until(func() -> bool: return log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Oh! Hello there." and e[2] == false), 1.0), "but a press on Onion alone is")
 

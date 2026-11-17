@@ -10,7 +10,8 @@ extends Node3D
 ## waiting stays bright with its dot breathing, so the eye goes to what to do now. "Step 2 of 4" in
 ## the bar, and one line at the foot on how to press, for a grown-up new to the headset.
 
-const SIZE := Vector2(0.46, 0.34)
+const SIZE := EntryLayout.SETUP_PLATE_SIZE
+const SKIP_SIZE := Vector2(0.19, 0.064)
 const SAGE := Color(0.62, 0.74, 0.6)
 const SLATE := Color(0.13, 0.15, 0.19)   # opaque: a see-through plate gets drawn over the words
 const GOOD := Color(0.4, 0.85, 0.5)
@@ -32,8 +33,8 @@ var _checks: Array[Dictionary] = []   # {dot: MeshInstance3D, words: Label3D, si
 var _step_words: Label3D
 var _shown := false
 var _clock := 0.0
-var _mode_button: EntryButton   # the adult's dev / play toggle, above the plate (both modes)
-var _skip_button: EntryButton   # dev only: "Skip setup", above the plate
+var _mode_button: EntryButton
+var _skip_button: EntryButton
 
 ## The line at the foot of the plate.
 const HOW_TO_PRESS := "To press: aim the hand ray at a button, then pinch."
@@ -69,6 +70,16 @@ func _ready() -> void:
 		dot.position = Vector3(SIZE.x * 0.5 - 0.016 - i * 0.02, SIZE.y * 0.5 - 0.018, 0.008)
 		add_child(dot)
 		_dots.append(dot)
+	var shortcut_y := SIZE.y * 0.5 + EntryLayout.SETUP_SHORTCUT_HEIGHT - SKIP_SIZE.y * 0.5
+	_mode_button = EntryButton.new()
+	_mode_button.position = Vector3(-SIZE.x * 0.5 + 0.075, shortcut_y, 0.012)
+	add_child(_mode_button)
+	_mode_button.setup("", &"entry_mode", GREY, Vector2(0.15, 0.04), 0.01)
+	_skip_button = EntryButton.new()
+	_skip_button.position = Vector3(SIZE.x * 0.5 - SKIP_SIZE.x * 0.5, shortcut_y, 0.012)
+	add_child(_skip_button)
+	_skip_button.setup("Skip", &"entry_skip_setup", Color("#3c668c"), SKIP_SIZE, 0.014, 44)
+	visibility_changed.connect(_update_shortcuts)
 	visible = false
 
 
@@ -183,27 +194,16 @@ func check_state(index: int) -> StringName:
 	return &"good" if colour.is_equal_approx(GOOD) else &"warn" if colour.is_equal_approx(WARN) else &"wait"
 
 
-## Recolours the button with [param id], if it is on the panel.
-## The small row above the plate: "Mode: dev / play" (press to switch) and, in dev, "Skip setup".
-## Not part of the step's own buttons, so the steps' layouts stay as they were.
+## Updates the adult's mode toggle. The Skip button stays in place across steps and modes.
 func show_mode(mode_name: String, dev: bool) -> void:
-	var y := SIZE.y * 0.5 + 0.03
-	if _mode_button == null or not is_instance_valid(_mode_button):
-		_mode_button = EntryButton.new()
-		_mode_button.position = Vector3(-SIZE.x * 0.5 + 0.075, y, 0.012)
-		add_child(_mode_button)
-		_mode_button.setup("Mode: " + mode_name, &"entry_mode", GREY, Vector2(0.15, 0.04), 0.01)
-	else:
-		_mode_button.set_text("Mode: " + mode_name)
+	_mode_button.set_text("Mode: " + mode_name)
 	_mode_button.set_colour(Color(0.55, 0.42, 0.2) if dev else GREY)
-	if dev and (_skip_button == null or not is_instance_valid(_skip_button)):
-		_skip_button = EntryButton.new()
-		_skip_button.position = Vector3(SIZE.x * 0.5 - 0.075, y, 0.012)
-		add_child(_skip_button)
-		_skip_button.setup("Skip setup", &"entry_skip_setup", GREY, Vector2(0.15, 0.04), 0.01)
-	elif not dev and _skip_button != null and is_instance_valid(_skip_button):
-		_skip_button.queue_free()
-		_skip_button = null
+
+
+func _update_shortcuts() -> void:
+	var layer := Pointer.UI_LAYER if is_visible_in_tree() else 0
+	_mode_button.target.collision_layer = layer
+	_skip_button.target.collision_layer = layer
 
 
 func set_button_colour(id: StringName, colour: Color) -> void:

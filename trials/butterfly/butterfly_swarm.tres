@@ -30,6 +30,12 @@ name = &"radius"
 easy = 0.72
 fixed = nan
 
+[sub_resource type="Resource" id="catch_radius"]
+script = ExtResource("2_axis")
+name = &"catch_radius"
+easy = 0.15
+fixed = nan
+
 [sub_resource type="Resource" id="tolerance"]
 script = ExtResource("2_axis")
 name = &"tolerance"
@@ -41,8 +47,8 @@ script = ExtResource("1_def")
 title = "Butterfly swarm"
 scene = ExtResource("3_scene")
 skill = &"butterfly_swarm"
-axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("butterflies"), SubResource("speed"), SubResource("radius"), SubResource("tolerance")])
-notes = "Global motion with butterflies: coherence is the driven axis, the share of the swarm flying round with the flow; the rest fly every way, and who is who keeps changing. One judged swing through the swarm per answer: against the flow wins the round, with it is a try once the net stops (a wind-up turned straight into the right way is forgiven). Unlike the dots, each butterfly also faces its way and they circle the child, so this is its own skill. Help only when asked: all follow the flow."
+axes = Array[ExtResource("2_axis")]([SubResource("coherence"), SubResource("butterflies"), SubResource("speed"), SubResource("radius"), SubResource("catch_radius"), SubResource("tolerance")])
+notes = "Coherence controls the share of the swarm following the flow. A swing against the flow wins when it has swept at least one butterfly into the net. A wrong swing counts when the net stops, with an immediate wind-up forgiven. Help makes the whole swarm follow the flow."
 hint_after = 0.0
 hint_fade = 0.0
 max_hint = 1

@@ -7,7 +7,6 @@ extends TestCase
 const TIDY := preload("res://trials/tidy/tidy.tres")
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
 const Motion := preload("res://trials/motion/motion_trial.gd")
-const ADVENTURE := preload("res://content/adventure.tres")
 
 var entry: Entry
 
@@ -131,7 +130,6 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await _until_said(said, "Pick whichever one you'd like to start with.", 60.0), "the things drop in, then Onion notices them")
 	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "Onion leads the first shelf level")
 	expect_eq(App.main.current_scene, &"first_visit", "in its own scene")
-	expect(not _said_line(said, ADVENTURE.greeting), "without Wei's welcome stacked on top")
 
 
 func test_jumping_to_each_part_plays_only_that_part() -> void:
@@ -554,7 +552,7 @@ func test_a_shelf_finished_while_onion_still_talks_goes_straight_to_the_closing(
 	expect(not _said_line(said, "You could join me, if you like."), "the rest of the invitation is not said")
 
 
-func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> void:
+func test_skip_stays_visible_across_modes_and_setup_steps() -> void:
 	expect(PlayMode.is_dev(), "the tests run in dev")
 	var reports := record(Events.reported)
 	await _boot_entry()
@@ -562,20 +560,53 @@ func test_dev_mode_offers_skip_setup_and_the_mode_toggle_switches_to_play() -> v
 		"the session logs its mode")
 	expect(await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0), "setup runs (step 1)")
 	expect(_target(&"entry_mode") != null, "the setup panel has the Mode toggle")
-	expect(_target(&"entry_skip_setup") != null, "dev: and a Skip setup button")
-	await _press(&"entry_skip_setup")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 20.0), "Skip setup goes straight to Start")
+	var skip := _target(&"entry_skip_setup")
+	expect(skip.is_visible_in_tree(), "dev: Skip is visible")
 	await _press(&"entry_mode")
 	expect(not PlayMode.is_dev(), "the toggle switches to play")
 	expect(reports.any(func(args: Array) -> bool: return args[0] == &"session_mode" and args[1].mode == "play"),
 		"the switch is logged")
-	expect(await until(func() -> bool: return _target(&"entry_skip_setup") == null, 5.0), "play: no Skip setup")
+	expect_eq(_target(&"entry_skip_setup"), skip, "play: the same Skip button")
+	expect(skip.is_visible_in_tree(), "play: Skip is visible")
 	var marker := App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
 	expect(marker == null or not marker.visible, "play: no scene marker")
 	await _press(&"entry_mode")
 	expect(PlayMode.is_dev(), "and back to dev")
 	marker = App.head().get_node_or_null(NodePath(SceneMarker.NAME)) as Label3D
 	expect(marker != null and marker.visible, "dev: the scene marker is back")
+	await _to_setup_panel()
+	expect_eq(_target(&"entry_skip_setup"), skip, "Skip stays in place through all the setup steps")
+	var said := record(Events.said)
+	var table := App.reality.work_surface()
+	await select(skip.global_position)
+	expect(await _until_said(said, "Oh! Hello there."), "Skip starts the opening in one pinch")
+	expect_eq(App.reality.work_surface(), table, "the opening uses the table already found")
+	expect(not skip.is_visible_in_tree() and skip.collision_layer == 0, "the hidden shortcut cannot receive a pinch")
+
+
+func test_skip_starts_in_play_mode_even_when_the_table_search_has_no_result() -> void:
+	await boot(null, &"intro")
+	for table in App.reality.surfaces(&"table"):
+		App.reality._surfaces.erase(table)
+	App.reality.is_settled = false
+	PlayMode.set_dev(false, "tests")
+	entry = app.get_node(^"Intro/Entry")
+	entry.skip_setup = false
+	var said := record(Events.said)
+	entry.run()
+	var skip := _target(&"entry_skip_setup")
+	expect(skip.is_visible_in_tree(), "Skip is available while Reality searches")
+	input.click(&"right", &"trigger_click")
+	await _press(&"entry_step_next")
+	var panel: SetupPanel = entry.get("_panel")
+	expect_eq(panel.step, 2, "manual setup waits on the table step")
+	expect(not App.reality.is_settled and _target(&"entry_confirm_yes") == null, "the scan is still pending")
+	await select(skip.global_position)
+	expect(await _until_said(said, "Oh! Hello there."), "one pinch keeps going with the available data")
+	var layout: EntryLayout = entry.get("_layout")
+	expect(not layout.real_table and App.reality.surfaces(&"table").is_empty(), "the virtual surface is not a measured table")
+	expect(App.reality.is_settled, "the opening can use the fallback without waiting for the scan")
+	expect(is_equal_approx(layout.reach_used(), EntryLayout.REACH_USUAL), "the usual reach is used")
 
 
 func test_under_the_test_runner_the_mode_is_dev_and_setup_is_skipped_by_default() -> void:

@@ -65,11 +65,30 @@ func test_the_visible_menu_opens_staff_tools_and_returns_to_the_same_round() -> 
 	await select((home.find_child("menu_staff_tools", true, false) as Target).global_position)
 	expect(facilitator.is_open and not home.is_open and get_tree().paused, "only staff tools owns input")
 	expect(facilitator.find_child("fac_restart", true, false) != null, "the button opens the Tools page directly")
+	expect(facilitator.find_children("fac_jump_*", "Target", true, false).is_empty(), "Intro jumps are absent outside Intro")
+	expect(facilitator.find_child("fac_zones", true, false) == null, "Intro zones are absent outside Intro")
 	await press_facilitator("fac_close")
 	expect(home.is_open and not facilitator.is_open and get_tree().paused, "Menu returns to the player menu while paused")
 	await wait(0.35)
 	await select((home.find_child("menu_resume", true, false) as Target).global_position)
 	expect(App.session.trial == trial and not get_tree().paused, "Close resumes the same round")
+
+
+func test_intro_tools_follow_setup_and_scene_changes() -> void:
+	await boot(null, &"intro")
+	var intro := App.main.intro()
+	intro.run()
+	await until(func() -> bool: return intro.tools_ready)
+	await open_intro_tools()
+	var facilitator := App.module(&"Facilitator")
+	expect(facilitator.find_child("fac_jump_hello", true, false) != null, "Intro jumps remain available during setup")
+	expect(facilitator.find_child("fac_zones", true, false) == null, "no zone overlay before the layout exists")
+	await press_facilitator("fac_close")
+	await App.main.change_scene(&"find_object")
+	Events.staff_tools_requested.emit()
+	await frames(2)
+	expect(facilitator.find_children("fac_jump_*", "Target", true, false).is_empty(), "old Intro buttons are removed after switching scenes")
+	expect(facilitator.find_child("fac_room_intro", true, false) != null, "room intro still works from any scene")
 
 
 func test_shared_ray_focus_feedback_and_tracking_loss_work_while_paused() -> void:

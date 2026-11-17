@@ -22,3 +22,5 @@ extends Resource
 @export var ray := true
 ## Seconds between rounds.
 @export var pause_between := 1.5
+## Seconds after the last round. A negative value uses [member pause_between].
+@export var pause_after := -1.0

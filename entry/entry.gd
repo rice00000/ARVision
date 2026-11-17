@@ -50,8 +50,7 @@ const RIPPLE_SECONDS := 5.0
 const CAULDRON_SINK := 0.6
 
 ## Dev or play (entry/play_mode.gd) replaced the DEBUG, SHOW_HANDS and SKIP_SETUP constants (Nov 10):
-## dev logs the beats, shows the hand outlines, what setup found and a "Skip setup" button; setup
-## itself runs in both modes.
+## dev logs the beats and shows the hand outlines and what setup found.
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
 const TEST_SPEED := 1.0
@@ -97,7 +96,6 @@ var _bench := Transform3D.IDENTITY  # Wei's bench frame: at the eyes, facing the
 var _bench_below := 0.35            # its top, metres below that frame
 var _bench_half := 0.27             # its half width, metres
 var _ahead := Vector3.FORWARD       # straight ahead from the seat, flat (at the start)
-var _on_table: Variant = null       # where the cauldron goes on the confirmed table, or null (no real table)
 
 ## Sent when the child touches (or points at and pinches) the cauldron.
 signal _part_over(how: StringName)   # a part &"finished", or a jump button &"interrupted" it
@@ -117,11 +115,8 @@ var _show_hands_now := false        # the hands step shows the outlines in both 
 var shelf_push := SHELF_PUSH
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
-## Skip the four setup steps (the table is the one found, reach and sound are the defaults) and go
-## straight to the Start screen. Setup runs in both modes (Megan, Nov 8): only the tests skip it by
-## default (a test hook; the entry tests turn it back on), and a dev tester can press "Skip setup".
+## Tests can bypass the setup steps and wait at the Start screen.
 var skip_setup := PlayMode.testing_now()
-var _skip_rest_of_setup := false    # dev: "Skip setup" was pressed
 ## Plan the room when Start (or a jump) is pressed: the child is seated then. Tests that look at the room
 ## before pressing anything turn it off.
 var plan_at_start := true
@@ -199,8 +194,6 @@ func run() -> void:
 	Events.intro_zones_requested.connect(toggle_zones)
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
 	App.reality.announce_table = false
-	if not App.reality.is_settled:
-		await App.reality.settled
 	tools_ready = true
 	show_sim_props(false)
 	await _setup()
@@ -258,8 +251,10 @@ func _plan_and_build() -> void:
 	_planned = true
 	_ahead = Vector3(-_plan_head.basis.z.x, 0.0, -_plan_head.basis.z.z).normalized()
 	_table = App.reality.work_surface()
-	_on_table = await _cauldron_on_table()
-	App.reality.select_table(_table)
+	var real := App.reality.surfaces(&"table").has(_table)
+	_layout = _new_layout(_table, real, _reach_measured)
+	App.reality.select_table(_table, real)
+	await _plan_layout()
 	# Wei's shelf (here and in the first visit) stands where the plan put the bench, not where the head is.
 	ShelfCopy.shelf_frame = _layout.bench
 	ShelfCopy.shelf_below = _layout.bench_below
@@ -593,7 +588,7 @@ func _setup() -> void:
 	_panel = SetupPanel.new()
 	add_child(_panel)
 	_panel.place(App.head().global_transform)
-	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())   # the adult's Mode toggle; dev adds "Skip setup"
+	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
 	if skip_setup:
 		_panel.hide_all()
 		print("ENTRY setup: skipped (tests)")
@@ -606,7 +601,7 @@ func _setup() -> void:
 	if not skipped:
 		skipped = await _step_sound_and_room()
 	_panel.hide_all()
-	print("ENTRY setup: ", "skipped by a jump button" if skipped else "all four steps done")
+	print("ENTRY setup: ", "skipped" if skipped else "all four steps done")
 
 
 ## Step 1: both hands seen and a pinch. The outlines show for this step.
@@ -715,6 +710,8 @@ func _step_sound_and_room() -> bool:
 			[["Room scan", &"wait"], ["Sound", &"wait"]],
 			[["Yes, I heard it", &"entry_step_next", SetupPanel.GREEN], ["Play again", &"entry_step_alt", SetupPanel.GREY]])
 	await _wait(0.5)
+	if _queued_part != &"":
+		return true
 	_chime()
 	var next_scan := 0.0
 	while true:
@@ -768,10 +765,10 @@ func _choose_part() -> StringName:
 	return part
 
 
-## The first setup answer, or &"skip" when Tools queued a jump.
+## The first setup answer, or &"skip" when Skip or Tools queued a part.
 func _take_press(ids: Array) -> StringName:
 	if get_tree().paused: return &""
-	if _queued_part != &"" or _skip_rest_of_setup: return &"skip"
+	if _queued_part != &"": return &"skip"
 	var result := &""
 	for id in _presses:
 		if id in ids:
@@ -881,17 +878,13 @@ func _on_target(target: Target) -> void:
 	if target != null and target.id == &"entry_mode":   # the setup panel's Mode toggle (adult)
 		(target.get_parent() as EntryButton).flash()
 		PlayMode.toggle()
-		if _panel != null and is_instance_valid(_panel):
-			_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
+		_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
 		print("ENTRY mode: ", PlayMode.name(), " (toggle)")
 		return
-	if target != null and target.id == &"entry_skip_setup":   # dev: straight to Start
+	if target != null and target.id in [&"entry_skip_setup", &"entry_part_all"]:
 		(target.get_parent() as EntryButton).flash()
-		_skip_rest_of_setup = true
-		print("ENTRY setup: skip pressed")
-		return
-	if target != null and target.id == &"entry_part_all":
-		(target.get_parent() as EntryButton).flash()
+		if target.id == &"entry_skip_setup":
+			print("ENTRY setup: skip pressed")
 		jump_to(&"all")
 		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
@@ -1057,12 +1050,8 @@ func toggle_zones() -> void:
 
 # --- The shelf to the side ----------------------------------------------------
 
-## Works out the layout (EntryLayout) from the confirmed table, the head and the reach, and
-## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
-## finds the height by depth). A coroutine: the search runs on a worker thread.
-func _cauldron_on_table() -> Variant:
-	var real := App.reality.surfaces(&"table").has(_table)
-	_layout = _new_layout(_table, real, _reach_measured)
+## Runs the layout search on a worker thread while the scene keeps drawing.
+func _plan_layout() -> void:
 	# The plan is a search that takes a second or more on the headset: off the main thread, the scene
 	# keeps drawing meanwhile (the layout holds numbers only, no nodes).
 	var started := Time.get_ticks_msec()
@@ -1078,10 +1067,6 @@ func _cauldron_on_table() -> Variant:
 	var problems := _layout.report()
 	if problems != "":
 		print("ENTRY layout: ", problems.replace("\n", "; "))
-	if not real:
-		return null
-	print("ENTRY spot: on the confirmed table, ", _away(_layout.cauldron), " m away")
-	return _layout.cauldron
 
 
 ## A layout for [param table] from where the head is now, straight ahead from the seat.
@@ -1120,6 +1105,14 @@ var _aim_hit: Dictionary = {}       # the last flat tabletop the ray found: {pos
 func _step_table() -> bool:
 	_presses.clear()
 	_beat("TEST: is this the table?")
+	if not App.reality.is_settled:
+		_panel.show_step(2, SETUP_STEPS, "Find the table", "The headset is looking for a table.", [], [])
+		while true:
+			if _take_press([]) == &"skip":
+				return true
+			if App.reality.is_settled and not get_tree().paused:
+				break
+			await get_tree().process_frame
 	var eye := App.head().global_transform
 	var table := App.reality.work_surface()
 	var real := App.reality.surfaces(&"table").has(table)
@@ -1406,7 +1399,7 @@ func _cauldron_spot() -> Vector3:
 	var eye := _bench.origin
 	_left = _ahead.rotated(Vector3.UP, PI * 0.5)
 	var spot := _layout.cauldron
-	if _on_table != null:
+	if _layout.real_table:
 		var flat: Variant = _flat_at(eye, Vector3(spot.x, eye.y, spot.z))   # the real top's height, if depth sees it
 		if flat != null and absf((flat as Vector3).y - spot.y) < 0.05:
 			spot.y = (flat as Vector3).y
@@ -1419,11 +1412,7 @@ func _cauldron_spot() -> Vector3:
 			print("ENTRY spot: real table by depth, ", _away(flat), " m away, ", snappedf(eye.y - (flat as Vector3).y, 0.01), " m below the eyes")
 			return flat
 		await _wait(0.25)
-	if _layout.real_table:
-		spot.y = _table.transform.origin.y
-		print("ENTRY spot: at the table's height (depth saw no flat patch there), ", _away(spot), " m away")
-	else:
-		print("ENTRY spot: no table; at the bench's height, ", _away(spot), " m away")
+	print("ENTRY spot: no table; at the bench's height, ", _away(spot), " m away")
 	return spot
 
 

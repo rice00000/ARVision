@@ -6,6 +6,5 @@
 
 [resource]
 script = ExtResource("1_adventure")
-greeting = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
 level_done = "Well done, alchemist!"
 places = Array[ExtResource("2_place")]([ExtResource("3_motion")])

@@ -42,7 +42,7 @@ Point and pinch **Menu → Staff tools**. Choose a chapter to jump to it. **Zone
 
 ## 1. Setup (for the grown-up)
 
-Both modes run setup. Dev mode offers **Skip setup** to go straight to **Start** with the default reach of 60 cm.
+**Skip** is at the top right in both modes. One pinch starts the opening using the available tabletop and reach. If needed, it uses a virtual surface and the usual 60 cm reach.
 
 **See:** a dark panel just above eye level, straight ahead: a sage bar "SETUP · for the grown-up", "Step N of 4" and
 dots, a title, one or two lines, check lines with dots, buttons. At the foot: "To press: aim the hand ray at a button, then pinch."
@@ -59,7 +59,7 @@ Judge:
 - [ ] Step 2: the outline sits on your real table (within a few cm). Off by about ______ cm.
 - [ ] Step 2 check line says "Room for everything" (or what did it say? ________________).
 - [ ] Step 3: the reach it shows: ______ cm. Does that match an easy (not stretched) reach? yes / no
-- [ ] The DEV buttons (far left and right) never get in the way of the panel or the table.
+- [ ] The Mode and Skip buttons stay visible above the panel throughout setup.
 
 Notes:
 

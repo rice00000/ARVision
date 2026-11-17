@@ -80,8 +80,17 @@ signal scene_changing
 signal reported(what: StringName, data: Dictionary)
 
 
-func say(text: String) -> void:
+## Pass [param speaker] and await to wait for its line. The player menu can pause and replay it.
+func say(text: String, speaker: Node = null) -> void:
+	if text.is_empty():
+		return
 	said.emit(text)
+	if speaker == null:
+		return
+	var voice := App.module(&"Voice")
+	if voice != null:
+		while is_instance_valid(speaker) and (not speaker.can_process() or voice.speaking() == text):
+			await get_tree().process_frame
 
 
 func report(what: StringName, data: Dictionary = {}) -> void:

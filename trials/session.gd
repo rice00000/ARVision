@@ -52,7 +52,7 @@ func play(session_plan: SessionPlan, announce_plan := true) -> void:
 	running = true
 	won = not plan.blocks.is_empty() and not plan.is_endless()
 	if announce_plan:
-		await _announce(plan.greeting)
+		await Events.say(plan.greeting, self)
 	if not App.reality.is_settled:
 		await App.reality.settled # toys placed before the table is known land on the lap
 	for index in plan.blocks.size():
@@ -62,7 +62,7 @@ func play(session_plan: SessionPlan, announce_plan := true) -> void:
 	block = null
 	running = false
 	if announce_plan:
-		await _announce(plan.farewell)
+		await Events.say(plan.farewell, self)
 	Events.session_finished.emit()
 
 
@@ -128,7 +128,7 @@ func _run_block(announce_plan: bool) -> void:
 	trial.grab = not block.ray
 	App.stage.add_child(trial)
 	if announce_plan:
-		await _announce(block.intro)
+		await Events.say(block.intro, self)
 	var round_index := 0
 	while not _skip and (block.rounds < 0 or round_index < block.rounds):
 		var condition := def.condition(level(), round_index, block.probe, block.pins)
@@ -142,16 +142,11 @@ func _run_block(announce_plan: bool) -> void:
 			Events.report(&"level", {skill = def.skill, first_try = first_try, before = before, step = def.step,
 				after = Profile.adapt(def.skill, first_try, def.up_after, def.step)})
 		round_index += 1
-		if not _skip:
-			await get_tree().create_timer(block.pause_between, false).timeout
+		var delay := block.pause_between
+		if round_index == block.rounds and block.pause_after >= 0.0:
+			delay = block.pause_after
+		if not _skip and delay > 0.0:
+			await get_tree().create_timer(delay, false).timeout
 	trial.queue_free()
 	trial = null
 	_skip = false
-
-
-## Says [param text] and waits about as long as it takes to hear it.
-func _announce(text: String) -> void:
-	if text.is_empty():
-		return
-	Events.say(text)
-	await get_tree().create_timer(clampf(text.length() * 0.06, 1.5, 6.0), false).timeout

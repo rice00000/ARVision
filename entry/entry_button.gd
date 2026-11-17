@@ -22,7 +22,7 @@ var _push := 0.0
 
 
 ## Builds the plate, its words and its hit box. Call once, after [method Node.add_child].
-func setup(text: String, button_id: StringName, colour: Color, size: Vector2, reach: float) -> void:
+func setup(text: String, button_id: StringName, colour: Color, size: Vector2, reach: float, font_size := 0) -> void:
 	id = button_id
 	plate = size
 	margin = reach
@@ -39,7 +39,7 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 	add_child(_face)
 	_words = Label3D.new()
 	_words.text = text
-	_words.font_size = 26 if plate.x > 0.15 else 24
+	_words.font_size = font_size if font_size > 0 else (26 if plate.x > 0.15 else 24)
 	_words.pixel_size = 0.0006
 	_words.position = Vector3(0, 0, 0.007)
 	_face.add_child(_words)

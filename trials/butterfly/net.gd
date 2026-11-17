@@ -1,8 +1,9 @@
 class_name ButterflyNet
 extends Node3D
 ## A butterfly net: a handle, a hoop and a bag. It lies on the table until a
-## hand takes it ([method hold]); then the handle runs on from the hand, away
-## from the shoulder, so the hoop sweeps a circle round the child. The hoop
+## hand takes it ([method hold]); then the handle runs on from the hand along
+## its pointing ray (on a Quest, from the shoulder through the hand; on the PC,
+## the cursor's ray), so the hoop is where the child aims. The hoop
 ## turns its opening to where it is going and the bag trails behind, so a
 ## swing meets what flies into it. This node's own frame is the hoop: origin
 ## at its centre, -Z out through the opening.
@@ -41,6 +42,10 @@ func lay(at: Vector3, towards: Vector3) -> void:
 	global_transform = Transform3D(Basis.looking_at(Vector3.UP, along), hoop + Vector3.UP * 0.012)
 	_place_handle(at + along * HANDLE * 0.5)
 	grip.global_position = at + along * HANDLE * 0.5
+	reset_motion()
+
+
+func reset_motion() -> void:
 	velocity = Vector3.ZERO
 	_last = Vector3.INF
 
@@ -54,9 +59,8 @@ func held() -> bool:
 	return hand != &""
 
 
-## Follows the hand, the hoop [constant HANDLE] beyond it, away from the shoulder.
-func follow(at: Vector3, shoulder: Vector3, delta: float) -> void:
-	var out := (at - shoulder).normalized()
+## Follows the hand at [param at], the hoop [constant HANDLE] beyond it along [param out] (unit length).
+func follow(at: Vector3, out: Vector3, delta: float) -> void:
 	var hoop := at + out * HANDLE
 	if not _last.is_finite() or hoop.distance_to(_last) > JUMP:
 		velocity = Vector3.ZERO

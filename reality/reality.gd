@@ -33,6 +33,7 @@ var announce_table := true
 
 var _surfaces: Array[Surface] = []
 var _selected_table: Surface
+var _selected_patch := false
 var _focus := Vector3.ZERO
 ## Leisure rooms are separate from measured AR surfaces; training is paused.
 var home_room: Node3D
@@ -75,7 +76,7 @@ func surfaces(surface_kind: StringName) -> Array[Surface]:
 ## Where tabletop stimuli go: the nearest table in reach, else a virtual patch
 ## in front of the child (no room scan, or no table in it).
 func work_surface() -> Surface:
-	if _selected_table in _surfaces:
+	if _selected_patch or _selected_table in _surfaces:
 		return _selected_table
 	var eye := App.head().global_transform
 	for table in surfaces(&"table"):
@@ -116,11 +117,13 @@ func add_surface(surface: Surface) -> void:
 	_surfaces.append(surface)
 
 
-## The table confirmed or marked by the facilitator.
-func select_table(surface: Surface) -> void:
+## Pins the work surface and ends the initial search. A virtual patch stays out of the measured surfaces.
+func select_table(surface: Surface, real := true) -> void:
 	_selected_table = surface
-	if surface not in _surfaces:
+	_selected_patch = not real
+	if real and surface not in _surfaces:
 		add_surface(surface)
+	_settle()
 
 
 func _settle() -> void:

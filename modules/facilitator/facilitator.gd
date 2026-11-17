@@ -116,8 +116,6 @@ func _activate() -> void:
 	var target := _pending
 	_pending = null
 	if not is_instance_valid(target): return
-	if App.session.block == null and target.id in [&"fac_easier", &"fac_harder", &"fac_skip"]:
-		return # nothing running to steer
 	Events.report(&"facilitator", {button = target.id})
 	if String(target.id).begins_with("fac_key_"):
 		_type(String(target.id).right(1))
@@ -220,23 +218,54 @@ func _refresh() -> void:
 	_refresh_training()
 	_refresh_saves()
 	_name.text = "Name: %s_" % _typed
+	_refresh_tools()
+
+
+func _refresh_tools() -> void:
 	var intro := App.main.intro()
 	var tools := _pages[&"Tools"]
+	_clear_buttons(tools)
 	var can_jump := intro != null and intro.tools_ready
-	_intro_status.text = "Intro: " + intro.beat if can_jump else "Intro tools available in Intro"
-	for part: String in Entry.PARTS:
-		_enable(tools.get_node("fac_jump_" + part), can_jump)
-	_enable(tools.get_node(^"fac_zones"), can_jump and intro.zones_available())
+	_intro_status.text = "Intro: " + intro.beat if can_jump else "Tools"
+	var parts := Entry.PARTS.keys() if can_jump else []
+	for i in parts.size():
+		var part: String = parts[i]
+		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.038),
+			Vector2(-0.095 + 0.19 * (i % 2), 0.065 - 0.044 * floori(i / 2.0)), tools)
+	var next := parts.size()
+	_button("fac_room_intro", "Room intro", Vector2(0.18, 0.038),
+		Vector2(-0.095 + 0.19 * (next % 2) if can_jump else 0.0, 0.065 - 0.044 * floori(next / 2.0)), tools)
+	var zones := can_jump and intro.zones_available()
+	if zones:
+		_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
+	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022 if zones else -0.095, -0.16), tools)
+	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127 if zones else 0.095, -0.16), tools)
 
 
 func _refresh_training() -> void:
 	var session := App.session
+	var training := _pages[&"Training"]
+	_clear_buttons(training)
+	var actions := [["fac_view", "Next view"]]
+	if session.block != null:
+		actions = [["fac_easier", "Easier"], ["fac_harder", "Harder"], ["fac_auto", "Auto level"],
+			["fac_view", "Next view"], ["fac_skip", "Skip block"]]
+	for i in actions.size():
+		_button(actions[i][0], actions[i][1], Vector2(0.18, 0.06),
+			Vector2(-0.095 + 0.19 * (i % 2) if actions.size() > 1 else 0.0, 0.02 - 0.075 * floori(i / 2.0)), training)
 	if session.block == null:
 		_status.text = "No block running"
 		return
 	_status.text = "Block %d / %d: %s\nLevel %.2f %s\nView: %s" % [session.block_index + 1,
 		session.plan.blocks.size(), session.block.trial.title, session.level(),
 		"(pinned)" if not is_nan(session.pinned) else "(auto)", App.reality.view.title]
+
+
+func _clear_buttons(page: Node3D) -> void:
+	for child in page.get_children():
+		if child is Target:
+			_disabled.erase(child)
+			child.free()
 
 
 func _refresh_saves() -> void:
@@ -296,10 +325,6 @@ func _build() -> void:
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)
-	var actions := [["fac_easier", "Easier"], ["fac_harder", "Harder"], ["fac_auto", "Auto level"],
-		["fac_view", "Next view"], ["fac_skip", "Skip block"]]
-	for i in actions.size():
-		_button(actions[i][0], actions[i][1], Vector2(0.18, 0.06), Vector2(-0.095 + 0.19 * (i % 2), 0.02 - 0.075 * floori(i / 2.0)), training)
 
 	var saves := _page(&"Saves")
 	_text(_playing, Vector2(0.0, 0.115), saves)
@@ -324,17 +349,6 @@ func _build() -> void:
 
 	var tools := _page(&"Tools")
 	_text(_intro_status, Vector2(0, 0.11), tools)
-	var parts := Entry.PARTS.keys()
-	for i in parts.size():
-		var part: String = parts[i]
-		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.041),
-			Vector2(-0.095 + 0.19 * (i % 2), 0.06 - 0.047 * floori(i / 2.0)), tools)
-	var next := parts.size()   # the room intro plays in any scene: it opens the room
-	_button("fac_room_intro", "Room intro", Vector2(0.18, 0.041),
-		Vector2(-0.095 + 0.19 * (next % 2), 0.06 - 0.047 * floori(next / 2.0)), tools)
-	_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
-	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022, -0.16), tools)
-	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127, -0.16), tools)
 
 	var confirm := _page(&"Confirm")
 	_text(_confirm_label, Vector2(0, 0.06), confirm)

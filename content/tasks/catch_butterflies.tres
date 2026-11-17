@@ -47,7 +47,8 @@ rounds = 3
 difficulty = 0.0
 intro = "A whole swarm! Most of them fly the same way round you. Swing your net to meet them."
 ray = false
-pause_between = 3.0
+pause_between = 0.0
+pause_after = 3.0
 
 [sub_resource type="Resource" id="level_3"]
 script = ExtResource("2_plan")
@@ -63,7 +64,8 @@ rounds = 3
 difficulty = 0.4
 intro = "A whole swarm! Most of them fly the same way round you. Swing your net to meet them."
 ray = false
-pause_between = 3.0
+pause_between = 0.0
+pause_after = 3.0
 
 [sub_resource type="Resource" id="level_4"]
 script = ExtResource("2_plan")

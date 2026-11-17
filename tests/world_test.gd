@@ -90,6 +90,14 @@ func test_each_level_pays_its_configured_first_and_repeat_reward() -> void:
 	expect_eq(progress.reward(task, task.levels[1]), 3, "another level has its own first reward")
 
 
+func test_level_completion_waits_for_the_whole_reward_line() -> void:
+	await boot()
+	var ended := record(App.module(&"Voice").line_finished)
+	await App.world._complete(TIDY, TIDY.levels[0])
+	expect_eq(ended, [["Well done, alchemist!", true], ["You earned 3 magic stones!", true]],
+		"both lines have played to the end before the menu can speak")
+
+
 func test_turning_to_the_table_unfolds_its_menu() -> void:
 	await boot()
 	var said := record(Events.said)
@@ -207,7 +215,10 @@ func test_motion_is_only_in_its_own_scene_and_needs_no_shelf_progress() -> void:
 	app.autostart = true
 	await App.main.change_scene(&"global_motion")
 	var at_wall := func() -> bool: return App.world.menu != null and App.world.menu.get("_open")
+	await wait(0.4)
+	expect(at_wall.call(), "the motion menu unfolds without a speech wait")
 	expect(await until(at_wall, 15.0), "motion has its own menu")
+	expect_eq(App.module(&"Voice").speaking(), App.world.place.arrive, "the cards are usable during the menu narration")
 	expect(_button("task_break_wall_steady_flow") != null and _button("task_tidy_shelf_shadow") == null, "the wall's list only")
 	await select(_button("task_break_wall_steady_flow").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")

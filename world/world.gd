@@ -40,7 +40,6 @@ func _ready() -> void:
 
 func run() -> void:
 	App.reality.apply_view(App.session.base_view)
-	await say(adventure.greeting)
 	if not App.reality.is_settled:
 		await App.reality.settled
 	var first := _new_elsewhere()
@@ -177,14 +176,6 @@ func _choose() -> Array:
 func _complete(task: Task, level: TaskLevel) -> void:
 	var stones := App.main.progress.complete(task, level)
 	Events.report(&"task_done", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
-	await say(adventure.level_done)
+	await Events.say(adventure.level_done, self)
 	if stones > 0:
-		await say("You earned %d magic stones!" % stones if stones != 1 else "You earned one magic stone!")
-
-
-## Says [param text] and waits about as long as it takes to hear it.
-func say(text: String) -> void:
-	if text.is_empty():
-		return
-	Events.say(text)
-	await get_tree().create_timer(clampf(text.length() * 0.06, 1.5, 6.0), false).timeout
+		await Events.say("You earned %d magic stones!" % stones if stones != 1 else "You earned one magic stone!", self)

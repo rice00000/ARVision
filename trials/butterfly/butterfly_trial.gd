@@ -1,26 +1,10 @@
 extends Trial
 ## Butterflies fly circles round the seated child, who catches them with a net.
 ## The net lies on the table until a hand takes it (reach and pinch), then stays
-## in that hand for the block. Two games on one scene script:
-##
-## Catch them all ([member swarm] off): each butterfly is judged on its own. A
-## swing that meets one head-on (the hoop going against its flight) takes it
-## into the bag; one that chases it bumps it off the rim: a wrong try. A net
-## held still, or swung across its path, it flutters round. The round is won
-## when the last one is in the bag; then they are let go.
-## Axes: speed (driven, m/s), butterflies, rings (1: all one way; 2: an upper and
-## a lower circle flying opposite ways), radius, catch_radius, tolerance.
-##
-## The swarm ([member swarm] on): global motion. A share of the swarm
-## (coherence) flies round one way, the rest flutter every way, and who is who
-## keeps changing. A swing through the swarm against the flow scoops a few into
-## the net and wins the round; one with the flow scatters them, and counts a
-## try once the net stops (one that turns straight into the right way was a
-## wind-up and counts nothing). Each round the flow may change.
-## Axes: coherence (driven), butterflies, speed, radius, tolerance.
-##
-## Help (asked for, or after [member TrialDef.hint_after]): catch them all slows
-## everyone to half speed; the swarm all flies with the flow.
+## in that hand for the block. The moving hoop scoops each butterfly it meets.
+## In the circles, meet each butterfly head-on and catch them all. In the swarm,
+## meet the group's flow head-on and finish one swing with a catch. A wrong
+## swarm swing counts when the net stops, or is forgiven if it was a wind-up.
 
 ## Below this hoop speed (m/s) the net is not swinging.
 const SWING := 0.3
@@ -31,18 +15,12 @@ const UPPER := 0.12
 const LOWER := 0.3
 ## Catch them all: a wrong bump counts one try, then none for this long.
 const TRY_GAP := 0.8
-## Swarm: swings that set off in a round's first seconds are hands settling, ignored.
-const ARM_SECONDS := 0.8
-## Swarm: how many one right swing scoops, and how far from the band round the circle a swing still counts.
-const SCOOP := 3
-const REACH := 0.15
 ## Swarm: each second this share of the noise trades places with the flow, and draws a new way to go.
 const SHUFFLE := 0.5
-## Seconds caught butterflies stay in the net before they are let go (the swarm).
+## Seconds before releasing the bag at the end of a round.
 const KEEP := 1.5
-## Where the shoulder is from the eyes: down and out to the hand's side.
-const SHOULDER_DOWN := 0.22
-const SHOULDER_OUT := 0.17
+## The reach along the child's depth axis, where judging distance is harder.
+const DEPTH_SLACK := 0.25
 
 @export var swarm := false
 
@@ -53,17 +31,18 @@ var _catch_radius := 0.0
 var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
 var _quiet_until := 0.0
-## Swarm: the flow's spin, who follows it, the wrong swing waiting for the net to stop.
+## Swarm: the flow's spin and who follows it.
 var _flow := 1.0
 var _signal: Array[int] = []
 var _noise: Array[int] = []
 var _shuffle_debt := 0.0
+## The current swing's answer and a possible wrong-way wind-up from before a turn.
+var _answer: Dictionary = {}
 var _wrong: Dictionary = {}
 var _swing_from := Vector3.ZERO
 var _swing_at := 0.0
 var _swinging := false
-var _judged := false
-## The way the judged swing went; turning back from it starts a new swing.
+## The way the swing went when it started or was judged. Turning back starts a new swing.
 var _swing_way := Vector3.ZERO
 var _slow_for := 0.0
 var _net: ButterflyNet
@@ -83,10 +62,11 @@ func _ready() -> void:
 func _setup(round_condition: TrialCondition) -> void:
 	_rng.randomize()
 	_attempts.clear()
-	_wrong.clear()
+	_answer = {}
+	_wrong = {}
 	_quiet_until = 0.0
 	_swinging = false
-	_judged = false
+	_slow_for = 0.0
 	_swarm.slow = 1.0
 	_swarm.speed = round_condition.value(&"speed")
 	_tolerance = round_condition.value(&"tolerance")
@@ -101,7 +81,8 @@ func _setup(round_condition: TrialCondition) -> void:
 		_net.lay(rest, _frame.origin)
 		say("Pick up the net from the table.")
 	if swarm:
-		say("Which way do most butterflies fly? Swing your net to meet them.")
+		if round_condition.round_index == 0:
+			say("Which way do most butterflies fly? Swing your net to meet them.")
 	else:
 		say("Catch the butterflies! Swing your net to meet them.")
 
@@ -167,70 +148,117 @@ func _on_touched(hand: StringName, target: Target) -> void:
 func _notification(what: int) -> void:
 	super(what)
 	if what == NOTIFICATION_PAUSED:
-		_wrong.clear()
-		_swinging = false
+		_net.reset_motion()
+		_wrong = {}
+		if not _answer.get("correct", false):
+			_answer = {}
+			_swinging = false
+
+
+func _teardown() -> void:
+	_swarm.release_after(KEEP)
+
+
+func _process(delta: float) -> void:
+	if is_running() and _answer.get("correct", false) and def.time_limit > 0.0 and seconds() + delta >= def.time_limit:
+		_end_swing(true)
+	super(delta)
 
 
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	var from := _net.global_position
+	if _net.held():
+		var pointer := App.rig.pointer(_net.hand)
+		if pointer.tracked():
+			_net.follow(pointer.grip().origin, -pointer.global_basis.z, delta)
+		else:
+			_net.reset_motion()
 	if swarm and is_running():
 		_shuffle(delta)
 	_swarm.step(delta)
-	if not _net.held():
+	if not _net.held() or (not swarm and not is_running()):
 		return
-	var pointer := App.rig.pointer(_net.hand)
-	if not pointer.tracked():
+	var swing := _net.velocity.slide(Vector3.UP)
+	var fast := swing.length_squared() >= SWING * SWING
+	if swarm and is_running():
+		if not _track_swing(swing, fast, delta):
+			return
+	elif not fast:
 		return
-	var eye := App.head().global_transform
-	var out := Vector3(eye.basis.x.x, 0.0, eye.basis.x.z).normalized() * (1.0 if _net.hand == &"right" else -1.0)
-	_net.follow(pointer.grip().origin, eye.origin + Vector3.DOWN * SHOULDER_DOWN + out * SHOULDER_OUT, delta)
-	if not is_running():
+	_sweep(from, swing)
+
+
+## Check the whole path of the hoop this tick. Compress depth so the same
+## circular reach test gives the child more room for error along their view.
+func _sweep(from: Vector3, swing: Vector3) -> void:
+	var hoop := _net.global_position
+	var travel := hoop - from
+	if travel.dot(swing) <= 0.0:
 		return
-	if swarm:
-		_track_swing(delta)
-		return
+	var depth := (hoop - _frame.origin).slide(Vector3.UP).normalized()
+	var stretch := depth * (1.0 - _catch_radius / DEPTH_SLACK)
+	var path := travel - stretch * travel.dot(depth)
+	var reach_squared := _catch_radius * _catch_radius
 	for i in _swarm.size():
-		if _swarm.flying(i) and _swarm.position_of(i).distance_to(_net.global_position) <= _catch_radius:
-			_meet(i)
+		if not _swarm.flying(i):
+			continue
+		var at := _swarm.position_of(i)
+		var offset := at - from
+		var point := offset - stretch * offset.dot(depth)
+		var closest := Geometry3D.get_closest_point_to_segment(point, Vector3.ZERO, path)
+		if point.distance_squared_to(closest) <= reach_squared:
+			_meet(i, at, swing)
 
 
-# -- catch them all -----------------------------------------------------------
-
-## The hoop has reached butterfly [param i]: caught, bumped (a wrong try) or it flutters round.
-func _meet(i: int) -> void:
-	var swing := Vector3(_net.velocity.x, 0.0, _net.velocity.z)
-	var flight := _swarm.heading(i)
+func _meet(i: int, at: Vector3, swing: Vector3) -> void:
+	var flight := _swarm.along(at, _flow) if swarm else _swarm.heading(i)
 	var against := rad_to_deg(swing.angle_to(-flight))
-	var along := rad_to_deg(swing.angle_to(flight))
-	if _net.velocity.length() < SWING or against > _tolerance and along > _tolerance:
+	var caught := against <= _tolerance
+	var score_swing := swarm and is_running()
+	if score_swing:
+		if _answer.is_empty():
+			_answer = _attempt(against)
+			_answer.merge({correct = caught, caught = 0, from = _swing_from,
+				onset_seconds = snappedf(_swing_at, 0.01),
+				coherence_shown = float(_signal.size()) / (_signal.size() + _noise.size())})
+			_swing_way = swing
+		caught = _answer.correct
+	if caught:
+		_swarm.catch_in(i, _net)
+	else:
 		_swarm.dodge(i, _net.global_position)
+	if swarm:
+		if score_swing and caught:
+			if _answer.caught == 0:
+				judge(&"good", at)
+				say("Got them!")
+			_answer.caught += 1
+			_signal.erase(i)
+			_noise.erase(i)
 		return
-	var result := {trial = condition.trial, round = condition.round_index, hand = _net.hand,
-		caught = against <= _tolerance, angle_degrees = snappedf(against, 0.1),
-		swing_speed = snappedf(_net.velocity.length(), 0.01), species = _swarm.species_of(i),
-		seconds = snappedf(seconds(), 0.01), help = hint_level}
-	if result.caught:
-		_attempts.append(result)
-		Events.report(&"catch_attempt", result)
-		judge(&"good", _swarm.position_of(i))
-		_swarm.catch_in(i, _net, _bag_spot())
+	_score_circle_contact(i, at, against, caught)
+
+
+func _score_circle_contact(i: int, at: Vector3, against: float, caught: bool) -> void:
+	if not caught and (against < 180.0 - _tolerance or seconds() < _quiet_until):
+		return
+	var result := _attempt(against)
+	result.merge({caught = caught, species = _swarm.species_of(i), seconds = snappedf(seconds(), 0.01)})
+	_log_attempt(result)
+	if caught:
+		judge(&"good", at)
 		var left := _swarm.flying_count()
 		if left == 0:
 			say("You caught them all! Let them fly free.")
-			_swarm.release(_away())
 			var wrong := _attempts.filter(func(a: Dictionary) -> bool: return not a.caught).size()
 			finish(true, {attempts = _attempts.duplicate(), caught = _attempts.size() - wrong, wrong = wrong})
 		elif left == 1:
 			say("Just one more!")
 		return
-	_swarm.dodge(i, _net.global_position)
-	if seconds() < _quiet_until:
-		return
 	_quiet_until = seconds() + TRY_GAP
-	_attempts.append(result)
-	Events.report(&"catch_attempt", result)
-	judge(&"bad", _swarm.position_of(i))
+	judge(&"bad", at)
 	count_try()
 	say("It flew away! Swing to meet it, not after it.")
 
@@ -255,93 +283,57 @@ func _shuffle(delta: float) -> void:
 		_swarm.steer(noise, _flow, _rng.randf_range(-PI, PI))
 
 
-## One judgement per swing: the first stretch of it fast enough, through the swarm's band. Turning back starts a new swing.
-func _track_swing(delta: float) -> void:
-	var hoop := _net.global_position
-	if _net.velocity.length() < SWING:
+## A turn starts a fresh swing, even if the same frame starts the next round.
+func _track_swing(swing: Vector3, fast: bool, delta: float) -> bool:
+	if not fast:
 		_slow_for += delta
 		if _swinging and _slow_for >= SWING_STOP:
 			_swinging = false
-			_judged = false
-			if not _wrong.is_empty():
-				_count_wrong()
-		return
+			_end_swing(true)
+		return false
 	_slow_for = 0.0
-	if _judged and _net.velocity.dot(_swing_way) < 0.0:
-		_swinging = false
-		_judged = false
-	if not _swinging:
+	if not _swinging or swing.dot(_swing_way) < 0.0:
+		_end_swing(false)
+		if not is_running():
+			return false
 		_swinging = true
-		_swing_from = hoop
+		_swing_from = _net.global_position
 		_swing_at = seconds()
-	if _judged or _swing_at < ARM_SECONDS:
-		return
-	var off := Vector2(hoop.x - _frame.origin.x, hoop.z - _frame.origin.z).length() - _swarm.radius
-	if absf(off) > _swarm.band + REACH:
-		return
-	_judged = true
-	_swing_way = _net.velocity
-	var flow := _swarm.along(hoop, _flow)
-	var swing := Vector3(_net.velocity.x, 0.0, _net.velocity.z)
-	var angle := rad_to_deg(swing.angle_to(-flow))
-	var result := {trial = condition.trial, round = condition.round_index, hand = _net.hand,
-		correct = angle <= _tolerance, angle_degrees = snappedf(angle, 0.1),
-		swing_speed = snappedf(_net.velocity.length(), 0.01), onset_seconds = snappedf(_swing_at, 0.01),
-		from = _swing_from, help = hint_level, coherence_shown = float(_signal.size()) / maxi(1, _signal.size() + _noise.size())}
-	var near := _nearest(hoop, SCOOP)
-	if not result.correct:
-		for i in near:
-			_swarm.dodge(i, hoop)
+		_swing_way = swing
+	return true
+
+
+## Score after the whole swing has had time to scoop butterflies along its path.
+func _end_swing(stopped: bool) -> void:
+	if not _answer.is_empty():
+		var result := _answer
+		_answer = {}
+		if result.correct:
+			var windups := 0 if _wrong.is_empty() else 1
+			if windups:
+				Events.report(&"catch_windup", _wrong)
+			_wrong = {}
+			_log_attempt(result)
+			finish(true, {attempts = _attempts.duplicate(), windups = windups, caught = result.caught,
+				first_attempt_correct = _attempts[0].correct, angle_degrees = result.angle_degrees})
+			return
 		_wrong = result
-		return
-	var windups := 0 if _wrong.is_empty() else 1
-	if windups:
-		Events.report(&"catch_windup", _wrong)
-	_wrong.clear()
+	if stopped and not _wrong.is_empty():
+		_log_attempt(_wrong)
+		_wrong = {}
+		judge(&"bad", _net.global_position)
+		count_try()
+		say("They flew away! Swing to meet most of them.")
+
+
+func _attempt(angle: float) -> Dictionary:
+	return {trial = condition.trial, round = condition.round_index, hand = _net.hand,
+		angle_degrees = snappedf(angle, 0.1), swing_speed = snappedf(_net.velocity.length(), 0.01), help = hint_level}
+
+
+func _log_attempt(result: Dictionary) -> void:
 	_attempts.append(result)
 	Events.report(&"catch_attempt", result)
-	for i in near:
-		_signal.erase(i)
-		_noise.erase(i)
-		_swarm.catch_in(i, _net, _bag_spot())
-	judge(&"good", hoop)
-	say("Got them!")
-	_swarm.release(_away(), false, KEEP)
-	finish(true, {attempts = _attempts.duplicate(), windups = windups,
-		first_attempt_correct = _attempts[0].correct, angle_degrees = result.angle_degrees})
-
-
-## The net stopped after going with the flow: that was its answer.
-func _count_wrong() -> void:
-	_attempts.append(_wrong)
-	Events.report(&"catch_attempt", _wrong)
-	_wrong.clear()
-	judge(&"bad", _net.global_position)
-	count_try()
-	say("They flew away! Swing to meet most of them.")
-
-
-func _nearest(at: Vector3, count: int) -> Array[int]:
-	var flying: Array[int] = []
-	for i in _swarm.size():
-		if _swarm.flying(i):
-			flying.append(i)
-	flying.sort_custom(func(a: int, b: int) -> bool:
-		return _swarm.position_of(a).distance_squared_to(at) < _swarm.position_of(b).distance_squared_to(at))
-	return flying.slice(0, count)
-
-
-# -- both ---------------------------------------------------------------------
-
-func _bag_spot() -> Vector3:
-	return Vector3(_rng.randf_range(-0.03, 0.03), _rng.randf_range(-0.03, 0.03), ButterflyNet.BAG_DEPTH * 0.6)
-
-
-## Out from the child through the net, level.
-func _away() -> Vector3:
-	var away := _net.global_position - _frame.origin
-	away.y = 0.0
-	return away.normalized()
 
 
 ## Help: catch them all slows everyone; the swarm all flies with the flow.

@@ -1,6 +1,6 @@
 extends Trial
 ## Tidy up: the alchemist's things fell off the shelf. Every
-## cubby shows what belongs in it on a sticker: a black shadow, a black outline,
+## cubby shows what belongs in it on a sticker: a printed shadow or outline,
 ## a shadow of its size, or a shadow in its colour, upright on the cubby's back
 ## wall. The child pinches a thing, carries it into a cubby and lets go. The right
 ## thing drops onto the board where it was let go, in front of its sticker; a
@@ -98,8 +98,11 @@ const MESSY_FAR := 0.29
 const MESSY_GAP := 0.05
 
 const WOOD := Color(0.55, 0.36, 0.2)
+const WOOD_TEXTURE := preload("res://trials/tidy/assets/plywood_diff_1k.jpg")
 const CARD := Color(0.93, 0.91, 0.86)
-const INK := Color(0.06, 0.06, 0.06)
+const CARD_SIZE := Vector2(CELL - BOARD - 0.01, CELL_HIGH - 0.022)
+const CARD_LIFT := 0.005
+const INK := Color("#626a75")
 const SHINE := Color(1.0, 0.85, 0.3)
 
 var _rng := RandomNumberGenerator.new()
@@ -662,29 +665,38 @@ func _build_shelf() -> void:
 	var high := PLINTH + ROWS * (CELL_HIGH + BOARD)
 	var back := -(SHELF_AHEAD + DEPTH)
 	var near := BENCH_NEAR
-	_box(Vector3(THINGS_WIDE + 0.06, 0.012, -back - near + 0.01), Vector3(0.0, -_below - 0.006, (back - near) * 0.5), WOOD.lightened(0.15))
+	var bench := StandardMaterial3D.new()
+	bench.albedo_color = WOOD.lightened(0.15)
+	_box(Vector3(THINGS_WIDE + 0.06, 0.012, -back - near + 0.01), Vector3(0.0, -_below - 0.006, (back - near) * 0.5), bench)
 	if _match == COLOUR_PRACTICE:
 		return
-	_box(Vector3(wide, high, 0.01), Vector3(0.0, -_below + high * 0.5, back - 0.005), WOOD)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_texture = WOOD_TEXTURE
+	wood.roughness = 0.95
+	wood.uv1_triplanar = true
+	wood.uv1_scale = Vector3.ONE * 2.0
+	_box(Vector3(wide, high, 0.01), Vector3(0.0, -_below + high * 0.5, back - 0.005), wood)
 	for row in ROWS + 1:
 		var y := -_below + PLINTH + row * (CELL_HIGH + BOARD) - BOARD * 0.5
-		_box(Vector3(wide, BOARD, DEPTH), Vector3(0.0, y, back + DEPTH * 0.5), WOOD)
+		_box(Vector3(wide, BOARD, DEPTH), Vector3(0.0, y, back + DEPTH * 0.5), wood)
 	for column in COLUMNS + 1:
 		var x := (column - COLUMNS * 0.5) * CELL
-		_box(Vector3(BOARD, high - PLINTH, DEPTH), Vector3(x, -_below + PLINTH + (high - PLINTH) * 0.5, back + DEPTH * 0.5), WOOD)
-	_box(Vector3(wide, PLINTH, DEPTH), Vector3(0.0, -_below + PLINTH * 0.5, back + DEPTH * 0.5), WOOD.darkened(0.2))
+		# Turn the grain along the length of the dividers.
+		_box(Vector3(high - PLINTH, BOARD, DEPTH), Vector3(x, -_below + PLINTH + (high - PLINTH) * 0.5, back + DEPTH * 0.5), wood, PI * 0.5)
+	_box(Vector3(wide, PLINTH, DEPTH), Vector3(0.0, -_below + PLINTH * 0.5, back + DEPTH * 0.5), wood)
+	var paper := QuadMesh.new()
+	paper.size = CARD_SIZE
 	for cell in COLUMNS * ROWS:
 		var floor_middle := Vector3((cell % COLUMNS - (COLUMNS - 1) * 0.5) * CELL,
 			-_below + PLINTH + (cell / COLUMNS) * (CELL_HIGH + BOARD), back + DEPTH * 0.5)
 		_floor.append(floor_middle)
 		var card := MeshInstance3D.new()
 		card.name = "Card_%d" % cell
-		var quad := QuadMesh.new()
-		quad.size = Vector2(CELL - BOARD, CELL_HIGH)
-		card.mesh = quad
+		card.mesh = paper
+		card.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		var material := _flat(CARD)
 		card.material_override = material
-		card.position = Vector3(floor_middle.x, floor_middle.y + CELL_HIGH * 0.5, back + 0.001)
+		card.position = Vector3(floor_middle.x, floor_middle.y + CARD_LIFT + CARD_SIZE.y * 0.5, back + 0.001)
 		_shelf.add_child(card)
 		_cards.append(material)
 		_cell_key.append("")
@@ -733,6 +745,7 @@ func _sticker(cell: int, look: Dictionary) -> void:
 			var edge := MeshInstance3D.new()
 			edge.mesh = hole
 			edge.material_override = _flat(ink)
+			edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			edge.rotation.x = PI / 2.0
 			edge.scale = Vector3(1.0, 0.02, 1.0)
 			edge.position.z = 0.002
@@ -747,6 +760,7 @@ func _flat_copy(shape: StringName, size: float, scale: float, colour: Color, ahe
 	flat.position.z = ahead
 	var mesh := _mesh(shape, size)
 	mesh.material_override = _flat(colour)
+	mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	flat.add_child(mesh)
 	return flat
 
@@ -785,15 +799,14 @@ static func _extent(shape: StringName, size: float) -> Vector3:
 	return extent
 
 
-func _box(size: Vector3, at: Vector3, colour: Color) -> void:
+func _box(size: Vector3, at: Vector3, material: StandardMaterial3D, angle := 0.0) -> void:
 	var box := BoxMesh.new()
 	box.size = size
 	var part := MeshInstance3D.new()
 	part.mesh = box
-	var material := StandardMaterial3D.new()
-	material.albedo_color = colour
 	part.material_override = material
 	part.position = at
+	part.rotation.z = angle
 	_shelf.add_child(part)
 
 
