@@ -2,6 +2,8 @@
 
 `trials/tidy/`, the alchemy table's game. Things fell off the shelf; each cubby shows what belongs there on a printed sticker. Put everything back. It replaced "find the toy I name" in the adventure; `trials/find` stays for session plans.
 
+The former Outline Match card now opens [Ready to Study](study-desk.md): everyday objects and tabletop outlines. Other shelf levels stay as described below.
+
 - **Play:** reach and pinch a thing, carry it into its cubby, then release. It keeps its contact point and turns with the hand. Right: it drops onto the board where it was let go (no pull to the middle), in front of its sticker; wrong: it goes back with shape/size/colour feedback. Release elsewhere, tracking loss or pause returns it unscored. Brief pinch dropouts (0.12 s) are ignored. All things back ends the round.
 - **Stickers** (axes `match`, `outline`): slate-gray silhouettes and outlines on matte paper, shadows of one shape in sizes a quarter apart, or one shape in colours. `things` (3-6) is driven; six shapes bring the look-alikes.
 - **Wood grain** by Rob Tuytel, [Poly Haven Plywood](https://polyhaven.com/a/plywood) (CC0).

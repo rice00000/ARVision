@@ -26,6 +26,7 @@ TRIALS = {
     "motion": "res://trials/motion/motion.tres",
     "motion_competing": "res://trials/motion/motion_competing.tres",
     "tidy": "res://trials/tidy/tidy.tres",
+    "desk": "res://trials/desk/desk.tres",
 }
 VIEWS = ["normal", "high_contrast", "greyscale", "black_white", "edges", "dim", "spotlight"]
 PLANS = {"demo": "res://content/sessions/demo.tres", "motion": "res://content/sessions/motion.tres",

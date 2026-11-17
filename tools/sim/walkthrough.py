@@ -129,6 +129,31 @@ def walk(sim):
     sim.run_until("session_finished", timeout=30)
 
 
+def walk_desk(sim):
+    child = Child(sim, seed=4)
+    sim.run_until("trial_started")
+    cells = sim.observe()["stimuli"]["layout"]["cells"]
+    objects = sim.observe()["stimuli"]["layout"]["things"]
+    middle = tuple((sum(c["position"][i] for c in cells) + sum(t["centre"][i] for t in objects)) / 10 for i in range(3))
+    child.actor.look_at(middle)
+    capture(sim, "16-desk-outlines", "Ready to Study: five everyday props, five neutral tabletop outlines")
+    child.tidy("wrong", None)
+    check(not sim.observe()["session"]["trial"]["tries"] == 0, "wrong outline judged only after release")
+    capture(sim, "17-desk-wrong", "Wrong drop returns to the tray; no correct outline is revealed")
+    for i in range(5):
+        child.tidy("right", None)
+        if i == 3:
+            child.actor.look_at(middle)
+            capture(sim, "18-desk-four-placed", "Four objects placed: their outlines are gone, the last remains")
+    # Look up to include the child-sized person arriving on the far side of the table.
+    child.actor.look_at((middle[0], middle[1] + 0.15, middle[2] - 0.12))
+    capture(sim, "19-desk-arriving", "With everything tidy, a student walks to the chair")
+    sim.wait(2.6)
+    capture(sim, "20-desk-studying", "The student sits down, opens the notebook and writes")
+    sim.run_until("trial_ended", timeout=10)
+    check(sim.events("trial_ended")[-1]["success"], "the study animation completes before the result")
+
+
 def gallery():
     figures = "\n".join(
         f'<figure><a href="{html.escape(p.name)}"><img src="{html.escape(p.name)}" loading="lazy"></a>'
@@ -157,6 +182,12 @@ def main():
         finally:
             gallery()
             print("GALLERY", OUT / "review.html")
+    with Sim(plan(block("desk", difficulty=0.0, ray=False, pause_between=2.0)),
+             profile="test_walkthrough_desk", rendered=True, out=OUT, eye=1.12) as sim:
+        try:
+            walk_desk(sim)
+        finally:
+            gallery()
     sys.exit(1 if failed else 0)
 
 

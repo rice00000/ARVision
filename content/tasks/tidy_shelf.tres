@@ -7,6 +7,7 @@
 
 [ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
 [ext_resource type="Resource" path="res://trials/tidy/odd_color_adaptive.tres" id="6_colour_adaptive"]
+[ext_resource type="Resource" path="res://trials/desk/desk.tres" id="7_desk"]
 
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
@@ -40,16 +41,15 @@ blocks = Array[ExtResource("3_block")]([SubResource("tidy_2")])
 
 [sub_resource type="Resource" id="tidy_3"]
 script = ExtResource("3_block")
-trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.67
-pins = Dictionary[StringName, float]({&"outline": 1.0})
+trial = ExtResource("7_desk")
+rounds = 1
+difficulty = 0.0
 ray = false
 pause_between = 1.0
 
 [sub_resource type="Resource" id="level_3"]
 script = ExtResource("2_plan")
-title = "Tidy the shelf, level 3"
+title = "Ready to study"
 greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_3")])
@@ -186,7 +186,8 @@ plan = SubResource("level_2")
 script = ExtResource("5_level")
 id = &"outline"
 project = &"outline"
-title = "Outline Match"
+title = "Ready to Study"
+completion = "Thanks for getting the desk ready!"
 first_reward = 3
 repeat_reward = 2
 plan = SubResource("level_3")

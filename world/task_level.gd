@@ -5,6 +5,8 @@ extends Resource
 @export var id: StringName
 @export var project: StringName
 @export var title := ""
+## Optional everyday wording for a level outside the alchemy story.
+@export var completion := ""
 @export_range(0, 9) var first_reward := 3
 @export_range(0, 9) var repeat_reward := 2
 @export var plan: SessionPlan

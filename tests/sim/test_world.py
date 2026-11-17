@@ -56,7 +56,7 @@ class Adventure(SimCase):
                          [(f"task_tidy_shelf_{name}", name == "shadow") for name in
                           ("shadow", "similar_shadows", "outline", "size", "color", "clutter")], "the first three rows")
         self.assertEqual([(b["title"], b["reward"]) for b in world["menu"]["buttons"]],
-                         [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Outline Match L1", 3),
+                         [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Ready to Study L1", 3),
                           ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3)])
         self.press(sim, actor, "task_tidy_shelf_shadow")
         self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1, "level_id": "shadow"})

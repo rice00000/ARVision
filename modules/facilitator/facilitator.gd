@@ -134,6 +134,8 @@ func _activate() -> void:
 	match target.id:
 		&"fac_scenes":
 			_show(&"Scenes")
+		&"fac_credits":
+			_show(&"Credits")
 		&"fac_easier":
 			App.session.nudge(-0.1)
 		&"fac_harder":
@@ -240,6 +242,8 @@ func _refresh_tools() -> void:
 		_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
 	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022 if zones else -0.095, -0.16), tools)
 	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127 if zones else 0.095, -0.16), tools)
+	if not can_jump:
+		_button("fac_credits", "Model credits", Vector2(0.18, 0.038), Vector2(0, -0.015), tools)
 
 
 func _refresh_training() -> void:
@@ -349,6 +353,11 @@ func _build() -> void:
 
 	var tools := _page(&"Tools")
 	_text(_intro_status, Vector2(0, 0.11), tools)
+	var credits := _page(&"Credits")
+	var attribution := Label3D.new()
+	_text(attribution, Vector2(0, -0.01), credits)
+	attribution.font_size = 22
+	attribution.text = "STUDY DESK MODELS\n\nNotebook + Pencil by Poly by Google\nCC BY 3.0, via Poly Pizza\npoly.pizza/m/aXVPyk0zekf\npoly.pizza/m/3Sd2klX0_s4\ncreativecommons.org/licenses/by/3.0/\nRescaled, rotated, grouped; outlines derived.\n\nMug: Kenney / Headphones: CreativeTrio (CC0)\nStudent, chair, plant: Quaternius (CC0)\nWood: Rob Tuytel, Poly Haven (CC0)"
 
 	var confirm := _page(&"Confirm")
 	_text(_confirm_label, Vector2(0, 0.06), confirm)

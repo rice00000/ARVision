@@ -63,6 +63,9 @@ class Child:
         if steps is None and self.policy.freezes(can_time_out):
             steps = ["freeze"]
         while self.result(started) is None:
+            if kind == "desk" and self.sim.observe()["stimuli"]["layout"]["celebrating"]:
+                self.actor.wait(0.25)
+                continue
             step = steps.pop(0) if steps else None
             if steps is not None and step is None:
                 break  # script done; the round goes on without the child
@@ -99,7 +102,7 @@ class Child:
         trial = observation["session"]["trial"]
         eye = observation["head"]["position"]
         view = observation["view"]
-        if kind == "tidy":
+        if kind in ("tidy", "desk"):
             layout = observation["stimuli"]["layout"]
             thing = self.next_thing(layout)
             free = len(self.free_cells(layout))
@@ -134,7 +137,7 @@ class Child:
             return
         elif kind == "find":
             self.find(started, name, arg or "right")
-        elif kind == "tidy":
+        elif kind in ("tidy", "desk"):
             self.tidy(name, arg)
         elif kind.startswith("motion"):
             self.motion(started, name, arg or ("right" if started["condition"]["round"] % 2 == 0 else "left"))
