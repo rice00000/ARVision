@@ -972,9 +972,9 @@ func _on_target(target: Target) -> void:
 		return
 	if PlayMode.is_dev():
 		print("ENTRY touched: ", target.id)
-	# Touch feedback (tracked hands can't vibrate): Wei's Feedback module plays a
-	# sound and shows a mark where the touch landed.
-	Events.feedback.emit(&"hint", target.global_position)
+	# Touch feedback (tracked hands can't vibrate): the cauldron's own knock, from the cauldron
+	# (Megan's scene review, Nov 17), not Wei's generic hint sound and mark.
+	_sounds.play(&"knock", _box.global_position)
 	_tapped = true
 	_runner.cauldron_touched.emit()
 
