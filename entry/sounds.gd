@@ -19,7 +19,11 @@ const FILES := {
 ## Loudness of each, in dB: all well under the speech. (The pops are matched by ear in the headset.)
 const LEVEL := {pre_rattle = -1.0, device_rattle = 8.0, seat = -16.0, pop_a = -13.0, pop_c = -15.0, reveal = -12.0}
 ## A sound that has no file of its own yet borrows another's: the knock is the seating click, lower.
-const BORROWS := {knock = {file = &"seat", pitch = 0.5, db = -14.0}, rattle_soft = {file = &"pre_rattle", pitch = 1.0, db = -9.0}}
+## The hub's impressions each have their own sound (Effects chat, Nov 17): a wooden knock for the shelf, a
+## high soft pop for the dots, a bright click for the cup. Placeholders until real files are chosen.
+const BORROWS := {knock = {file = &"seat", pitch = 0.5, db = -14.0}, rattle_soft = {file = &"pre_rattle", pitch = 1.0, db = -9.0},
+		impression_shelf = {file = &"seat", pitch = 0.55, db = -12.0}, impression_dots = {file = &"pop_a", pitch = 1.5, db = -12.0},
+		impression_turn_to_fit = {file = &"seat", pitch = 1.8, db = -14.0}, place = {file = &"seat", pitch = 1.0, db = -16.0}}
 ## Seconds of lead-in to skip, so the sound lands when the thing happens (pop C has ~0.8 s before its pop).
 const START := {pop_c = 0.8}
 ## The reveal pad is 5 s long; this fades it out after about this long.

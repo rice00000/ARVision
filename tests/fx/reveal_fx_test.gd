@@ -48,6 +48,8 @@ func test_the_table_front_keeps_the_old_timing_and_stays_soft() -> void:
 
 func test_scanned_walls_and_floor_join_fainter_below_hip_height_and_never_under_the_table() -> void:
 	await boot(null, &"intro")
+	var keep := RevealFx.room_strength
+	RevealFx.room_strength = 0.6   # off by default since Nov 17 (table only); the room part still works
 	for wall in RevealShots.sim_walls():
 		App.reality.add_surface(wall)
 	var table := App.reality.work_surface()
@@ -72,6 +74,7 @@ func test_scanned_walls_and_floor_join_fainter_below_hip_height_and_never_under_
 	await wait(1.4)
 	expect(fx.room_radius > fx.table_radius + 0.5, "the room front travels on past the table (%.2f m)" % fx.room_radius)
 	expect(fx.room_radius <= RevealFx.ROOM_FAR + 0.001, "but no farther than %.1f m" % RevealFx.ROOM_FAR)
+	RevealFx.room_strength = keep
 
 
 func test_a_detail_is_drawn_up_at_full_width_and_left_clean() -> void:
@@ -119,3 +122,32 @@ func test_the_opening_reveal_shows_the_whole_workshop_and_leaves_no_light_behind
 			"the light is gone once it has faded")
 	for detail: Node3D in details:
 		expect(detail.scale.is_equal_approx(detail.get_meta(&"size", Vector3.ONE)), "%s ends at its full size" % detail.name)
+
+
+func test_by_default_the_reveal_is_table_only_even_with_a_room_scan() -> void:
+	await boot(null, &"intro")
+	for wall in RevealShots.sim_walls():
+		App.reality.add_surface(wall)
+	expect_eq(RevealFx.room_strength, 0.0, "table only by default (Megan, Nov 17)")
+	var table := App.reality.work_surface()
+	var fx := _fx(table.transform.origin)
+	fx.play(table.transform.origin, 1.5, 1.0, Callable())
+	expect_eq(fx.planes, 1, "the light is on the table only")
+
+
+func test_with_shows_workshop_off_the_reveal_shows_no_shelf_and_ends_on_the_gear_afterglow() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	var keep := RevealFx.shows_workshop
+	RevealFx.shows_workshop = false
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false
+	entry.run()
+	await until(func() -> bool: return entry.zones_available(), 20.0)
+	entry.jump_to(&"reveal")
+	expect(await until(func() -> bool: return entry.find_child("hub_glow_afterglow", true, false) != null, 25.0),
+			"the gear's afterglow (glow A) comes as the light ends")
+	var details: Array = entry.get("_details")
+	expect(details.all(func(d: Node3D) -> bool: return not d.visible), "Wei's shelf and the things stay hidden")
+	expect(await until(func() -> bool: return not HubGlow.any_lit(), 8.0), "the afterglow goes by itself")
+	RevealFx.shows_workshop = keep
