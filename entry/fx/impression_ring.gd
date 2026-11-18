@@ -117,6 +117,20 @@ func front() -> Impression:
 	return best
 
 
+## The open game nearest the arc's middle: where the waiting glow and the teaching hand go (never a locked one).
+func leader() -> Impression:
+	var best: Impression = null
+	var best_angle := INF
+	for i in impressions.size():
+		var piece := impressions[i]
+		if not is_instance_valid(piece) or piece.sealed:
+			continue
+		if absf(_angle(i)) < best_angle:
+			best_angle = absf(_angle(i))
+			best = piece
+	return best if best != null else front()
+
+
 ## The bubble (task or place) whose target is [param target], or null.
 func impression_for(target: Target) -> Impression:
 	for place in places:
@@ -421,7 +435,7 @@ func _angle(i: int) -> float:
 func _place() -> void:
 	var shrink := lerpf(1.0, REST_SCALE, rest)
 	var arc_middle := global_position - _toward * RADIUS
-	var leader := front()
+	var leader := leader()
 	var middle_angle := 0.0 if _carousel() or impressions.size() % 2 == 1 else STEP * 0.5
 	var edge := STEP * (2.0 if _carousel() else 9.0)
 	for i in impressions.size():
@@ -433,7 +447,8 @@ func _place() -> void:
 		var frontness := clampf(1.0 - (absf(angle) - middle_angle) / STEP, 0.0, 1.0)
 		var peek := _carousel() and absf(angle) > STEP * 1.5   # the ends: smaller (there's more)
 		var size := lerpf(SIDE_SCALE, FRONT_SCALE, frontness) * (0.75 if peek else 1.0) * shrink
-		var at := arc_middle + (_toward * cos(angle) + _side * sin(angle)) * RADIUS \
+		# The first game on the child's left (they read left to right): -_side is the child's right.
+		var at := arc_middle + (_toward * cos(angle) - _side * sin(angle)) * RADIUS \
 				+ Vector3.DOWN * (absf(angle) * 0.02 + 0.03 * rest)
 		impression.scale = Vector3.ONE * size
 		impression.global_position = at - Vector3.UP * Impression.MIDDLE.y * size

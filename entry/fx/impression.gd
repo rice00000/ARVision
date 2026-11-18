@@ -70,6 +70,8 @@ static func make(of_kind: StringName) -> Impression:
 			impression._cup()
 		&"house":
 			impression._house()
+		&"butterflies":
+			impression._butterfly()
 		&"stop", &"finish":
 			impression._cross()
 		&"help":
@@ -94,6 +96,8 @@ static func footprint(of_kind: StringName) -> Vector2:
 			return Vector2(0.12, 0.06)
 		&"stop", &"finish", &"help":
 			return Vector2(0.12, 0.03)
+		&"butterflies":
+			return Vector2(0.15, 0.04)
 	return Vector2(0.16, 0.16)
 
 
@@ -217,7 +221,7 @@ const RIM := Color(0.36, 0.36, 0.35)
 const BRASS := Color(0.74, 0.56, 0.24)   # the house's porthole rim: a place, not a game
 const POP_DROPS := 7
 ## What the chosen bubble's title says (and the sound label).
-const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop",
+const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop", &"butterflies": "Butterflies",
 		&"stop": "Stop", &"finish": "Finish", &"help": "Help"}
 const INK := Color(0.114, 0.114, 0.133)   # #1D1D22 (design chat, Nov 18)
 const TILE := Color(0.953, 0.918, 0.824)  # #F3EAD2
@@ -516,6 +520,29 @@ func _cup() -> void:
 	handle.position = Vector3(0.066, 0.065, 0)
 	handle.scale = Vector3(1.0, 1.0, 1.3)
 	_body.add_child(handle)
+
+
+## Wei's butterflies (Megan, Nov 18): a big orange butterfly, wings open, dark body and spots, its own silhouette.
+func _butterfly() -> void:
+	var wing_colour := Color(0.94, 0.55, 0.16)
+	for side: float in [-1.0, 1.0]:
+		var upper := _mesh(_sphere(0.042), wing_colour)
+		upper.scale = Vector3(1.0, 1.15, 0.25)
+		upper.position = Vector3(side * 0.04, 0.095, 0)
+		upper.rotation.z = side * -0.35
+		var lower := _mesh(_sphere(0.03), wing_colour)
+		lower.scale = Vector3(1.0, 1.1, 0.25)
+		lower.position = Vector3(side * 0.03, 0.045, 0)
+		lower.rotation.z = side * 0.4
+		var spot := _mesh(_sphere(0.011), OUTLINE, false)
+		spot.scale = Vector3(1, 1, 0.3)
+		spot.position = Vector3(side * 0.046, 0.1, 0.011)
+	var body := _mesh(_cylinder(0.009, 0.007, 0.1), OUTLINE, false)
+	body.position = Vector3(0, 0.072, 0.006)
+	for side: float in [-1.0, 1.0]:
+		var feeler := _mesh(_cylinder(0.002, 0.002, 0.035), OUTLINE, false)
+		feeler.position = Vector3(side * 0.008, 0.135, 0.006)
+		feeler.rotation.z = side * -0.4
 
 
 ## The ✕ (design chat, Nov 18, `DESIGN_EXIT_AND_HELP.md`): a cream square tile with a near-black edge and a

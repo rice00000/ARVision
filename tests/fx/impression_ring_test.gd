@@ -225,3 +225,13 @@ func test_it_sinks_away_and_rises_back_with_its_pieces() -> void:
 	await ring.rise(mouth, 0.3)
 	expect(ring.visible and ring.opened, "open again")
 	expect(front.global_position.is_equal_approx(at), "the front piece is back in its place")
+
+
+func test_the_games_read_left_to_right_as_the_child_sees_them() -> void:
+	await boot(null, &"intro")
+	var ring := _ring()
+	var eye := App.head().global_position
+	var basis := App.head().global_basis
+	var right := basis.x
+	var xs: Array = ring.impressions.map(func(i: Impression) -> float: return (i.global_position - eye).dot(right))
+	expect(xs[0] < xs[1] and xs[1] < xs[2], "the first game is on the left (%s)" % [xs])

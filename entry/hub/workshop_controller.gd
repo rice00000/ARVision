@@ -53,7 +53,10 @@ const TOUR_LINES: Array[String] = ["Tap the cauldron for games.", "Pinch a bubbl
 const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
-const BUDS: Array[StringName] = [&"shelf", &"dots"]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
+const BUDS: Array[StringName] = [&"shelf", &"dots", &"butterflies"]
+## What opens when (Megan, Nov 18): the dots after the first game, the butterflies after the dots. One unlock per
+## return to the hub. Locked games show with a padlock from the first visit.
+const UNLOCKS: Array[Array] = [[&"dots", &""], [&"butterflies", &"dots"]]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
 
 var workshop: Workshop
 var activities: Array[Summonable] = []
@@ -131,9 +134,10 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		await _run(activity)
 	else:
 		await _offer(_activity(&"shelf"))
-		var dots := _activity(&"dots")
-		if dots != null:
-			await _offer(dots, false, true)   # there's more: the dots wait in a closed bubble until the first game ends
+		for unlock: Array in UNLOCKS:   # there's more: each waits in a locked bubble until it opens
+			var locked := _activity(unlock[0])
+			if locked != null:
+				await _offer(locked, false, true)
 		if welcome:
 			await Onion.line(WELCOME, self)
 	while true:
@@ -194,9 +198,9 @@ func _hub() -> StringName:
 			_demo.stop()
 			cued = &""
 			waited = 0.0
-		if played.is_empty() and cued == &"" and waited > CUE_AFTER and ring.front() != null:
+		if played.is_empty() and cued == &"" and waited > CUE_AFTER and ring.leader() != null:
 			cued = &"pinch"
-			_demo.aim_pinch(ring.front().target)   # shows aim-and-pinch on the shelf: no words
+			_demo.aim_pinch(ring.leader().target)   # shows aim-and-pinch on the shelf: no words
 	_demo.stop()
 	print("HUB choice: ", _picked)
 	return _picked
@@ -276,15 +280,7 @@ func _run(activity: Summonable) -> void:
 	ring.wake()
 	# After the first game: the dots rise in, the door to Wei's room appears below. One line each, at most 2
 	# lines before the child's next action (the game's own ending line was the first).
-	var dots := _activity(&"dots")
-	var dots_piece := _impression_of(dots) if dots != null else null
-	if not said_more and dots != null and dots.is_available() and (dots_piece == null or dots_piece.sealed):
-		said_more = true
-		if dots_piece != null:
-			await dots_piece.unseal()   # its lock opens and drops away, then the bubble clears: the dots can be played now
-		else:
-			await _offer(dots)
-		await Onion.line(MORE, self)
+	await _unlock_next()
 	if ring.door == null:
 		# The places row, from after the first game (design chat, Nov 18): ? · house · ✕. The house says its own
 		# teaser the first time a hand comes to it; ? plays the controls tour; ✕ finishes the visit after Onion asks.
@@ -293,6 +289,29 @@ func _run(activity: Summonable) -> void:
 	for a in activities:   # Turn to fit (or anything) that can run now
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
+
+
+## Opens the next locked game whose time has come (UNLOCKS), once per return: its lock clicks open and drops away,
+## then "There are more waiting.".
+func _unlock_next() -> void:
+	for unlock: Array in UNLOCKS:
+		var activity := _activity(unlock[0])
+		if activity == null or not activity.is_available():
+			continue
+		var after: StringName = unlock[1]
+		if after != &"" and not played.has(after):
+			continue
+		if after == &"" and played.is_empty():
+			continue
+		var piece := _impression_of(activity)
+		if piece != null and not piece.sealed:
+			continue
+		if piece != null:
+			await piece.unseal()
+		else:
+			await _offer(activity)
+		await Onion.line(MORE, self)
+		return
 
 
 ## A game is left early through the cauldron's ✕: its round is dropped (interrupted), "We can come back to these."
@@ -695,7 +714,7 @@ func _tour() -> void:
 			break
 		var shown: Impression = null
 		match step:
-			1: shown = ring.front()
+			1: shown = ring.leader()
 			2: shown = ring.door
 			3: shown = ring.place_of(&"finish")
 		for piece in ring._all():
