@@ -48,6 +48,8 @@ const APART_DEG := 22.0
 ## A wall lantern never shows near the games' ring: at least this far from the cauldron in the view.
 const CLEAR_OF_RING_DEG := 30.0
 
+## Which layout the hub hangs: &"high" (beams under the ceiling, small dim lanterns) or &"walls".
+static var style := &"high"
 ## The Quest switch: false = no dynamic lights at all (the glow alone still reads).
 static var lights_on := true
 ## True while a game runs: steady glow, no embers.
@@ -55,6 +57,9 @@ static var quiet := false
 static var alive: Array[Lantern] = []
 
 var lit := 1.0                               # 0..1, for fading in
+var size := SCALE                            # the model's scale (the high lanterns are smaller)
+var glow := 1.0                              # brightness, times GLOW_ENERGY / HALO_ALPHA (the high ones are dimmer)
+var embers := true
 var light: OmniLight3D
 var _glass: StandardMaterial3D
 var _halo: ShaderMaterial
@@ -65,9 +70,12 @@ var _next_ember := 0.0
 var _random := RandomNumberGenerator.new()
 
 
-static func make(parent: Node, at: Vector3, with_light := true) -> Lantern:
+static func make(parent: Node, at: Vector3, with_light := true, scale_to := SCALE, brightness := 1.0, with_embers := true) -> Lantern:
 	var lantern := Lantern.new()
 	lantern.name = "Lantern"
+	lantern.size = scale_to
+	lantern.glow = brightness
+	lantern.embers = with_embers
 	parent.add_child(lantern)
 	lantern.global_position = at
 	lantern._build(with_light)
@@ -105,6 +113,78 @@ static func hang(parent: Node, mouth: Vector3, eye: Vector3, middle: Vector3) ->
 		hung.append(lantern)
 		count += 1
 	return hung
+
+
+## The "roof" version (Megan, Nov 18): a few dark wooden beams just under the real ceiling, with small,
+## dim lanterns hanging from them, high and spread round the room: seen when the child looks up or around,
+## never in the way. No dynamic light, no embers. The ceiling comes from the scan (&"ceiling"), else the
+## floor + [constant ROOF_HEIGHT], else a guess from the seated eyes. Beams stop at scanned walls.
+const ROOF_HEIGHT := 2.3
+const BEAM_SIZE := Vector2(0.10, 0.13)       # width, height
+const BEAM_ROWS: Array[float] = [-0.7, 0.7, 2.0]   # metres ahead of the eyes (one behind the child)
+const BEAM_LENGTH := 4.4                     # without scanned walls
+const BEAM_WOOD := Color(0.30, 0.20, 0.13)
+const HIGH_SCALE := 0.2
+const HIGH_GLOW := 0.6
+const HIGH_DROP := 0.15                      # chain length below the beam (the model's own chain)
+## Lantern spots, (row, metres to the side): spread round, none straight ahead.
+const HIGH_SPOTS: Array[Vector2] = [Vector2(0, -1.1), Vector2(0, 1.3), Vector2(1, -1.5), Vector2(1, 1.0), Vector2(2, -1.1), Vector2(2, 1.3)]
+
+
+static func hang_high(parent: Node, eye: Vector3, middle: Vector3) -> Array[Lantern]:
+	var ahead := Vector3(middle.x - eye.x, 0.0, middle.z - eye.z).normalized()
+	var right := ahead.cross(Vector3.UP).normalized()
+	var top := _ceiling(eye) - 0.04
+	var beams := Node3D.new()
+	beams.name = "Rafters"
+	parent.add_child(beams)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = BEAM_WOOD
+	wood.roughness = 0.9
+	var hung: Array[Lantern] = []
+	for row in BEAM_ROWS.size():
+		var centre := Vector3(eye.x, top - BEAM_SIZE.y * 0.5, eye.z) + ahead * BEAM_ROWS[row]
+		var reach := _beam_reach(centre, right)
+		var beam := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(reach.y - reach.x, BEAM_SIZE.y, BEAM_SIZE.x)
+		box.material = wood
+		beam.mesh = box
+		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		beams.add_child(beam)
+		beam.global_transform = Transform3D(Basis(right, Vector3.UP, right.cross(Vector3.UP)), centre + right * (reach.x + reach.y) * 0.5)
+		for spot in HIGH_SPOTS:
+			if int(spot.x) != row or spot.y < reach.x + 0.2 or spot.y > reach.y - 0.2:
+				continue
+			var at := centre + right * spot.y + Vector3.DOWN * (BEAM_SIZE.y * 0.5 + HIGH_DROP - 0.10 * HIGH_SCALE)
+			hung.append(make(parent, at, false, HIGH_SCALE, HIGH_GLOW, false))
+	return hung
+
+
+## The ceiling's height: scanned, else the floor + ROOF_HEIGHT, else from the seated eyes.
+static func _ceiling(eye: Vector3) -> float:
+	for ceiling: Surface in App.reality.surfaces(&"ceiling"):
+		return maxf(ceiling.transform.origin.y, eye.y + 0.8)
+	for floor_: Surface in App.reality.surfaces(&"floor"):
+		return maxf(floor_.transform.origin.y + ROOF_HEIGHT, eye.y + 0.8)
+	return eye.y + 1.15
+
+
+## How far a beam through [param centre] along [param along] can run each way before a scanned wall.
+static func _beam_reach(centre: Vector3, along: Vector3) -> Vector2:
+	var reach := Vector2(-BEAM_LENGTH * 0.5, BEAM_LENGTH * 0.5)
+	for wall: Surface in App.reality.surfaces(&"wall_face"):
+		var frame := wall.transform
+		var normal := frame.basis.y.normalized()
+		var facing := along.dot(normal)
+		if absf(facing) < 0.3:
+			continue
+		var t := (frame.origin - centre).dot(normal) / facing
+		if t > 0.0:
+			reach.y = minf(reach.y, t - 0.02)
+		else:
+			reach.x = maxf(reach.x, t + 0.02)
+	return reach
 
 
 ## Candidate spots on the scanned walls, left and right in turn, nearer the middle bearing first.
@@ -167,6 +247,11 @@ func add_bracket(normal: Vector3) -> void:
 	plate.look_at_from_position(global_position - normal * WALL_OUT + Vector3.UP * 0.01, global_position - normal * (WALL_OUT + 1.0), Vector3.UP)
 
 
+## The middle of the glass, from the hang point.
+func glass_offset() -> Vector3:
+	return GLASS * size / SCALE
+
+
 ## Fades the glow in from dark (on the Quest the model fades in too).
 func appear(seconds := 1.5) -> void:
 	lit = 0.0
@@ -178,8 +263,8 @@ func appear(seconds := 1.5) -> void:
 
 func _build(with_light: bool) -> void:
 	var model: Node3D = load(MODEL).instantiate()
-	model.scale = Vector3.ONE * SCALE
-	model.position = Vector3(0.0, -0.10 * SCALE, 0.0)
+	model.scale = Vector3.ONE * size
+	model.position = Vector3(0.0, -0.10 * size, 0.0)
 	add_child(model)
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -205,7 +290,8 @@ func _build(with_light: bool) -> void:
 	halo.mesh = quad
 	halo.name = "halo"
 	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	halo.position = GLASS
+	halo.position = glass_offset()
+	halo.scale = Vector3.ONE * size / SCALE
 	add_child(halo)
 	if with_light and lights_on:
 		light = OmniLight3D.new()
@@ -216,7 +302,7 @@ func _build(with_light: bool) -> void:
 		light.shadow_enabled = false
 		light.light_bake_mode = Light3D.BAKE_DISABLED
 		light.light_cull_mask = 0xFFFFF & ~OWN_LAYER
-		light.position = GLASS
+		light.position = glass_offset()
 		add_child(light)
 	_random.randomize()
 	_noise.seed = _random.randi()
@@ -241,7 +327,7 @@ func _process(delta: float) -> void:
 	_calm = move_toward(_calm, 1.0 if quiet else 0.0, delta)   # eases over ~1 s
 	var breathe := _noise.get_noise_1d(_time) * 1.6   # ~−1..1
 	_apply(1.0 + clampf(breathe, -1.0, 1.0) * FLICKER * (1.0 - _calm))
-	if quiet or lit < 1.0 or not is_visible_in_tree():
+	if quiet or not embers or lit < 1.0 or not is_visible_in_tree():
 		return
 	_next_ember -= delta
 	if _next_ember <= 0.0:
@@ -250,7 +336,7 @@ func _process(delta: float) -> void:
 
 
 func _apply(bright: float) -> void:
-	var level := bright * lit
+	var level := bright * lit * glow
 	if _glass != null:
 		_glass.emission_energy_multiplier = GLOW_ENERGY * level
 	if _halo != null:
@@ -276,7 +362,7 @@ func _ember() -> void:
 	dot.name = "ember"
 	dot.mesh = quad
 	dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	dot.position = ROOF + Vector3(_random.randf_range(-0.02, 0.02), 0.0, _random.randf_range(-0.02, 0.02))
+	dot.position = ROOF * size / SCALE + Vector3(_random.randf_range(-0.02, 0.02), 0.0, _random.randf_range(-0.02, 0.02))
 	add_child(dot)
 	var drift := Vector3(_random.randf_range(-0.025, 0.025), EMBER_RISE * _random.randf_range(0.8, 1.1), _random.randf_range(-0.025, 0.025))
 	var tween := dot.create_tween().set_parallel()

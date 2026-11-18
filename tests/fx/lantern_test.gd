@@ -110,3 +110,29 @@ func test_the_fireplace_fades_in_under_the_hub_lower_in_a_game_and_out_without_a
 	ambience.fade_out()
 	await wait(HubAmbience.FADE + 0.3)
 	expect(not ambience.playing, "faded out and stopped")
+
+
+func test_the_roof_beams_hang_small_dim_lanterns_high_out_of_the_working_view() -> void:
+	await boot(null, &"intro")
+	var eye := App.head().global_position
+	_walls(eye)
+	var middle := eye + Vector3(0, -0.45, -0.6)
+	var hung := Lantern.hang_high(app, eye, middle)
+	expect(hung.size() >= 4, "a few lanterns round the room (%d)" % hung.size())
+	var top := Lantern._ceiling(eye)
+	for lantern in hung:
+		var glass := lantern.global_position + lantern.glass_offset()
+		var flat := Vector3(glass.x - eye.x, 0, glass.z - eye.z)
+		var up := rad_to_deg(atan2(glass.y - eye.y, flat.length()))
+		expect(up > 12.0, "high: above the level gaze, ~40° above the table where the child works (%.0f°)" % up)
+		expect(glass.y < top, "under the ceiling")
+		expect(_flat_angle(eye, glass, middle) > 25.0, "none straight ahead")
+		expect(lantern.light == null and not lantern.embers, "no light, no embers")
+		expect(lantern.size < Lantern.SCALE and lantern.glow < 1.0, "smaller and dimmer")
+	var rafters := app.get_node(^"Rafters")
+	expect(rafters.get_child_count() == Lantern.BEAM_ROWS.size(), "the beams")
+	for beam: MeshInstance3D in rafters.get_children():
+		var half := (beam.mesh as BoxMesh).size.x * 0.5
+		var ends: Array[Vector3] = [beam.global_transform * Vector3(-half, 0, 0), beam.global_transform * Vector3(half, 0, 0)]
+		for end in ends:
+			expect(absf(end.x - eye.x) < 2.3 and end.z - eye.z > -2.4, "a beam stops at the walls")

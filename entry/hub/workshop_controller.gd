@@ -249,7 +249,10 @@ func _build_gear() -> void:
 ## One lantern behind and above the cauldron, plus a few on the scanned walls (Megan, Nov 18). They fade in.
 func _hang_lanterns() -> void:
 	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else _mouth() + Vector3.LEFT * 0.4
-	lanterns = Lantern.hang(self, _mouth(), App.head().global_position, middle)
+	if Lantern.style == &"high":
+		lanterns = Lantern.hang_high(self, App.head().global_position, middle)
+	else:
+		lanterns = Lantern.hang(self, _mouth(), App.head().global_position, middle)
 	for lantern in lanterns:
 		lantern.appear(2.0)
 
@@ -257,6 +260,9 @@ func _hang_lanterns() -> void:
 func _show_lanterns(on: bool) -> void:
 	for lantern in lanterns:
 		lantern.visible = on
+	var rafters := get_node_or_null(^"Rafters") as Node3D
+	if rafters != null:
+		rafters.visible = on
 
 
 func _build_exit() -> void:

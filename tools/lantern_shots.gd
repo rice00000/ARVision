@@ -10,6 +10,10 @@ var _hub: WorkshopController
 
 
 func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--style="):
+			Lantern.style = StringName(arg.trim_prefix("--style="))
+	_out = ProjectSettings.globalize_path("res://build/lanterns_%s" % Lantern.style)
 	DirAccess.make_dir_recursive_absolute(_out.path_join("clip"))
 	get_window().size = Vector2i(1280, 800)
 	Profile.wipe()
@@ -36,20 +40,23 @@ func _ready() -> void:
 	print("LANTERNS ", hub.lanterns.size())
 	for l in hub.lanterns:
 		print("  at ", l.global_position + Lantern.GLASS, " light ", l.light != null)
-	await _shot("0_cauldron", -0.3, 0.55, 90.0)
 	await _shot("1_hub", -0.45, 0.0)
-	await _shot("2_wide", -0.25, 0.0, 100.0)
-	await _shot("3_left", -0.1, 0.75, 100.0)
-	await _shot("4_right", -0.1, -0.75, 100.0)
+	await _shot("2_ahead", -0.05, 0.0, 95.0)
+	await _shot("3_up", 0.55, 0.0, 95.0)
+	await _shot("4_left", 0.2, 1.2, 95.0)
+	await _shot("5_right", 0.2, -1.2, 95.0)
 	# A close look at the cauldron's lantern, then ~6 s of frames for a clip (the glow breathing, embers).
 	var cam := App.rig.head as Camera3D
 	cam.fov = 40.0
-	var target := hub.lanterns[0].global_position + Lantern.GLASS
+	var target := hub.lanterns[0].global_position + hub.lanterns[0].glass_offset()
 	var eye := cam.global_position
 	var flat := Vector3(target.x - eye.x, 0.0, target.z - eye.z)
 	_look(atan2(target.y - eye.y, flat.length()), atan2(-flat.x, -flat.z))
 	await _pause(0.3)
-	await _shot("5_close", NAN, NAN, 40.0)
+	await _shot("6_close", NAN, NAN, 40.0)
+	if not "--clip" in OS.get_cmdline_user_args():
+		get_tree().quit()
+		return
 	Lantern.alive[0].set("_next_ember", 1.0)   # make sure the clip shows one ember
 	for i in 180:
 		await get_tree().create_timer(1.0 / 30.0).timeout
