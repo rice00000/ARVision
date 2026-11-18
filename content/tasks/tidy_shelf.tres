@@ -7,6 +7,8 @@
 [ext_resource type="Script" uid="uid://r0plwybnwais" path="res://world/task_level.gd" id="5_level"]
 [ext_resource type="Resource" uid="uid://dpybbkc5dnhul" path="res://trials/tidy/odd_color_adaptive.tres" id="6_colour_adaptive"]
 [ext_resource type="Resource" path="res://trials/desk/desk.tres" id="7_desk"]
+[ext_resource type="Resource" path="res://trials/sandwich/sandwich.tres" id="8_sandwich"]
+[ext_resource type="Resource" path="res://trials/bookshelf/bookshelf.tres" id="9_bookshelf"]
 
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
@@ -74,6 +76,51 @@ project = &"outline"
 title = "Ready to Study"
 completion = "Thanks for getting the desk ready!"
 plan = SubResource("level_3")
+
+[sub_resource type="Resource" id="bookshelf_block"]
+script = ExtResource("3_block")
+trial = ExtResource("9_bookshelf")
+rounds = 1
+difficulty = 0.0
+ray = false
+pause_between = 1.5
+
+[sub_resource type="Resource" id="bookshelf_plan"]
+script = ExtResource("2_plan")
+title = "Bookshelf Match"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("bookshelf_block")])
+
+[sub_resource type="Resource" id="bookshelf"]
+script = ExtResource("5_level")
+id = &"bookshelf"
+project = &"bookshelf"
+title = "Bookshelf Match"
+completion = "The bookshelf is tidy. Nice work!"
+plan = SubResource("bookshelf_plan")
+
+[sub_resource type="Resource" id="sandwich_block"]
+script = ExtResource("3_block")
+trial = ExtResource("8_sandwich")
+rounds = 1
+difficulty = 0.0
+ray = false
+
+[sub_resource type="Resource" id="sandwich_plan"]
+script = ExtResource("2_plan")
+title = "Make a Sandwich"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("sandwich_block")])
+
+[sub_resource type="Resource" id="sandwich"]
+script = ExtResource("5_level")
+id = &"sandwich"
+project = &"sandwich"
+title = "Make a Sandwich"
+completion = "Lunch is ready. Nice work!"
+plan = SubResource("sandwich_plan")
 
 [sub_resource type="Resource" id="tidy_4"]
 script = ExtResource("3_block")
@@ -254,4 +301,4 @@ plan = SubResource("odd_colour_adaptive_plan")
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3"), SubResource("odd_color_adaptive")])
+levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("bookshelf"), SubResource("sandwich"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3"), SubResource("odd_color_adaptive")])

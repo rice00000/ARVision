@@ -142,6 +142,7 @@ func focus_point() -> Vector3:
 func _on_touched(hand: StringName, target: Target) -> void:
 	if target == _net.grip and not _net.held():
 		_net.hold(hand)
+		Events.play(&"grab", _net.grip.global_position)
 		Events.report(&"net_taken", {trial = condition.trial, hand = hand, seconds = snappedf(seconds(), 0.01)})
 
 
@@ -227,6 +228,7 @@ func _meet(i: int, at: Vector3, swing: Vector3) -> void:
 		caught = _answer.correct
 	if caught:
 		_swarm.catch_in(i, _net)
+		Events.play(&"catch", at)
 	else:
 		_swarm.dodge(i, _net.global_position)
 	if swarm:

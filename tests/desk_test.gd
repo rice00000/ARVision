@@ -2,7 +2,6 @@ extends TestCase
 
 const DESK := preload("res://trials/desk/desk.tres")
 const TASK := preload("res://content/tasks/tidy_shelf.tres")
-const Visuals := preload("res://trials/desk/desk_visuals.gd")
 
 
 func _start(rounds := 1) -> Trial:
@@ -58,7 +57,7 @@ func test_pickup_hover_and_help_never_reveal_the_matching_outline() -> void:
 	var trial := await _start()
 	var picked := record(Events.picked)
 	var feedback := record(Events.feedback)
-	var lines: Dictionary = trial.get("_outlines")
+	var lines: Dictionary = trial.get("_guides")
 	var original := {}
 	for key: String in lines:
 		original[key] = [lines[key].transform, lines[key].material_override]
@@ -89,13 +88,13 @@ func test_wrong_drop_returns_and_right_drop_snaps_and_hides_only_its_outline() -
 	expect_eq(picked.size(), 1, "one pick per deliberate drop")
 	expect(not picked[0][0].correct, "wrong pairing recorded")
 	expect(thing.global_transform.is_equal_approx(home), "wrong thing returns to its tray spot")
-	for line: Node3D in trial.get("_outlines").values():
+	for line: Node3D in trial.get("_guides").values():
 		expect(line.visible, "a wrong answer reveals no correct outline")
 	await _take(thing)
 	await _drop(_cell(trial, key) + Vector3(0.009, 0.025, 0.008))
 	expect(trial.get("_placed").has(thing), "a forgiving correct drop snaps into place")
 	expect(thing.global_position.distance_to(_cell(trial, key)) < 0.001, "snapped to the clean arrangement")
-	expect(not trial.get("_outlines")[key].visible, "only its finished outline disappears")
+	expect(not trial.get("_guides")[key].visible, "only its finished outline disappears")
 	expect_eq(picked.size(), 2, "second drop logged once")
 
 

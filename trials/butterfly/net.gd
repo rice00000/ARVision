@@ -17,6 +17,8 @@ const SMOOTHING := 0.06
 const TURN_SPEED := 0.2
 ## A hoop step longer than this in one tick is tracking finding the hand again, not a swing.
 const JUMP := 0.15
+## A swing this fast (m/s) swishes; the hoop slows below half of it before it can swish again.
+const SWISH_SPEED := 0.8
 
 ## The hand holding it, or &"" while it lies on the table.
 var hand: StringName = &""
@@ -28,6 +30,7 @@ var grip: Target
 var _handle := MeshInstance3D.new()
 var _last := Vector3.INF
 var _opening := Vector3.FORWARD
+var _swishing := false
 
 
 func _ready() -> void:
@@ -48,6 +51,7 @@ func lay(at: Vector3, towards: Vector3) -> void:
 func reset_motion() -> void:
 	velocity = Vector3.ZERO
 	_last = Vector3.INF
+	_swishing = false
 
 
 func hold(side: StringName) -> void:
@@ -67,7 +71,13 @@ func follow(at: Vector3, out: Vector3, delta: float) -> void:
 	elif delta > 0.0:
 		velocity = velocity.lerp((hoop - _last) / delta, minf(1.0, delta / SMOOTHING))
 	_last = hoop
-	if velocity.length() > TURN_SPEED:
+	var speed := velocity.length()
+	if not _swishing and speed >= SWISH_SPEED:
+		_swishing = true
+		Events.play(&"swish", hoop)
+	elif speed < SWISH_SPEED * 0.5:
+		_swishing = false
+	if speed > TURN_SPEED:
 		_opening = _opening.slerp(velocity.normalized(), minf(1.0, delta * 12.0))
 	var up := out if absf(out.dot(_opening)) < 0.95 else Vector3.UP
 	global_transform = Transform3D(Basis.looking_at(_opening, up), hoop)

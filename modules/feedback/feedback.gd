@@ -1,20 +1,23 @@
 extends Module
 ## A judged response, given two ways: a sound and a mark where it happened
-## (tracked hands cannot vibrate). Never colour alone: good is a rising chime and
-## a ring, bad a soft falling tone and a cross, hint a single note and a dot.
+## (tracked hands cannot vibrate). Never colour alone: good is two bright notes rising
+## and a ring, bad a soft low wooden "oh-oh" and a cross, hint a glassy ping and a dot.
+## A won level gets a harp-and-chime flourish. The sounds are in C major like the piano
+## (tools/sound/design.py); takes alternate so a long session never repeats one note pair.
 
-const RATE := 22050
-## Notes (Hz) of each kind's sound, played one after another.
-const NOTES := {good = [660.0, 880.0], bad = [262.0, 220.0], hint = [523.0], win = [523.25, 659.25, 783.99, 1046.50]}
+const SOUNDS := {
+	good = [preload("sounds/good_1.ogg"), preload("sounds/good_2.ogg"), preload("sounds/good_3.ogg")],
+	bad = [preload("sounds/bad_1.ogg"), preload("sounds/bad_2.ogg")],
+	hint = [preload("sounds/hint_1.ogg"), preload("sounds/hint_2.ogg")],
+}
+const WIN := preload("sounds/win.ogg")
 const COLOURS := {good = Color(0.3, 0.9, 0.4), bad = Color(0.95, 0.35, 0.3), hint = Color(1.0, 0.85, 0.3)}
 
-var _sounds: Dictionary[StringName, AudioStreamWAV] = {}
+var _take: Dictionary[StringName, int] = {}
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	for kind: StringName in NOTES:
-		_sounds[kind] = _chime(NOTES[kind])
 	Events.feedback.connect(_on_feedback)
 	Events.level_won.connect(_play_fanfare)
 	Events.scene_changing.connect(func() -> void:
@@ -24,16 +27,21 @@ func _ready() -> void:
 
 func _play_fanfare(_task: StringName, _level: int, _stones: int) -> void:
 	var player := AudioStreamPlayer.new()
-	player.stream = _sounds[&"win"]
-	player.volume_db = -8.0
+	player.stream = WIN
+	player.bus = &"SFX"
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
 
 
 func _on_feedback(kind: StringName, at: Vector3) -> void:
+	var takes: Array = SOUNDS[kind]
+	_take[kind] = (_take.get(kind, randi()) + 1) % takes.size()
 	var player := AudioStreamPlayer3D.new()
-	player.stream = _sounds[kind]
+	player.stream = takes[_take[kind]]
+	player.bus = &"SFX"
+	player.unit_size = 1.0   # full level within a metre, falling off naturally beyond
+	player.max_db = 0.0
 	add_child(player)
 	player.global_position = at
 	player.finished.connect(player.queue_free)
@@ -82,19 +90,3 @@ func _add_mesh(parent: Node3D, mesh: Mesh, material: Material, rotation: Vector3
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)
 
-
-## Soft sine notes, each with a short attack and a fade.
-func _chime(notes: Array) -> AudioStreamWAV:
-	var length := int(RATE * 0.14)
-	var data := PackedByteArray()
-	data.resize(notes.size() * length * 2)
-	for n in notes.size():
-		for i in length:
-			var envelope := minf(1.0, i / 200.0) * (1.0 - float(i) / length)
-			var sample := sin(TAU * notes[n] * i / RATE) * envelope * 0.35
-			data.encode_s16((n * length + i) * 2, int(sample * 32767.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = RATE
-	wav.data = data
-	return wav

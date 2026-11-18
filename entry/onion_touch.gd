@@ -29,6 +29,7 @@ func setup(model: Node3D) -> void:
 func _ready() -> void:
 	name = "OnionTouch"
 	_sound.stream = SOUND
+	_sound.bus = &"SFX"
 	_sound.volume_db = SOUND_DB
 	_sound.max_db = SOUND_DB # the 3D player caps at +3 dB by default
 	_sound.max_polyphony = 4 # quick taps overlap instead of cutting each other off

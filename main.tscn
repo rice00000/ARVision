@@ -23,6 +23,8 @@
 [ext_resource type="Script" uid="uid://xaahhff556jl" path="res://modules/home/home.gd" id="24_home"]
 [ext_resource type="Script" uid="uid://cogkxfcp7o4jv" path="res://modules/pets/pets.gd" id="25_pets"]
 [ext_resource type="Script" uid="uid://cjljyha2i37cx" path="res://entry/room_intro.gd" id="26_room_intro"]
+[ext_resource type="Script" path="res://modules/sound/sound.gd" id="27_sound"]
+[ext_resource type="Script" path="res://modules/music/music.gd" id="28_music"]
 
 [sub_resource type="Environment" id="environment"]
 background_mode = 1
@@ -82,6 +84,12 @@ script = ExtResource("25_pets")
 
 [node name="Home" type="Node" parent="Modules" unique_id=262303556]
 script = ExtResource("24_home")
+
+[node name="Sound" type="Node" parent="Modules" unique_id=1739204481]
+script = ExtResource("27_sound")
+
+[node name="Music" type="Node" parent="Modules" unique_id=1739204482]
+script = ExtResource("28_music")
 
 [node name="RoomIntro" type="Node" parent="." unique_id=189297261]
 script = ExtResource("26_room_intro")

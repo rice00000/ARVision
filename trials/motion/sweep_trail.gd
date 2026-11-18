@@ -1,8 +1,9 @@
 class_name SweepTrail
 extends Node3D
 ## What the rig saw one hand sweep: strands of wind winding from where the sweep
-## set off to the hand, fading once the sweep stops. Silent. White either way: it
-## shows the hand was seen, never whether the answer is right. Wind shader: see
+## set off to the hand, fading once the sweep stops, with a soft breath of air as it
+## sets off. White either way and the same sound either way: it shows the hand was seen,
+## never whether the answer is right. Wind shader: see
 ## wind_trail.gdshader.
 
 const WIND := preload("res://trials/motion/wind_trail.gdshader")
@@ -49,6 +50,8 @@ func show_sweep(from: Vector3, to: Vector3) -> void:
 	for mesh: MeshInstance3D in get_children():
 		mesh.global_transform = place
 		mesh.visible = true
+	if _strength <= 0.0:
+		Events.play(&"sweep", to)
 	_strength = 1.0
 
 

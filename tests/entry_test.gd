@@ -113,7 +113,7 @@ func test_setup_is_quiet_and_waits_for_start() -> void:
 	expect(panel.visible, "setup returns when Tools closes")
 	await wait(6.0)
 	expect(said.is_empty(), "nothing is said before Start (no 'Got it' line either): %s" % [said])
-	expect((entry.get("_music") as AudioStreamPlayer).playing, "the piano is already playing (it starts with the scene)")
+	expect(App.module(&"Music").playing(), "the piano is already playing (it plays from the start)")
 
 
 func test_start_plays_everything_into_the_world() -> void:
@@ -651,14 +651,13 @@ func test_the_story_sounds_play_at_their_moments() -> void:
 	await _press(&"entry_part_all")
 	expect(await _until_said(said, "Could you help me with something?", 60.0), "the opening plays")
 	expect(sounds.played.has(&"pre_rattle"), "the soft rattle plays before Onion appears")
-	expect(sounds.played.has(&"pop_a"), "and Onion's pop (candidate A)")
+	expect(sounds.played.has(&"pop"), "and Onion's pop")
 	await _touch_cauldron()
 	expect(await until(func() -> bool: return sounds.played.has(&"device_rattle"), 30.0), "the heavier rattle precedes the device")
 	expect(not sounds.played.has(&"seat"), "no seating click before the gear is set in")
 	expect(await until(func() -> bool: return sounds.played.has(&"seat"), 60.0), "one click when it is seated")
 	expect(await until(func() -> bool: return sounds.played.has(&"reveal"), 60.0), "the reveal pad with the ripple")
 	expect_eq(sounds.played.count(&"seat"), 1, "the click plays once")
-	expect(sounds.toggle_pop() == "c", "the pop can be switched to candidate C")
 
 
 func test_the_cauldron_is_hidden_during_the_first_shelf_level() -> void:

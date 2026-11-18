@@ -73,6 +73,7 @@ func _offer_replay() -> void:
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
 	button.global_position = eye.origin + forward * 0.4 + Vector3.DOWN * 0.15
+	Events.play(&"appear", button.global_position)
 	Events.say("To play again, point at the yellow ball and pinch.")
 	await button.pressed
 	button.queue_free()

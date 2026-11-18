@@ -214,22 +214,7 @@ For Wei / the organizer: his bench stays 28-42 cm below the eyes whatever the ta
 and the panel stand on the table. Clamping it to the real top (when one is confirmed) would fix it; his file, his call.
 The "shelf near edge" (21 cm) is the bench's front; Wei's nearest things lie about 19-20 cm from the eyes.
 
-**Sounds** (suggestions; the headset check is Megan's). Measured loudness (EBU R128): the voice clips -22.6 to -17.1
-LUFS (median -19.4); piano -18.4; pre-rattle -31.1; device rattle -38.6 (a very quiet file); pop A -16.0; pop C -14.1;
-reveal -17.7; the seat click is 0.19 s, RMS -17.5 dB, true peak +2.4 dBFS (it clips). `AudioStreamPlayer3D` with
-`unit_size = 3.0` adds the full `max_db` (+3 dB) to everything nearer than 3 m, so each sound plays 3 dB over its
-LEVEL, and the A/C pops differ by 1.9 dB. Suggested, for the voice clearly on top (sounds 9-13 dB under it, music 14):
-
-```gdscript
-# in Sounds.play: no near-field boost; it falls off naturally beyond 1 m
-player.unit_size = 1.0
-player.max_db = 0.0
-const LEVEL := {pre_rattle = -1.0, device_rattle = 8.0, seat = -16.0, pop_a = -13.0, pop_c = -15.0, reveal = -12.0}
-# entry.gd: MUSIC_DB := -15.0
-```
-(device_rattle +8 dB because the file is so quiet: better to normalise the file to about -24 LUFS and use -5.) Where
-they play from is right: the rattles at the cauldron (could be its mouth, `_mouth`, a few cm up), the pop at the peek
-spot, the click at the socket, the reveal pad at the socket (where the ripple starts). The voice is not positional
+**Sounds**: redesigned on November 17, 2026 (designed files, files levelled in place, SFX/Music/Voice buses with the piano and effects dipping under the voice): [modules/sound/README.md](../modules/sound/README.md). The voice is not positional
 (Wei's Voice module): Onion speaks from the middle of the head, not from where it floats. A positional voice
 (`AudioStreamPlayer3D` on Onion) would help a child find Onion by ear: Wei's module, a proposal.
 

@@ -64,6 +64,7 @@ func change_scene(id: StringName, fade := true) -> void:
 	switching = true
 	App.hold_pause(&"scene", true)
 	if fade:   # the opening hands over to its first visit without a black blink (Megan's scene one)
+		Events.play(&"transition")
 		await _fade_to(1.0, 0.18)
 	Save.write()
 	var previous := current_scene

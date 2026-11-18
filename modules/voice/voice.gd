@@ -46,6 +46,7 @@ func _ready() -> void:
 	_label.width = 900.0
 	_label.visible = false
 	App.rig.add_child(_label)
+	_player.bus = &"Voice"
 	add_child(_player)
 	Events.said.connect(_say)
 	Events.player_menu_toggled.connect(_player_menu)

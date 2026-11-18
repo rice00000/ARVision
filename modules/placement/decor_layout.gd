@@ -90,6 +90,7 @@ func take_out(id: StringName) -> void:
 		return
 	inventory.take(id)
 	_capture()
+	Events.play(&"appear", node.global_position)
 	Events.report(&"furniture_taken_out", {item = id, room = current_room, position = node.position})
 	Events.say("Pinch the furniture, move your hand, then let go. Touch the box to put it away.")
 
@@ -121,7 +122,7 @@ func _select(hand: StringName, target: Target, _origin: Vector3, _direction: Vec
 	_start_grip = App.rig.pointer(hand).grip()
 	_start_pose = held.transform
 	_mark.visible = true
-	Events.feedback.emit(&"hint", held.global_position)
+	Events.play(&"grab", held.global_position)
 
 
 func _process(_delta: float) -> void:
@@ -148,8 +149,10 @@ func _button(hand: StringName, action: StringName, pressed: bool) -> void:
 func _release(commit: bool) -> void:
 	if not commit:
 		held.transform = _start_pose
+		Events.play(&"slide", held.global_position)
 		Events.say("That place is full. Try an empty space.")
 	else:
+		Events.play(&"place", held.global_position)
 		Events.report(&"furniture_placed", {item = held.id, room = current_room, position = held.position})
 	Events.feedback.emit(&"good" if commit else &"hint", held.global_position)
 	held = null
@@ -162,6 +165,7 @@ func store_held() -> void:
 	var inventory := App.module(&"Inventory")
 	if inventory == null: return
 	var id := held.id
+	Events.play(&"stash", held.global_position)
 	held.free()
 	held = null
 	_mark.visible = false

@@ -186,7 +186,8 @@ func _setup(round_condition: TrialCondition) -> void:
 		_home[thing] = spots[i] + _frame.basis.y * _stands[thing].y * 0.5
 		if arrive and _match != COLOUR_PRACTICE:
 			thing.global_transform = Transform3D(_frame.basis, _home[thing] + _frame.basis.y * 0.12)
-			_move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
+			var drop := _move(thing, _home[thing], 0.5).set_trans(Tween.TRANS_BOUNCE)
+			drop.parallel().tween_callback(Events.play.bind(&"drop", _home[thing])).set_delay(0.28 + 0.03 * i)   # lands, a small clatter
 		else:
 			thing.global_transform = Transform3D(_frame.basis, _home[thing])
 	if seeded:
@@ -381,6 +382,7 @@ func _take(hand: StringName, thing: Target) -> void:
 		_hopping = null
 	_carried[hand] = thing
 	_grip_offset[hand] = App.rig.pointer(hand).grip().affine_inverse() * thing.global_transform
+	Events.play(&"grab", thing.global_position)
 	Events.report(&"taken", {thing = _key[thing], hand = hand})
 
 
@@ -400,6 +402,7 @@ func _physics_process(_delta: float) -> void:
 			if cell >= 0:
 				_put(hand, cell)
 			else:
+				Events.play(&"slide", thing.global_position)
 				_return(hand)
 
 
@@ -461,6 +464,7 @@ func _put(hand: StringName, cell: int) -> void:
 	Events.report(&"put", _puts.back())
 	if not right:
 		judge(&"bad", thing.global_position)
+		Events.play(&"slide", thing.global_position)
 		_move(thing, _home[thing], 0.35)
 		count_try()
 		match _match:
@@ -475,6 +479,7 @@ func _put(hand: StringName, cell: int) -> void:
 	_filled[cell] = true
 	var rest := _rest(thing, cell)
 	_move(thing, rest, 0.25).set_trans(Tween.TRANS_BOUNCE)
+	Events.play(&"place", rest)
 	judge(&"good", rest)
 	_unhint()
 	if _match == ODD_COLOUR or _placed.size() == _things.size():

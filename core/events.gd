@@ -35,6 +35,9 @@ signal said(text: String)
 ## A response was judged: &"good", &"bad" or &"hint". Feedback answers with a
 ## sound and a mark at [param at]: never colour alone.
 signal feedback(kind: StringName, at: Vector3)
+## A sound effect by name (modules/sound), from where it happens; [code]Vector3.INF[/code] for no place
+## (screen-wide, like a scene change). Use [method play].
+signal sound(cue: StringName, at: Vector3)
 ## How the real world is shown changed (passthrough filter, dimming, focus).
 signal view_changed(view: Dictionary)
 
@@ -91,6 +94,10 @@ func say(text: String, speaker: Node = null) -> void:
 	if voice != null:
 		while is_instance_valid(speaker) and (not speaker.can_process() or voice.speaking() == text):
 			await get_tree().process_frame
+
+
+func play(cue: StringName, at := Vector3.INF) -> void:
+	sound.emit(cue, at)
 
 
 func report(what: StringName, data: Dictionary = {}) -> void:

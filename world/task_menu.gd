@@ -67,6 +67,7 @@ func _ready() -> void:
 	visible = not get_tree().paused
 	_build()
 	scale = Vector3(1.0, 0.05, 1.0)
+	Events.play(&"menu_open")
 	var unfold := create_tween()
 	unfold.tween_property(self, ^"scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	unfold.tween_callback(func() -> void:
@@ -142,6 +143,7 @@ func fold() -> void:
 	_drag_hand = &""
 	_hover(null)
 	_update_rows()
+	Events.play(&"menu_close")
 	var tween := create_tween()
 	tween.tween_property(self, ^"scale", Vector3(1.0, 0.05, 1.0), 0.2)
 	tween.tween_callback(queue_free)

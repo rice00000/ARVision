@@ -175,6 +175,7 @@ func release_after(seconds: float) -> void:
 
 
 func _release_one(i: int) -> void:
+	Events.play(&"flutter_away", _pos[i])
 	_state[i] = FREE
 	_clock[i] = 0.0
 	var outside := _net.to_global(Vector3.FORWARD * 0.18)

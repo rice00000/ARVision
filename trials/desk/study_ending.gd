@@ -1,7 +1,7 @@
 extends Node3D
 ## A short, pausable walk -> sit -> open notebook -> write sequence, local to this trial.
 
-const Visuals := preload("res://trials/desk/desk_visuals.gd")
+const Props := preload("res://trials/study_props.gd")
 const STUDENT := preload("res://trials/desk/assets/student.glb")
 const CHAIR := preload("res://trials/desk/assets/chair.glb")
 const FLOOR := -0.68
@@ -45,7 +45,7 @@ func start(keys: Dictionary[Target, String]) -> void:
 	var top: Node3D = notebook.get_node(^"Model").find_child("Box002", true, false) as Node3D
 	_cover = Node3D.new()
 	notebook.add_child(_cover)
-	_cover.position = Vector3(-Visuals.size_of("notebook").x * 0.5, 0, 0)
+	_cover.position = Vector3(-Props.size_of("notebook").x * 0.5, 0, 0)
 	top.reparent(_cover)
 
 

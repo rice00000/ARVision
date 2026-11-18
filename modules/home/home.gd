@@ -146,6 +146,7 @@ func _activate() -> void:
 			var item := _item()
 			App.module(&"Inventory").buy(item.id)
 			Events.say("It is yours!")
+			Events.play(&"purchase", _panel.global_position)
 			Events.feedback.emit(&"good", _panel.global_position)
 			if item.kind == ItemDef.Kind.ROOM:
 				_show(CONFIRM.find_key(page))

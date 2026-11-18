@@ -82,6 +82,7 @@ func mark(runner: Node, symbol: String, hold := 0.9) -> void:
 	label.position = Vector3(0.0, EntryLayout.mark_lift(_height, label.pixel_size), 0.0)
 	_holder.add_child(label)
 	label.add_to_group(&"entry_transient")
+	Events.play(&"mark", label.global_position)
 	var tween := runner.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(label, "modulate:a", 1.0, EntryLayout.MARK_IN)

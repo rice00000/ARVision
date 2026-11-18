@@ -62,6 +62,8 @@ const VERTICAL := 0.77
 var side: StringName
 ## The Target the ray points at now, or null.
 var aimed: Target
+## An interaction can occupy this hand while its pose continues to update.
+var ui_available := true
 
 @onready var _controller := get_parent() as XRController3D
 var _finger: Area3D
@@ -101,7 +103,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER
-	_set_aim(cast() if tracked() else null)
+	_set_aim(cast() if ui_available and tracked() else null)
 	_marker.visible = App.xr == null and tracked()
 	_draw_ui_ray()
 
@@ -126,7 +128,7 @@ func _draw_ui_ray() -> void:
 			if target.show_ray and target.is_visible_in_tree() and target.collision_layer != 0:
 				show = true
 				break
-	show = show and tracked() and (App.xr != null or side == &"right")
+	show = show and ui_available and tracked() and (App.xr != null or side == &"right")
 	_beam.visible = show
 	_dot.visible = show and aimed is UITarget
 	if not show: return
@@ -251,9 +253,18 @@ func grip() -> Transform3D:
 	return Transform3D(global_basis, tip())
 
 
-## The palm faces up: the back of the hand (the palm's own up) faces the floor.
-func palm_up() -> bool:
-	return tracked() and grip().basis.y.y < -0.7
+## The palm surface. As with fingertip input, the synthetic hand supplies a pose
+## on desktop. A missing XR palm cannot be inferred from the aiming ray.
+func palm() -> Transform3D:
+	if App.xr != null:
+		return App.rig.tracked_hand(side).palm()
+	if not tracked(): return TrackedHand.UNTRACKED
+	var axes := global_basis
+	return Transform3D(Basis(axes.x, axes.z, -axes.y), global_position)
+
+
+func hand_closed() -> bool:
+	return _controller.is_button_pressed(&"trigger_click") or _controller.is_button_pressed(&"grip_click")
 
 
 func tracked() -> bool:
@@ -261,6 +272,7 @@ func tracked() -> bool:
 
 
 func _on_button(action: String, pressed: bool) -> void:
+	if not ui_available: return
 	var active := pressed and tracked()
 	var target := cast() if active and action == "trigger_click" else null
 	var on_ui := target is UITarget

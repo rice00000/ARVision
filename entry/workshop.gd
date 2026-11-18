@@ -6,10 +6,7 @@ extends Node3D
 ## the handoff; when the child leaves that scene too, the workshop goes with it.
 ##
 ## In Find the object, Onion becomes the body of the World's "this way" guide and waits
-## beside the shelf in between. The piano fades out instead of cutting off.
-
-## Seconds the piano takes to fade out after the handoff.
-const MUSIC_FADE := 3.0
+## beside the shelf in between.
 
 ## Onion, the guide.
 var onion: Onion
@@ -26,7 +23,7 @@ var _sounds: Sounds
 var layout: EntryLayout
 
 
-## Takes over from the opening. [param parts]: onion, cauldron, rest (where Onion waits), music (or null),
+## Takes over from the opening. [param parts]: onion, cauldron, rest (where Onion waits),
 ## mechanism, gear, mouth, sounds, layout. Call after adding this to Main.
 func take(parts: Dictionary) -> void:
 	add_to_group(&"activity_scenery")
@@ -49,12 +46,6 @@ func take(parts: Dictionary) -> void:
 	if sounds != null and is_instance_valid(sounds):
 		sounds.reparent(self)   # the closing's clunk and rattle
 		_sounds = sounds
-	var music: AudioStreamPlayer = parts.get("music")
-	if music != null and is_instance_valid(music):
-		music.reparent(self)
-		var fade := create_tween()
-		fade.tween_property(music, "volume_db", -60.0, MUSIC_FADE)
-		fade.tween_callback(music.queue_free)
 	create_tween().tween_property(onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
 	Events.scene_changing.connect(_on_scene_changing)
 	Events.reported.connect(_on_reported)
@@ -140,7 +131,9 @@ func goodbye() -> void:
 	var tween := create_tween()
 	tween.tween_property(onion, "global_position", _mouth + Vector3.UP * 0.06, 0.8).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(onion, "global_position", _mouth + Vector3.DOWN * 0.12, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_callback(func() -> void: onion.visible = false)
+	tween.tween_callback(func() -> void:
+		Events.play(&"vanish", _mouth)
+		onion.visible = false)
 	await tween.finished
 
 

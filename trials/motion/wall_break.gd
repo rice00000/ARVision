@@ -160,6 +160,7 @@ func _shatter(size: Vector2) -> void:
 	for side in 2:
 		var player := AudioStreamPlayer3D.new()
 		player.stream = SHATTER[side]
+		player.bus = &"SFX"
 		player.unit_size = 4.0
 		player.position = Vector3(size.x * (side - 0.5), 0.0, 0.0)
 		add_child(player)

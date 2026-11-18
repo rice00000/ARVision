@@ -169,6 +169,58 @@ def gallery():
         encoding="utf-8")
 
 
+def walk_sandwich(sim):
+    child = Child(sim, seed=4)
+    started = sim.run_until("trial_started")
+    layout = sim.observe()["stimuli"]["layout"]
+    child.actor.look_at(tuple(layout["focus"]))
+    sim.wait(5.0)
+    capture(sim, "21-sandwich-counter", "Make a Sandwich: a shuffled tray, an open stack and a 3D sample")
+    for _ in range(2):
+        child.sandwich("right")
+    child.actor.look_at(tuple(layout["focus"]))
+    capture(sim, "22-sandwich-building", "The player builds from the bottom, one pinch and release at a time")
+    for _ in range(2):
+        child.sandwich("right")
+    plate = layout["plate"]
+    sim.head(at=(plate[0], plate[1] + 0.123, plate[2] - 0.02), seconds=0.32)
+    sim.wait(0.67)
+    check(sim.observe()["stimuli"]["layout"]["stage"] == "showcase", "the finished sandwich lifts")
+    capture(sim, "23-sandwich-showcase", "The finished stack opens into layers and spins amid golden sparks")
+    sim.wait(1.85)
+    sim.head(at=(plate[0], plate[1] + 0.045, plate[2] - 0.025), seconds=0.22)
+    check(sim.observe()["stimuli"]["layout"]["stage"] == "served", "the stack settles back on its plate")
+    capture(sim, "24-sandwich-served", "Ready to serve, before the results come in")
+    check(sim.run_until("trial_ended", timeout=6)["success"], "the animation finishes before the result")
+    check(child.result(started)["data"]["first_try"], "the whole sandwich was stacked correctly")
+
+
+def walk_bookshelf(sim):
+    child = Child(sim, seed=4)
+    sim.run_until("trial_started")
+    focus = tuple(sim.observe()["stimuli"]["layout"]["focus"])
+    child.actor.lean((0.0, 0.015, 0.065), at=focus)
+    sim.wait(4.5)
+    for hand in ("left", "right"):
+        sim.track(hand, False)
+    capture(sim, "25-bookshelf-glass", "Bookshelf Match: five glass models in the cubbies and the matching objects on the tray")
+    for hand in ("left", "right"):
+        sim.track(hand, True)
+    for _ in range(2):
+        child.tidy("right", None)
+    child.actor.look_at(focus)
+    capture(sim, "26-bookshelf-matching", "Correctly placed objects replace their own glass models")
+    for _ in range(3):
+        child.tidy("right", None)
+    check(sim.events("trial_ended")[-1]["success"], "all five things fit on the shelf")
+    child.actor.look_at(focus)
+    sim.wait(0.7)
+    for hand in ("left", "right"):
+        sim.track(hand, False)
+    capture(sim, "27-bookshelf-tidy", "The finished bookshelf")
+    check(sim.run_until("session_finished", timeout=6), "the bookshelf session completes")
+
+
 def main():
     failed = rendered_cv_test()
     for old in OUT.glob("*.png"):
@@ -186,6 +238,18 @@ def main():
              profile="test_walkthrough_desk", rendered=True, out=OUT, eye=1.12) as sim:
         try:
             walk_desk(sim)
+        finally:
+            gallery()
+    with Sim(plan(block("sandwich", difficulty=0.0, ray=False, pause_between=2.0)),
+             profile="test_walkthrough_sandwich", rendered=True, out=OUT, eye=1.12) as sim:
+        try:
+            walk_sandwich(sim)
+        finally:
+            gallery()
+    with Sim(plan(block("bookshelf", difficulty=0.0, ray=False, pause_between=2.0)),
+             profile="test_walkthrough_bookshelf", rendered=True, out=OUT, eye=1.12) as sim:
+        try:
+            walk_bookshelf(sim)
         finally:
             gallery()
     sys.exit(1 if failed else 0)

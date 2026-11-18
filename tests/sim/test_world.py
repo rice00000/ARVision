@@ -54,10 +54,10 @@ class Adventure(SimCase):
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
                          [(f"task_tidy_shelf_{name}", name == "shadow") for name in
-                          ("shadow", "similar_shadows", "outline", "size", "color", "clutter")], "the first three rows")
+                          ("shadow", "similar_shadows", "outline", "bookshelf", "sandwich", "size")], "the first three rows")
         self.assertEqual([(b["title"], b["reward"]) for b in world["menu"]["buttons"]],
                          [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Ready to Study L1", 3),
-                          ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3)])
+                          ("Bookshelf Match L1", 3), ("Make a Sandwich L1", 3), ("Size Match L1", 3)])
         self.press(sim, actor, "task_tidy_shelf_shadow")
         self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1, "level_id": "shadow"})
         Child(sim, seed=3).play()
@@ -132,11 +132,12 @@ class Adventure(SimCase):
                         next_menu = sim.observe()["world"]["menu"]
                         self.assertEqual(next_menu["first_row"], menu["first_row"] + 1, "one row per pinch")
                         menu = next_menu
-                    self.assertEqual(len(reached), 10 if scene == "find_object" else 6)
+                    self.assertEqual(len(reached), 12 if scene == "find_object" else 6)
                     if scene == "find_object":
+                        self.assertIn("task_tidy_shelf_bookshelf", reached)
                         self.assertIn("task_tidy_shelf_odd_color_adaptive", reached)
                         self.press(sim, actor, "level_scroll_up")
-                        self.assertEqual(sim.observe()["world"]["menu"]["first_row"], 1)
+                        self.assertEqual(sim.observe()["world"]["menu"]["first_row"], 2)
                 sim.close()
 
 

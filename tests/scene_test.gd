@@ -92,7 +92,7 @@ func test_progress_survives_scene_switches_and_the_headset_keeps_its_pause() -> 
 	expect(App.session == session and not app.switching, "choosing the current scene does not restart it")
 
 
-func test_leaving_intro_removes_its_music_and_waiting_story() -> void:
+func test_leaving_intro_removes_its_waiting_story_and_the_piano_plays_on() -> void:
 	await boot(null, &"intro")
 	var entry: Entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false   # these tests look at the room before pressing anything
@@ -100,10 +100,9 @@ func test_leaving_intro_removes_its_music_and_waiting_story() -> void:
 	# The opening waits for the grown-up's setup; a jump button skips it and starts the story.
 	await jump_to_intro_part(&"hello")
 	await wait(3.0)
-	var music: AudioStreamPlayer = entry.get("_music")
-	expect(music.playing, "the opening is playing")
 	await app.change_scene(&"find_object")
-	expect(not is_instance_valid(entry) and not is_instance_valid(music), "all opening output removed")
+	expect(not is_instance_valid(entry), "all opening output removed")
+	expect(App.module(&"Music").playing(), "the piano plays on across scenes")
 	var said := record(Events.said)
 	await wait(10.0)
 	expect(said.is_empty(), "the old story never speaks again")

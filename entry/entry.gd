@@ -26,10 +26,6 @@ const PEEK_LIFT := 0.06
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
 const CAULDRON_WIDTH := 0.22
-## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md).
-const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
-## Music volume, decibels: well under the voice.
-const MUSIC_DB := -15.0
 
 ## DEMO: the child stays seated. Everything to reach or look at closely sits inside
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.
@@ -72,7 +68,6 @@ var _rim := 0.15                    # height of the rim above the table, metres 
 var _mouth := Vector3.ZERO          # centre of the opening (the brew's surface), world
 var _mouth_radius := 0.05           # radius of the opening, metres (measured)
 var _left := Vector3.LEFT           # the child's left, flat (set when the cauldron is placed)
-var _music := AudioStreamPlayer.new()
 var _orb := Onion.new()             # Onion (the guide); moves around
 var _handed_over := false           # the workshop has Onion and the cauldron now
 var _clock := 0.0
@@ -174,7 +169,7 @@ func _exit_tree() -> void:
 	if not _handed_over:   # not handed over to the first visit: the shelf goes back to Wei's place
 		ShelfCopy.shelf_frame = Transform3D.IDENTITY
 		show_sim_props(true)
-	for node in [_orb, _box, _music]:
+	for node in [_orb, _box]:
 		if is_instance_valid(node) and node.get_parent() == null:
 			node.free()
 
@@ -183,7 +178,6 @@ func _exit_tree() -> void:
 func run() -> void:
 	_runner = PartRunner.new()
 	add_child(_runner)
-	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
 	PlayMode.log_start()   # every session records dev / play
 	SceneMarker.show_text("Opening")
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
@@ -216,8 +210,6 @@ func run() -> void:
 		_pending = &""
 		if part == &"":
 			part = await _choose_part()
-		if not _music.playing:
-			_start_music()
 		Engine.time_scale = TEST_SPEED
 		var fast := part != &"all"
 		_set_up_for(&"hello" if part == &"all" else part)
@@ -831,12 +823,12 @@ func _show_detail(detail: Node3D, shown: bool) -> void:
 
 
 ## Leaves Onion and the cauldron standing for the next scene: a [Workshop] under Main takes
-## them (and the piano, which fades out), glides Onion beside the shelf, and in Find the
+## them, glides Onion beside the shelf, and in Find the
 ## object makes Onion the body of the World's "this way" guide.
 func _hand_over() -> void:
 	var workshop := Workshop.new()
 	App.main.add_child(workshop)
-	workshop.take({onion = _orb, cauldron = _box, rest = _beside_shelf(), music = _music, mechanism = _mechanism,
+	workshop.take({onion = _orb, cauldron = _box, rest = _beside_shelf(), mechanism = _mechanism,
 			gear = _gear, mouth = _mouth, sounds = _sounds, layout = _layout})
 	if is_instance_valid(_cauldron_target):
 		_cauldron_target.queue_free()   # nothing to touch there any more
@@ -1861,7 +1853,7 @@ func _socket_track(from: Vector3, new_origin: Vector3, yaw: float, gear_goes: bo
 
 
 ## The gear pops up through the brew (small, with a little overshoot), clears the rim, then
-## arcs out, tilting and growing, and stands within reach. No flash, no sound but its own.
+## arcs out, tilting and growing, and lands within reach with a soft clack. No flash.
 func _emerge_gear() -> void:
 	_gear.visible = true
 	_gear.scale = Vector3.ONE * GEAR_OUT_SCALE
@@ -1874,6 +1866,7 @@ func _emerge_gear() -> void:
 	tween.tween_property(_gear, "global_position", clear, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(_surprise)
 	tween.tween_method(_gear_arc.bind(clear, _gear_rest, 0.06), 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(func() -> void: _sounds.play(&"gear_land", _gear_rest))
 	await tween.finished
 
 
@@ -1959,7 +1952,7 @@ func _knock() -> void:
 
 ## Onion pops up out of the cauldron: a rounded rise with a small overshoot, then settles.
 func _pop() -> void:
-	_sounds.play_pop(_peek_spot())
+	_sounds.play(&"pop", _peek_spot())
 	var tween := _runner.create_tween()
 	tween.tween_property(_orb, "global_position", _peek_spot() + Vector3.UP * 0.01, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(_orb, "global_position", _peek_spot(), 0.2).set_trans(Tween.TRANS_SINE)
@@ -2195,20 +2188,6 @@ func _material(colour: Color, glows := false) -> StandardMaterial3D:
 ## Moves [param thing] smoothly to [param where] in [param seconds].
 func _move(thing: Node3D, where: Vector3, seconds: float) -> void:
 	await _runner.move(thing, where, seconds)
-
-
-## Quiet piano, fading in, looping.
-func _start_music() -> void:
-	if _music.is_inside_tree():
-		return
-	var stream: AudioStreamMP3 = MUSIC.duplicate()
-	stream.loop = true
-	_music.stream = stream
-	_music.volume_db = -60.0
-	add_child(_music)
-	_music.play()
-	print("ENTRY music playing: ", _music.playing)
-	create_tween().tween_property(_music, "volume_db", MUSIC_DB, 4.0)
 
 
 # --- Interaction -------------------------------------------------------------
