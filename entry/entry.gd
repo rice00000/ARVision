@@ -942,9 +942,9 @@ func _set_up_for(part: StringName) -> void:
 	_orb.actions.lean = 0.0
 	_carry.reset()
 	_surface_points.clear()
-	_box.visible = part != &"shelf"   # back for every part but the shelf (it went after the ripple)
+	_box.visible = true   # every part: the hub's menu is the cauldron (it no longer sinks after the ripple; Megan, Nov 18)
 	_box.scale = Vector3.ONE
-	_cauldron_gone = part == &"shelf"
+	_cauldron_gone = false
 	_gear.visible = false
 	_gear_spin.running = false
 	_mech_spin.running = false

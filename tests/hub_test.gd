@@ -70,18 +70,13 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect(hub.ring.impressions[1].kind == &"dots" and hub.ring.impressions[1].sealed, "the dots wait in a closed bubble (there's more)")
 	expect(hub.ring.impressions.all(func(i: Impression) -> bool: return i.bud == null), "no buds in the menu (Megan, Nov 18)")
 	expect(await until(func() -> bool: return hub.state == &"hub", 10.0), "the hub waits")
-	expect(not hub.ring.visible and not hub.ring.opened, "the menu is closed: it waits for the child's tap")
-	expect(await until(func() -> bool: return hub.cauldron_lit(), 3.0), "the cauldron glows softly (\"you can tap me\")")
+	# Megan, Nov 18: on "Well, this one's ready for us!" the menu opens by itself, Find Objects waiting in front.
+	expect(await until(func() -> bool: return hub.ring.opened and hub.ring.visible and not hub.ring.turning, 10.0), "the menu opened by itself with the line")
 	expect(App.session.trial == null, "nothing plays until the child chooses")
 	var cauldron := (App.main.get_node(^"Workshop") as Workshop).cauldron()
 	expect(cauldron.visible, "the cauldron stays")
+	expect(hub.menu_sign.is_visible_in_tree() and hub.menu_sign.get_parent() == cauldron, "the ☰ is engraved on the cauldron itself")
 	var demo := hub.find_children("*", "DemoHand", true, false)
-	expect(not demo.is_empty() and await until(func() -> bool: return (demo[0] as DemoHand).visible, WorkshopController.CUE_AFTER + 4.0),
-			"after ~5 s with no tap the hand shows a tap at the cauldron")
-	var lines := said.size()
-	Events.touched.emit(&"right", hub.cauldron_target)   # one tap (a touch counts on the cauldron)
-	expect(await until(func() -> bool: return hub.ring.opened and hub.ring.visible and not hub.ring.turning, 5.0), "one tap opens the menu: the fog rises")
-	expect_eq(said.size(), lines, "no new line")
 	expect(await until(func() -> bool: return not hub.cauldron_lit(), 3.0), "the cauldron's glow goes while the menu is open")
 	var eye := App.head().global_position
 	var shelf := hub.ring.impressions[0]
@@ -97,7 +92,7 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running, 20.0), "the shelf plays")
-	expect(hub.menu_sign.visible, "the still ☰ stays over the brew during the game")
+	expect(hub.menu_sign.is_visible_in_tree(), "the ☰ engraved on the cauldron stays during the game")
 	expect(hub.stop_bubble == null, "no ✕ until the child taps the cauldron")
 	expect(not hub.ring.visible, "the menu drew into the cauldron for the game")
 	expect(not hub.carry.enabled, "the gear can't be lifted during a game")

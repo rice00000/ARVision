@@ -483,29 +483,82 @@ func _build_cauldron() -> void:
 	_build_sign(mouth)
 
 
-## The ☰: three short rounded frosted bars with dark outlines, still, just over the brew, facing the child.
-## A hint, not a separate button: tapping it or the cauldron opens the menu.
+## The ☰ engraved on the cauldron's belly, facing the child (Megan, Nov 18: "I like the three line icon, just make
+## it look like a cauldron engraving"): three short grooves cut into the pot, darker than the clay, part of the
+## cauldron (it rattles with it), never floating. They warm with the cauldron's glow. Tapping them or the cauldron
+## opens the menu.
+var _groove_light: StandardMaterial3D
 func _build_sign(mouth: Vector3) -> void:
 	menu_sign = Node3D.new()
-	menu_sign.name = "menu_sign"
-	add_child(menu_sign)
+	menu_sign.name = "menu_engraving"
+	var pot := workshop.cauldron() if workshop != null else null
 	var eye := App.head().global_position
-	menu_sign.global_position = mouth + Vector3.UP * 0.1
-	menu_sign.look_at(menu_sign.global_position + Vector3(eye.x - mouth.x, 0.0, eye.z - mouth.z), Vector3.UP, true)
-	var frost := Impression._lit(Color(0.97, 0.97, 0.96), true)
+	var toward := Vector3(eye.x - mouth.x, 0.0, eye.z - mouth.z).normalized()
+	var belly := mouth + Vector3.DOWN * 0.05
+	var radius := 0.06
+	if pot != null:
+		var box := _bounds(pot)
+		if box.size != Vector3.ZERO:
+			# Measured without the legs and handles: the belly's middle is a little under the rim, and its radius
+			# is the narrower of the pot's two widths (the handles stick out sideways).
+			belly = Vector3(mouth.x, mouth.y - (mouth.y - box.position.y) * 0.32, mouth.z)   # the belly's widest band
+			radius = _surface_toward(pot, belly, toward, minf(box.size.x, box.size.z) * 0.5)
+		pot.add_child(menu_sign)
+	else:
+		add_child(menu_sign)
+	menu_sign.global_position = belly + toward * (radius - 0.002)   # on the surface, cut in a little
+	menu_sign.look_at(menu_sign.global_position + toward, Vector3.UP, true)
+	_groove_light = StandardMaterial3D.new()
+	_groove_light.albedo_color = Color(0.16, 0.13, 0.1)   # a dark cut in the pale pot
+	_groove_light.roughness = 0.9
+	_groove_light.emission_enabled = true
+	_groove_light.emission = GLOW
+	_groove_light.emission_energy_multiplier = 0.0
+	var size := clampf(radius * 0.55, 0.022, 0.045)
 	for row in 3:
-		var bar := MeshInstance3D.new()
+		var groove := MeshInstance3D.new()
 		var capsule := CapsuleMesh.new()
-		capsule.radius = 0.008
-		capsule.height = 0.07
-		bar.mesh = capsule
-		bar.material_override = frost
-		bar.rotation.z = PI * 0.5   # lying across
-		bar.position = Vector3(0.0, (1 - row) * 0.022, 0.0)
-		menu_sign.add_child(bar)
-	sign_target = Target.sphere(&"hub_menu_sign", 0.06)
-	menu_sign.add_child(sign_target)
-	menu_sign.visible = false
+		capsule.radius = size * 0.11
+		capsule.height = size
+		groove.mesh = capsule
+		groove.material_override = _groove_light
+		groove.rotation.z = PI * 0.5   # lying across
+		groove.scale = Vector3(1.0, 1.0, 0.45)   # cut into the surface, not standing on it
+		groove.position = Vector3(0.0, (1 - row) * size * 0.36, 0.0)
+		menu_sign.add_child(groove)
+	sign_target = Target.sphere(&"hub_menu_sign", 0.04)
+	add_child(sign_target)   # under the hub, not the pot: the workshop itself carries no touch targets
+	sign_target.global_position = menu_sign.global_position
+
+
+## How far the pot's own surface reaches from [param centre] along [param toward], at that height: its mesh points
+## within a band around the line (the legs and handles stick out elsewhere). [param fallback] when none.
+func _surface_toward(node: Node3D, centre: Vector3, toward: Vector3, fallback: float) -> float:
+	var best := 0.0
+	var side := toward.cross(Vector3.UP)
+	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh == null:
+			continue
+		var faces := mesh.mesh.get_faces()
+		var xf := mesh.global_transform
+		for point in faces:
+			var p := xf * point - centre
+			if absf(p.y) < 0.015 and absf(p.dot(side)) < 0.02:
+				best = maxf(best, p.dot(toward))
+	return best if best > 0.01 else fallback
+
+
+## The world box round every mesh under [param node].
+func _bounds(node: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh == null:
+			continue
+		var b := mesh.global_transform * mesh.get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	return box
 
 
 ## The gear in its socket can be lifted out (Carry): out = the visit ends.
@@ -624,7 +677,7 @@ func _cauldron_step(delta: float) -> void:
 					_on_press(cauldron_target, false)   # a headset fingertip into the pot (desktop: the click)
 	if open_to_tap and not ever_opened:
 		want = maxf(want, 0.4)   # the first time it waits glowing softly ("you can tap me")
-	menu_sign.visible = open_to_tap or state == &"game"   # the still ☰ stays over the brew during a game
+	_groove_light.emission_energy_multiplier = glow * 0.8   # the engraving warms with the cauldron's glow
 	sign_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0
 	# The sound label: a hand coming to the cauldron, the first few times, "Games".
 	if want >= 0.6 and not _cauldron_hover and open_to_tap:
@@ -711,7 +764,7 @@ func _award(activity: Summonable, outcome: StringName) -> int:
 ## The earning moment (§2, §4): [param stones] rise from the brew into the house's badge, one clink each; a
 ## first-time shelf level grows the shelf a row; the first time ever, Onion says what they're for.
 ## The first visit's welcome (story chat, Nov 18): "Welcome to the workshop.", a fond look round, "It's a bit
-## particular…", the cauldron clicks ready (the games are inside it), "Well, this one's ready for us!". Not awaited:
+## particular…", the cauldron clicks ready and the menu opens by itself, "Well, this one's ready for us!". Not awaited:
 ## a tap on the cauldron works throughout, and the rest stops once the menu is open.
 var _welcoming := false
 func _welcome() -> void:
@@ -728,9 +781,13 @@ func _welcome() -> void:
 		await get_tree().create_timer(BREATH, false).timeout
 		_play(&"unlock", _mouth())   # the mechanism clicks ready
 		glow = 1.0
+		# Megan, Nov 18: the menu opens by itself here and Find Objects waits in front, glowing; the child pinches it.
+		_open_menu()
 		if workshop != null:
-			workshop.attend(_rim())
+			workshop.attend(_mouth() + Vector3.UP * 0.25)
 		await Onion.line(READY, self)
+		if workshop != null:
+			workshop.attend(null)
 	_welcoming = false
 
 

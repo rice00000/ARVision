@@ -34,6 +34,14 @@ func _ready() -> void:
 		_hub = app.find_child("WorkshopController", true, false) as WorkshopController
 		return _hub != null and _hub.state == &"hub" and not _hub.ring.turning, 1800)
 	var hub := _hub
+	var eng_cam := App.rig.head as Camera3D
+	var eng_was := eng_cam.global_transform
+	eng_cam.look_at(hub.menu_sign.global_position)
+	eng_cam.fov = 30.0
+	await _pause(0.3)
+	await _shot("cauldron_engraving", "The ☰ engraved on the cauldron's belly (no floating bars)")
+	eng_cam.global_transform = eng_was
+	eng_cam.fov = 80.0
 	_open(hub)
 	await _until(func() -> bool: return hub.ring.opened and not hub.ring.turning)
 	await _pause(0.8)

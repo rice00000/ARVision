@@ -557,6 +557,8 @@ func test_a_pick_up_ends_onions_shelf_lines() -> void:
 	expect(await until(func() -> bool:
 		var trial := App.session.trial
 		return trial != null and trial.is_running(), 60.0), "the shelf round runs (the jump goes straight to the shelf)")
+	var workshop := App.main.get_node_or_null(^"Workshop") as Workshop
+	expect(workshop != null and workshop.cauldron() != null and workshop.cauldron().is_visible_in_tree(), "the Shelf jump keeps the cauldron (the hub's menu; Megan, Nov 18)")
 	Events.report(&"taken", {})   # the child picks a shape up at once
 	await wait(12.0)
 	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "a pick-up ends Onion's lines")

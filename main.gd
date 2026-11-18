@@ -10,7 +10,8 @@ extends Node3D
 const SCENES := {
 	&"intro": {title = "Intro", path = "res://scenes/intro.tscn"},
 	&"find_object": {title = "Find the object", path = "res://scenes/find_object.tscn"},
-	&"first_visit": {title = "First visit (Onion)", path = "res://scenes/first_visit.tscn"},
+	# Not listed in Staff tools (Megan, Nov 18): on its own it has no cauldron; it is reached through the Intro.
+	&"first_visit": {title = "First visit (Onion)", path = "res://scenes/first_visit.tscn", listed = false},
 	&"global_motion": {title = "Global motion", path = "res://scenes/global_motion.tscn"},
 	&"turn_to_fit": {title = "Turn to fit (real cup)", path = "res://scenes/turn_to_fit.tscn"},
 }

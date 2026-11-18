@@ -258,7 +258,8 @@ func _show(page: StringName) -> void:
 func _refresh() -> void:
 	_scene_label.text = "Current: %s" % Main.SCENES[App.main.current_scene].title
 	for id: StringName in Main.SCENES:
-		_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
+		if Main.SCENES[id].get("listed", true):
+			_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
 	_refresh_training()
 	_refresh_saves()
 	_refresh_results()
@@ -389,6 +390,8 @@ func _build() -> void:
 	_text(_scene_label, Vector2(0.0, 0.1), scenes)
 	var row := 0
 	for id: StringName in Main.SCENES:
+		if not Main.SCENES[id].get("listed", true):
+			continue   # reached only through another scene (the first visit, through the Intro)
 		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.055),
 			Vector2(0.0, 0.032 - row * 0.063), scenes)
 		row += 1
