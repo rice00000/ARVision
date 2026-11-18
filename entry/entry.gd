@@ -479,12 +479,19 @@ func _pickup() -> void:
 		_attend(_gear)   # looks at the gear with a small curious lean; the gear stays still
 		_orb.actions.lean_to(_runner, 0.15, 0.5)
 		_glow_gear(true)   # a soft, steady highlight on the casing while the hand shows it
+		_demo.pinch_lift(_gear)   # the hand shows the pinch from the ask on (Megan, Nov 18); the real gear stays put
+		var demo := _demo
+		_carry.picked_up.connect(func() -> void:
+			if is_instance_valid(demo):
+				demo.stop(), CONNECT_ONE_SHOT)   # grabbed mid-line: the hand goes at once
 		await say("Would you pick it up for me?")   # picking it up is the child agreeing to help
 		if not _carry.has_been_picked_up():
-			_demo.pinch_lift(_gear)   # shows the gesture; the real gear stays where it is
-			await say("Pinch your fingers together, and keep them closed.")
+			say("Pinch your fingers together, and keep them closed.")   # not awaited: a pick-up cuts it short (Megan, Nov 18)
 	await _child_picks_up()
 	_demo.stop()
+	var voice := App.module(&"Voice")
+	if voice != null and voice.has_method(&"speaking") and voice.speaking().begins_with("Pinch your fingers") and voice.has_method(&"skip"):
+		voice.skip()   # already picked up: no need to finish "Pinch your fingers…"
 	_glow_gear(false)   # grabbed: the highlight goes
 	_orb.actions.lean_to(_runner, 0.0, 0.4)
 	_orb.actions.lift(_runner, 0.02, 0.6)   # a small pleased lift

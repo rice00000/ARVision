@@ -1031,7 +1031,8 @@ func test_grabbing_the_gear_during_the_ask_takes_the_glow_and_the_hand_away_at_o
 	expect(carry_node.enabled, "and the child may already take it (a jump straight here switches Carry on)")
 	await _hand_pinch(Carry.middle_of(entry.get("_gear")), true)   # grabbed in the middle of the line
 	expect(await until(func() -> bool: return not _glowing(entry), 0.5), "the glow goes the moment it is grabbed")
-	expect(carry_node.held and not (entry.get("_demo") as DemoHand).visible, "held, and no hand is shown")
+	expect(carry_node.held, "held")
+	expect(await until(func() -> bool: return not (entry.get("_demo") as DemoHand).visible, DemoHand.FADE_SECONDS + 0.3), "and the hand (shown from the ask on) fades away at once")
 	expect(await until(func() -> bool: return entry.get("_part_running") == false, 30.0), "the beat goes on to its end")
 	expect(not _glowing(entry), "and the glow stays off")
 	input.press(&"right", &"trigger_click", false)
@@ -1680,6 +1681,20 @@ func test_the_pick_up_instruction_is_not_cut_while_the_gear_waits_to_be_taken() 
 	await wait(0.4)
 	expect(not log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Pinch your fingers together, and keep them closed." and e[2] == false), "and not cut either, while nothing has been picked up")
 	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Pinch your fingers together, and keep them closed.").size(), 1, "said once")
+
+
+## Megan, Nov 18: the teaching hand shows the pinch from "Would you pick it up for me?" on, and picking the gear up
+## cuts "Pinch your fingers…" short.
+func test_the_hand_shows_the_pinch_from_the_ask_and_a_pick_up_cuts_the_pinch_line() -> void:
+	var entry := await _opening_at_start()
+	var log := _line_log()
+	await jump_to_intro_part(&"pickup")
+	expect(await until(func() -> bool: return _voice().speaking() == "Would you pick it up for me?", 30.0), "Onion asks")
+	var demo := entry.get("_demo") as Node3D
+	expect(demo != null and demo.is_visible_in_tree(), "the hand already shows the pinch during the ask")
+	expect(await until(func() -> bool: return _voice().speaking() == "Pinch your fingers together, and keep them closed.", 30.0), "then the instruction")
+	(entry.get("_carry") as Carry).picked_up.emit()   # the child picks the gear up mid-line
+	expect(await until(func() -> bool: return log.any(func(e: Array) -> bool: return e[0] == "ended" and e[1] == "Pinch your fingers together, and keep them closed." and e[2] == false), 5.0), "the pick-up cuts the line short")
 
 
 func test_a_press_meant_for_the_cauldron_or_one_that_just_took_something_is_never_a_skip() -> void:
