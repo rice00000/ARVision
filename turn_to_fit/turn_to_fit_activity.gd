@@ -11,6 +11,7 @@ extends Summonable
 ## * pause()/resume(): the game node pauses with the world by itself (it's PAUSABLE under the always-running
 ##   controller); nothing else to do.
 
+const TASK := preload("res://content/tasks/turn_to_fit.tres")
 ## How often the CV server is asked "are you there?" (GET /health), and how long an answer may take.
 const PROBE_EVERY := 3.0
 const PROBE_TIMEOUT := 1.5
@@ -46,11 +47,22 @@ func id() -> StringName:
 	return &"turn_to_fit"
 
 
+## One level, "a full go" (design chat, Nov 18): 3 stones the first time, 2 after, whatever the score. The hub
+## gives them through Wei's TaskProgress, as for every game.
+func task() -> Task:
+	return TASK
+
+
+func level_ids() -> Array[StringName]:
+	return [&"go"]
+
+
 func is_available() -> bool:
 	return TurnToFitGame.has_setup() and (server_override if server_override != null else server_ok)
 
 
 func summon(_workspace: Transform3D) -> void:
+	take_level()
 	current = TurnToFitGame.new()
 	current.frame_source = frame_source
 	current.tracker.use_server = use_server

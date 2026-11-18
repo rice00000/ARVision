@@ -16,8 +16,17 @@ func id() -> StringName:
 	return &"shelf"
 
 
+## Find Objects plays only the shelf (Megan, Nov 18): Wei's five shelf levels by difficulty.
+func task() -> Task:
+	return FirstVisit.SHELF_TASK
+
+
+func level_ids() -> Array[StringName]:
+	return [&"shadow", &"size", &"clutter", &"color", &"similar_shadows"]
+
+
 func summon(_workspace: Transform3D) -> void:
-	finished.emit(await _visit.play_shelf())
+	finished.emit(await _visit.play_shelf(take_level()))
 
 
 func leave() -> void:

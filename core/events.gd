@@ -55,6 +55,9 @@ signal block_started(index: int, info: Dictionary)
 signal session_finished
 ## A fully successful, scored level; repeats earn the same reward.
 signal level_won(task: StringName, level: int, stones: int)
+## False in the workshop (the hub's stones flying into the house's badge replace them; design chat, Nov 18):
+## Wei's trophy and fanfare on [signal level_won] stay quiet.
+var celebrate := true
 signal inventory_changed
 signal player_menu_requested
 signal player_menu_toggled(open: bool)

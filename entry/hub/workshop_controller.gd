@@ -14,8 +14,13 @@ extends Node
 ##   ("Welcome to the workshop."); after ~5 s with the menu open and no choice the teaching hand shows
 ##   aim-and-pinch. After the first game the dots' bubble opens ("There are more waiting.", once). Turn to fit
 ##   joins only when it can run. Buds under the shelf and the dots show their next level as a silhouette.
-## * **Places:** Wei's room's door sits below the tasks from after the first game, its line "The room has a few
-##   surprises left in it." after the next game (≤ 2 lines between the child's actions).
+## * **Places:** below the tasks from after the first game: ? (the controls tour) · eye (the child's look for the
+##   real room) · the Virtual Workshop house (with the stones badge) · ✕ (finish, after Onion asks).
+## * **Stones and levels** (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md`): after every game its
+##   stones rise from the brew into the house's badge (effort, not accuracy: 3 first time, 2 on a repeat, 1 for
+##   leaving early); the first time Onion says what they're for. Pressing a game with a finished level opens its
+##   own row (the recommended level big in the middle). What's been played, one-time lines and the look are
+##   saved per child (HubMemory).
 ## * **The gear** turns in its socket. Lifting it out ends the visit: Onion asks "All done for today?"; set back
 ##   in, nothing happens; let go anywhere else, the closing starts (the gear flies home into the cauldron).
 ## * **During a game** the bubbles sink into the cauldron, the gear can't be lifted, and the
@@ -29,7 +34,9 @@ signal _picked_signal
 const CUE_AFTER := 5.0          # seconds without a tap / choice before the teaching hand shows it (first visit)
 const WELCOME := "Welcome to the workshop."
 const MORE := "There are more waiting."
-const SURPRISES := "The room has a few surprises left in it."
+const STONES_YOURS := "These stones are yours."
+const STONES_SPEND := "You can spend them in the Virtual Workshop."
+const ROW_WAIT := 8.0           # a game's own row or the looks: this long with no press, they sink
 const LEFT_EARLY := "We can come back to these."
 const ALL_DONE := "All done for today?"
 const ORDER: Array[StringName] = [&"shelf", &"dots", &"turn_to_fit"]
@@ -74,8 +81,15 @@ var ambience: HubAmbience           # the quiet fireplace crackle under the hub
 var current: Summonable
 var state := &"idle"            # &"hub", &"game", &"home", &"closing", &"closed"
 var played: Array[StringName] = []
-var said_more := false
-var said_surprises := false
+## Saved per child: games played, one-time lines, the look (design chat, Nov 18).
+var memory: HubMemory
+## The stones badge on the house (from when the places row shows).
+var badge: StonesBadge
+## A row shown in the menu's place: a game's levels (&"levels") or the looks (&"looks"); null otherwise.
+var row: ImpressionRing
+var row_kind := &""
+## During a game: the pause bubble's eye (shelf and Turn to fit only), beside the ✕.
+var eye_bubble: Impression
 ## The menu has been opened by the child at least once.
 var ever_opened := false
 var _picked: StringName = &""
@@ -100,6 +114,10 @@ var _cauldron_tapped := false
 var _touring := false
 var _tour_id := 0
 var _cauldron_hover := false
+var _row_pressed: Impression
+var _row_since := 0.0
+var _stop_pick := &""            # the pause bubbles' answer: &"stop", &"eye" or &"" (carry on)
+var _looking := false            # the looks row is up (from the hub's eye)
 
 
 func _ready() -> void:
@@ -121,6 +139,9 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		voice.line_finished.connect(func(_text: String, _completed: bool) -> void:
 			_quiet_since = _clock)
 		Events.said.connect(func(_text: String) -> void: _quiet_since = INF)   # speaking now: wait for its end
+	memory = HubMemory.get_or_make()
+	if memory != null:
+		played = memory.played   # the same array: what's played is saved as it happens
 	_build_ring()
 	_build_cauldron()
 	_build_carry()
@@ -136,14 +157,18 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	else:
 		await _offer(_activity(&"shelf"))
 		for unlock: Array in UNLOCKS:   # there's more: each waits in a locked bubble until it opens
-			var locked := _activity(unlock[0])
-			if locked != null:
-				await _offer(locked, false, true)
+			var next := _activity(unlock[0])
+			if next != null:
+				await _offer(next, false, not _unlocked(unlock))
+		if not played.is_empty():
+			_show_places()   # a later visit: the places row is there from the start
 		if welcome:
 			await Onion.line(WELCOME, self)
 	while true:
 		_picked = &""
 		var choice := await _hub()
+		if choice not in [&"gear_finish", &"finish", &"gear_home"] and not await _choose_level(_activity(choice)):
+			continue
 		if choice == &"gear_finish":
 			break
 		if choice == &"finish":
@@ -233,6 +258,8 @@ func _offer(activity: Summonable, welcome := false, locked := false) -> void:
 	if locked:
 		impression.set_sealed(true)   # shown, not open yet: a press says "Soon" (Megan: there's more to explore)
 	impression.set_bud(impression.kind in BUDS)   # none for now (Megan, Nov 18: no buds in the menu)
+	if impression.kind == &"shelf":
+		impression.set_rows(_shelf_rows())   # one row more for each shelf level finished
 	if welcome:
 		await Onion.line(WELCOME, self)
 	if workshop != null:
@@ -271,25 +298,31 @@ func _run(activity: Summonable) -> void:
 	_drop_stop_bubble()
 	print("HUB ", activity.id(), " finished: ", outcome)
 	Events.report(&"hub_activity_finished", {activity = activity.id(), outcome = outcome})
+	var stones_before := _stones()
+	var grew := activity.id() == &"shelf" and activity.played_level != null \
+			and not App.main.progress.is_done(activity.task(), activity.played_level)
+	var stones := _award(activity, outcome)
+	grew = grew and not _exited and stones > 0
 	activity.fold()
 	current = null
 	ever_opened = true
 	_play(&"menu_open", _mouth())
 	await ring.rise(_mouth())   # and the menu rises again by itself, back at the hub
-	if not played.has(activity.id()):
+	if memory != null:
+		memory.mark_played(activity.id())
+	elif not played.has(activity.id()):
 		played.append(activity.id())
 	ring.wake()
-	# After the first game: the dots rise in, the door to Wei's room appears below. One line each, at most 2
-	# lines before the child's next action (the game's own ending line was the first).
-	await _unlock_next()
+	# After the first game: the places row (with the stones badge) appears below, the next game opens.
 	if ring.door == null:
-		# The places row, from after the first game (design chat, Nov 18): ? · house · ✕. The house says its own
-		# teaser the first time a hand comes to it; ? plays the controls tour; ✕ finishes the visit after Onion asks.
-		var house := Impression.make(&"house")
-		ring.set_places([Impression.make(&"help"), house, Impression.make(&"finish")] as Array[Impression], house)
+		_show_places(stones_before)
+	elif badge != null:
+		badge.set_count(stones_before)
+	await _unlock_next()
 	for a in activities:   # Turn to fit (or anything) that can run now
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
+	_stones_rise(stones, grew)   # not awaited: presses on the bubbles work while the stones fly
 
 
 ## Opens the next locked game whose time has come (UNLOCKS), once per return: its lock clicks open and drops away,
@@ -311,7 +344,8 @@ func _unlock_next() -> void:
 			await piece.unseal()
 		else:
 			await _offer(activity)
-		await Onion.line(MORE, self)
+		if memory == null or memory.first_time(&"more"):
+			await Onion.line(MORE, self)   # the first time only (design chat, Nov 18)
 		return
 
 
@@ -347,17 +381,20 @@ func _build_ring() -> void:
 			impression.reset_bubble()   # the menu stays: the tour plays over it
 			_tour()
 			return
+		if impression.kind == &"eye":
+			impression.reset_bubble()
+			_looks_from_hub()
+			return
 		_pick(&"gear_home" if impression == ring.door else impression.kind))
 	ring.hovered.connect(func(impression: Impression) -> void:
 		# A soft glass tink, a little higher for each bubble along the arc, then its name.
 		var step := ring.impressions.find(impression)
 		_play(&"hover_tink", impression.global_position, 1.0 + 0.08 * (step if step >= 0 else -2))
-		if impression == ring.door and not said_surprises:
-			# The house introduces itself (Megan, Nov 18, option D): its teaser the first time a hand comes to it.
-			if _label(SURPRISES):
-				said_surprises = true
+		if impression == ring.door:
+			# Its name, then the count (design chat, Nov 18: "Seven stones"). The teaser line is cut.
+			_label(impression.label(), false, StonesBadge.spoken(badge.count if badge != null else _stones()))
 			return
-		_label(SOON if impression.sealed else Impression.title_for(impression.kind)))
+		_label(SOON if impression.sealed else impression.label()))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target, true))
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
 
@@ -369,7 +406,25 @@ func _on_press(target: Target, pinched: bool) -> void:
 		if pinched and _clock_real - _stop_since >= STOP_GUARD:
 			_stop_chosen = true   # pinch only: a sweep through it never counts
 		return
+	if eye_bubble != null and is_instance_valid(eye_bubble) and target == eye_bubble.target:
+		if pinched and _clock_real - _stop_since >= STOP_GUARD:
+			_stop_pick = &"eye"
+		return
 	var on_cauldron := target == cauldron_target or target == sign_target
+	if row != null:
+		# A game's own row or the looks: a tap on the cauldron takes them away; a pinch picks (a look stays up).
+		if on_cauldron:
+			_cauldron_tapped = true
+			return
+		var piece := row.impression_for(target)
+		if piece == null or not pinched:
+			return
+		_row_since = _clock_real
+		if row_kind == &"looks":
+			_press_look(piece)
+		elif row.press(piece) == &"chosen":
+			pass   # it pops; [signal ImpressionRing.chosen] follows
+		return
 	if on_cauldron and (state == &"game" or state == &"asking"):
 		# A game: pause it (or carry on); the finish check: no, not yet. A pinch only (Megan, Nov 18: a hand
 		# passing over the cauldron mid-game paused it): games happen right around the cauldron.
@@ -551,12 +606,6 @@ func _cauldron_step(delta: float) -> void:
 				continue
 			if pointer.aimed == cauldron_target:
 				want = 1.0
-			if tap_in_game and pointer.tracked() and App.xr != null:
-				var poke := pointer.tip().distance_to(cauldron_target.global_position) <= _cauldron_radius()
-				var poked: bool = _poking.get(side, false)
-				_poking[side] = poke
-				if poke and not poked:
-					_cauldron_tapped = true
 			if pointer.tracked() and open_to_tap:
 				var gap := pointer.tip().distance_to(cauldron_target.global_position)
 				want = maxf(want, clampf(inverse_lerp(GLOW_NEAR_FROM, GLOW_NEAR_FULL, gap), 0.0, 1.0))
@@ -564,7 +613,7 @@ func _cauldron_step(delta: float) -> void:
 				var was: bool = _poking.get(side, false)
 				_poking[side] = inside
 				if inside and not was and App.xr != null:
-					_open_menu()   # a headset fingertip into the pot (desktop: the click)
+					_on_press(cauldron_target, false)   # a headset fingertip into the pot (desktop: the click)
 	if open_to_tap and not ever_opened:
 		want = maxf(want, 0.4)   # the first time it waits glowing softly ("you can tap me")
 	menu_sign.visible = open_to_tap or state == &"game"   # the still ☰ stays over the brew during a game
@@ -585,7 +634,7 @@ func _cauldron_step(delta: float) -> void:
 ## Says a bubble's (or the cauldron's) name, quietly: only when Onion has been quiet for a moment
 ## ([constant LABEL_QUIET] s) and not in the hub's first [constant LABEL_SETTLE] s, so a label never stacks
 ## on a line (Megan, Nov 18, issue 5). True if it was said.
-func _label(text: String, anywhere := false) -> bool:
+func _label(text: String, anywhere := false, then := "") -> bool:
 	if text == "" or (state != &"hub" and not anywhere):
 		return false
 	var now := _clock
@@ -595,8 +644,220 @@ func _label(text: String, anywhere := false) -> bool:
 	if voice != null and voice.has_method(&"speaking") and voice.speaking() != "":
 		return false
 	print("HUB label: ", text)
-	Onion.line(text, self)
+	if then == "":
+		Onion.line(text, self)
+	else:
+		(func() -> void:
+			await Onion.line(text, self)
+			await get_tree().create_timer(0.3, false).timeout   # a short breath, then the count
+			Onion.line(then, self)).call()
 	return true
+
+
+# --- Places, stones and levels (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md`) -------------------
+
+## Is [param unlock] (a row of UNLOCKS) open for this child? (Saved: what they've played.)
+func _unlocked(unlock: Array) -> bool:
+	var activity := _activity(unlock[0])
+	if activity == null or not activity.is_available():
+		return false
+	var after: StringName = unlock[1]
+	return not played.is_empty() if after == &"" else played.has(after)
+
+
+## The places row: ? · eye · house · ✕ (design chat, Nov 18), the house with the stones badge showing
+## [param stones] (default: the inventory's count).
+func _show_places(stones := -1) -> void:
+	var house := Impression.make(&"house")
+	ring.set_places([Impression.make(&"help"), Impression.make(&"eye"), house, Impression.make(&"finish")] as Array[Impression], house)
+	badge = StonesBadge.attach(house, stones if stones >= 0 else _stones())
+
+
+## The shelf piece's rows: 1 + shelf levels finished, at most 4.
+func _shelf_rows() -> int:
+	var shelf := _activity(&"shelf")
+	return mini(1 + (shelf.done_levels().size() if shelf != null else 0), 4)
+
+
+func _stones() -> int:
+	var inventory := App.module(&"Inventory")
+	return inventory.count(&"magic_stone") if inventory != null else 0
+
+
+## A game's stones (§3: effort, never accuracy): its level's first / repeat reward (Wei's TaskProgress, which
+## also marks it done) when it ran to its end, whatever the score; 1 when the child left it by the ✕ (the level
+## isn't marked done). Returns how many.
+func _award(activity: Summonable, outcome: StringName) -> int:
+	if _exited:
+		var inventory := App.module(&"Inventory")
+		if inventory == null:
+			return 0
+		inventory.add(&"magic_stone", 1)
+		Events.report(&"stones_for_trying", {activity = activity.id()})
+		return 1
+	if outcome == &"interrupted" or activity.task() == null or activity.played_level == null:
+		return 0
+	return App.main.progress.complete(activity.task(), activity.played_level)
+
+
+## The earning moment (§2, §4): [param stones] rise from the brew into the house's badge, one clink each; a
+## first-time shelf level grows the shelf a row; the first time ever, Onion says what they're for.
+func _stones_rise(stones: int, grew: bool) -> void:
+	if badge == null or stones <= 0:
+		return
+	var mine := badge
+	await mine.fly_in(self, _mouth() + Vector3.UP * 0.03, stones, func(at: Vector3) -> void:
+		_play(&"stone_clink", at))
+	if not is_instance_valid(mine) or state != &"hub":
+		return
+	if grew:
+		var shelf := _impression_of(_activity(&"shelf"))
+		if shelf != null:
+			shelf.set_rows(_shelf_rows(), 0.4)
+	if memory != null and &"stones" in memory.said:
+		return
+	var house := ring.door
+	if house == null or not ring.opened:
+		return
+	if memory != null:
+		memory.first_time(&"stones")
+	if workshop != null:
+		workshop.attend(house.global_position)   # Onion turns to the house; it glows while Onion speaks
+	house.set_waiting(0.8)
+	await Onion.line(STONES_YOURS, self)
+	await get_tree().create_timer(0.7, false).timeout
+	await Onion.line(STONES_SPEND, self)
+	if is_instance_valid(house):
+		house.set_waiting(0.0)
+
+
+## Pressing a game (§5b): with nothing of it finished (or one level), its recommended level, at once. Else its own
+## row: the recommended next level big in the middle, the finished ones around it to play again. True = play
+## (the level is set on [param activity]); false = back to the menu (a tap on the cauldron, or ROW_WAIT s).
+func _choose_level(activity: Summonable) -> bool:
+	if activity == null:
+		return false
+	if badge != null:
+		badge.land_all()
+	var levels := activity.levels()
+	var done := activity.done_levels()
+	if levels.size() <= 1 or done.is_empty():
+		activity.level = activity.recommended()
+		return true
+	var best := activity.recommended()
+	var shown: Array[Impression] = []
+	var middle := 0
+	for level in levels:
+		if level != best and level not in done:
+			continue
+		if level == best:
+			middle = shown.size()
+		var piece := activity.make_impression() as Impression
+		piece.title = level.title
+		piece.level = level
+		if piece.kind == &"shelf":
+			piece.set_rows(_shelf_rows())
+		shown.append(piece)
+	await ring.sink(_mouth(), 0.4)
+	await _open_row(&"levels", shown, middle)
+	var picked := await _wait_row()
+	var level: TaskLevel = picked.level if picked != null else null
+	await _close_row()
+	if level == null:
+		_play(&"menu_open", _mouth())
+		await ring.rise(_mouth(), 0.6)
+		return false
+	activity.level = level
+	print("HUB level: ", level.id)
+	return true
+
+
+# --- Rows in the menu's place: a game's levels, the looks ----------------------------------------------------
+
+func _open_row(kind: StringName, pieces: Array[Impression], middle := -1) -> void:
+	row_kind = kind
+	_row_pressed = null
+	_cauldron_tapped = false
+	var eye := App.head().global_position
+	row = ImpressionRing.make(self, pieces, ImpressionRing.spot(_mouth(), eye), eye, _mouth())
+	row.name = "row_%s" % kind
+	row.centre = middle
+	row.visible = false
+	row.opened = false
+	row.hovered.connect(func(piece: Impression) -> void:
+		_play(&"hover_tink", piece.global_position, 1.0 + 0.08 * row.impressions.find(piece))
+		_label(piece.label(), true))
+	row.chosen.connect(func(piece: Impression) -> void: _row_pressed = piece)
+	_play(&"menu_open", _mouth())
+	await row.rise(_mouth(), 0.4)
+	_row_since = _clock_real
+
+
+## Waits for a press in the row (a level: the bubble that popped) or for it to be left: a tap on the cauldron,
+## or ROW_WAIT s with no press (null).
+func _wait_row() -> Impression:
+	while row != null:
+		await get_tree().process_frame
+		if _row_pressed != null:
+			return _row_pressed
+		if _cauldron_tapped:
+			return null
+		if _clock_real - _row_since >= ROW_WAIT:
+			return null
+	return null
+
+
+func _close_row() -> void:
+	if row == null:
+		return
+	var leaving := row
+	_play(&"menu_close", _mouth())
+	await leaving.sink(_mouth(), 0.4)
+	leaving.queue_free()
+	if row == leaving:
+		row = null
+		row_kind = &""
+	_cauldron_tapped = false
+
+
+## The eye in the hub's places row (§6): the menu sinks, the four looks rise; the menu comes back after.
+func _looks_from_hub() -> void:
+	if _looking or state != &"hub":
+		return
+	_looking = true
+	_stop_tour()
+	await ring.sink(_mouth(), 0.4)
+	await _show_looks()
+	if state == &"hub":
+		_play(&"menu_open", _mouth())
+		await ring.rise(_mouth(), 0.6)
+	_looking = false
+
+
+## The looks row: Normal · High contrast · Edges · Black and white, each a little picture of the same scene in
+## that look, the current one ringed. A pinch applies one to the real room at once (it stays up); a tap on the
+## cauldron or ROW_WAIT s without a press leaves, keeping the last one chosen.
+func _show_looks() -> void:
+	var pieces: Array[Impression] = []
+	for id in HubMemory.LOOKS:
+		pieces.append(Impression.make_look(id))
+	await _open_row(&"looks", pieces)
+	for piece in row.impressions:
+		piece.set_picked(memory != null and piece.look == memory.look)
+	await _wait_row()
+	await _close_row()
+
+
+func _press_look(piece: Impression) -> void:
+	if piece.look == &"" or row == null:
+		return
+	print("HUB look: ", piece.look)
+	if memory != null:
+		memory.choose_look(piece.look)
+	for other in row.impressions:
+		other.set_picked(other == piece)
+	piece.touched()
+	_play(&"hover_tink", piece.global_position, 1.1)
 
 
 # --- The ✕ bubble: pausing a game, the finish check (design chat, Nov 18) -------------------------------
@@ -614,7 +875,12 @@ func _watch_cauldron() -> void:
 		App.hold_pause(&"cauldron", true)
 		if current != null:
 			current.pause()
-		var chosen := await _offer_stop(&"stop")
+		# The eye beside the ✕ in the shelf and Turn to fit (not the dots: their dim must stay the same every round).
+		var with_eye := current != null and current.id() in [&"shelf", &"turn_to_fit"]
+		var chosen := await _offer_stop(&"stop", with_eye)
+		if _stop_pick == &"eye":
+			await _show_looks()   # still paused; leaving the looks, the game carries on
+			_stop_pick = &""
 		App.hold_pause(&"cauldron", false)
 		if current != null:
 			current.resume()
@@ -639,46 +905,64 @@ func _ask_finish() -> bool:
 	return yes
 
 
-## Raises one ✕ bubble of [param kind] from the brew and waits: true if it was pinched (it pops), false after
-## STOP_WAIT s or a tap on the cauldron (it sinks). Runs while the world is paused.
-func _offer_stop(kind: StringName) -> bool:
+## Raises one ✕ bubble of [param kind] from the brew (with the eye on its left when [param with_eye]: eye · ✕)
+## and waits: true if the ✕ was pinched (it pops), false after STOP_WAIT s, a tap on the cauldron (they sink) or
+## a pinch on the eye ([member _stop_pick] = &"eye"). Runs while the world is paused.
+func _offer_stop(kind: StringName, with_eye := false) -> bool:
 	_stop_chosen = false
+	_stop_pick = &""
 	_cauldron_tapped = false
 	stop_bubble = Impression.make(kind)
-	stop_bubble.add_bubble()
-	add_child(stop_bubble)
+	var bubbles: Array[Impression] = [stop_bubble]
+	if with_eye:
+		eye_bubble = Impression.make(&"eye")
+		bubbles.push_front(eye_bubble)
+	for piece in bubbles:
+		piece.add_bubble()
+		add_child(piece)
 	var eye := App.head().global_position
 	var top := ImpressionRing.spot(_mouth(), eye) + Vector3.DOWN * 0.06
+	var toward := Vector3(eye.x - top.x, 0.0, eye.z - top.z).normalized()
+	var right := Vector3.UP.cross(toward).normalized()   # the child's right
 	var size := STOP_SCALE
+	var spots: Array[Vector3] = []
+	for i in bubbles.size():
+		spots.append(top + right * (i - (bubbles.size() - 1) * 0.5) * 0.15)
 	var rise := create_tween()
 	rise.tween_method(func(k: float) -> void:
-		stop_bubble.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k)
-		stop_bubble.global_position = _mouth().lerp(top, k) - Vector3.UP * Impression.MIDDLE.y * size * lerpf(0.2, 1.0, k)
-		stop_bubble.look_at(stop_bubble.global_position + Vector3(eye.x - top.x, 0.0, eye.z - top.z), Vector3.UP, true)
-		stop_bubble.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		for i in bubbles.size():
+			var piece := bubbles[i]
+			piece.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k)
+			piece.global_position = _mouth().lerp(spots[i], k) - Vector3.UP * Impression.MIDDLE.y * size * lerpf(0.2, 1.0, k)
+			piece.look_at(piece.global_position + toward, Vector3.UP, true)
+			piece.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	_play(&"menu_open", _mouth())
 	_stop_since = _clock_real
-	var labelled := false
+	var labelled := {}
 	while _clock_real - _stop_since < STOP_WAIT:
 		await get_tree().process_frame
-		if _stop_chosen:
+		if _stop_chosen or _stop_pick != &"" or _cauldron_tapped:
 			break
-		if _cauldron_tapped:
-			break
-		if not labelled and _hand_near(stop_bubble.target.global_position, 0.12):
-			labelled = _label(Impression.title_for(kind), true)
+		for piece in bubbles:
+			if not labelled.get(piece, false) and _hand_near(piece.target.global_position, 0.12):
+				labelled[piece] = _label(piece.label(), true)
 	var chosen := _stop_chosen
+	var popped: Impression = stop_bubble if chosen else (eye_bubble if _stop_pick == &"eye" else null)
 	if chosen:
-		stop_bubble.touched()
-		stop_bubble.pop()
-		await get_tree().create_timer(0.35, true).timeout
-	else:
-		var at := stop_bubble.global_position
-		var sink := create_tween()
-		sink.tween_method(func(k: float) -> void:
-			stop_bubble.global_position = at.lerp(_mouth(), k)
-			stop_bubble.scale = Vector3.ONE * size * lerpf(1.0, 0.2, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-		await sink.finished
+		_stop_pick = &"stop"
+	if popped != null:
+		popped.touched()
+		popped.pop()
+	var starts: Array[Vector3] = []
+	for piece in bubbles:
+		starts.append(piece.global_position)
+	var sink := create_tween()
+	sink.tween_method(func(k: float) -> void:
+		for i in bubbles.size():
+			if bubbles[i] != popped and is_instance_valid(bubbles[i]):
+				bubbles[i].global_position = starts[i].lerp(_mouth(), k)
+				bubbles[i].scale = Vector3.ONE * size * lerpf(1.0, 0.2, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await sink.finished
 	_drop_stop_bubble()
 	_cauldron_tapped = false
 	_stop_chosen = false
@@ -686,9 +970,11 @@ func _offer_stop(kind: StringName) -> bool:
 
 
 func _drop_stop_bubble() -> void:
-	if stop_bubble != null and is_instance_valid(stop_bubble):
-		stop_bubble.queue_free()
+	for piece in [stop_bubble, eye_bubble]:
+		if piece != null and is_instance_valid(piece):
+			piece.queue_free()
 	stop_bubble = null
+	eye_bubble = null
 
 
 func _hand_near(at: Vector3, within: float) -> bool:

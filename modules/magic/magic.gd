@@ -17,6 +17,8 @@ func _ready() -> void:
 
 
 func _celebrate(_task: StringName, _level: int, _stones: int) -> void:
+	if not Events.celebrate:
+		return
 	var clip := Sprite3D.new()
 	clip.name = "LevelCelebration"
 	clip.texture = TROPHY

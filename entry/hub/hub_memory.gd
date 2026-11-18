@@ -1,0 +1,85 @@
+class_name HubMemory
+extends Node
+## What the workshop hub remembers per child (saved with their progress, key "hub"; design chat, Nov 18,
+## `claude/DESIGN_STONES_AND_LEVELS.md`): which games they have played (so the next game opens one at a time,
+## across visits), which one-time lines Onion has said, and the visual look they picked through the eye.
+##
+## The look is applied as [code]App.session.base_view[/code] as soon as the save loads, so it is on from the
+## start of the next visit. Staff tools' "Next view" still overrides it for the grown-up.
+
+const LOOKS: Array[StringName] = [&"normal", &"high_contrast", &"edges", &"black_white"]
+
+var save_key := "hub"
+## Game ids played at least once (finished or left).
+var played: Array[StringName] = []
+## One-time lines already said (&"stones", &"more").
+var said: Array[StringName] = []
+## The child's look (one of LOOKS).
+var look := &"normal"
+
+
+## The one memory, under the app's main node (made on first use).
+static func get_or_make() -> HubMemory:
+	if App.main == null:
+		return null
+	var memory := App.main.get_node_or_null(^"HubMemory") as HubMemory
+	if memory == null:
+		memory = HubMemory.new()
+		memory.name = "HubMemory"
+		App.main.add_child(memory)
+	memory._apply_look()   # a new session starts at Normal: the child's look again
+	return memory
+
+
+func save_state() -> Dictionary:
+	return {played = played.map(func(id: StringName) -> String: return String(id)),
+			said = said.map(func(id: StringName) -> String: return String(id)), look = String(look)}
+
+
+func load_state(data: Dictionary) -> void:
+	played.clear()
+	for id: Variant in data.get("played", []):
+		played.append(StringName(str(id)))
+	said.clear()
+	for id: Variant in data.get("said", []):
+		said.append(StringName(str(id)))
+	look = StringName(str(data.get("look", "normal")))
+	if look not in LOOKS:
+		look = &"normal"
+	_apply_look()
+
+
+func mark_played(id: StringName) -> void:
+	if id not in played:
+		played.append(id)
+		Save.request()
+
+
+## True the first time (and remembers it).
+func first_time(line: StringName) -> bool:
+	if line in said:
+		return false
+	said.append(line)
+	Save.request()
+	return true
+
+
+## The child picked [param id]: it shows in the real room now and from the start of every later visit.
+func choose_look(id: StringName) -> void:
+	if id not in LOOKS:
+		return
+	look = id
+	_apply_look()
+	if App.reality != null:
+		App.reality.apply_view(App.session.base_view)
+	Events.report(&"view_chosen", {look = String(id), title = view_of(id).title})
+	Save.request()
+
+
+static func view_of(id: StringName) -> View:
+	return load("res://content/views/%s.tres" % id) as View
+
+
+func _apply_look() -> void:
+	if App.session != null:
+		App.session.base_view = view_of(look)

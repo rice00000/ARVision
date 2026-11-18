@@ -24,6 +24,7 @@ const BORROWS := {
 	locked_bonk = {file = &"knock", pitch = 0.6, db = -10.0},    # a closed bubble pressed: soft, never a buzzer
 	unlock = {file = &"reveal", pitch = 1.2, db = -8.0},        # a closed bubble opens
 	menu_open = {file = &"pop", pitch = 0.7, db = -10.0},
+	stone_clink = {file = &"seat", pitch = 2.3, db = -14.0},     # a stone lands in the house's badge (under any voice)
 	menu_close = {file = &"pop", pitch = 0.55, db = -14.0},
 	place = {file = &"seat", pitch = 1.0, db = -6.0},
 	gear_lift = {file = &"pop", pitch = 1.3, db = -10.0},

@@ -22,7 +22,6 @@ var _onion: Workshop
 var _shelf_spot := Vector3.INF
 var _reminder: ShelfReminder   # a hand that shows how to pick a shape up, if the child waits (interaction chat)
 var _shelf_plays := 0      # how many times the shelf has been played in this visit
-var _shelf_level := 1      # the next of Wei's levels after the tutorial (level 2 first)
 var controller: WorkshopController
 var _left := false         # the child left the shelf early (the exit token)
 
@@ -31,6 +30,8 @@ var _left := false         # the child left the shelf early (the exit token)
 
 func run() -> void:
 	_onion = App.main.get_node_or_null(^"Workshop") as Workshop
+	Events.celebrate = false   # the hub's stones replace Wei's trophy and fanfare in the workshop
+	HubMemory.get_or_make()    # the child's saved look is the base view from here
 	App.reality.apply_view(App.session.base_view)
 	if not App.reality.is_settled:
 		await App.reality.settled
@@ -65,15 +66,18 @@ func _go_home() -> void:
 	await _motion.visit_home()
 
 
-## The shelf activity, once: Onion's tutorial the first time, Wei's next level after that. Returns
-## &"done" (every round won), &"left" (not all won, or left early) or &"interrupted".
-func play_shelf() -> StringName:
+## The shelf activity, once: [param level] (the hub's pick). Shadow Match with Onion's tutorial until this child
+## has finished it; any other level (or a replay) as Wei's own. Returns &"done" (every round won), &"left" (not
+## all won, or left early) or &"interrupted". The hub gives the stones (WorkshopController).
+func play_shelf(level: TaskLevel = null) -> StringName:
 	_shelf_plays += 1
 	_left = false
 	_rounds_ended = 0
 	_rounds_won = 0
-	if _shelf_plays > 1:
-		return await _more_shelf()
+	if level == null:
+		level = SHELF_TASK.level_by_id(TUTORIAL_LEVEL)
+	if level.id != TUTORIAL_LEVEL or App.main.progress.is_done(SHELF_TASK, level):
+		return await _more_shelf(level)
 	Tidy.onion_voice = true
 	_started = false
 	SceneMarker.show_text("Shelf")
@@ -110,8 +114,6 @@ func _invitation_open() -> bool:
 func _play() -> StringName:
 	var level := SHELF_TASK.level_by_id(TUTORIAL_LEVEL)
 	await App.session.play(_reminder.prepare(level.plan), false)
-	if App.session.won:
-		App.main.progress.complete(SHELF_TASK, level)
 	_started = true   # done before Onion finished talking: no more of the invitation, and no waiting for it
 	var voice := App.module(&"Voice")
 	if voice != null and voice.has_method(&"skip"):
@@ -139,19 +141,14 @@ func _closing() -> StringName:
 	return &"done" if all_won else &"left"
 
 
-## Wei's next shelf level (his own lines this time).
-func _more_shelf() -> StringName:
-	var level := SHELF_TASK.levels[_shelf_level]
-	SceneMarker.show_text("Shelf, level %d" % (_shelf_level + 1))
+## One of Wei's shelf levels (his own lines this time).
+func _more_shelf(level: TaskLevel) -> StringName:
+	SceneMarker.show_text("Shelf: %s" % level.title)
 	Tidy.onion_voice = false
 	await App.session.play(level.plan)
 	var won := App.session.won and not _left
 	if not won:
 		await say(WorkshopController.LEFT_EARLY)
-	if won:
-		App.main.progress.complete(SHELF_TASK, level)
-	# After the last level the shelf replays it for its configured repeat reward.
-	_shelf_level = mini(_shelf_level + 1, SHELF_TASK.levels.size() - 1)
 	return &"done" if won else &"left"
 
 
@@ -176,6 +173,7 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 
 
 func _exit_tree() -> void:
+	Events.celebrate = true
 	Tidy.onion_voice = false
 	Tidy.shelf_frame = Transform3D.IDENTITY   # the opening's planned bench ends with the first visit
 	Entry.show_sim_props(true)

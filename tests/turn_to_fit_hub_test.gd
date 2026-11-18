@@ -113,7 +113,7 @@ func test_a_first_go_free_look_lines_five_rounds_check_in_ending_and_stones() ->
 	expect(_said_line(TurnToFitGame.FOUND_PLACE), "5 of 5 fits: \"There. Everything's found its place.\"")
 	var rounds := reported.filter(func(r: Array) -> bool: return r[0] == &"turn_to_fit_round")
 	expect_eq(rounds.size(), 6, "6 rounds logged (5 turns + the check-in): %s" % [rounds.map(func(r: Array) -> String: return "%s/%s" % [r[1].get("mode", ""), r[1].get("result", "")])])
-	expect_eq(App.module(&"Inventory").count(&"magic_stone") - stones_before, TurnToFitGame.STONES, "the first full go earns stones")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone") - stones_before, 0, "the game gives none itself: the hub gives every game's stones (DESIGN_STONES_AND_LEVELS §3)")
 	expect_eq(line_colour, Vector3(TurnToFitGame.GOLD.r, TurnToFitGame.GOLD.g, TurnToFitGame.GOLD.b), "never green before a fit")
 	activity.fold()
 

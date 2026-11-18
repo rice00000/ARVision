@@ -231,11 +231,7 @@ func _end() -> void:
 	_ending = true
 	phase = &"end"
 	Events.report(&"turn_to_fit", {event = &"go_end", fits = go.fits, ending = go.ending()})
-	var record := progress()
-	if not record.get("stones", false):
-		record.stones = true
-		save_progress(record)
-		Events.level_won.emit(&"turn_to_fit", 1, STONES)   # Inventory adds them (first full go only)
+	# Stones: the hub gives them now (3 first, 2 after; design chat, Nov 18, DESIGN_STONES_AND_LEVELS §3).
 	_finish(&"done", FOUND_PLACE if go.ending() == &"found_place" else COME_BACK)
 
 

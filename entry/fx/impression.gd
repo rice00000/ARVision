@@ -11,6 +11,14 @@ extends Node3D
 
 ## &"shelf", &"dots" or &"turn_to_fit".
 var kind := &""
+## Its own name, when it isn't its kind's (a level in a game's row: "Size Match"); see [method label].
+var title := ""
+## A level bubble's level (the game's own row), or null.
+var level: TaskLevel
+## A look bubble's look (&"normal", &"high_contrast", &"edges", &"black_white"), or &"".
+var look := &""
+## The shelf piece's rows (1..4): it grows a row with each shelf level finished (design chat, Nov 18).
+var rows := 2
 ## The dots game's look. Megan, Nov 17 late, picked &"cloud" (a cream cloud with five navy dots: a silhouette
 ## unlike the square shelf and the cup). The others stay for previews (tools/dots_icon_preview): &"disc" (the
 ## old navy disc), &"comets" (read as ice-cream cones), &"lantern" (a brass firefly lantern).
@@ -76,6 +84,8 @@ static func make(of_kind: StringName) -> Impression:
 			impression._cross()
 		&"help":
 			impression._question()
+		&"eye":
+			impression._eye()
 	impression._make_halo()
 	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
 	impression.target.position.y = 0.075
@@ -94,7 +104,7 @@ static func footprint(of_kind: StringName) -> Vector2:
 			return Vector2(0.16, 0.12)
 		&"house":
 			return Vector2(0.12, 0.06)
-		&"stop", &"finish", &"help":
+		&"stop", &"finish", &"help", &"eye", &"look":
 			return Vector2(0.12, 0.03)
 		&"butterflies":
 			return Vector2(0.15, 0.04)
@@ -222,9 +232,16 @@ const BRASS := Color(0.74, 0.56, 0.24)   # the house's porthole rim: a place, no
 const POP_DROPS := 7
 ## What the chosen bubble's title says (and the sound label).
 const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop", &"butterflies": "Butterflies",
-		&"stop": "Stop", &"finish": "Finish", &"help": "Help"}
+		&"stop": "Stop", &"finish": "Finish", &"help": "Help", &"eye": "Looks"}
+## The looks the eye offers (design chat, Nov 18, DESIGN_STONES_AND_LEVELS §6): their names, said and shown.
+const LOOK_TITLES := {&"normal": "Normal", &"high_contrast": "High contrast", &"edges": "Edges", &"black_white": "Black and white"}
 const INK := Color(0.114, 0.114, 0.133)   # #1D1D22 (design chat, Nov 18)
 const TILE := Color(0.953, 0.918, 0.824)  # #F3EAD2
+
+
+## Its name, shown and said: its own [member title], else its kind's.
+func label() -> String:
+	return title if title != "" else title_for(kind)
 
 
 ## The name shown and said for [param of_kind].
@@ -395,30 +412,50 @@ static func _flat(colour: Color, alpha: float) -> StandardMaterial3D:
 # --- Looks ---------------------------------------------------------------------------------------
 
 func _shelf() -> void:
-	# A chunky square frame with four cream cubbies: Wei's shelf, simplified. Megan, Nov 17 late: three cubbies
-	# show a big dark shape like Wei's (square, triangle, circle); the fourth stays empty.
+	# A chunky wooden shelf of cream cubbies, two across: Wei's shelf, simplified. Megan, Nov 17 late: the cubbies
+	# show big dark shapes like Wei's (square, triangle, circle, one empty). Design chat, Nov 18: one row of
+	# cubbies more for each shelf level finished ([member rows], 1..4); the whole piece keeps its middle at MIDDLE.
 	var w := 0.16
-	var h := 0.15
 	var d := 0.08
-	_box(Vector3(w, h, d), Vector3(0, h * 0.5, 0), WOOD)
-	var cell := Vector2((w - 0.036) * 0.5, (h - 0.036) * 0.5)
-	for col in 2:
-		for row in 2:
+	var cell := Vector2((w - 0.036) * 0.5, 0.048)
+	var h := 0.012 + rows * (cell.y + 0.012)
+	var base := MIDDLE.y - h * 0.5
+	_box(Vector3(w, h, d), Vector3(0, base + h * 0.5, 0), WOOD)
+	var shapes := [&"square", &"triangle", &"circle", &"", &"triangle", &"square", &"", &"circle"]
+	for row in rows:
+		for col in 2:
 			var x := (col - 0.5) * (cell.x + 0.012)
-			var y := 0.012 + cell.y * 0.5 + row * (cell.y + 0.012)
+			var y := base + 0.012 + cell.y * 0.5 + (rows - 1 - row) * (cell.y + 0.012)
 			_box(Vector3(cell.x, cell.y, 0.012), Vector3(x, y, d * 0.5 - 0.004), CREAM, false)
 			var front := Vector3(x, y, d * 0.5 + 0.004)
-			match [col, row]:
-				[0, 1]:   # top left: a square
-					_box(Vector3(0.032, 0.032, 0.006), front, OUTLINE, false)
-				[1, 1]:   # top right: a triangle, point up
+			match shapes[(row * 2 + col) % shapes.size()]:
+				&"square":
+					_box(Vector3(0.03, 0.03, 0.006), front, OUTLINE, false)
+				&"triangle":
 					var prism := PrismMesh.new()
-					prism.size = Vector3(0.038, 0.034, 0.006)
+					prism.size = Vector3(0.034, 0.03, 0.006)
 					_mesh(prism, OUTLINE, false).position = front
-				[0, 0]:   # bottom left: a circle
-					var dot := _mesh(_cylinder(0.018, 0.018, 0.006), OUTLINE, false)
+				&"circle":
+					var dot := _mesh(_cylinder(0.016, 0.016, 0.006), OUTLINE, false)
 					dot.rotation.x = PI * 0.5
 					dot.position = front
+
+
+## The shelf grows to [param count] rows (1..4), over [param seconds] (0 = at once), from its middle.
+func set_rows(count: int, seconds := 0.0) -> void:
+	count = clampi(count, 1, 4)
+	if kind != &"shelf" or count == rows:
+		return
+	rows = count
+	for child in _body.get_children():
+		child.queue_free()
+	_shelf()
+	if seconds > 0.0:
+		_body.scale = Vector3(1.0, 0.8, 1.0)
+		_body.position.y = MIDDLE.y * 0.2
+		var grow := create_tween().set_parallel()
+		grow.tween_property(_body, "scale", Vector3.ONE, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		grow.tween_property(_body, "position:y", 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _dots() -> void:
@@ -691,3 +728,76 @@ static func _lit(colour: Color, outlined: bool) -> StandardMaterial3D:
 		outline.grow_amount = 0.005
 		material.next_pass = outline
 	return material
+
+
+## The eye (design chat, Nov 18): an almond outline with a round pupil, near-black on a cream tile like the ✕'s.
+## "Looks": a row of visual looks for the real room.
+func _eye() -> void:
+	_box(Vector3(0.12, 0.12, 0.02), Vector3(0, 0.075, 0), TILE)
+	var lid := MeshInstance3D.new()
+	var almond := TorusMesh.new()
+	almond.inner_radius = 0.036
+	almond.outer_radius = 0.045
+	lid.mesh = almond
+	lid.material_override = _flat(INK, 1.0)
+	lid.rotation.x = PI * 0.5
+	lid.scale = Vector3(1.0, 1.0, 0.55)   # flattened top to bottom: an almond
+	lid.position = Vector3(0, 0.075, 0.012)
+	_body.add_child(lid)
+	var pupil := _mesh(_cylinder(0.015, 0.015, 0.006), INK, false)
+	pupil.rotation.x = PI * 0.5
+	pupil.position = Vector3(0, 0.075, 0.012)
+	var shine := _disc(0.005, _flat(TILE, 1.0))
+	shine.position = Vector3(0.006, 0.081, 0.0155)
+	_body.add_child(shine)
+
+
+## A look bubble: [param id]'s little picture (the same wall, window, table and cup in that look), framed.
+static func make_look(id: StringName) -> Impression:
+	var piece := Impression.new()
+	piece.kind = &"look"
+	piece.look = id
+	piece.title = LOOK_TITLES.get(id, String(id).capitalize())
+	piece.name = "impression_look_%s" % id
+	piece._body = Node3D.new()
+	piece.add_child(piece._body)
+	piece._box(Vector3(0.16, 0.124, 0.012), Vector3(0, 0.075, -0.004), INK, false)
+	var picture := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.15, 0.1125)
+	var paint := StandardMaterial3D.new()
+	paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	paint.albedo_texture = load("res://entry/assets/looks/%s.png" % id)
+	quad.material = paint
+	picture.mesh = quad
+	picture.position = Vector3(0, 0.075, 0.003)
+	piece._body.add_child(picture)
+	piece._make_halo()
+	piece.target = Target.sphere(StringName("impression_look_%s" % id), 0.1)
+	piece.target.position.y = 0.075
+	piece.add_child(piece.target)
+	return piece
+
+
+var _picked_ring: MeshInstance3D
+
+
+## The current look's thick near-black ring (~0.6 cm) round its bubble.
+func set_picked(on: bool) -> void:
+	if on and _picked_ring == null and bubble != null:
+		_picked_ring = MeshInstance3D.new()
+		_picked_ring.name = "picked"
+		var torus := TorusMesh.new()
+		torus.inner_radius = BUBBLE_RADIUS * 1.02
+		torus.outer_radius = BUBBLE_RADIUS * 1.02 + 0.016   # ~0.6 cm at the row's scale
+		_picked_ring.mesh = torus
+		_picked_ring.material_override = _flat(INK, 1.0)
+		_picked_ring.rotation.x = PI * 0.5
+		bubble.add_child(_picked_ring)
+	if _picked_ring != null:
+		_picked_ring.visible = on
+
+
+## True while it shows the current look's ring.
+func is_picked() -> bool:
+	return _picked_ring != null and _picked_ring.visible

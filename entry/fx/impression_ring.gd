@@ -66,6 +66,9 @@ var impressions: Array[Impression] = []
 var door: Impression
 ## The places row, left to right (design chat, Nov 18): ? · house · ✕, or just the house.
 var places: Array[Impression] = []
+## The piece that sits straight ahead (biggest), or -1 for the arc's own middle. A game's own row puts its
+## recommended level there (design chat, Nov 18).
+var centre := -1
 ## Carousel steps turned (past STILL_MAX only): piece i sits at (i - offset) * STEP.
 var offset := 0.0
 var turning := false
@@ -129,9 +132,9 @@ func aim(eye: Vector3) -> void:
 func _strayed(eye: Vector3) -> bool:
 	if _eye == Vector3.INF:
 		return true
-	var centre := mouth if mouth != Vector3.INF else global_position
-	var was := Vector2(_eye.x - centre.x, _eye.z - centre.z)
-	var now := Vector2(eye.x - centre.x, eye.z - centre.z)
+	var pivot := mouth if mouth != Vector3.INF else global_position
+	var was := Vector2(_eye.x - pivot.x, _eye.z - pivot.z)
+	var now := Vector2(eye.x - pivot.x, eye.z - pivot.z)
 	if was.length() > 0.05 and now.length() > 0.05 and absf(was.angle_to(now)) > FOLLOW_TURN:
 		return true
 	return eye.distance_to(_eye) > FOLLOW_MOVE
@@ -141,15 +144,15 @@ func _strayed(eye: Vector3) -> bool:
 func _follow_to(eye: Vector3) -> void:
 	if _follow != null and _follow.is_running():
 		return
-	var centre := mouth if mouth != Vector3.INF else global_position
+	var pivot := mouth if mouth != Vector3.INF else global_position
 	var from := _eye
-	var a0 := Vector2(from.x - centre.x, from.z - centre.z)
-	var a1 := Vector2(eye.x - centre.x, eye.z - centre.z)
+	var a0 := Vector2(from.x - pivot.x, from.z - pivot.z)
+	var a1 := Vector2(eye.x - pivot.x, eye.z - pivot.z)
 	var turn := a0.angle_to(a1)
 	_follow = create_tween()
 	_follow.tween_method(func(k: float) -> void:
 		var flat := a0.rotated(turn * k).normalized() * lerpf(a0.length(), a1.length(), k)
-		aim(Vector3(centre.x + flat.x, lerpf(from.y, eye.y, k), centre.z + flat.y))
+		aim(Vector3(pivot.x + flat.x, lerpf(from.y, eye.y, k), pivot.z + flat.y))
 		_place(), 0.0, 1.0, FOLLOW_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
@@ -242,7 +245,7 @@ func _choose(impression: Impression) -> void:
 	impression.pop()
 	# Its name over it, in big retro letters, with a chime (Megan, Nov 18).
 	var top := impression.bubble.global_position + Vector3.UP * (Impression.BUBBLE_RADIUS * impression.scale.y + 0.015)
-	ChosenTitle.show_over(get_parent(), Impression.title_for(impression.kind), top, App.head().global_position)
+	ChosenTitle.show_over(get_parent(), impression.label(), top, App.head().global_position)
 	await get_tree().create_timer(0.6).timeout   # the pop, then the name, then the game
 	chosen.emit(impression)
 
@@ -484,6 +487,8 @@ func _wrapped(steps: float) -> float:
 
 ## Where piece [param i] sits on the arc: radians from straight toward the child.
 func _angle(i: int) -> float:
+	if centre >= 0 and not _carousel():
+		return (i - centre) * STEP
 	if not _carousel():
 		return (i - (impressions.size() - 1) * 0.5) * STEP
 	return _wrapped(i - offset) * STEP
@@ -495,7 +500,7 @@ func _place() -> void:
 	var shrink := lerpf(1.0, REST_SCALE, rest)
 	var arc_middle := global_position - _toward * RADIUS
 	var leader := leader()
-	var middle_angle := 0.0 if _carousel() or impressions.size() % 2 == 1 else STEP * 0.5
+	var middle_angle := 0.0 if _carousel() or centre >= 0 or impressions.size() % 2 == 1 else STEP * 0.5
 	var edge := STEP * (2.0 if _carousel() else 9.0)
 	for i in impressions.size():
 		var impression := impressions[i]

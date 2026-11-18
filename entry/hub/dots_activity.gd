@@ -16,7 +16,17 @@ func id() -> StringName:
 	return &"dots"
 
 
+## One fixed level (Steady Flow): the motion graphs need the same conditions every round (Megan, Nov 18).
+func task() -> Task:
+	return MotionVisit.WALL_TASK
+
+
+func level_ids() -> Array[StringName]:
+	return [&"steady_flow"]
+
+
 func summon(_workspace: Transform3D) -> void:
+	take_level()
 	finished.emit(await _motion.run_motion())
 
 

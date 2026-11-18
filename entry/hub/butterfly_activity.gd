@@ -2,12 +2,11 @@ class_name ButterflyActivity
 extends Summonable
 ## Wei's "Catch the butterflies" in the hub (Megan, Nov 18): his first level (Butterfly Circle), unchanged,
 ## with his own narrator's instructions for now. Locked from the first visit; it opens after the dots
-## (WorkshopController). Each go plays the next of his levels the child hasn't played this visit.
+## (WorkshopController). Each go plays the first of his levels this child hasn't finished (saved).
 
 const TASK := preload("res://content/tasks/catch_butterflies.tres")
 const LEVELS: Array[StringName] = [&"one_way", &"both_ways"]
 
-var _plays := 0
 var _left := false
 
 
@@ -19,11 +18,17 @@ func id() -> StringName:
 	return &"butterflies"
 
 
+func task() -> Task:
+	return TASK
+
+
+func level_ids() -> Array[StringName]:
+	return LEVELS
+
+
 func summon(_workspace: Transform3D) -> void:
 	_left = false
-	var level := TASK.level_by_id(LEVELS[mini(_plays, LEVELS.size() - 1)])
-	_plays += 1
-	await App.session.play(level.plan, false)
+	await App.session.play(take_level().plan, false)
 	finished.emit(&"left" if _left else &"done")
 
 

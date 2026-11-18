@@ -113,12 +113,21 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	expect(hub.ring.door != null and hub.ring.door.visible, "the Virtual Workshop house waits below the tasks now")
 	expect(hub.ring.door.global_position.y < hub.ring.impressions[0].global_position.y - 0.05, "below the tasks")
 	var row := hub.ring.places.map(func(p: Impression) -> StringName: return p.kind)
-	expect_eq(row, [&"help", &"house", &"finish"], "the places row: ? · house · ✕")
+	expect_eq(row, [&"help", &"eye", &"house", &"finish"], "the places row: ? · eye · house · ✕")
 	var eye := App.head().global_position
 	var right := Vector3(eye.x - hub.ring.global_position.x, 0, eye.z - hub.ring.global_position.z).normalized().cross(Vector3.UP) * -1.0
 	expect(hub.ring.place_of(&"help").global_position.dot(right) < hub.ring.place_of(&"finish").global_position.dot(right), "? on the left, ✕ on the right")
-	expect(not _said_line(said, WorkshopController.SURPRISES), "the house's line waits for a hand to come to it")
 	expect(not _said_line(said, "Thank you for helping."), "cut")
+	# The earning moment (DESIGN_STONES_AND_LEVELS §2, §4): the first shelf's 3 stones fly into the house's badge,
+	# then, the first time ever, Onion says what they're for.
+	expect(hub.badge != null, "the stones badge sits on the house")
+	var stones: int = App.module(&"Inventory").count(&"magic_stone")
+	expect(stones >= 3, "the first shelf earned 3 stones (%d)" % stones)
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.STONES_YOURS), 20.0), "Onion: \"These stones are yours.\"")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.STONES_SPEND), 10.0), "\"You can spend them in the Virtual Workshop.\"")
+	expect_eq(hub.badge.count, stones, "the badge's count ends at the inventory's count")
+	expect(App.main.get_node(^"Magic").find_child("LevelCelebration", true, false) == null if App.main.has_node(^"Magic") else true, "no trophy in the workshop")
+	expect_eq(hub.ring.impressions[0].rows, 2, "the shelf grew a row (Shadow Match done)")
 
 
 func test_a_cauldron_tap_in_a_game_pauses_it_and_its_x_ends_it_with_a_pinch_never_a_touch() -> void:
@@ -236,7 +245,6 @@ func test_the_door_fades_to_weis_room_and_back_to_the_hub() -> void:
 	home.close()
 	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.opened, 15.0), "back at the hub, the menu up again")
 	expect(veil == null or not veil.visible, "the fade has cleared")
-	expect(not _said_line(said, WorkshopController.SURPRISES), "the Home line waits for the next game's end")
 
 
 ## The socket sits at the table's front right (Megan, Nov 18; was right of middle, Nov 17 late). It fades under Wei's
@@ -261,9 +269,9 @@ func test_the_socket_sits_front_right_and_hides_under_the_bench_during_the_shelf
 	expect(socket.visible, "the socket is back")
 
 
-## Issue 2 (Megan, Nov 18): the house introduces itself the first time a hand comes to it; issue 5: a label
-## never plays on top of a line, nor in the hub's first moments.
-func test_the_house_says_its_teaser_on_the_first_hover_and_labels_wait_for_quiet() -> void:
+## The house says its name and the child's stones ("Three stones"; design chat, Nov 18: the teaser line is cut);
+## issue 5: a label never plays on top of a line, nor in the hub's first moments.
+func test_the_house_says_its_name_and_the_stones_and_labels_wait_for_quiet() -> void:
 	var said := record(Events.said)
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
@@ -274,14 +282,18 @@ func test_the_house_says_its_teaser_on_the_first_hover_and_labels_wait_for_quiet
 		await frames(1)
 	Engine.time_scale = 1.0
 	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.door != null and hub.ring.opened, 40.0), "back at the hub with the house")
-	expect(not _said_line(said, WorkshopController.SURPRISES), "the house came silently")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.STONES_SPEND), 30.0), "the stones are introduced first")
 	await wait(WorkshopController.LABEL_SETTLE + WorkshopController.LABEL_QUIET + 0.5)
+	var count := StonesBadge.spoken(App.module(&"Inventory").count(&"magic_stone"))
 	var tries := 0
-	while not _said_line(said, WorkshopController.SURPRISES) and tries < 12:   # a hand comes to the house (again)
+	while not _said_line(said, count) and tries < 12:   # a hand comes to the house (again)
 		hub.ring.hovered.emit(hub.ring.door)
-		await wait(0.5)
+		await wait(1.0)
 		tries += 1
-	expect(_said_line(said, WorkshopController.SURPRISES), "a hand at the house: its teaser")
+	expect(_said_line(said, "Virtual Workshop"), "a hand at the house: its name")
+	expect(_said_line(said, count), "then the count: \"%s\"" % count)
+	hub.ring.hovered.emit(hub.ring.door)
+	await frames(2)
 	var shelf_name := Impression.title_for(&"shelf")
 	var named := said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size()
 	hub.ring.hovered.emit(hub.ring.impressions[0])   # while the teaser is still being said

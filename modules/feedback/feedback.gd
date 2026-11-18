@@ -26,6 +26,8 @@ func _ready() -> void:
 
 
 func _play_fanfare(_task: StringName, _level: int, _stones: int) -> void:
+	if not Events.celebrate:
+		return
 	var player := AudioStreamPlayer.new()
 	player.stream = WIN
 	player.bus = &"SFX"

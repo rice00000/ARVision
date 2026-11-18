@@ -32,6 +32,59 @@ func leave() -> void:
 	pass
 
 
+# --- Levels (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md` §5) --------------------------------
+
+## The level the next go plays (the hub sets it, from the game's own row); null = [method recommended].
+var level: TaskLevel
+## The level the last go played: the hub gives its stones (Wei's [code]TaskProgress.complete[/code]).
+var played_level: TaskLevel
+
+
+## Wei's task this game's levels live in, or null (no stones by level).
+func task() -> Task:
+	return null
+
+
+## The hub's own level list for this game, easiest first (a slice of [method task]'s levels).
+func level_ids() -> Array[StringName]:
+	return []
+
+
+func levels() -> Array[TaskLevel]:
+	var list: Array[TaskLevel] = []
+	var from := task()
+	if from == null:
+		return list
+	for level_id in level_ids():
+		var found := from.level_by_id(level_id)
+		if found != null:
+			list.append(found)
+	return list
+
+
+## The levels this child has finished (saved, in Wei's TaskProgress).
+func done_levels() -> Array[TaskLevel]:
+	return levels().filter(func(l: TaskLevel) -> bool:
+		return App.main != null and App.main.progress.is_done(task(), l))
+
+
+## The first level not finished yet, else the last.
+func recommended() -> TaskLevel:
+	var list := levels()
+	for candidate in list:
+		if App.main == null or not App.main.progress.is_done(task(), candidate):
+			return candidate
+	return list.back() if not list.is_empty() else null
+
+
+## What the next go plays (and forgets the hub's pick).
+func take_level() -> TaskLevel:
+	var next := level if level != null else recommended()
+	level = null
+	played_level = next
+	return next
+
+
 func pause() -> void:
 	pass
 

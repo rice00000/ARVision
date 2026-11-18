@@ -265,8 +265,8 @@ script = ExtResource("5_level")
 id = &"odd_color_adaptive"
 project = &"odd_color"
 title = "Odd Color Adaptive"
-first_reward = 0
-repeat_reward = 0
+first_reward = 2
+repeat_reward = 2
 plan = SubResource("odd_colour_adaptive_plan")
 
 [resource]

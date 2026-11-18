@@ -45,6 +45,10 @@ func _choose_game(kind: StringName, timeout := 60.0) -> bool:
 		if not await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0):
 			return false
 	Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
+	# A game with a level finished opens its own row (design chat, Nov 18): pinch the recommended one.
+	await until(func() -> bool: return hub.state != &"hub" or (hub.row != null and hub.row.opened), 3.0)
+	if hub.row != null and hub.row_kind == &"levels":
+		Events.selected.emit(&"right", hub.row.leader().target, Vector3.ZERO, Vector3.FORWARD)
 	return true
 
 
@@ -529,8 +533,8 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not _said_line(said, "You earned 3 magic stones!"), "Onion owns the tutorial closing")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
-	var next_level := task.levels[1]
-	if not await _choose_game(&"shelf"):   # back at the hub: the shelf again plays Wei's next level
+	var next_level := task.level_by_id(&"size")   # Find Objects' order (Megan, Nov 18): Shadow → Size → Clutter → Color → Similar
+	if not await _choose_game(&"shelf"):   # back at the hub: the shelf again plays the next level
 		expect(false, "the child can choose the shelf again in the hub")
 		return
 	for block: Block in next_level.plan.blocks:
