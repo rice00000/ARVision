@@ -11,6 +11,10 @@ extends Node3D
 
 ## &"shelf", &"dots" or &"turn_to_fit".
 var kind := &""
+## The dots game's look. Megan, Nov 17 late, picked &"cloud" (a cream cloud with five navy dots: a silhouette
+## unlike the square shelf and the cup). The others stay for previews (tools/dots_icon_preview): &"disc" (the
+## old navy disc), &"comets" (read as ice-cream cones), &"lantern" (a brass firefly lantern).
+static var dots_style := &"cloud"
 ## The size it stands at (the mesh's own size is its full size).
 var size := Vector3.ONE
 
@@ -48,7 +52,11 @@ static func make(of_kind: StringName) -> Impression:
 		&"shelf":
 			impression._shelf()
 		&"dots":
-			impression._dots()
+			match dots_style:
+				&"comets": impression._dots_comets()
+				&"cloud": impression._dots_cloud()
+				&"lantern": impression._dots_lantern()
+				_: impression._dots()
 		&"turn_to_fit":
 			impression._cup()
 	impression._make_halo()
@@ -64,7 +72,7 @@ static func footprint(of_kind: StringName) -> Vector2:
 		&"shelf":
 			return Vector2(0.16, 0.08)
 		&"dots":
-			return Vector2(0.15, 0.05)
+			return Vector2(0.19, 0.05) if dots_style == &"cloud" else Vector2(0.15, 0.05)
 		&"turn_to_fit":
 			return Vector2(0.16, 0.12)
 	return Vector2(0.16, 0.16)
@@ -147,7 +155,8 @@ func _update_halo() -> void:
 # --- Looks ---------------------------------------------------------------------------------------
 
 func _shelf() -> void:
-	# A chunky square frame with four cream cubbies: Wei's shelf, simplified (no shapes inside: detail).
+	# A chunky square frame with four cream cubbies: Wei's shelf, simplified. Megan, Nov 17 late: three cubbies
+	# show a big dark shape like Wei's (square, triangle, circle); the fourth stays empty.
 	var w := 0.16
 	var h := 0.15
 	var d := 0.08
@@ -158,6 +167,18 @@ func _shelf() -> void:
 			var x := (col - 0.5) * (cell.x + 0.012)
 			var y := 0.012 + cell.y * 0.5 + row * (cell.y + 0.012)
 			_box(Vector3(cell.x, cell.y, 0.012), Vector3(x, y, d * 0.5 - 0.004), CREAM, false)
+			var front := Vector3(x, y, d * 0.5 + 0.004)
+			match [col, row]:
+				[0, 1]:   # top left: a square
+					_box(Vector3(0.032, 0.032, 0.006), front, OUTLINE, false)
+				[1, 1]:   # top right: a triangle, point up
+					var prism := PrismMesh.new()
+					prism.size = Vector3(0.038, 0.034, 0.006)
+					_mesh(prism, OUTLINE, false).position = front
+				[0, 0]:   # bottom left: a circle
+					var dot := _mesh(_cylinder(0.018, 0.018, 0.006), OUTLINE, false)
+					dot.rotation.x = PI * 0.5
+					dot.position = front
 
 
 func _dots() -> void:
@@ -174,6 +195,69 @@ func _dots() -> void:
 		var dot := _mesh(_cylinder(0.014, 0.014, 0.006), CREAM, false)
 		dot.rotation.x = PI * 0.5
 		dot.position = Vector3(spot.x, r + 0.012 + spot.y, 0.019)
+
+
+func _dots_comets() -> void:
+	# Three cream dots rising TOGETHER (all up: never a left/right cue beside a left/right answer), each with a
+	# short tapering trail below it, on a navy disc standing on its edge.
+	var r := 0.075
+	var disc := _mesh(_cylinder(r, r, 0.03), NAVY)
+	disc.rotation.x = PI * 0.5
+	disc.position = Vector3(0, r + 0.012, 0)
+	_box(Vector3(0.08, 0.012, 0.05), Vector3(0, 0.006, 0), NAVY.darkened(0.3))
+	for spot: Vector2 in [Vector2(-0.032, 0.012), Vector2(0.032, 0.012), Vector2(0.0, 0.04)]:
+		var at := Vector3(spot.x, r + 0.012 + spot.y, 0.02)
+		var head := _mesh(_sphere(0.016), CREAM, false)
+		head.position = at
+		head.scale = Vector3(1, 1, 0.45)
+		var tail := _mesh(_cylinder(0.014, 0.002, 0.05), CREAM.darkened(0.12), false)
+		tail.position = at + Vector3.DOWN * 0.03
+
+
+func _dots_cloud() -> void:
+	# A puffy cream cloud (four round lobes, flat front) with five big navy dots on it: "a cloud of dots".
+	for lobe: Array in [[Vector2(-0.05, 0.05), 0.04], [Vector2(0.0, 0.075), 0.052], [Vector2(0.05, 0.055), 0.042], [Vector2(0.0, 0.035), 0.045]]:
+		var puff := _mesh(_sphere(lobe[1]), CREAM)
+		puff.position = Vector3(lobe[0].x, lobe[0].y + 0.02, 0)
+		puff.scale = Vector3(1, 1, 0.45)
+	for spot: Vector2 in [Vector2(-0.045, 0.07), Vector2(0.0, 0.1), Vector2(0.045, 0.075), Vector2(-0.018, 0.05), Vector2(0.025, 0.045)]:
+		var dot := _mesh(_cylinder(0.012, 0.012, 0.006), NAVY, false)
+		dot.rotation.x = PI * 0.5
+		dot.position = Vector3(spot.x, spot.y + 0.01, 0.024)
+
+
+func _dots_lantern() -> void:
+	# A small brass lantern: a dark frame, a warm glowing inside with three bright dots ("fireflies"), a ring on top.
+	var brass := Color(0.72, 0.55, 0.25)
+	_box(Vector3(0.1, 0.014, 0.06), Vector3(0, 0.007, 0), brass)
+	_box(Vector3(0.1, 0.014, 0.06), Vector3(0, 0.136, 0), brass)
+	for x: float in [-0.045, 0.045]:
+		_box(Vector3(0.01, 0.12, 0.01), Vector3(x, 0.072, 0.025), brass.darkened(0.3))
+	var inside := _box(Vector3(0.08, 0.115, 0.04), Vector3(0, 0.072, 0), Color(1.0, 0.8, 0.4), false)
+	var glow := inside.material_override as StandardMaterial3D
+	glow.emission_enabled = true
+	glow.emission = Color(1.0, 0.75, 0.35)
+	glow.emission_energy_multiplier = 0.6
+	for spot: Vector3 in [Vector3(-0.02, 0.05, 0.022), Vector3(0.02, 0.07, 0.022), Vector3(-0.005, 0.1, 0.022)]:
+		var fly := _mesh(_sphere(0.012), CREAM, false)
+		fly.position = spot
+		fly.scale = Vector3(1, 1, 0.4)
+	var ring := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.012
+	torus.outer_radius = 0.02
+	ring.mesh = torus
+	ring.material_override = _lit(brass, true)
+	ring.rotation.x = PI * 0.5
+	ring.position = Vector3(0, 0.16, 0)
+	_body.add_child(ring)
+
+
+func _sphere(radius: float) -> SphereMesh:
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	return mesh
 
 
 func _cup() -> void:
