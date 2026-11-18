@@ -94,7 +94,11 @@ func _run() -> void:
 	_onion.scale = Vector3.ONE * 0.01
 	Events.play(&"appear", _onion.global_position)
 	create_tween().tween_property(_onion, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	await say("This is your room!")
+	await say("And this little place? This one's yours.")   # story chat revision, Nov 18 (was "This is your room!")
+	if run != _runs: return
+	await get_tree().create_timer(0.7).timeout
+	if run != _runs: return
+	await say("You can use your magic stones to choose things for your room.")
 	if run != _runs: return
 	await _gift(run)
 	if run != _runs: return

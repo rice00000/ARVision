@@ -70,17 +70,18 @@ func run_motion() -> StringName:
 	_subtitles_under_cloud(true)
 	if _plays == 1:
 		SceneMarker.show_text("Tutorial")
-		# Story chat, Nov 18: fondly exasperated, then the demonstration ("Here, let me show you." is replaced).
+		# Story chat, Nov 18 (revision): thoughtful curiosity, a shared discovery; Onion studies the dots.
 		if _onion != null:
-			_onion.tilt(true)
-		await _narrator.say("I once told these dots to stay put. They didn't listen.")
-		if _onion != null:
-			_onion.tilt(false)
+			_onion.attend(App.head().global_position - App.head().global_basis.z * 1.2)
+		await _narrator.say("So many little dots. It all looks a bit jumbled, doesn't it?")
 		await get_tree().create_timer(0.7, false).timeout
-		await _narrator.say("Watch what happens when they move together.")
+		await _narrator.say("But look—some of them are moving together.")
+		await get_tree().create_timer(0.7, false).timeout
+		await _narrator.say("Watch which way they go.")
+		if _onion != null:
+			_onion.attend(null)
 		await _tutorial()
-		await _narrator.say("Your turn.")
-		await _narrator.say("Watch which way the dots are moving, then sweep your hand that way.")
+		await _narrator.say("Your turn! Sweep your hand the same way the dots are moving.")
 	SceneMarker.show_text("Motion")
 	Motion.onion_voice = true
 	_in_motion = true

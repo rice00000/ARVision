@@ -43,6 +43,11 @@ const READY := "Well, this one's ready for us!"
 const DOTS_WOKE := "Oh! Looks like we've woken another one!"
 const DOTS_AWAKE := "The Dots are awake. Shall we see what they're up to?"
 const BREATH := 0.7             # seconds between Onion's lines (story chat: ~0.6-1 s)
+## The other games' first unlocks (story chat revision, Nov 18), once per child.
+const BUTTERFLIES_BACK := "The butterflies have returned. I wonder where they've been."
+const CUP_DIFFERENT := "This one's a little different. We'll need something from your world."
+## The first time the child picks the house (not waited for: the child goes in at once).
+const COME_ALONG := "Come along. There's something I'd like to show you."
 const ROW_WAIT := 8.0           # a game's own row or the looks: this long with no press, they sink
 const LEFT_EARLY := "We can come back to these."
 const ALL_DONE := "All done for today?"
@@ -60,10 +65,12 @@ const STOP_GUARD := 0.5         # a ✕ bubble ignores presses for its first hal
 const STOP_WAIT := 6.0          # with no choice for this long, the ✕ bubble sinks and things carry on
 const STOP_SCALE := 0.45
 const TOUR_STEP := 5.0          # seconds per tour step (its line and one teaching-hand demo)
-const TOUR_DIM := 0.5           # everything the tour isn't showing fades to half
+const TOUR_DIM := 0.25          # what the tour isn't showing fades a little (story chat: no dramatic dimming)
 ## The controls tour (design chat, Nov 18; step 2 is a pinch, Megan 9:13): what each step says.
-const TOUR_LINES: Array[String] = ["Tap the cauldron for games.", "Pinch a bubble to choose.",
-		"This goes to the Virtual Workshop.", "Lift the gear to finish."]
+## Story chat revision, Nov 18: an opening line, then one line per control; no closing line (Onion nods).
+const TOUR_OPENING := "Need a little reminder? I'll show you."
+const TOUR_LINES: Array[String] = ["Tap the cauldron to find your games.", "Pinch a bubble to choose.",
+		"This little house leads to your Virtual Workshop.", "When you're ready to finish, lift the gear."]
 const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
@@ -177,6 +184,7 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		await _closing_starts()
 		if closing.is_valid():
 			await closing.call()
+		await _dim_lanterns()   # the lanterns go out one by one (story chat), after "Well. I'll do my best."
 		state = &"closed"
 		if not await _restart():   # Megan, Nov 18: a tap on the cauldron starts again (the gear pops out)
 			break
@@ -197,6 +205,8 @@ func _visit(home: Callable) -> void:
 			continue
 		if choice == &"gear_home":
 			if home.is_valid():
+				if memory == null or memory.first_time(&"house_come"):
+					Onion.line(COME_ALONG, self)   # not awaited: the child goes in at once (story chat)
 				state = &"home"
 				carry.stop()
 				_show_lanterns(false)
@@ -214,6 +224,17 @@ func _visit(home: Callable) -> void:
 const RESTARTED := &"visit_restarted"
 var _restart_tapped := false
 var _seat_at := Vector3.INF   # where the gear sits in its socket (kept from the visit, for the restart)
+
+
+## The lanterns dim one by one, farthest first (the goodbye's end).
+func _dim_lanterns() -> void:
+	var eye := App.head().global_position
+	var order := lanterns.filter(func(l: Lantern) -> bool: return is_instance_valid(l) and l.visible)
+	order.sort_custom(func(a: Lantern, b: Lantern) -> bool: return a.global_position.distance_to(eye) > b.global_position.distance_to(eye))
+	Lantern.quiet = true
+	for lantern: Lantern in order:
+		create_tween().tween_property(lantern, ^"lit", 0.0, 0.8).set_trans(Tween.TRANS_SINE)
+		await get_tree().create_timer(0.35, false).timeout
 
 
 ## After the goodbye: waits for a tap on the cauldron (no time limit; the grown-up ends the session in Staff
@@ -657,10 +678,14 @@ func _build_carry() -> void:
 			return   # putting the gear back after the goodbye: not "All done for today?"
 		_stop_tour()
 		_play(&"gear_lift", _gear_at())
+		if workshop != null:
+			workshop.slow_gears(2.5)   # the workshop starts slowing (story chat); setting the gear back wakes it
 		print("HUB gear lifted")
 		Onion.line(ALL_DONE, self))
 	carry.docked.connect(func() -> void:
 		_play(&"seat", _gear_at())
+		if workshop != null:
+			workshop.start_gears()
 		_spin_gear(true))
 	carry.released.connect(func(docked: bool) -> void:
 		if not docked:
@@ -872,6 +897,21 @@ func _welcome() -> void:
 ## After a game, once the menu is back (not awaited): a game that just opened gets its lines (the dots, the first
 ## time: "Oh! Looks like we've woken another one!" / "The Dots are awake…"; story chat, Nov 18), then the stones.
 func _after_game(woke: Summonable, stones: int, grew: bool) -> void:
+	var other_line := {&"butterflies": BUTTERFLIES_BACK, &"turn_to_fit": CUP_DIFFERENT}
+	if woke != null and woke.id() in other_line and (memory == null or memory.first_time(StringName("%s_awake" % woke.id()))):
+		var piece := _impression_of(woke)
+		if piece != null:
+			piece.touched()   # a gentle flutter of the icon
+			if workshop != null:
+				workshop.attend(piece.global_position)
+		await Onion.line(other_line[woke.id()], self)
+		if workshop != null:
+			workshop.attend(null)
+		if state != &"hub":
+			if badge != null:
+				badge.land_all()
+			return
+		await get_tree().create_timer(BREATH, false).timeout
 	if woke != null and woke.id() == &"dots" and (memory == null or memory.first_time(&"dots_awake")):
 		var piece := _impression_of(woke)
 		if workshop != null and piece != null:
@@ -1187,6 +1227,10 @@ func _tour() -> void:
 	var mine := _tour_id
 	print("HUB tour starts")
 	var gear := workshop.gear_node() if workshop != null else null
+	await Onion.line(TOUR_OPENING, self)
+	if mine != _tour_id or state != &"hub":
+		return
+	await get_tree().create_timer(BREATH, false).timeout
 	for step in TOUR_LINES.size():
 		if mine != _tour_id or state != &"hub":
 			break
@@ -1212,6 +1256,8 @@ func _tour() -> void:
 			await get_tree().process_frame
 	if mine == _tour_id:
 		_end_tour()
+		if workshop != null:
+			workshop.cheer()   # a reassuring nod; no closing line
 
 
 func _stop_tour() -> void:

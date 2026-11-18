@@ -82,10 +82,15 @@ func slow_gears(seconds := 1.5) -> void:
 	for part in [_gear, _mechanism]:
 		if part != null and is_instance_valid(part):
 			spins.append_array(part.find_children("*", "GearSpin", true, false))
+	if _slowing != null and _slowing.is_valid():
+		_slowing.kill()
 	var tween := create_tween().set_parallel(true)
+	_slowing = tween
 	for spin: GearSpin in spins:
 		tween.tween_property(spin, "rate", 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	await tween.finished
+	if _slowing != tween:
+		return   # woken again meanwhile (the gear was set back)
 	for spin: GearSpin in spins:
 		spin.running = false
 
@@ -181,8 +186,14 @@ func gear_out(on_table: Vector3) -> void:
 	await tween.finished
 
 
+var _slowing: Tween
+
+
 ## The gears turn again (after [method slow_gears]).
 func start_gears() -> void:
+	if _slowing != null and _slowing.is_valid():
+		_slowing.kill()
+	_slowing = null
 	for part in [_gear, _mechanism]:
 		if part != null and is_instance_valid(part):
 			for spin: GearSpin in part.find_children("*", "GearSpin", true, false):
