@@ -41,6 +41,7 @@ static func make(parent: Node, gear_at: Vector3, eye: Vector3, with_home := fals
 		menu._row.look_at(face, Vector3.UP, true)
 	for spec: Array in [[&"gear_home", &"home"], [&"gear_stones", &"stones"], [&"gear_finish", &"finish"]]:
 		var button := HubButton.make(spec[0], spec[1], HubButton.RADIUS if spec[1] != &"stones" else 0.034)
+		button.pinch_only = true   # Megan, Nov 18: the gear's buttons answer only a pinch; a hand resting by the socket touched Finish
 		menu._row.add_child(button)
 		button.pressed.connect(func(id: StringName) -> void: menu.chosen.emit(id))
 		menu.buttons[spec[0]] = button

@@ -107,6 +107,9 @@ func test_finish_visit_on_the_gear_sinks_the_ring_and_plays_the_closing() -> voi
 	expect(finish.global_position.distance_to(socket.global_position) < 0.3, "the gear's buttons stand over the socket")
 	expect(finish.visible and finish.open, "Finish visit shows on the gear")
 	expect(not hub.gear.buttons[&"gear_home"].visible, "Home not yet (after the first game)")
+	Events.touched.emit(&"right", finish.target)   # a hand resting by the socket (Megan, Nov 18: pinch only)
+	await frames(10)
+	expect(hub.state == &"hub" and hub.ring.visible, "a touch on Finish visit never counts")
 	Engine.time_scale = 4.0
 	Events.selected.emit(&"right", finish.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return not hub.ring.visible, 15.0), "the ring sinks into the cauldron first")
@@ -179,8 +182,8 @@ func test_home_on_the_gear_fades_to_weis_room_and_back_to_the_hub() -> void:
 
 
 ## The socket sits at the table's front right (Megan, Nov 18; was right of middle, Nov 17 late). It fades under Wei's
-## bench during the shelf only when the bench covers it.
-func test_the_socket_sits_front_right_and_hides_under_the_bench_only_if_covered() -> void:
+## bench during the shelf (the board can reach it there too).
+func test_the_socket_sits_front_right_and_hides_under_the_bench_during_the_shelf() -> void:
 	var hub := await _to_hub()
 	var workshop := App.main.get_node(^"Workshop") as Workshop
 	var socket := workshop.get("_mechanism") as Node3D
@@ -191,15 +194,8 @@ func test_the_socket_sits_front_right_and_hides_under_the_bench_only_if_covered(
 	var angle := rad_to_deg(ahead.signed_angle_to(to.normalized(), Vector3.DOWN))
 	expect(angle > 20.0, "the socket is to the child's right, out of the middle (%d degrees)" % roundi(angle))
 	expect(to.length() < 0.5, "and near the table's near edge (%.2f m)" % to.length())
-	var covered := workshop.socket_covered()
-	print("TEST socket under the bench: ", covered)
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
-	if covered:
-		expect(await until(func() -> bool: return hub.state == &"game" and not socket.visible, 10.0), "the socket fades under the bench")
-	else:
-		expect(await until(func() -> bool: return hub.state == &"game", 10.0), "the shelf game runs")
-		await wait(1.0)
-		expect(socket.visible, "clear of the bench: the socket stays")
+	expect(await until(func() -> bool: return hub.state == &"game" and not socket.visible, 10.0), "the socket fades under the bench during the shelf")
 	Engine.time_scale = 4.0
 	await _finish_rounds()
 	expect(await until(func() -> bool: return _in_hub(hub), 40.0), "back at the hub")

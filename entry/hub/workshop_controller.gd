@@ -146,7 +146,9 @@ func _run(activity: Summonable) -> void:
 	if workshop != null:
 		workshop.attend(null)
 	print("HUB game: ", activity.id())
-	var under_bench := activity.id() == &"shelf" and workshop != null and workshop.socket_covered()   # under Wei's bench board
+	# Wei's bench board can reach the socket at the front right too (Megan's laptop test, Nov 18): it always fades
+	# under the board during the shelf, as before (the layout's zones miss the board's real edge on some tables).
+	var under_bench := activity.id() == &"shelf" and workshop != null
 	if under_bench:
 		workshop.hide_socket(true)
 	activity.summon(_workspace())
