@@ -172,6 +172,19 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		if welcome:
 			_welcome()   # not awaited: talk never blocks play (story chat, Nov 18)
 	while true:
+		await _visit(home)
+		state = &"closing"
+		await _closing_starts()
+		if closing.is_valid():
+			await closing.call()
+		state = &"closed"
+		if not await _restart():   # Megan, Nov 18: a tap on the cauldron starts again (the gear pops out)
+			break
+
+
+## The hub's own loop, until the visit ends (the gear lifted out and let go, or the ✕ confirmed).
+func _visit(home: Callable) -> void:
+	while true:
 		_picked = &""
 		var choice := await _hub()
 		if choice not in [&"gear_finish", &"finish", &"gear_home"] and not await _choose_level(_activity(choice)):
@@ -194,11 +207,68 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 				await ring.rise(_mouth())
 			continue
 		await _run(_activity(choice))
-	state = &"closing"
-	await _closing_starts()
-	if closing.is_valid():
-		await closing.call()
-	state = &"closed"
+
+
+# --- Restart after the goodbye (Megan, Nov 18) -------------------------------------------------------
+
+const RESTARTED := &"visit_restarted"
+var _restart_tapped := false
+var _seat_at := Vector3.INF   # where the gear sits in its socket (kept from the visit, for the restart)
+
+
+## After the goodbye: waits for a tap on the cauldron (no time limit; the grown-up ends the session in Staff
+## tools). Then the closing plays backwards: no hello, no lines. Onion pops back up, the socket rises, the gear
+## pops out onto the table; the child sets it back in (the teaching hand shows how after a moment), the gears
+## turn, the lanterns glow, and the menu opens. Saved progress carries on. False only if the scene is leaving.
+func _restart() -> bool:
+	_restart_tapped = false
+	while not _restart_tapped:
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return false
+	state = &"restarting"
+	print("HUB restart")
+	Events.report(RESTARTED, {})
+	App.results_after_closing = false
+	var socket := workshop.socket_at() if workshop != null else _mouth()
+	var seat := _seat_at if _seat_at != Vector3.INF else socket + Vector3.UP * GEAR_SEAT
+	if workshop != null:
+		workshop.onion_back(_onion_spot())
+		await workshop.socket_back()
+		var eye := App.head().global_position
+		var toward := Vector3(eye.x - socket.x, 0.0, eye.z - socket.z).normalized()
+		await workshop.gear_out(Vector3(socket.x, seat.y - GEAR_SEAT, socket.z) + toward * 0.14)   # clear of the socket, toward the child
+	var gear := workshop.gear_node() if workshop != null else null
+	if gear != null:
+		carry.begin(gear, seat)
+		var waited := 0.0
+		var shown := false
+		while not carry.has_docked():
+			await get_tree().process_frame
+			if not is_inside_tree():
+				return false
+			waited += get_process_delta_time()
+			if not shown and waited > CUE_AFTER and not carry.held:
+				shown = true
+				_demo.pinch_lift(gear)   # how to put it back: no words
+			if carry.held:
+				_demo.stop()
+		_demo.stop()
+	# Quick wake-up: the gears turn, the lanterns glow again, the fire comes back; then the menu.
+	if workshop != null:
+		workshop.start_gears()
+	Lantern.quiet = false
+	for lantern in lanterns:
+		lantern.visible = true
+		lantern.appear(1.0)
+	ambience.hub()
+	await get_tree().create_timer(0.8, false).timeout
+	state = &"hub"
+	_hub_since = _clock
+	_play(&"menu_open", _mouth())
+	await ring.rise(_mouth())
+	ring.wake()
+	return true
 
 
 # --- The hub ---------------------------------------------------------------------------------------
@@ -368,6 +438,9 @@ func _exit_game() -> void:
 
 
 func _closing_starts() -> void:
+	var gear := workshop.gear_node() if workshop != null else null
+	if gear != null:
+		_seat_at = gear.global_position + Vector3.UP * GEAR_SEAT   # for a restart
 	carry.stop()
 	_demo.stop()
 	_drop_stop_bubble()
@@ -432,6 +505,9 @@ func _on_press(target: Target, pinched: bool) -> void:
 			_press_look(piece)
 		elif row.press(piece) == &"chosen":
 			pass   # it pops; [signal ImpressionRing.chosen] follows
+		return
+	if on_cauldron and state == &"closed":
+		_restart_tapped = true   # after the goodbye: start again
 		return
 	if on_cauldron and (state == &"game" or state == &"asking"):
 		# A game: pause it (or carry on); the finish check: no, not yet. A pinch only (Megan, Nov 18: a hand
@@ -577,6 +653,8 @@ func _build_carry() -> void:
 				socket.rotation.y, pot.global_position if pot != null else Vector3.INF, 0.2)
 		carry.follow(pot, socket)
 	carry.picked_up.connect(func() -> void:
+		if state == &"restarting":
+			return   # putting the gear back after the goodbye: not "All done for today?"
 		_stop_tour()
 		_play(&"gear_lift", _gear_at())
 		print("HUB gear lifted")
@@ -657,7 +735,7 @@ func _cauldron_step(delta: float) -> void:
 		return
 	var open_to_tap := state == &"hub" and not ring.opened and not _opening and not get_tree().paused
 	# During a game (and the finish check) the cauldron takes a tap too: it pauses the game (design chat, Nov 18).
-	var tap_in_game := state == &"game" or state == &"asking"
+	var tap_in_game := state == &"game" or state == &"asking" or state == &"closed"   # closed: a tap restarts
 	cauldron_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0   # nothing to aim at over the open menu
 	var want := 0.0
 	if open_to_tap and App.rig:

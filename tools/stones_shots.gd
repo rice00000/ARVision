@@ -96,6 +96,19 @@ func _ready() -> void:
 	_look(0.0)
 	await _pause(2.0)
 	await _shot("weis_room", "Wei's room from the house: Workshop (a cauldron) · Shop (teal stone, count) · My things")
+	home.close()
+	await _until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning, 1800)
+	Engine.time_scale = 3.0
+	hub.carry.released.emit(false)   # the visit ends
+	await _until(func() -> bool: return hub.state == &"closed", 3600)
+	Engine.time_scale = 1.0
+	_look(-0.6)
+	await _pause(1.0)
+	await _shot("after_goodbye", "After the goodbye: the cauldron waits (a tap starts again)")
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	await _until(func() -> bool: return hub.carry.enabled, 900)
+	await _pause(0.5)
+	await _shot("restart_gear_out", "Restart: Onion and the socket are back, the gear is on the table to set in")
 	get_tree().quit()
 
 

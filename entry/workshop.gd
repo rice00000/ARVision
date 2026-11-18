@@ -138,6 +138,63 @@ func goodbye() -> void:
 	await tween.finished
 
 
+# --- Restart after the goodbye (Megan, Nov 18): the closing played backwards -------------------------------
+
+## The socket rises out of the table again (after [method fade_socket]).
+func socket_back(seconds := 0.6) -> void:
+	if not is_instance_valid(_mechanism):
+		return
+	_mechanism.remove_meta(&"faded_for_good")
+	var shown: Vector3 = _mechanism.get_meta(&"scale_shown", Vector3.ONE)
+	_mechanism.visible = true
+	var tween := create_tween()
+	tween.tween_property(_mechanism, "scale", shown, seconds).set_trans(Tween.TRANS_SINE)
+	await tween.finished
+
+
+## Onion pops back up out of the cauldron to [param spot] (after [method goodbye]).
+func onion_back(spot: Vector3) -> void:
+	onion.global_position = _mouth + Vector3.DOWN * 0.08
+	onion.visible = true
+	Events.play(&"vanish", _mouth)
+	var tween := create_tween()
+	tween.tween_property(onion, "global_position", _mouth + Vector3.UP * 0.12, 0.5).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(onion, "global_position", spot, 0.8).set_trans(Tween.TRANS_SINE)
+	await tween.finished
+
+
+## The gear pops out of the cauldron and lands on the table at [param on_table] (after [method gear_home]).
+func gear_out(on_table: Vector3) -> void:
+	if _gear == null or not is_instance_valid(_gear):
+		return
+	if _sounds != null:
+		_sounds.play(&"device_rattle", _mouth)
+	_gear.global_position = _mouth + Vector3.DOWN * 0.03
+	_gear.visible = true
+	var over := _mouth.lerp(on_table, 0.5) + Vector3.UP * 0.14
+	var tween := create_tween()
+	tween.tween_property(_gear, "global_position", over, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_gear, "global_position", on_table, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(func() -> void:
+		if _sounds != null:
+			_sounds.play(&"gear_land", on_table))
+	await tween.finished
+
+
+## The gears turn again (after [method slow_gears]).
+func start_gears() -> void:
+	for part in [_gear, _mechanism]:
+		if part != null and is_instance_valid(part):
+			for spin: GearSpin in part.find_children("*", "GearSpin", true, false):
+				spin.rate = 1.0
+				spin.running = true
+
+
+## The socket's world position (its seat), or the mouth without one.
+func socket_at() -> Vector3:
+	return _mechanism.global_position if is_instance_valid(_mechanism) else _mouth
+
+
 ## The cauldron (the hub's centre).
 func cauldron() -> Node3D:
 	return _cauldron
@@ -152,8 +209,11 @@ func gear_node() -> Node3D:
 func fade_socket(seconds := 1.2) -> void:
 	if not is_instance_valid(_mechanism):
 		return
+	if not _mechanism.has_meta(&"scale_shown"):
+		_mechanism.set_meta(&"scale_shown", _mechanism.scale)   # a restart brings it back at this size
+	var shown: Vector3 = _mechanism.get_meta(&"scale_shown")
 	var tween := create_tween()
-	tween.tween_property(_mechanism, "scale", Vector3(1.0, 0.02, 1.0), seconds).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(_mechanism, "scale", Vector3(shown.x, shown.y * 0.02, shown.z), seconds).set_trans(Tween.TRANS_SINE)
 	tween.tween_callback(func() -> void: _mechanism.visible = false)
 	_mechanism.set_meta(&"faded_for_good", true)
 

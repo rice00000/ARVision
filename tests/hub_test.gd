@@ -191,6 +191,32 @@ func test_lifting_the_gear_out_ends_the_visit_and_setting_it_back_does_nothing()
 	App.results_after_closing = false
 
 
+## Megan, Nov 18: after the goodbye a tap on the cauldron starts again: Onion and the socket come back, the gear
+## pops out, the child sets it in; no hello, no lines; then the menu opens.
+func test_after_the_goodbye_a_cauldron_tap_restarts_with_the_gear_to_set_back() -> void:
+	var said := record(Events.said)
+	var reported := record(Events.reported)
+	var hub := await _to_hub()
+	expect(await _open(hub), "the menu is open")
+	Engine.time_scale = 4.0
+	hub.carry.released.emit(false)   # the gear lifted out and let go: the visit ends
+	expect(await until(func() -> bool: return hub.state == &"closed", 90.0), "the closing plays")
+	Engine.time_scale = 1.0
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	var lines := said.size()
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)   # a tap on the cauldron
+	expect(await until(func() -> bool: return hub.state == &"restarting", 5.0), "it starts again")
+	expect(reported.any(func(r: Array) -> bool: return r[0] == WorkshopController.RESTARTED), "logged")
+	expect(await until(func() -> bool: return hub.carry.enabled and workshop.gear_node().visible, 10.0), "the gear popped out, ready to pick up")
+	expect((workshop.get("_mechanism") as Node3D).visible, "the socket is back")
+	expect(workshop.onion.visible, "Onion is back")
+	expect(not App.results_after_closing, "Staff tools won't jump to Results")
+	hub.carry.simulate(0.2)   # the child sets it back in
+	expect(await until(func() -> bool: return hub.state == &"hub" and hub.ring.opened, 20.0), "the gear in: the menu opens")
+	expect_eq(said.size(), lines, "no hello and no lines")
+	expect(not _said_line(said.slice(lines), WorkshopController.ALL_DONE), "picking the gear up was not \"All done for today?\"")
+
+
 func test_the_dots_dim_the_room_put_subtitles_under_the_cloud_and_onion_answers_a_wrong_sweep() -> void:
 	var said := record(Events.said)
 	Engine.time_scale = 1.0
