@@ -36,7 +36,7 @@ const EMBER_RISE := 0.14
 const EMBER_SECONDS := 2.6
 ## The cauldron's lantern (its glass): this far behind the mouth, to its outer side, and above it (clear
 ## of the ring, 16 cm over the rim, and its fog, ~64 cm).
-const CAULDRON_SPOT := Vector3(0.65, 0.6, 0.5)
+const CAULDRON_SPOT := Vector3(0.65, 0.6, 0.61)   # z +0.11 with the bubble menu (ABOVE_RIM 0.16 → 0.27), so it stays above it
 ## The wall lanterns: how many at most, how far from the wall, and their glass heights above the eyes.
 const WALL_MAX := 3
 const WALL_OUT := 0.16
