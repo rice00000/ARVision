@@ -62,7 +62,7 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	var hub := await _to_hub()
 	expect(hub != null, "the hub runs in the first visit")
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.WELCOME), 20.0), "Onion: \"Welcome to the workshop.\"")
-	expect_eq(hub.ring.impressions.size(), 3, "the shelf, and the dots and the butterflies beside it")
+	expect_eq(hub.ring.impressions.size(), 4, "the shelf, then the dots, the butterflies and the cup, locked")
 	expect_eq(hub.ring.impressions[0].kind, &"shelf", "the shelf")
 	expect(not hub.ring.impressions[0].sealed, "the shelf is open")
 	expect(hub.ring.impressions[1].kind == &"dots" and hub.ring.impressions[1].sealed, "the dots wait in a closed bubble (there's more)")
@@ -83,7 +83,7 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect(await until(func() -> bool: return not hub.cauldron_lit(), 3.0), "the cauldron's glow goes while the menu is open")
 	var eye := App.head().global_position
 	var shelf := hub.ring.impressions[0]
-	expect(shelf.global_position.distance_to(eye) < 0.56, "the shelf bubble is within easy reach (%.2f m)" % shelf.global_position.distance_to(eye))
+	expect(shelf.global_position.distance_to(eye) < 0.62, "the shelf bubble is within easy ray-and-pinch reach (%.2f m; bubbles are pinched, not touched)" % shelf.global_position.distance_to(eye))
 	expect(hub.ring.leader() == shelf, "the waiting glow is on the open game, not a locked one")
 	expect(await until(func() -> bool: return (demo[0] as DemoHand).visible, WorkshopController.CUE_AFTER + 4.0),
 			"after ~5 s with no choice the hand shows aim-and-pinch")
@@ -108,7 +108,8 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	expect(hub.ring.opened and hub.ring.visible, "the menu rose again by itself")
 	expect(kinds.has(&"dots"), "the dots are in the menu (%s)" % [kinds])
 	expect(not hub.ring.impressions[1].sealed, "the dots' bubble opened")
-	expect(not kinds.has(&"turn_to_fit"), "Turn to fit only when it can run")
+	var cup := hub.ring.impressions.filter(func(i: Impression) -> bool: return i.kind == &"turn_to_fit")
+	expect(cup.size() == 1 and cup[0].sealed, "Turn to fit waits locked, the last game")
 	expect(hub.ring.door != null and hub.ring.door.visible, "the Virtual Workshop house waits below the tasks now")
 	expect(hub.ring.door.global_position.y < hub.ring.impressions[0].global_position.y - 0.05, "below the tasks")
 	var row := hub.ring.places.map(func(p: Impression) -> StringName: return p.kind)
@@ -370,7 +371,7 @@ func test_the_butterflies_wait_locked_then_open_after_the_dots_and_play() -> voi
 	var hub := await _to_hub()
 	await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning, 30.0)
 	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)
-	expect_eq(kinds, [&"shelf", &"dots", &"butterflies"], "the games in order")
+	expect_eq(kinds, [&"shelf", &"dots", &"butterflies", &"turn_to_fit"], "the games in order, the cup last")
 	var butterflies := hub.ring.impressions[2]
 	expect(butterflies.sealed and butterflies.find_child("lock", true, false).visible, "the butterflies wait locked")
 	for kind: StringName in [&"shelf", &"dots"]:

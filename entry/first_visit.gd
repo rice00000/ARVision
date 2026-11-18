@@ -57,7 +57,7 @@ func run() -> void:
 	start_with = &""
 	var welcome := invite
 	invite = false
-	await controller.run(_onion, [shelf, dots, ButterflyActivity.new(), TurnToFitSlot.new()], first, welcome, _motion.closing, _go_home)
+	await controller.run(_onion, [shelf, dots, ButterflyActivity.new(), TurnToFitActivity.new()], first, welcome, _motion.closing, _go_home)
 
 
 ## Scene 11: Home on the gear → Wei's room and back (MotionVisit has the fade).

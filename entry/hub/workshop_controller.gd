@@ -54,9 +54,10 @@ const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may pl
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
 const BUDS: Array[StringName] = [&"shelf", &"dots", &"butterflies"]
-## What opens when (Megan, Nov 18): the dots after the first game, the butterflies after the dots. One unlock per
-## return to the hub. Locked games show with a padlock from the first visit.
-const UNLOCKS: Array[Array] = [[&"dots", &""], [&"butterflies", &"dots"]]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
+## What opens when (Megan, Nov 18): the dots after the first game, the butterflies after the dots, Turn to fit
+## (the cup, the last game) after the butterflies and only once it can run (a saved cup setup and the CV server
+## answering). One unlock per return to the hub. Locked games show with a padlock from the first visit.
+const UNLOCKS: Array[Array] = [[&"dots", &""], [&"butterflies", &"dots"], [&"turn_to_fit", &"butterflies"]]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
 
 var workshop: Workshop
 var activities: Array[Summonable] = []
