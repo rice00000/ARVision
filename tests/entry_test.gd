@@ -25,6 +25,24 @@ func _boot_entry() -> void:
 	entry.run()
 
 
+## The hub (Scene 7): waits until the game [param kind] waits in the ring, then pinches it.
+func _choose_game(kind: StringName, timeout := 60.0) -> bool:
+	var found := {}
+	var ready := func() -> bool:
+		var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+		if hub == null or hub.state != &"hub" or hub.ring == null or hub.ring.turning:
+			return false
+		for impression in hub.ring.impressions:
+			if is_instance_valid(impression) and impression.kind == kind:
+				found.target = impression.target
+				return true
+		return false
+	if not await until(ready, timeout):
+		return false
+	Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
+	return true
+
+
 func _said_line(said: Array, text: String) -> bool:
 	return said.any(func(args: Array) -> bool: return args[0] == text)
 
@@ -126,10 +144,13 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect(await _until_said(said, "I'm Onion, by the way."), "and its name")
 	await _touch_cauldron()
 	expect(await until(func() -> bool: return (entry.get("_gear") as Node3D).visible, 30.0), "the gear comes out of the cauldron")
-	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "the ripple, then welcome")
-	expect_eq(App.main.current_scene, &"first_visit", "welcomed with the shelf already playable")
-	expect(await _until_said(said, "Pick whichever one you'd like to start with.", 60.0), "the things drop in, then Onion notices them")
+	expect(await _until_said(said, Entry.REVEAL_LINE, 60.0), "the reveal: the cauldron's puff, then Onion's line")
+	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "the hub: the shelf rises into the ring, then welcome")
+	expect_eq(App.main.current_scene, &"first_visit", "the hub is in the first visit's scene")
+	expect(App.session.trial == null, "nothing plays until the child chooses the shelf")
+	expect(await _choose_game(&"shelf"), "the child pinches the shelf in the ring")
 	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "Onion leads the first shelf level")
+	expect(await _until_said(said, "Pick whichever one you'd like to start with.", 60.0), "and invites")
 	expect_eq(App.main.current_scene, &"first_visit", "in its own scene")
 	expect(not _said_line(said, ADVENTURE.greeting), "without Wei's welcome stacked on top")
 
@@ -146,11 +167,10 @@ func test_jumping_to_each_part_plays_only_that_part() -> void:
 	# (where the table is narrow the socket rides its drawn track at the start of the reveal; wait it out)
 	expect(await until(func() -> bool: return _docked(), 20.0), "ripple: the gear is already in its socket")
 	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "ripple: Onion is already up beside the socket (the lifted spot)")
-	expect(await until(func() -> bool: return _shown(entry.get("_details")) > 0, 60.0), "ripple: plays")
+	expect(await _until_said(said, Entry.REVEAL_LINE, 60.0), "ripple: plays (the puff, then Onion's line)")
 	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")
 	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "ripple: the panel comes back")
-	var details := _shown(entry.get("_details"))
-	expect(details > 0, "ripple: the workshop was revealed")
+	expect_eq(_shown(entry.get("_details")), 0, "ripple: no shelf at the reveal (Scene 6; the hub offers it)")
 
 	# Hello: the workshop goes, the things go, Onion back inside.
 	await jump_to_intro_part(&"hello")
@@ -414,7 +434,7 @@ func test_a_jump_button_during_setup_skips_the_rest() -> void:
 	await _boot_entry()
 	var said := record(Events.said)
 	await jump_to_intro_part(&"reveal")
-	expect(await until(func() -> bool: return _shown(entry.get("_details")) > 0, 60.0), "the ripple plays straight from step 1")
+	expect(await _until_said(said, Entry.REVEAL_LINE, 60.0), "the ripple plays straight from step 1")
 	expect(not _said_line(said, "Oh! Hello there."), "and nothing before it")
 
 
@@ -462,7 +482,7 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	await wait(1.0)
 	expect((entry.get("_orb") as Onion).cue, "the touch part is waiting for the tap")
 	await jump_to_intro_part(&"reveal")   # cuts in
-	expect(await until(func() -> bool: return _shown(entry.get("_details")) > 0, 30.0), "the ripple plays at once")
+	expect(await _until_said(said, Entry.REVEAL_LINE, 30.0), "the ripple plays at once")
 	expect(not (entry.get("_orb") as Onion).cue, "and the touch part is gone")
 	expect(not _said_line(said, "Oh! Hello there."), "without the earlier parts")
 	# Back at the panel, wait for a part again and cut straight into the shelf scene.
@@ -486,7 +506,7 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	var said := record(Events.said)
 	await jump_to_intro_part(&"shelf")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the first visit loads")
-	expect(Tidy.onion_voice, "Wei's own spoken lines are switched off while Onion leads")
+	expect(await until(func() -> bool: return Tidy.onion_voice, 10.0), "Wei's own spoken lines are switched off while Onion leads")
 	var reports := record(Events.reported)
 	for round_index in 2:
 		expect(await until(func() -> bool:
@@ -500,17 +520,14 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(App.main.progress.is_done(task, level), "the shelf menu remembers the tutorial completion")
 	expect_eq(App.main.progress.reward(task, level), 2, "the shelf menu now offers the repeat reward")
 	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3, "the tutorial grants the first reward")
-	expect(_said_line(said, "There. Everything's found its place."), "Onion closes the level")
-	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
+	expect(await _until_said(said, "There. Everything's found its place.", 10.0), "Onion closes the level")
+	expect(not _said_line(said, "Thank you for helping."), "\"Thank you for helping.\" is cut (Scene 8)")
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
-	var more: UITarget
-	if not await until(func() -> bool: return app.find_child("visit_more_shelf", true, false) != null, 20.0):
-		expect(false, "the child can choose to play more shapes")
-		return
-	more = app.find_child("visit_more_shelf", true, false) as UITarget
 	var next_level := task.levels[1]
-	await select(more.global_position)
+	if not await _choose_game(&"shelf"):   # back at the hub: the shelf again plays Wei's next level
+		expect(false, "the child can choose the shelf again in the hub")
+		return
 	for block: Block in next_level.plan.blocks:
 		for round_index in block.rounds:
 			if not await until(func() -> bool:
@@ -519,23 +536,22 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 				expect(false, "the next shelf level starts round %d" % round_index)
 				return
 			App.session.trial.finish(true)
-	expect(await until(func() -> bool: return App.main.progress.is_done(task, next_level)), "More shapes saves the completed level")
-	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3 + next_level.first_reward, "More shapes grants the first reward")
+	expect(await until(func() -> bool: return App.main.progress.is_done(task, next_level)), "the shelf again saves the completed level")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3 + next_level.first_reward, "the shelf again grants the first reward")
 
 
-func test_onion_invites_with_the_shelf_already_playable_and_a_pick_up_ends_the_talk() -> void:
+func test_a_pick_up_ends_onions_shelf_lines() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	var said := record(Events.said)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child in the shelf part")
-	expect_eq(App.main.current_scene, &"first_visit", "the invitation plays in the shelf scene")
-	var trial := App.session.trial
-	expect(trial != null and trial.is_running(), "the shelf round is already running: shapes can be picked up while Onion talks")
-	Events.report(&"taken", {})   # the child picks a shape up
+	expect(await until(func() -> bool:
+		var trial := App.session.trial
+		return trial != null and trial.is_running(), 60.0), "the shelf round runs (the jump goes straight to the shelf)")
+	Events.report(&"taken", {})   # the child picks a shape up at once
 	await wait(12.0)
-	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "a pick-up ends the invitation")
-	expect(not _said_line(said, "The shapes on the shelf show where things go."), "and the rule (the child is already playing)")
+	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "a pick-up ends Onion's lines")
+	expect(not _said_line(said, "Welcome to the workshop."), "a jump has no welcome (the hub's first visit has it)")
 
 
 func test_a_shelf_finished_while_onion_still_talks_goes_straight_to_the_closing() -> void:
@@ -543,13 +559,12 @@ func test_a_shelf_finished_while_onion_still_talks_goes_straight_to_the_closing(
 	await _to_setup_panel()
 	var said := record(Events.said)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child in the shelf scene")
 	for round_index in 2:   # the child sorts both rounds before Onion has finished inviting
 		expect(await until(func() -> bool:
 			var trial := App.session.trial
 			return trial != null and trial.is_running() and trial.condition.round_index == round_index), "round %d runs" % round_index)
 		App.session.trial.finish(true)
-	expect(await _until_said(said, "Thank you for helping.", 15.0), "the closing comes at once")
+	expect(await _until_said(said, "There. Everything's found its place.", 15.0), "the closing comes at once")
 	expect(not _said_line(said, "Pick whichever one you'd like to start with."), "the rest of the invitation is not said")
 
 
@@ -592,7 +607,8 @@ func test_a_shape_can_be_taken_while_onion_invites() -> void:
 	var said := record(Events.said)
 	var reports := record(Events.reported)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child")
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running(), 60.0), "the shelf round runs")
+	await wait(1.0)
 	var trial := App.session.trial
 	var thing: Target = (trial.get("_things") as Array)[0]
 	var at := thing.global_position
@@ -614,7 +630,8 @@ func test_on_desktop_a_click_on_a_shape_takes_it() -> void:
 	var said := record(Events.said)
 	var reports := record(Events.reported)
 	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "Welcome to the workshop.", 60.0), "Onion welcomes the child")
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running(), 60.0), "the shelf round runs")
+	await wait(1.0)
 	var trial := App.session.trial
 	var thing: Target = (trial.get("_things") as Array)[0]
 	await frames(2)
@@ -677,7 +694,7 @@ func test_the_story_sounds_play_at_their_moments() -> void:
 	expect(sounds.toggle_pop() == "c", "the pop can be switched to candidate C")
 
 
-func test_the_cauldron_is_hidden_during_the_first_shelf_level() -> void:
+func test_the_cauldron_stays_during_the_first_shelf_level() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	await jump_to_intro_part(&"shelf")
@@ -685,7 +702,7 @@ func test_the_cauldron_is_hidden_during_the_first_shelf_level() -> void:
 	await wait(1.0)
 	var workshop := App.main.get_node(^"Workshop") as Workshop
 	var cauldron := workshop.get("_cauldron") as Node3D
-	expect(cauldron != null and not cauldron.visible, "the cauldron is out of sight for the object test")
+	expect(cauldron != null and cauldron.visible, "the cauldron stays for the whole visit (Nov 17)")
 	expect(workshop.find_children("*", "OmniLight3D", true, false).size() == 1, "Onion is still there")
 
 
@@ -702,7 +719,7 @@ func test_the_first_visit_does_not_claim_success_after_a_time_out() -> void:
 	await visit._closing()
 	Engine.time_scale = 1.0
 	expect(not _said_line(said, "There. Everything's found its place."), "no claim that everything is in place")
-	expect(_said_line(said, "Thank you for helping."), "a neutral thank-you")
+	expect(_said_line(said, "We can come back to these."), "the not-all-won line (Scene 8)")
 
 
 func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
@@ -723,7 +740,7 @@ func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
 	expect(not _said_line(said, plan.blocks[0].intro), "Onion supplies the level introduction")
 
 
-func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_success_is_marked_once() -> void:
+func test_the_closing_and_the_first_success_line_once() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	var said := record(Events.said)
@@ -737,16 +754,19 @@ func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_
 	expect(await _until_said(said, "There! You did that.", 40.0), "the first success gets its lines")
 	await wait(3.0)
 	expect(said.filter(func(a: Array) -> bool: return a[0] == "There! You did that.").size() == 1, "once")
-	await visit._ending()
+	await visit.closing()
 	Engine.time_scale = 1.0
-	expect(_said_line(said, "Thank you for trying that with me."), "the approved ending")
+	expect(not _said_line(said, "Thank you for trying that with me."), "cut (Scene 10)")
 	for line: String in ["It's been lovely having you here.", "I'll have everything ready for your next visit.", "Well. I'll do my best."]:
 		expect(_said_line(said, line), "the closing says: " + line)
+	expect(not _said_line(said, "The room has a few surprises left in it."), "not after the first success any more (it's Home's offer)")
 	var workshop := App.main.get_node(^"Workshop") as Workshop
 	expect(not (workshop.get("_gear") as Node3D).visible, "the gear went home into the cauldron")
-	expect((workshop.get("_cauldron") as Node3D).visible, "the cauldron is back for it")
+	expect((workshop.get("_cauldron") as Node3D).visible, "the cauldron is still there (it never left)")
 	expect(not workshop.onion.visible, "Onion ducked inside")
-	expect(visit.find_child("visit_end_session", true, false) != null, "the end-session control is shown")
+	expect(visit.find_child("visit_end_session", true, false) == null, "no End-session button in the room (Scene 10)")
+	expect(App.results_after_closing, "Staff tools will open on Results")
+	App.results_after_closing = false
 	expect(not Motion.onion_voice, "Wei's lines are back afterwards")
 
 

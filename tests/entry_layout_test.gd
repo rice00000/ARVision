@@ -190,7 +190,7 @@ func test_the_opening_puts_things_where_the_map_says_and_moves_them_at_the_revea
 	Engine.time_scale = 1.0
 
 
-func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_same_ones() -> void:
+func test_the_opening_keeps_the_first_things_hidden_and_the_shelf_level_makes_its_own() -> void:
 	Engine.time_scale = 1.0
 	await boot(null, &"intro")
 	app.autostart = true
@@ -201,19 +201,14 @@ func test_the_first_things_appear_with_the_shelf_and_the_shelf_level_makes_the_s
 	expect(await until(func() -> bool: return entry.find_child("entry_part_all", true, false) != null, 30.0), "the opening is set up")
 	var copy: Variant = entry.get("_shelf")
 	expect(copy != null and copy.things().size() >= 3, "the opening has made the first round's things (%s)" % [copy.things().size() if copy != null else 0])
-	var before := {}
-	for thing: Node3D in copy.things():
-		before[thing.name] = thing.global_position
+	var things: Array = copy.things()
+	for thing: Node3D in things:
 		expect(not thing.visible, "%s is hidden until the ripple reaches it" % thing.name)
 	entry.jump_to(&"shelf")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "the first visit loads")
 	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.get("_things") != null and not (App.session.trial.get("_things") as Array).is_empty(), 30.0), "and its trial makes things")
-	var made: Array = App.session.trial.get("_things")
-	expect_eq(made.size(), before.size(), "the same number of things")
-	for thing: Node3D in made:
-		expect(before.has(thing.name), "%s is one of the things the opening showed (same shape, same colour, same seed)" % thing.name)
-		if before.has(thing.name):
-			expect(thing.global_position.distance_to(before[thing.name]) < 0.001, "%s is in the same place (no swap, no drop-in)" % thing.name)
+	# Since Scene 6/7 the reveal no longer shows the shelf: its things arrive as Wei's do when the shelf is chosen.
+	expect(things.all(func(thing: Variant) -> bool: return not is_instance_valid(thing) or not (thing as Node3D).visible), "the opening never showed them")
 	await App.main.change_scene(&"global_motion")   # leave the first visit: it gives the shelf's static settings back
 	var tidy = load("res://trials/tidy/tidy_trial.gd")
 	tidy.seed_next = 0

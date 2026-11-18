@@ -25,6 +25,9 @@ extends Module
 @export var distance := 0.75
 ## How far (degrees, left-right) the head turns away from the subtitle before it moves to the new view.
 @export var recentre_degrees := 35.0
+## When set (degrees from the horizon, straight ahead), subtitles stand there instead: the dots visit puts them
+## under the dot cloud (Scene 9, Megan Nov 17). NAN = the usual place.
+var fixed_elevation := NAN
 ## The text size and its plate (high contrast: near-white on near-black).
 const FONT_SIZE := 72
 const PIXEL := 0.0006
@@ -148,6 +151,8 @@ func spot() -> Vector3:
 	var ahead := Vector3(gaze.x, 0.0, gaze.z).normalized()
 	var pitch := rad_to_deg(asin(clampf(gaze.y, -1.0, 1.0)))
 	var elevation := deg_to_rad(clampf(pitch + above_gaze, min_elevation, above_horizon))
+	if not is_nan(fixed_elevation):
+		elevation = deg_to_rad(fixed_elevation)
 	return eye.origin + (ahead * cos(elevation) + Vector3.UP * sin(elevation)) * distance
 
 

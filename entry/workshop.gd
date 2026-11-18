@@ -91,14 +91,6 @@ func slow_gears(seconds := 1.5) -> void:
 		spin.running = false
 
 
-## The cauldron (sunk away at the reveal) comes back up where it stood.
-func cauldron_back(seconds := 0.7) -> void:
-	_cauldron.visible = true
-	var tween := create_tween()
-	tween.tween_property(_cauldron, "scale", Vector3.ONE, seconds).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	await tween.finished
-
-
 ## The gear lifts out of its socket, floats over and drops into the cauldron, with a soft clunk.
 func gear_home() -> void:
 	if _gear == null or not is_instance_valid(_gear):
@@ -112,7 +104,8 @@ func gear_home() -> void:
 	tween.tween_callback(func() -> void:
 		_gear.visible = false
 		if _sounds != null:
-			_sounds.play(&"knock", _mouth))   # the soft clunk as it lands
+			_sounds.play(&"knock", _mouth)   # the soft clunk as it lands
+		PlaceSignal.play(self, _mouth, Vector3.UP, 0.08, false))   # Scene 10: "found its place" as it goes home
 	await tween.finished
 
 
@@ -144,6 +137,25 @@ func goodbye() -> void:
 	await tween.finished
 
 
+## The cauldron (the hub's centre).
+func cauldron() -> Node3D:
+	return _cauldron
+
+
+## The seated gear (the child's menu sits on it), or null.
+func gear_node() -> Node3D:
+	return _gear if is_instance_valid(_gear) else null
+
+
+## The closing's end (Scene 10): the empty socket fades into the table as Onion ducks in.
+func fade_socket(seconds := 1.2) -> void:
+	if not is_instance_valid(_mechanism):
+		return
+	var tween := create_tween()
+	tween.tween_property(_mechanism, "scale", Vector3(1.0, 0.02, 1.0), seconds).set_trans(Tween.TRANS_SINE)
+	tween.tween_callback(func() -> void: _mechanism.visible = false)
+
+
 ## Where the cauldron's mouth is.
 func mouth() -> Vector3:
 	return _mouth
@@ -167,7 +179,7 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 	if scene == &"find_object":
 		_become_guide()
 	elif scene == &"first_visit":
-		_cauldron.visible = false   # the object test is what to look at now: the cauldron would distract
+		_cauldron.visible = true   # the hub: the cauldron stays for the whole visit (Nov 17)
 	else:
 		queue_free()
 

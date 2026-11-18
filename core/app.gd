@@ -23,6 +23,9 @@ var sim_input: SimInput
 
 ## Who holds the world paused (&"facilitator", &"headset"). Paused while anyone does.
 var _pause_holds: Dictionary[StringName, bool] = {}
+## Set by the workshop's closing (Scene 10): the next time Staff tools opens, it opens on Results (the grown-up
+## reviews, then ends the session there).
+var results_after_closing := false
 
 
 func _ready() -> void:

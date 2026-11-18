@@ -163,6 +163,29 @@ func quiet(seconds := 0.8) -> void:
 		_place(), _waiting, 0.0, seconds)
 
 
+## The closing (Scene 10, Megan Nov 17): the ring and its fog sink quietly into the cauldron's [param mouth]
+## and are gone, before Onion's first goodbye line.
+func sink(mouth: Vector3, seconds := 1.2) -> void:
+	_quiet = true
+	turning = true
+	var starts: Array[Vector3] = []
+	for impression in impressions:
+		starts.append(impression.global_position if is_instance_valid(impression) else mouth)
+	var tween := create_tween()
+	tween.tween_method(func(k: float) -> void:
+		for i in impressions.size():
+			var impression := impressions[i]
+			if is_instance_valid(impression):
+				impression.global_position = starts[i].lerp(mouth, k)
+				impression.scale = Vector3.ONE * lerpf(1.0, 0.2, k)
+				impression.set_waiting(0.0)
+				impression.set_near(0.0)
+		_fog_light.albedo_color.a = FOG_ALPHA * (1.0 - k)
+		_column_light.albedo_color.a = FOG_ALPHA * 0.7 * (1.0 - k), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await tween.finished
+	visible = false
+
+
 ## Lights the front one and the fog again (back at the hub after a game).
 func wake() -> void:
 	_quiet = false

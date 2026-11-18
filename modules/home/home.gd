@@ -46,6 +46,11 @@ var _offscreen := 0.0
 var _wallet := Node3D.new()   # the magic stones the child has, beside the Menu button (Megan, Nov 10)
 
 
+## The workshop hides the floating ☰ from the child (Megan, Nov 17: the table gear is the child's menu; the
+## grown-up uses Staff tools). Opening Wei's room from the gear's Home still works (open / room_requested).
+var hide_entry := false
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_entry = HomeUI.button(App.rig, &"menu_open", "Menu", "Point and pinch to open the game menu.", Vector3.ZERO, "≡")
@@ -415,7 +420,7 @@ func _update_entry() -> void:
 	# Polish V1: hidden only while the grown-up's setup panel shows. In the story opening it stays, in
 	# play mode too (Megan, Nov 16: the Menu must be reachable in play). Staff tools also open with the
 	# left-palm pinch (M on the laptop).
-	var available := not App.menu_active() and not App.main.switching
+	var available := not App.menu_active() and not App.main.switching and not hide_entry
 	if available:   # (never asks the scene mid-switch, when it may be gone)
 		var entry := App.main.intro()
 		available = entry == null or not entry.setting_up()

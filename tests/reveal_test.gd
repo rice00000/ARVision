@@ -48,7 +48,7 @@ func test_the_cauldron_is_planned_clear_of_the_bench() -> void:
 	expect(bench.is_empty(), "the cauldron never stands in the bench's way, so it can stay (%s)" % [layout.ripple_overlaps()])
 
 
-func test_the_reveal_keeps_the_cauldron_puffs_speaks_then_the_shelf_pops_out() -> void:
+func test_the_reveal_keeps_the_cauldron_puffs_and_speaks_with_no_shelf() -> void:
 	await _boot()
 	var said := record(Events.said)
 	var box: Node3D = entry.get("_box")
@@ -64,12 +64,7 @@ func test_the_reveal_keeps_the_cauldron_puffs_speaks_then_the_shelf_pops_out() -
 	expect(await until(func() -> bool: return said.any(func(a: Array) -> bool: return a[0] == Entry.REVEAL_LINE), 10.0), "Onion's line")
 	expect(ref.get_ref() == null, "said as the puff has faded, not over it")
 	expect(not pivot.visible, "still no shelf while Onion speaks")
-	expect(await until(func() -> bool: return entry.find_child("shelf_impression", true, false) != null, 15.0), "the shelf pops out of the cauldron")
-	var small := entry.find_child("shelf_impression", true, false) as Node3D
-	var mouth: Vector3 = entry.get("_mouth")
-	expect(Vector2(small.global_position.x - mouth.x, small.global_position.z - mouth.z).length() < 0.05, "from the cauldron's mouth")
-	expect(small.scale.x < 0.6, "small as it comes out")
-	expect(await until(func() -> bool: return pivot.visible and pivot.scale.is_equal_approx(pivot.get_meta(&"size", Vector3.ONE)), 10.0),
-			"then the shelf stands at the bench, full size")
+	# Scene 7: the shelf no longer pops out here: the hub's ring offers it in the first visit.
 	expect(await until(func() -> bool: return not bool(entry.get("_part_running")), 20.0), "the reveal ends")
 	expect(box.visible, "with the cauldron still there")
+	expect(not pivot.visible and entry.find_child("shelf_impression", true, false) == null, "and no shelf (the hub offers it)")

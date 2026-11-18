@@ -23,11 +23,25 @@ extends Trial
 ## show the hand was seen ([SweepTrail]), right or wrong alike.
 ## Hint 1 (only when asked): every dot follows the flow.
 ## With [member break_wall] (the tech demo), a right sweep also breaks the wall ahead.
+##
+## Log (for the Staff tools results, Nov 17; log only, stimuli and judging unchanged): every
+## motion_attempt, motion_windup, motion_round_interrupted and the round's trial_end carry
+## [method log_stamp]: the log version, the play mode, whether the level was pinned, and a
+## per-run round number, so a round's lines join up and dev or pinned runs never mix with play.
+## A round that ends without being won (skipped, timed out, or the scene left) logs
+## motion_round_interrupted {trial, round, coherence_shown, help, seconds_shown, reason, ...}.
 
 const HEADINGS: Array[StringName] = [&"right", &"left", &"toward", &"away"]
 ## Flow of each heading in the cloud's frame: its -Z points away from the child.
 const FLOWS: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]
 const ARM_SECONDS := 0.8
+## Version of the motion log lines. 1 = before Nov 17 (no log_version field). 2 adds
+## motion_round_interrupted and [method log_stamp]. 3 (hub, Nov 17) adds view_dim, the room's dimming
+## during the round, so dimmed and undimmed rounds never pool. Raise it whenever a motion line changes meaning.
+const LOG_VERSION := 3
+
+## Rounds started in this run; each round logs its own number ([code]round_serial[/code]).
+static var _rounds_started := 0
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
@@ -47,6 +61,9 @@ var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
 ## Per hand, its latest wrong-way sweep, waiting for the hand to stop.
 var _wrong: Dictionary[StringName, Dictionary] = {}
+## This round's number in the run, and the share of dots following the flow as it began (before any help).
+var _serial := 0
+var _coherence_start := 0.0
 
 @onready var _cloud: MotionCloud = $Cloud
 @onready var _shimmer: AudioStreamPlayer3D = $Cloud/Shimmer
@@ -78,6 +95,9 @@ func _setup(round_condition: TrialCondition) -> void:
 	_cloud.global_transform = _frame
 	var trial_seed := _rng.randi_range(1, 1000000)
 	_signal_dots = signal_dots
+	_rounds_started += 1
+	_serial = _rounds_started
+	_coherence_start = float(signal_dots) / _dots
 	_cloud.show_flow(round_condition, _flow, _signal_dots, trial_seed)
 	_shimmer.play()
 	round_condition.set_value(&"heading", HEADINGS[heading])
@@ -101,14 +121,15 @@ func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float)
 	var result := classify(_frame.basis.inverse() * (to - from), _flow, _tolerance)
 	result.merge({trial = condition.trial, round = condition.round_index, hand = hand, from = from,
 		onset_seconds = onset, duration_seconds = duration,
-		help = hint_level, coherence_shown = float(_signal_dots) / _dots})
+		help = hint_level, coherence_shown = float(_signal_dots) / _dots}, true)
+	result.merge(log_stamp(), true)
 	if not result.correct:
 		_wrong[hand] = result
 		return
 	# A wrong sweep that set off elsewhere was a wind-up; this sweep's own start bending in is not.
 	var windups := _wrong.values().filter(func(wrong: Dictionary) -> bool: return wrong.from != from)
 	for windup: Dictionary in windups:
-		Events.report(&"motion_windup", windup)
+		Events.report(&"motion_windup", windup) # stamped with the attempt fields above
 	_wrong.clear()
 	_attempts.append(result)
 	Events.report(&"motion_attempt", result)
@@ -125,6 +146,54 @@ func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float)
 		angle_degrees = result.angle_degrees})
 
 
+## What every motion log line of this round carries (log version 2).
+func log_stamp() -> Dictionary:
+	var session := App.session
+	var mine := session != null and session.trial == self
+	var source := "outside_session"
+	if mine:
+		if not is_nan(session.pinned):
+			source = "pinned"
+		elif session.block != null and session.block.difficulty >= 0.0:
+			source = "fixed"
+		else:
+			source = "staircase"
+	return {log_version = LOG_VERSION, session_mode = PlayMode.name(), level_pinned = source == "pinned",
+		level_source = source, round_serial = _serial, coherence_start = _coherence_start,
+		heading = condition.value(&"heading") if condition else &"",
+		view_dim = snappedf(App.reality.view.dim, 0.01) if App.reality != null else 0.0}
+
+
+## Ends the round (see [Trial]). Stamps its line and logs a round that ends unwon.
+func finish(success: bool, extra: Dictionary = {}) -> void:
+	if not is_running():
+		return
+	if not success:
+		_log_interrupted(&"timed_out" if extra.get("timed_out", false) else &"ended_unwon")
+	super(success, extra.merged(log_stamp(), true))
+
+
+## The facilitator skipped the round (see [Trial]).
+func abandon() -> void:
+	if is_running():
+		_log_interrupted(&"skipped")
+	super()
+
+
+## A round that ended without being won. Its first attempt, if there was one, still counts.
+func _log_interrupted(reason: StringName) -> void:
+	var first := {}
+	if not _attempts.is_empty():
+		var attempt: Dictionary = _attempts[0]
+		first = {correct = attempt.correct, help = attempt.help, coherence_shown = attempt.coherence_shown,
+			onset_seconds = attempt.onset_seconds}
+	var data := {trial = condition.trial, round = condition.round_index,
+		coherence_shown = float(_signal_dots) / maxi(_dots, 1), help = hint_level,
+		seconds_shown = snappedf(seconds(), 0.001), reason = reason, attempts = _attempts.size(),
+		first_attempt = first}
+	Events.report(&"motion_round_interrupted", data.merged(log_stamp(), true))
+
+
 ## The hand stopped after going the wrong way: that was its answer.
 func _on_swept(hand: StringName) -> void:
 	if not _wrong.has(hand):
@@ -135,12 +204,17 @@ func _on_swept(hand: StringName) -> void:
 	Events.report(&"motion_attempt", result)
 	judge(&"bad", _cloud.global_position)
 	count_try()
-	say("Not that way. Watch the dots and try again.")
+	if onion_voice:   # in the workshop Onion says its own calm line (Scene 9, Megan Nov 17): MotionVisit hears this
+		Events.report(&"motion_wrong", {trial = condition.trial, round = condition.round_index})
+	else:
+		say("Not that way. Watch the dots and try again.")
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PAUSED:
 		_wrong.clear()
+	elif what == NOTIFICATION_EXIT_TREE and is_running():
+		_log_interrupted(&"left") # the scene changed or the app closed mid-round
 
 
 ## Help: every dot follows the flow.

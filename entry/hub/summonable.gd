@@ -14,9 +14,9 @@ func id() -> StringName:
 func is_available() -> bool:
 	return true
 
-## The small solid stand-in (Effects supplies the look).
+## The small solid stand-in in the hub's ring (Effects' look, `entry/fx/impression.gd`).
 func make_impression() -> Node3D:
-	return Node3D.new()
+	return Impression.make(id())
 
 ## Grow from the impression, then run.
 func summon(_workspace: Transform3D) -> void:
@@ -25,6 +25,12 @@ func summon(_workspace: Transform3D) -> void:
 ## Shrink back into the impression.
 func fold() -> void:
 	pass
+
+## Ends it early (the exit-task token): it stops at once and still emits [signal finished] (&"left").
+## (Added by the Hub chat, Nov 17.)
+func leave() -> void:
+	pass
+
 
 func pause() -> void:
 	pass

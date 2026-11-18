@@ -1705,6 +1705,16 @@ func test_the_invitation_in_the_first_visit_is_not_cut_until_the_child_has_taken
 	var log := _line_log()
 	App.main.change_scene(&"first_visit")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not is_instance_valid(entry), 15.0), "in the first visit")
+	# The hub (Scene 7): the child pinches the shelf in the ring; then Onion's shelf lines are the invitation.
+	var found := {}
+	expect(await until(func() -> bool:
+		var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+		if hub == null or hub.state != &"hub" or hub.ring == null or hub.ring.turning or hub.ring.impressions.is_empty():
+			return false
+		found.target = hub.ring.impressions[0].target
+		return true, 30.0), "the shelf waits in the hub's ring")
+	if found.has("target"):
+		Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return _voice().speaking() != "", 30.0), "Onion speaks")
 	var line: String = _voice().speaking()
 	var skip: LineSkip = App.main.get_node(^"LineSkip")
