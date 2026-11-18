@@ -1,7 +1,8 @@
 class_name StonesBadge
 extends Node3D
 ## The child's magic stones in the workshop (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md` §1–2):
-## a pill-shaped badge on the Virtual Workshop house bubble, upper right over its rim: cream with a near-black
+## a pill-shaped badge on the Virtual Workshop house bubble, lower right over its rim (the design said upper right;
+## there the arc's bubbles above hid it, Nov 18 pictures): cream with a near-black
 ## edge, a teal gem on the left, the count on the right in big bold digits (it must read under blur).
 ##
 ## After a game the stones rise out of the brew one at a time and arc into it ([method fly_in]): ~0.9 s each,
@@ -28,7 +29,7 @@ static func attach(house: Impression, stones: int) -> StonesBadge:
 	badge.name = "stones_badge"
 	var on: Node3D = house.bubble if house.bubble != null else house
 	on.add_child(badge)
-	badge.position = Vector3(0.55, 0.78, 0.85) * Impression.BUBBLE_RADIUS
+	badge.position = Vector3(0.55, -0.8, 0.85) * Impression.BUBBLE_RADIUS
 	badge._build()
 	badge.set_count(stones)
 	return badge
