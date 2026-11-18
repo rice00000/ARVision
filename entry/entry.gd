@@ -370,7 +370,7 @@ func _hello(fast := false) -> void:
 	_orb.actions.hop(_runner)   # a small startled hop
 	await _wait(0.5)   # then an angled peek into the opening
 	_attend(null)   # a glance back at the child, still leaning over the cauldron
-	await _wait(0.6)   # ("Nearly ready." cut: Megan, Nov 17) the glance reads on its own
+	await say("Nearly ready.")   # restored (story chat, Nov 18): a sheepish correction, still half over the cauldron
 	_orb.actions.lean_in(_runner, false)   # straightens up
 	await _wait(0.4)
 	await say("I'm Onion, by the way.")
@@ -465,7 +465,7 @@ func _out() -> void:
 	_attend(_gear)   # the settled gear
 	_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
 	# (No look at the socket yet: the story moved that cue to placement, so the child can examine the gear first.)
-	await say("There it is! The table's missing piece.")
+	await say("Aha! There it is! The table's missing piece.")   # story chat, Nov 18
 	_attend(null)   # turns back to the child (Megan cut "I've been looking for that.")
 
 
@@ -572,7 +572,13 @@ func _reveal() -> void:
 			break   # no puff (the cauldron sank, or the band has gone past it): the line after the band
 		await _runner.tick
 	_attend(null)
+	# Story chat, Nov 18: Onion jumps in surprise, then leans closer, delighted.
+	_orb.actions.hop(_runner)
+	await _wait(0.35)
+	_attend(_box.global_position + Vector3.UP * (_rim + 0.1))
+	_orb.actions.lean_to(_runner, 0.2, 0.5)
 	await say(REVEAL_LINE)   # SCRIPT.md, approved Nov 17 (subtitle only until the voice is baked)
+	_orb.actions.lean_to(_runner, 0.0, 0.5)
 	# Scene 7: no shelf here any more: the hub's ring offers it (it rises out of the cauldron, WorkshopController).
 	while rippling.on:
 		await _runner.tick

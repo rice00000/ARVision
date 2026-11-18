@@ -62,6 +62,8 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	var hub := await _to_hub()
 	expect(hub != null, "the hub runs in the first visit")
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.WELCOME), 20.0), "Onion: \"Welcome to the workshop.\"")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.PARTICULAR), 20.0), "\"It's a bit particular, this place…\" (story chat, Nov 18)")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.READY), 20.0), "the cauldron clicks ready: \"Well, this one's ready for us!\"")
 	expect_eq(hub.ring.impressions.size(), 4, "the shelf, then the dots, the butterflies and the cup, locked")
 	expect_eq(hub.ring.impressions[0].kind, &"shelf", "the shelf")
 	expect(not hub.ring.impressions[0].sealed, "the shelf is open")
@@ -101,7 +103,8 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	expect(not hub.carry.enabled, "the gear can't be lifted during a game")
 	Engine.time_scale = 4.0
 	await _finish_rounds()
-	expect(await until(func() -> bool: return _said_line(said, WorkshopController.MORE), 40.0), "Onion: \"There are more waiting.\"")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.DOTS_WOKE), 40.0), "Onion: \"Oh! Looks like we've woken another one!\"")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.DOTS_AWAKE), 10.0), "\"The Dots are awake. Shall we see what they're up to?\"")
 	expect(await until(func() -> bool: return _in_hub(hub), 20.0), "back at the hub")
 	Engine.time_scale = 1.0
 	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)

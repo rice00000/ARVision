@@ -33,9 +33,16 @@ signal _picked_signal
 
 const CUE_AFTER := 5.0          # seconds without a tap / choice before the teaching hand shows it (first visit)
 const WELCOME := "Welcome to the workshop."
-const MORE := "There are more waiting."
-const STONES_YOURS := "These stones are yours."
-const STONES_SPEND := "You can spend them in the Virtual Workshop."
+## Story chat, Nov 18 (locked): the stones, the first time they land in the house's badge.
+const STONES_YOURS := "Oh, look! Some magic stones!"
+const STONES_SPEND := "They're yours to spend in the Virtual Workshop."
+## The workshop introduces itself after "Welcome to the workshop." (first visit), then the menu "clicks ready".
+const PARTICULAR := "It's a bit particular, this place. Things wake up when they're ready."
+const READY := "Well, this one's ready for us!"
+## The dots' first unlock (replaces "There are more waiting.").
+const DOTS_WOKE := "Oh! Looks like we've woken another one!"
+const DOTS_AWAKE := "The Dots are awake. Shall we see what they're up to?"
+const BREATH := 0.7             # seconds between Onion's lines (story chat: ~0.6-1 s)
 const ROW_WAIT := 8.0           # a game's own row or the looks: this long with no press, they sink
 const LEFT_EARLY := "We can come back to these."
 const ALL_DONE := "All done for today?"
@@ -163,7 +170,7 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		if not played.is_empty():
 			_show_places()   # a later visit: the places row is there from the start
 		if welcome:
-			await Onion.line(WELCOME, self)
+			_welcome()   # not awaited: talk never blocks play (story chat, Nov 18)
 	while true:
 		_picked = &""
 		var choice := await _hub()
@@ -216,6 +223,8 @@ func _hub() -> StringName:
 			continue
 		waited += get_process_delta_time()
 		if not ring.opened:
+			if _welcoming:
+				waited = 0.0   # the teaching hand waits for Onion's welcome to finish
 			if not ever_opened and cued != &"tap" and waited > CUE_AFTER:
 				cued = &"tap"
 				_demo.tap(_rim())   # shows a tap at the cauldron: no words
@@ -318,16 +327,16 @@ func _run(activity: Summonable) -> void:
 		_show_places(stones_before)
 	elif badge != null:
 		badge.set_count(stones_before)
-	await _unlock_next()
+	var woke := await _unlock_next()
 	for a in activities:   # Turn to fit (or anything) that can run now
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
-	_stones_rise(stones, grew)   # not awaited: presses on the bubbles work while the stones fly
+	_after_game(woke, stones, grew)   # not awaited: presses on the bubbles work while Onion talks and stones fly
 
 
 ## Opens the next locked game whose time has come (UNLOCKS), once per return: its lock clicks open and drops away,
-## then "There are more waiting.".
-func _unlock_next() -> void:
+## Returns the game that opened (its lines come after, in [method _after_game]), or null.
+func _unlock_next() -> Summonable:
 	for unlock: Array in UNLOCKS:
 		var activity := _activity(unlock[0])
 		if activity == null or not activity.is_available():
@@ -344,9 +353,8 @@ func _unlock_next() -> void:
 			await piece.unseal()
 		else:
 			await _offer(activity)
-		if memory == null or memory.first_time(&"more"):
-			await Onion.line(MORE, self)   # the first time only (design chat, Nov 18)
-		return
+		return activity
+	return null
 
 
 ## A game is left early through the cauldron's ✕: its round is dropped (interrupted), "We can come back to these."
@@ -702,6 +710,51 @@ func _award(activity: Summonable, outcome: StringName) -> int:
 
 ## The earning moment (§2, §4): [param stones] rise from the brew into the house's badge, one clink each; a
 ## first-time shelf level grows the shelf a row; the first time ever, Onion says what they're for.
+## The first visit's welcome (story chat, Nov 18): "Welcome to the workshop.", a fond look round, "It's a bit
+## particular…", the cauldron clicks ready (the games are inside it), "Well, this one's ready for us!". Not awaited:
+## a tap on the cauldron works throughout, and the rest stops once the menu is open.
+var _welcoming := false
+func _welcome() -> void:
+	_welcoming = true
+	await Onion.line(WELCOME, self)
+	if workshop != null and not ring.opened:
+		for look: Vector3 in [Vector3(-0.8, 0.5, -1.2), Vector3(0.8, 0.4, -1.2)]:   # affectionately round the room
+			workshop.attend(App.head().global_position + App.head().global_basis * look)
+			await get_tree().create_timer(0.6, false).timeout
+		workshop.attend(null)
+	if not ring.opened and not _opening:
+		await Onion.line(PARTICULAR, self)
+	if not ring.opened and not _opening:
+		await get_tree().create_timer(BREATH, false).timeout
+		_play(&"unlock", _mouth())   # the mechanism clicks ready
+		glow = 1.0
+		if workshop != null:
+			workshop.attend(_rim())
+		await Onion.line(READY, self)
+	_welcoming = false
+
+
+## After a game, once the menu is back (not awaited): a game that just opened gets its lines (the dots, the first
+## time: "Oh! Looks like we've woken another one!" / "The Dots are awake…"; story chat, Nov 18), then the stones.
+func _after_game(woke: Summonable, stones: int, grew: bool) -> void:
+	if woke != null and woke.id() == &"dots" and (memory == null or memory.first_time(&"dots_awake")):
+		var piece := _impression_of(woke)
+		if workshop != null and piece != null:
+			workshop.attend(piece.global_position)   # Onion looks toward it with interest
+		await Onion.line(DOTS_WOKE, self)
+		if state == &"hub":
+			await get_tree().create_timer(BREATH, false).timeout
+			await Onion.line(DOTS_AWAKE, self)
+		if workshop != null:
+			workshop.attend(null)
+		if state != &"hub":
+			if badge != null:
+				badge.land_all()
+			return
+		await get_tree().create_timer(BREATH, false).timeout
+	await _stones_rise(stones, grew)
+
+
 func _stones_rise(stones: int, grew: bool) -> void:
 	if badge == null or stones <= 0:
 		return
@@ -725,7 +778,7 @@ func _stones_rise(stones: int, grew: bool) -> void:
 		workshop.attend(house.global_position)   # Onion turns to the house; it glows while Onion speaks
 	house.set_waiting(0.8)
 	await Onion.line(STONES_YOURS, self)
-	await get_tree().create_timer(0.7, false).timeout
+	await get_tree().create_timer(BREATH, false).timeout
 	await Onion.line(STONES_SPEND, self)
 	if is_instance_valid(house):
 		house.set_waiting(0.0)

@@ -803,8 +803,13 @@ func test_the_closing_and_the_first_success_line_once() -> void:
 	expect(await until(func() -> bool: return visit.get("_in_motion"), 60.0), "the motion rounds start")
 	Events.trial_ended.emit(&"motion", true, {})
 	Events.trial_ended.emit(&"motion", true, {})
-	expect(await _until_said(said, "There! You did that.", 40.0), "the first success gets its lines")
 	await wait(3.0)
+	expect(not _said_line(said, "There! You did that."), "Onion stays quiet during the measured rounds (story chat, Nov 18)")
+	while App.session.running:
+		if App.session.trial != null and App.session.trial.is_running():
+			App.session.trial.finish(true)
+		await frames(2)
+	expect(await _until_said(said, "There! You did that.", 40.0), "the dots fly away: \"There! You did that.\"")
 	expect(said.filter(func(a: Array) -> bool: return a[0] == "There! You did that.").size() == 1, "once")
 	await visit.closing()
 	Engine.time_scale = 1.0

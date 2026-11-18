@@ -70,8 +70,14 @@ func run_motion() -> StringName:
 	_subtitles_under_cloud(true)
 	if _plays == 1:
 		SceneMarker.show_text("Tutorial")
+		# Story chat, Nov 18: fondly exasperated, then the demonstration ("Here, let me show you." is replaced).
+		if _onion != null:
+			_onion.tilt(true)
+		await _narrator.say("I once told these dots to stay put. They didn't listen.")
+		if _onion != null:
+			_onion.tilt(false)
+		await get_tree().create_timer(0.7, false).timeout
 		await _narrator.say("Watch what happens when they move together.")
-		await _narrator.say("Here, let me show you.")
 		await _tutorial()
 		await _narrator.say("Your turn.")
 		await _narrator.say("Watch which way the dots are moving, then sweep your hand that way.")
@@ -94,6 +100,14 @@ func run_motion() -> StringName:
 		dev.queue_free()
 	if not _left:
 		await get_tree().create_timer(SETTLE, false).timeout   # the last earned effect finishes
+		# Story chat, Nov 18: the dots fly away; "There! You did that." (whatever the score); Onion follows them
+		# briefly, then turns back to the child.
+		if _onion != null:
+			_onion.attend(App.head().global_position + Vector3.UP * 0.6 - App.head().global_basis.z * 1.5)
+		await _narrator.say("There! You did that.")
+		await get_tree().create_timer(0.6, false).timeout
+		if _onion != null:
+			_onion.attend(null)
 	Motion.onion_voice = false
 	await _haze(false)   # the dots push the bad energy back, once, whatever the score
 	_subtitles_under_cloud(false)
@@ -229,18 +243,9 @@ func _on_trial_ended(_skill: StringName, success: bool, _data: Dictionary) -> vo
 	_rounds_ended += 1
 	if success:
 		_rounds_won += 1
-	if success and not _first_success:   # the full reaction, on the first success only
-		_first_success = true
-		# Scene 9: only "There! You did that." ("The room has a few surprises left in it." moved to Home's offer),
-		# and the next round's dots wait until it has finished.
-		var block := App.session.block
-		var pause_was := block.pause_between if block != null else 0.0
-		if block != null:
-			block.pause_between = maxf(pause_was, SETTLE + 2.4)
-		await get_tree().create_timer(SETTLE, false).timeout
-		await _narrator.say("There! You did that.")
-		if block != null:
-			block.pause_between = pause_was
+	if success and not _first_success:
+		_first_success = true   # (story chat, Nov 18: Onion stays quiet during the measured rounds; "There! You did
+		# that." moved to the end, as the dots fly away)
 
 
 func _on_trial_started(_trial: StringName, _condition: Dictionary) -> void:

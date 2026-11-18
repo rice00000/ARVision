@@ -119,7 +119,7 @@ func test_hello_has_no_nearly_ready_and_one_second_of_quiet() -> void:
 	var quiet := (Engine.get_process_frames() - start) / 60.0
 	expect(quiet > 0.8 and quiet < 1.4, "about 1 s of quiet before the rattle (%.2f s)" % quiet)
 	expect(await until(func() -> bool: return said.any(func(a: Array) -> bool: return a[0] == "I'm Onion, by the way."), 30.0), "Onion introduces itself")
-	expect(not said.any(func(a: Array) -> bool: return a[0] == "Nearly ready."), "\"Nearly ready.\" is cut")
+	expect(said.any(func(a: Array) -> bool: return a[0] == "Nearly ready."), "\"Nearly ready.\" is back (story chat, Nov 18)")
 
 
 ## Visual pass (Megan, Nov 18): the floating ☰ Menu and the stones chip leave the child's view from the opening on.

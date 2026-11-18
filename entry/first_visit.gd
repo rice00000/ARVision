@@ -97,9 +97,18 @@ func play_shelf(level: TaskLevel = null) -> StringName:
 	# The shelf level is running from here: the child may pick shapes up and sort while Onion talks.
 	if _onion != null and _shelf_spot != Vector3.INF:
 		_onion.attend(_shelf_spot)   # looks toward the shelf
+	# Story chat, Nov 18: Onion recognizes the shelf things with affectionate surprise, then the instructions.
+	# A pick-up ends the lines at once (talk never blocks play).
 	if not _started:
+		await say("Oh! I'd nearly forgotten about these.")
+	if not _started:
+		await _breath()
+		await say("Finding their place is usually my job. Care to join me?")
+	if not _started:
+		await _breath()
 		await say("The shapes on the shelf show where things go.")
 	if not _started:
+		await _breath()
 		await say("Pick whichever one you'd like to start with.")
 	if _onion != null:
 		_onion.attend(null)
@@ -172,7 +181,9 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 		var ended := _rounds_ended
 		await get_tree().process_frame
 		if _rounds_ended == ended:   # not when that placement finished the round: there are no others
-			await say("It fits. Let's find places for the others.")   # the first placement only
+			if _onion != null:
+				_onion.cheer()   # a satisfied little nod
+			await say("Aha! Right where it belongs. Now, who's next?")   # the first placement only (story chat, Nov 18)
 
 
 func _exit_tree() -> void:
@@ -199,6 +210,11 @@ func _place_signal(key: StringName) -> void:
 			if is_instance_valid(thing):
 				PlaceSignal.play(self, (thing as Node3D).global_position, Vector3.UP, 0.06)
 			return
+
+
+## A short breath between Onion's lines (story chat, Nov 18: ~0.6–1 s).
+func _breath() -> void:
+	await get_tree().create_timer(0.7, false).timeout
 
 
 ## Speaks [param text] as Onion (baked audio and subtitle) and waits for it; see [method Onion.line].
