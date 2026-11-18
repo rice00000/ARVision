@@ -76,7 +76,9 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 				state = &"home"
 				gear.set_enabled(false)
 				ring.quiet()
+				ring.visible = false   # not over Wei's room
 				await home.call()
+				ring.visible = true
 				ring.wake()
 			continue
 		await _run(_activity(choice))
@@ -210,7 +212,11 @@ func _on_ring_press(target: Target) -> void:
 
 func _build_gear() -> void:
 	var at := _mouth() + Vector3.RIGHT * 0.2
-	if workshop != null and workshop.gear_node() != null:
+	# The socket (the gear turns in it): the gear node itself can be unplaced after a jump.
+	var socket: Node3D = workshop.get("_mechanism") if workshop != null else null
+	if socket != null and is_instance_valid(socket):
+		at = socket.global_position + Vector3.UP * 0.03
+	elif workshop != null and workshop.gear_node() != null:
 		at = workshop.gear_node().global_position + Vector3.UP * 0.03
 	gear = GearMenu.make(self, at, App.head().global_position, false)
 	_update_stones()

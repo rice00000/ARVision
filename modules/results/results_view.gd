@@ -62,6 +62,10 @@ func reload(folder := "", current := "") -> void:
 	_rounds_all = MotionResults.load_rounds(MotionResults.visit_paths(folder))
 	var visit := current.get_file().get_basename()
 	_rounds_visit = _rounds_all.filter(func(r: Dictionary) -> bool: return r.visit == visit) if visit != "" else []
+	# Hub review: rounds are split by mode and view, so open on the latest round's group when this one is empty.
+	if MotionResults.in_group(_rounds_all, group).is_empty() and not _rounds_all.is_empty():
+		group = _rounds_all.back().group
+		task_index = 0
 	_redraw()
 
 

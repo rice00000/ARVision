@@ -7,6 +7,8 @@ extends Node
 var _out := ProjectSettings.globalize_path("res://build/hub_flow")
 var _n := 0
 var _line := ""
+var _hub: WorkshopController
+var _visit: MotionVisit
 
 
 func _ready() -> void:
@@ -19,18 +21,19 @@ func _ready() -> void:
 	await get_tree().process_frame
 	(App.rig.head as Camera3D).fov = 80.0
 	Events.said.connect(func(text: String) -> void: _line = text)
-	var entry: Entry = app.get_node(^"Intro/Entry")
-	entry.run()
 	app.autostart = true
-	await _until(func() -> bool: return entry.zones_available())
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false   # plan the room now (as the tests do), then hand over to the first visit
+	entry.run()
+	await _until(func() -> bool: return entry.tools_ready and entry.zones_available() and entry.get("_layout") != null, 2400)
 	await _pause(1.0)
 	_look(-0.6)
-	entry.jump_to(&"shelf")
+	entry.call(&"_to_shelf", false)   # the opening's own hand-over: the first visit with its welcome
 	await _until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching)
-	var hub: WorkshopController = null
 	await _until(func() -> bool:
-		hub = app.find_child("WorkshopController", true, false) as WorkshopController
-		return hub != null and hub.state == &"hub" and not hub.ring.turning)
+		_hub = app.find_child("WorkshopController", true, false) as WorkshopController
+		return _hub != null and _hub.state == &"hub" and not _hub.ring.turning, 1800)
+	var hub := _hub
 	await _pause(0.6)
 	await _shot("s7_hub_first", "Scene 7: the first visit's hub, the shelf alone in the ring")
 	await _pause(5.5)
@@ -47,10 +50,9 @@ func _ready() -> void:
 	await _pause(0.3)
 	await _shot("s7_gear_menu", "Scene 7: a hand near the gear: Home, stones, Finish visit")
 	_press(hub, &"dots")
-	var visit: MotionVisit = null
 	await _until(func() -> bool:
-		visit = App.main.get_node_or_null(^"FirstVisit/Visit/Motion") as MotionVisit
-		return visit != null and visit.in_motion() and App.session.trial != null, 2400)
+		_visit = App.main.get_node_or_null(^"FirstVisit/Visit/Motion") as MotionVisit
+		return _visit != null and _visit.in_motion() and App.session.trial != null, 2400)
 	_look(-0.25)
 	await _pause(3.0)
 	await _shot("s9_dots_dimmed", "Scene 9: the dots, the room dimmed, subtitles under the cloud")

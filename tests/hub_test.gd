@@ -103,6 +103,8 @@ func test_finish_visit_on_the_gear_sinks_the_ring_and_plays_the_closing() -> voi
 	hub.gear.reveal()   # a hand comes near the gear
 	await frames(2)
 	var finish: HubButton = hub.gear.buttons[&"gear_finish"]
+	var socket := (App.main.get_node(^"Workshop") as Workshop).get("_mechanism") as Node3D
+	expect(finish.global_position.distance_to(socket.global_position) < 0.3, "the gear's buttons stand over the socket")
 	expect(finish.visible and finish.open, "Finish visit shows on the gear")
 	expect(not hub.gear.buttons[&"gear_home"].visible, "Home not yet (after the first game)")
 	Engine.time_scale = 4.0
@@ -168,6 +170,8 @@ func test_home_on_the_gear_fades_to_weis_room_and_back_to_the_hub() -> void:
 	var veil := App.head().find_child("HomeVeil", true, false) as MeshInstance3D
 	expect(veil != null, "through a fade on the head (no camera movement)")
 	expect(hub.state == &"home", "the hub waits while the child is in the room")
+	expect(not hub.ring.visible, "the ring isn't over Wei's room")
+	expect(not _said_line(said, "Point and pinch to keep playing, choose a game, or visit your room."), "no menu line: straight into the room")
 	home.close()
 	expect(await until(func() -> bool: return _in_hub(hub), 15.0), "back at the hub, as it was")
 	expect(veil == null or not veil.visible, "the fade has cleared")

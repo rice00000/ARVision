@@ -72,7 +72,7 @@ func _ready() -> void:
 	Events.scene_changing.connect(close)
 	Events.player_menu_requested.connect(open)
 	Events.room_requested.connect(func() -> void:
-		open()
+		open(true)
 		if is_open: _show(&"room"))
 	Events.facilitator_toggled.connect(func(open: bool) -> void:
 		if open: close()
@@ -105,7 +105,8 @@ func _anchor_entry() -> void:
 	_offscreen = -1.0   # the next frame places it at the top left of the view at once
 
 
-func open() -> void:
+## [param quiet]: no menu line (the gear's Home goes straight into the room, Scene 11).
+func open(quiet := false) -> void:
 	if is_open or App.main.switching: return
 	is_open = true
 	App.hold_pause(&"player_menu", true)
@@ -120,7 +121,8 @@ func open() -> void:
 		eye.origin + forward * MENU_DISTANCE + Vector3.UP * height * MENU_DISTANCE / 0.48)
 	_panel.visible = true
 	_show(&"menu")
-	Events.say("Point and pinch to keep playing, choose a game, or visit your room.")
+	if not quiet:
+		Events.say("Point and pinch to keep playing, choose a game, or visit your room.")
 
 
 func close() -> void:

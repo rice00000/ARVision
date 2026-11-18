@@ -61,11 +61,9 @@ func test_a_dev_round_shows_only_under_dev() -> void:
 	await press_facilitator("fac_results")
 	await frames(2)
 	var view := App.module(&"Facilitator").find_child("ResultsView", true, false) as ResultsView
-	expect(view.shown_rounds().is_empty(), "the test's dev round is not shown as play")
-	for i in 2:
-		await press_facilitator("fac_res_group")
-		await frames(2)
+	# Hub review: Play is empty, so the tab opens on the latest round's group (never pooled with play).
 	expect_eq(_caption("fac_res_group"), "Showing: Dev", "dev")
+	expect(MotionResults.in_group(view.get("_rounds_all"), "play").is_empty(), "the test's dev round is not counted as play")
 	expect_eq(view.shown_rounds().size(), 1, "the dev round, from this visit's log")
 	expect_eq(view.graph().rounds.size(), 1, "and it is what the graph draws")
 
