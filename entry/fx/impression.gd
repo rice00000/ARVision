@@ -43,6 +43,8 @@ const OUTLINE := Color(0.06, 0.05, 0.05)
 const WOOD := Color(0.42, 0.25, 0.12)
 const CREAM := Color(0.97, 0.93, 0.82)
 const NAVY := Color(0.10, 0.14, 0.34)
+const NIGHT := Color(0.13, 0.15, 0.24)   # the dots icon's cloud: the dimmed room of the dots game
+const ICE := Color(0.78, 0.94, 1.0)      # the dots game's own pale icy-blue dots
 const CUP := Color(0.96, 0.95, 0.92)   # near-white: the orange first tried had the table's brightness (lost without colour)
 const CUP_INSIDE := Color(0.86, 0.42, 0.22)
 const GLOW := Color(1.0, 0.86, 0.55)
@@ -66,8 +68,8 @@ static func make(of_kind: StringName) -> Impression:
 				_: impression._dots()
 		&"turn_to_fit":
 			impression._cup()
-		&"door":
-			impression._door()
+		&"house":
+			impression._house()
 	impression._make_halo()
 	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
 	impression.target.position.y = 0.075
@@ -84,8 +86,8 @@ static func footprint(of_kind: StringName) -> Vector2:
 			return Vector2(0.19, 0.05) if dots_style == &"cloud" else Vector2(0.15, 0.05)
 		&"turn_to_fit":
 			return Vector2(0.16, 0.12)
-		&"door":
-			return Vector2(0.11, 0.03)
+		&"house":
+			return Vector2(0.12, 0.06)
 	return Vector2(0.16, 0.16)
 
 
@@ -150,6 +152,10 @@ func unseal(seconds := 0.8) -> void:
 	if not sealed:
 		return
 	sealed = false
+	if _sounds == null:
+		_sounds = Sounds.new()
+		add_child(_sounds)
+	_sounds.play(&"unlock", global_position)   # a sparkly "it opened"
 	var open := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	open.tween_property(_body, "scale", Vector3.ONE, seconds)
 	if bubble != null:   # the bubble clears
@@ -177,6 +183,15 @@ const BUBBLE_RADIUS := 0.11         # round the piece's middle (its pieces are 1
 const MIDDLE := Vector3(0.0, 0.075, 0.0)
 const FROST := Color(0.96, 0.97, 0.96)
 const RIM := Color(0.36, 0.36, 0.35)
+const BRASS := Color(0.74, 0.56, 0.24)   # the house's porthole rim: a place, not a game
+const POP_DROPS := 7
+## What the chosen bubble's title says (and the sound label).
+const TITLES := {&"shelf": "The Shelf", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop"}
+
+
+## The name shown and said for [param of_kind].
+static func title_for(of_kind: StringName) -> String:
+	return TITLES.get(of_kind, String(of_kind).capitalize())
 
 
 ## Puts the piece in its menu bubble: a milky frosted backing behind it (figure-ground on any wall; the piece's
@@ -217,7 +232,10 @@ func add_bubble() -> void:
 	torus.inner_radius = BUBBLE_RADIUS * 0.97
 	torus.outer_radius = BUBBLE_RADIUS * 1.02
 	rim.mesh = torus
-	rim.material_override = _flat(RIM, 1.0)
+	if kind == &"house":
+		torus.inner_radius = BUBBLE_RADIUS * 0.95
+		torus.outer_radius = BUBBLE_RADIUS * 1.06   # a thicker brass porthole
+	rim.material_override = _lit(BRASS, true) if kind == &"house" else _flat(RIM, 1.0)
 	rim.rotation.x = PI * 0.5   # in the bubble's face
 	bubble.add_child(rim)
 	var shine := _disc(BUBBLE_RADIUS * 0.12, _flat(Color.WHITE, 0.85))
@@ -264,14 +282,42 @@ func set_bud(on: bool) -> void:
 	bud.add_child(next)
 
 
-## The chosen bubble pops: the shell swells and is gone in ~0.3 s; the piece stays (it sinks with the rest).
+## The chosen bubble pops (Megan, Nov 18): the shell swells a little and bursts into a ring of small droplets
+## that fly out a few centimetres and vanish (~0.3 s), with a bright pop. The piece stays still in place.
 func pop() -> void:
 	if bubble == null:
 		return
+	if _sounds == null:
+		_sounds = Sounds.new()
+		add_child(_sounds)
+	_sounds.play(&"bubble_pop", global_position)
+	var drops := Node3D.new()
+	drops.name = "pop_drops"
+	add_child(drops)
+	drops.position = MIDDLE
+	var drop_light := _lit(FROST, true)
+	for i in POP_DROPS:
+		var drop := MeshInstance3D.new()
+		var ball := SphereMesh.new()
+		ball.radius = 0.009
+		ball.height = 0.018
+		drop.mesh = ball
+		drop.material_override = drop_light
+		var angle := TAU * i / POP_DROPS + 0.3
+		drop.position = Vector3(cos(angle), sin(angle), 0.0) * BUBBLE_RADIUS * 0.95
+		drops.add_child(drop)
+	var burst := create_tween()
+	burst.tween_method(func(k: float) -> void:
+		for i in drops.get_child_count():
+			var angle := TAU * i / POP_DROPS + 0.3
+			var drop := drops.get_child(i) as Node3D
+			drop.position = Vector3(cos(angle), sin(angle), 0.0) * BUBBLE_RADIUS * lerpf(0.95, 1.45, k)
+			drop.scale = Vector3.ONE * (1.0 - k), 0.0, 1.0, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	burst.tween_callback(drops.queue_free)
 	var tween := create_tween().set_parallel()
-	tween.tween_property(bubble, "scale", Vector3.ONE * 1.25, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_shell_light, "albedo_color:a", 0.0, 0.25)
-	tween.tween_property(_frost_light, "albedo_color:a", 0.0, 0.25)
+	tween.tween_property(bubble, "scale", Vector3.ONE * 1.12, 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_shell_light, "albedo_color:a", 0.0, 0.12)
+	tween.tween_property(_frost_light, "albedo_color:a", 0.0, 0.12)
 	tween.chain().tween_callback(func() -> void:
 		bubble.visible = false
 		bubble.scale = Vector3.ONE
@@ -371,13 +417,16 @@ func _dots_comets() -> void:
 
 
 func _dots_cloud() -> void:
-	# A puffy cream cloud (four round lobes, flat front) with five big navy dots on it: "a cloud of dots".
+	# A puffy cloud (four round lobes, flat front) with five big dots on it: "a cloud of dots". In the dots
+	# game's own colours (Megan, Nov 18): a night-blue cloud like the dimmed room, pale icy-blue dots like the
+	# game's dots (it was cream with navy dots, the game's look reversed).
 	for lobe: Array in [[Vector2(-0.05, 0.05), 0.04], [Vector2(0.0, 0.075), 0.052], [Vector2(0.05, 0.055), 0.042], [Vector2(0.0, 0.035), 0.045]]:
-		var puff := _mesh(_sphere(lobe[1]), CREAM)
+		var puff := _mesh(_sphere(lobe[1]), NIGHT)
 		puff.position = Vector3(lobe[0].x, lobe[0].y + 0.02, 0)
 		puff.scale = Vector3(1, 1, 0.45)
 	for spot: Vector2 in [Vector2(-0.045, 0.07), Vector2(0.0, 0.1), Vector2(0.045, 0.075), Vector2(-0.018, 0.05), Vector2(0.025, 0.045)]:
-		var dot := _mesh(_cylinder(0.012, 0.012, 0.006), NAVY, false)
+		var dot := _mesh(_cylinder(0.012, 0.012, 0.006), ICE, false)
+		dot.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED   # they glow a little, as in the game
 		dot.rotation.x = PI * 0.5
 		dot.position = Vector3(spot.x, spot.y + 0.01, 0.024)
 
@@ -435,14 +484,17 @@ func _cup() -> void:
 	_body.add_child(handle)
 
 
-func _door() -> void:
-	# Wei's room (fog menu, Megan Nov 18): a little navy door in a cream frame with a brass knob, in the
-	# menu's lower "places" row. Its own silhouette (tall, narrow), dark outline like the others.
-	_box(Vector3(0.11, 0.15, 0.025), Vector3(0, 0.075, 0), CREAM)
-	_box(Vector3(0.08, 0.13, 0.012), Vector3(0, 0.07, 0.016), NAVY, false)
-	var knob := _mesh(_cylinder(0.008, 0.008, 0.012), Color(0.8, 0.62, 0.26), false)
-	knob.rotation.x = PI * 0.5
-	knob.position = Vector3(0.024, 0.07, 0.026)
+## The Virtual Workshop (Wei's room; Megan, Nov 18: "a house not a door"): a little cream house with a
+## terracotta roof and a navy door, in the menu's lower "places" row. Dark outline like the others.
+func _house() -> void:
+	_box(Vector3(0.1, 0.075, 0.06), Vector3(0, 0.0375, 0), CREAM)
+	var roof := PrismMesh.new()
+	roof.size = Vector3(0.125, 0.06, 0.07)
+	var top := _mesh(roof, Color(0.72, 0.33, 0.22))
+	top.position = Vector3(0, 0.105, 0)
+	_box(Vector3(0.028, 0.048, 0.006), Vector3(0, 0.024, 0.031), NAVY, false)
+	_box(Vector3(0.022, 0.02, 0.006), Vector3(0.03, 0.048, 0.031), NAVY, false)
+	_box(Vector3(0.022, 0.02, 0.006), Vector3(-0.03, 0.048, 0.031), NAVY, false)
 
 
 func _make_halo() -> void:

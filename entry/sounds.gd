@@ -17,7 +17,12 @@ const BORROWS := {
 	impression_shelf = {file = &"knock", pitch = 1.0, db = -4.0},
 	impression_dots = {file = &"pop", pitch = 1.4, db = -6.0},
 	impression_turn_to_fit = {file = &"seat", pitch = 1.6, db = -8.0},
-	impression_door = {file = &"knock", pitch = 0.8, db = -4.0},
+	impression_house = {file = &"knock", pitch = 0.8, db = -4.0},
+	bubble_pop = {file = &"pop", pitch = 1.8, db = -4.0},      # the chosen bubble bursts (a real pop sound to come)
+	chosen_chime = {file = &"reveal", pitch = 1.5, db = -10.0},  # the name appears: "you did it"
+	hover_tink = {file = &"pop", pitch = 2.4, db = -18.0},       # a hand comes to a bubble (pitch varies per bubble)
+	locked_bonk = {file = &"knock", pitch = 0.6, db = -10.0},    # a closed bubble pressed: soft, never a buzzer
+	unlock = {file = &"reveal", pitch = 1.2, db = -8.0},        # a closed bubble opens
 	menu_open = {file = &"pop", pitch = 0.7, db = -10.0},
 	menu_close = {file = &"pop", pitch = 0.55, db = -14.0},
 	place = {file = &"seat", pitch = 1.0, db = -6.0},
@@ -36,7 +41,7 @@ func _ready() -> void:
 
 
 ## Plays [param key] at [param where] (world position).
-func play(key: StringName, where: Vector3) -> void:
+func play(key: StringName, where: Vector3, pitch := 1.0) -> void:
 	played.append(key)
 	var borrowed: Dictionary = BORROWS.get(key, {})
 	var stream: AudioStream = _streams.get(borrowed.get("file", key))
@@ -45,7 +50,7 @@ func play(key: StringName, where: Vector3) -> void:
 	var player := AudioStreamPlayer3D.new()
 	player.stream = stream
 	player.volume_db = borrowed.get("db", 0.0)
-	player.pitch_scale = borrowed.get("pitch", 1.0)
+	player.pitch_scale = borrowed.get("pitch", 1.0) * pitch
 	player.bus = &"SFX"
 	player.unit_size = 1.0
 	player.max_db = 0.0

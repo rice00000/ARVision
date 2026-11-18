@@ -37,8 +37,8 @@ const GLOW := Color(1.0, 0.86, 0.55)    # HubGlow's warm tint
 const GLOW_NEAR_FROM := 0.35            # a hand this close to the cauldron starts its glow...
 const GLOW_NEAR_FULL := 0.12            # ...fully at this distance
 const GEAR_SEAT := 0.008
-## Sound labels (Megan, Nov 18): a bubble says its name when a hand comes to it; a closed one says "Soon".
-const LABELS := {&"shelf": "The shelf", &"dots": "The dots", &"turn_to_fit": "Turn to fit", &"door": "Wei's room"}
+## Sound labels (Megan, Nov 18): a bubble says its name ([method Impression.title_for]) when a hand comes to it;
+## a closed one says "Soon".
 const SOON := "Soon"
 const GAMES := "Games"          # the cauldron's label, the first few times a hand comes to it
 const GAMES_TIMES := 3
@@ -254,7 +254,7 @@ func _run(activity: Summonable) -> void:
 		said_surprises = true
 		await Onion.line(SURPRISES, self)
 	if ring.door == null:
-		ring.set_door(Impression.make(&"door"))   # silent now: its line comes after the next game (the line budget)
+		ring.set_door(Impression.make(&"house"))   # silent now: its line comes after the next game (the line budget)
 	for a in activities:   # Turn to fit (or anything) that can run now
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
@@ -289,7 +289,10 @@ func _build_ring() -> void:
 	ring.chosen.connect(func(impression: Impression) -> void:
 		_pick(&"gear_home" if impression == ring.door else impression.kind))
 	ring.hovered.connect(func(impression: Impression) -> void:
-		_label(SOON if impression.sealed else LABELS.get(&"door" if impression == ring.door else impression.kind, "")))
+		# A soft glass tink, a little higher for each bubble along the arc, then its name.
+		var step := ring.impressions.find(impression)
+		_play(&"hover_tink", impression.global_position, 1.0 + 0.08 * (step if step >= 0 else -2))
+		_label(SOON if impression.sealed else Impression.title_for(impression.kind)))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target, true))
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
 
@@ -302,7 +305,7 @@ func _on_press(target: Target, _pinched: bool) -> void:
 		return
 	var impression := ring.impression_for(target)
 	if impression != null and ring.press(impression) == &"sealed":
-		_play(&"menu_close", impression.global_position)
+		_play(&"locked_bonk", impression.global_position)
 		_label(SOON)
 
 
@@ -532,10 +535,10 @@ func _gear_at() -> Vector3:
 	return gear.global_position if gear != null else _mouth()
 
 
-func _play(sound: StringName, at: Vector3) -> void:
+func _play(sound: StringName, at: Vector3, pitch := 1.0) -> void:
 	var sounds: Variant = workshop.get("_sounds") if workshop != null else null
 	if sounds != null and is_instance_valid(sounds):
-		(sounds as Sounds).play(sound, at)
+		(sounds as Sounds).play(sound, at, pitch)
 
 
 func _mouth() -> Vector3:

@@ -12,7 +12,10 @@ extends Node3D
 ## * **Tasks: a still arc** within touch reach, up to [constant STILL_MAX] all in view and none moving (Megan:
 ##   B). The middle one is a little bigger. ONE press picks any; the chosen bubble pops. Past
 ##   [constant STILL_MAX] it turns into a carousel whose ends peek out (a press on a side one slides it in).
-## * **Places: a lower row**, a little nearer: Wei's room's door, in a smaller bubble ([method set_door]).
+## * **Places: a lower row**, a little nearer: the Virtual Workshop (Wei's room) as a little house in a smaller
+##   bubble with a brass porthole rim ([method set_door]).
+## * **Chosen:** the bubble pops into droplets with a pop sound; the game's name appears over it in big retro
+##   letters with a chime ([ChosenTitle]).
 ## * **Buds** under a bubble show the game's next level as a silhouette ([method Impression.set_bud]).
 ## * **Rest:** after [constant REST_AFTER] s with no hand near, the bubbles shrink to [constant REST_SCALE] in
 ##   place (still pressable); a hand coming near wakes them in ~0.5 s.
@@ -149,7 +152,10 @@ func _choose(impression: Impression) -> void:
 		await step_to(impression, false)
 	impression.touched()
 	impression.pop()
-	await get_tree().create_timer(0.35).timeout   # the pop and its sound, then the game
+	# Its name over it, in big retro letters, with a chime (Megan, Nov 18).
+	var top := impression.bubble.global_position + Vector3.UP * (Impression.BUBBLE_RADIUS * impression.scale.y + 0.015)
+	ChosenTitle.show_over(get_parent(), Impression.title_for(impression.kind), top, App.head().global_position)
+	await get_tree().create_timer(0.6).timeout   # the pop, then the name, then the game
 	chosen.emit(impression)
 
 

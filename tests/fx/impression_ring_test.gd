@@ -53,10 +53,17 @@ func test_one_press_picks_any_bubble_at_once_and_it_pops() -> void:
 	var picked := record(ring.chosen)
 	expect_eq(ring.press(cup), &"chosen", "one press picks a side one")
 	expect(not ring.turning, "nothing slides (a still arc)")
-	await wait(0.6)
+	await frames(3)
+	expect(cup.find_child("pop_drops", true, false) != null, "its bubble bursts into droplets")
+	var title := app.find_child("chosen_title", true, false) as ChosenTitle
+	expect(title != null and title.text == "Turn to Fit", "its name appears over it")
+	expect(title != null and title.global_position.y > cup.bubble.global_position.y, "above the bubble")
+	await wait(0.9)
 	expect(cup.global_position.is_equal_approx(where), "it stayed where it was")
 	expect_eq(picked.size(), 1, "chosen, once")
 	expect(not cup.bubble.visible, "its bubble popped")
+	await wait(ChosenTitle.IN_SECONDS + ChosenTitle.HOLD_SECONDS + ChosenTitle.OUT_SECONDS)
+	expect(app.find_child("chosen_title", true, false) == null, "the name goes after a moment")
 
 
 func test_past_five_the_arc_becomes_a_carousel_whose_ends_peek_out() -> void:
@@ -159,7 +166,7 @@ func test_buds_show_the_next_level_under_a_bubble() -> void:
 func test_the_door_sits_below_the_tasks_and_a_press_chooses_it_at_once() -> void:
 	await boot(null, &"intro")
 	var ring := _ring()
-	var door := Impression.make(&"door")
+	var door := Impression.make(&"house")
 	ring.set_door(door)
 	var eye := App.head().global_position
 	var front := ring.front()
@@ -170,7 +177,7 @@ func test_the_door_sits_below_the_tasks_and_a_press_chooses_it_at_once() -> void
 	var picked := record(ring.chosen)
 	expect_eq(ring.press(door), &"chosen", "one press")
 	expect(not ring.turning, "the carousel doesn't move for it")
-	await wait(0.6)
+	await wait(0.9)
 	expect(picked.size() == 1 and picked[0][0] == door, "the door is chosen")
 
 
@@ -199,7 +206,7 @@ func test_resting_pieces_can_still_be_pressed() -> void:
 	ring.rest = 1.0
 	var picked := record(ring.chosen)
 	expect_eq(ring.press(ring.front()), &"chosen", "a resting piece can be pressed")
-	await wait(0.8)
+	await wait(1.0)
 	expect_eq(picked.size(), 1, "and chosen")
 
 

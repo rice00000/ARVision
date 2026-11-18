@@ -4,6 +4,7 @@
 |---|---|---|---|---|
 | `cauldron-cream-sage.glb` | Cauldron, Quaternius | https://poly.pizza/m/QaWJOPa6Gt | CC0 | Material-only recolour (cream, sage, stone, terracotta); geometry unchanged |
 | `onion_the_wisp.glb` | "Onion the Wisp" by Edvin Borkovskij | https://sketchfab.com/3d-models/onion-the-wisp-210b78bf2caf40649cdc7c2583fd10f7 | CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/) — credit required | None to the file; scaled and turned in the game, a light added around it |
+| `fonts/luckiest_guy.woff2` | Luckiest Guy, Astigmatic (Google Fonts), via Fontsource `@fontsource/luckiest-guy` 5.3.0 (latin subset) | https://fonts.google.com/specimen/Luckiest+Guy | Apache 2.0 (`fonts/LUCKIEST_GUY_LICENSE.txt`) | None; the chosen game's title (`entry/fx/chosen_title.gd`) |
 
 Asset library and provenance: `~/Documents/Virtual Reality/assets/entry-scene/` (ASSET_REGISTER.md, music/SOURCES.md).
 
