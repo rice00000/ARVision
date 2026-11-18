@@ -100,3 +100,23 @@ func test_the_pop_bubbles_are_not_hidden_inside_onion() -> void:
 		if flat > 0.05 or bubble.global_position.y > onion.y + 0.05:
 			clear += 1
 	expect(clear >= PopBurst.COUNT - 1, "the bubbles are out beside or above Onion (%d of %d clear)" % [clear, PopBurst.COUNT])
+
+
+func test_hello_has_no_nearly_ready_and_one_second_of_quiet() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false
+	entry.run()
+	await until(func() -> bool: return entry.tools_ready, 20.0)
+	var said := record(Events.said)
+	var sounds: Sounds = entry.get("_sounds")
+	entry.jump_to(&"all")
+	await until(func() -> bool: return bool(entry.get("_part_running")), 10.0)
+	var start := Engine.get_process_frames()
+	await until(func() -> bool: return sounds.played.has(&"pre_rattle"), 10.0)
+	var quiet := (Engine.get_process_frames() - start) / 60.0
+	expect(quiet > 0.8 and quiet < 1.4, "about 1 s of quiet before the rattle (%.2f s)" % quiet)
+	expect(await until(func() -> bool: return said.any(func(a: Array) -> bool: return a[0] == "I'm Onion, by the way."), 30.0), "Onion introduces itself")
+	expect(not said.any(func(a: Array) -> bool: return a[0] == "Nearly ready."), "\"Nearly ready.\" is cut")

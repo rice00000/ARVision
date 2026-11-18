@@ -344,7 +344,7 @@ func _hello(fast := false) -> void:
 	_beat("1: hello")
 	_rattle(0.0)
 	if not fast:
-		await _wait(2.0)   # nothing rushes the child
+		await _wait(1.0)   # nothing rushes the child (1 s, was 2: Megan's scene review, Nov 17)
 	_rattle(0.012)   # a soft rattle: something moves about in there
 	_sounds.play(&"pre_rattle", _box.global_position)
 	if is_instance_valid(_cog):
@@ -366,7 +366,7 @@ func _hello(fast := false) -> void:
 	_orb.actions.hop(_runner)   # a small startled hop
 	await _wait(0.5)   # then an angled peek into the opening
 	_attend(null)   # a glance back at the child, still leaning over the cauldron
-	await say("Nearly ready.")
+	await _wait(0.6)   # ("Nearly ready." cut: Megan, Nov 17) the glance reads on its own
 	_orb.actions.lean_in(_runner, false)   # straightens up
 	await _wait(0.4)
 	await say("I'm Onion, by the way.")

@@ -14,7 +14,7 @@ const RISE := 0.20          # metres the puff's middle rises
 const BLOBS := 5
 const START_SIZE := 0.05    # a blob's diameter as it leaves the mouth, metres
 const END_SIZE := 0.16      # and as it thins out
-const PEAK := 0.32          # its most solid (soft: never a flash)
+const PEAK := 0.42          # its most solid (soft: never a flash); 0.32 read faint on a light wall (Build A uses 0.42 too)
 const TINT := Color(1.0, 0.86, 0.62)   # warm, like the reveal's band
 
 var _blobs: Array[Dictionary] = []   # {node, material, from, to, delay}
