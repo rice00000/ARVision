@@ -1,8 +1,7 @@
 extends TestCase
-## The hub's carousel arc of choices above the cauldron (entry/fx/impression_ring.gd; Megan, Nov 17): still
-## unless asked, steps a pressed side choice to the front, chooses only the front one, side ones at half
-## size and apart, a new one rises into the arc, lights what the hand aims at, goes dark before a task.
-## The cup has no base.
+## The hub's ring of games on the cauldron's fog (entry/fx/impression_ring.gd; Megan, Nov 17): still unless
+## pressed, one press picks any choice (a side one turns to the front first), sides smaller and apart, a new
+## one rises into the ring, lights what the hand aims at, goes dark (fog too) before a game. The cup has no base.
 
 const KINDS: Array[StringName] = [&"shelf", &"dots", &"turn_to_fit"]
 
@@ -30,7 +29,7 @@ func test_the_front_choice_faces_the_child_full_size_and_the_ring_holds_still() 
 			expect(Vector2(front.global_position.x - eye.x, front.global_position.z - eye.z).length()
 					< Vector2(impression.global_position.x - eye.x, impression.global_position.z - eye.z).length(),
 					"the front one is nearest the child (%s)" % impression.kind)
-			expect(is_equal_approx(impression.scale.x, ImpressionRing.SIDE_SCALE), "%s sits at half size beside it" % impression.kind)
+			expect(is_equal_approx(impression.scale.x, ImpressionRing.SIDE_SCALE), "%s sits smaller round the ring" % impression.kind)
 			expect(Vector2(impression.global_position.x - front.global_position.x, impression.global_position.z - front.global_position.z).length() > 0.15,
 					"%s is well apart from the front one" % impression.kind)
 	expect(front._halo.visible, "the front one has the waiting halo")
@@ -42,16 +41,21 @@ func test_the_front_choice_faces_the_child_full_size_and_the_ring_holds_still() 
 		expect(ring.impressions[i].global_position.is_equal_approx(before[i]), "nothing turns by itself")
 
 
-func test_pressing_a_side_choice_turns_it_to_the_front_and_only_the_front_one_is_chosen() -> void:
+func test_one_press_picks_a_side_choice_after_turning_it_to_the_front() -> void:
 	await boot(null, &"intro")
 	var ring := _ring()
 	var cup := ring.impressions[2]
-	expect_eq(ring.press(cup), &"turned", "a side choice turns, it isn't chosen")
-	expect_eq(ring.press(ring.impressions[1]), &"busy", "no second turn while it turns")
-	await wait(ImpressionRing.TURN_SECONDS + 0.6)
+	var picked := record(ring.chosen)
+	expect_eq(ring.press(cup), &"chosen", "one press picks it")
+	expect_eq(ring.press(ring.impressions[1]), &"busy", "nothing else while it turns")
+	expect(picked.is_empty(), "not chosen before it has turned to the front")
+	await wait(ImpressionRing.TURN_SECONDS * 1.2 + 0.6)
 	expect(ring.front() == cup, "the cup is in front now")
-	expect(cup._halo.visible and not ring.impressions[0]._halo_light.albedo_color.a > 0.3, "the halo moved with it")
-	expect_eq(ring.press(cup), &"chosen", "pressing the front one chooses it")
+	expect_eq(picked.size(), 1, "then it's chosen, once")
+	var front_pick := record(ring.chosen)
+	expect_eq(ring.press(cup), &"chosen", "the front one is chosen too")
+	await wait(0.5)
+	expect_eq(front_pick.size(), 1, "at once, without a turn")
 
 
 func test_a_sealed_choice_stays_where_it_is() -> void:
@@ -83,9 +87,10 @@ func test_aiming_at_a_side_choice_lights_it() -> void:
 	expect(not side._halo.visible or side._halo_light.albedo_color.a <= dark + 0.01, "and goes back when the aim leaves")
 
 
-func test_quiet_all_darkens_the_ring_before_a_task() -> void:
+func test_quiet_all_darkens_the_ring_and_its_fog_before_a_task() -> void:
 	await boot(null, &"intro")
-	_ring()
+	var ring := _ring()
+	expect(ring.find_child("fog", true, false) != null, "the ring sits on the stew's fog")
 	await frames(2)
 	expect(HubGlow.any_lit(), "lit while waiting")
 	await HubGlow.quiet_all(0.3)
@@ -116,4 +121,4 @@ func test_a_new_choice_rises_into_the_arc_and_comes_to_the_front() -> void:
 	await wait(ImpressionRing.RISE_SECONDS + 0.2)
 	expect(ring.front() == dots, "the new one is in front")
 	expect(dots._halo.visible, "with the halo")
-	expect(is_equal_approx(shelf.scale.x, ImpressionRing.SIDE_SCALE), "the shelf moved aside, at half size")
+	expect(is_equal_approx(shelf.scale.x, ImpressionRing.SIDE_SCALE), "the shelf moved round, smaller")

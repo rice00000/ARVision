@@ -45,7 +45,7 @@ func _ready() -> void:
 	var middle := Vector3(mouth.x, mouth.y + ImpressionRing.ABOVE_RIM, mouth.z)
 	# 1. First visit: only the shelf (hidden, not sealed).
 	var shelf := Impression.make(&"shelf")
-	var ring := ImpressionRing.make(self, [shelf] as Array[Impression], middle, eye)
+	var ring := ImpressionRing.make(self, [shelf] as Array[Impression], middle, eye, mouth)
 	await _pause(0.3)
 	await _save("ring_1_first_visit")
 	# 2. After the first shelf: the dots rise out of the cauldron and come to the front.
@@ -65,15 +65,15 @@ func _ready() -> void:
 	App.sim_input.point(&"right", real_eye + (at - real_eye).normalized() * 0.25 + Vector3.DOWN * 0.05, at)
 	await _pause(0.2)
 	await _save("ring_5_aim_at_shelf")
-	# 5. Pinched: the arc slides it to the front and stops.
+	# 5. One press: the ring turns it to the front, then it's chosen (its pulse).
 	ring.press(shelf)
+	await _pause(0.5)
+	await _save("ring_6_turning")
 	await _pause(0.6)
-	await _save("ring_6_sliding")
-	await _pause(1.0)
 	var away := real_eye + Vector3(0.5, -0.4, -0.3)
 	App.sim_input.point(&"right", real_eye + (away - real_eye).normalized() * 0.25 + Vector3.DOWN * 0.05, away)
 	await _pause(0.2)
-	await _save("ring_7_shelf_in_front")
+	await _save("ring_7_shelf_chosen")
 	get_tree().quit()
 
 
