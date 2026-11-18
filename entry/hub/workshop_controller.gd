@@ -42,6 +42,8 @@ const GEAR_SEAT := 0.008
 const SOON := "Soon"
 const GAMES := "Games"          # the cauldron's label, the first few times a hand comes to it
 const GAMES_TIMES := 3
+const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
+const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
 const BUDS: Array[StringName] = [&"shelf", &"dots"]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
 
@@ -75,6 +77,9 @@ var _poking: Dictionary = {}    # side -> the fingertip is inside the cauldron's
 var menu_sign: Node3D
 var sign_target: Target
 var _games_said := 0
+var _hub_since := 0.0           # when the hub last began waiting (seconds)
+var _quiet_since := 0.0         # when Onion last finished a line
+var _clock := 0.0               # game time, seconds (unpaused)
 var _cauldron_hover := false
 
 
@@ -92,6 +97,11 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		add_child(a)
 	_demo = DemoHand.new()
 	add_child(_demo)
+	var voice := App.module(&"Voice")
+	if voice != null and voice.has_signal(&"line_finished"):
+		voice.line_finished.connect(func(_text: String, _completed: bool) -> void:
+			_quiet_since = _clock)
+		Events.said.connect(func(_text: String) -> void: _quiet_since = INF)   # speaking now: wait for its end
 	_build_ring()
 	_build_cauldron()
 	_build_carry()
@@ -141,6 +151,7 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 ## The hub: waits for a choice in the menu, or the gear lifted out. Opens the menu on the child's tap.
 func _hub() -> StringName:
 	state = &"hub"
+	_hub_since = _clock
 	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
 	ambience.hub()
 	SceneMarker.show_text("Hub")
@@ -246,7 +257,6 @@ func _run(activity: Summonable) -> void:
 	ever_opened = true
 	_play(&"menu_open", _mouth())
 	await ring.rise(_mouth())   # and the menu rises again by itself, back at the hub
-	var first_game := played.is_empty()
 	if not played.has(activity.id()):
 		played.append(activity.id())
 	ring.wake()
@@ -261,9 +271,6 @@ func _run(activity: Summonable) -> void:
 		else:
 			await _offer(dots)
 		await Onion.line(MORE, self)
-	elif first_game == false and ring.door != null and not said_surprises:
-		said_surprises = true
-		await Onion.line(SURPRISES, self)
 	if ring.door == null:
 		ring.set_door(Impression.make(&"house"))   # silent now: its line comes after the next game (the line budget)
 	for a in activities:   # Turn to fit (or anything) that can run now
@@ -304,6 +311,11 @@ func _build_ring() -> void:
 		# A soft glass tink, a little higher for each bubble along the arc, then its name.
 		var step := ring.impressions.find(impression)
 		_play(&"hover_tink", impression.global_position, 1.0 + 0.08 * (step if step >= 0 else -2))
+		if impression == ring.door and not said_surprises:
+			# The house introduces itself (Megan, Nov 18, option D): its teaser the first time a hand comes to it.
+			if _label(SURPRISES):
+				said_surprises = true
+			return
 		_label(SOON if impression.sealed else Impression.title_for(impression.kind)))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target, true))
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
@@ -421,11 +433,11 @@ func _spin_gear(on: bool) -> void:
 
 ## One lantern behind and above the cauldron, plus a few on the scanned walls (Megan, Nov 18). They fade in.
 func _hang_lanterns() -> void:
+	lanterns = Lantern.take_from_reveal(self)   # lit by the reveal already (Megan, Nov 18): they just stay
+	if not lanterns.is_empty():
+		return
 	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else _mouth() + Vector3.LEFT * 0.4
-	if Lantern.style == &"high":
-		lanterns = Lantern.hang_high(self, App.head().global_position, middle)
-	else:
-		lanterns = Lantern.hang(self, _mouth(), App.head().global_position, middle)
+	lanterns = Lantern.hang_style(self, _mouth(), App.head().global_position, middle)
 	for lantern in lanterns:
 		lantern.appear(2.0)
 
@@ -465,6 +477,8 @@ func _pick(id: StringName) -> void:
 # --- Pause ---------------------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	if not get_tree().paused:
+		_clock += delta
 	_cauldron_step(delta)
 	var paused := get_tree().paused
 	if paused == _was_paused:
@@ -518,15 +532,21 @@ func _cauldron_step(delta: float) -> void:
 	_glow_quad.visible = glow > 0.003
 
 
-## Says a bubble's (or the cauldron's) name, quietly: only while nothing else is being said.
-func _label(text: String) -> void:
-	if text == "":
-		return
+## Says a bubble's (or the cauldron's) name, quietly: only when Onion has been quiet for a moment
+## ([constant LABEL_QUIET] s) and not in the hub's first [constant LABEL_SETTLE] s, so a label never stacks
+## on a line (Megan, Nov 18, issue 5). True if it was said.
+func _label(text: String) -> bool:
+	if text == "" or state != &"hub":
+		return false
+	var now := _clock
+	if now - _hub_since < LABEL_SETTLE or now - _quiet_since < LABEL_QUIET:
+		return false
 	var voice := App.module(&"Voice")
 	if voice != null and voice.has_method(&"speaking") and voice.speaking() != "":
-		return
+		return false
 	print("HUB label: ", text)
 	Onion.line(text, self)
+	return true
 
 
 ## True while the cauldron's glow is lit.

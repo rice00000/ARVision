@@ -564,6 +564,7 @@ func _reveal() -> void:
 		await _ripple()
 		rippling.on = false
 	light.call()
+	_light_lanterns()
 	while rippling.on and not (_puffed and not is_instance_valid(_puff)):
 		if not _puffed and _band_done:
 			break   # no puff (the cauldron sank, or the band has gone past it): the line after the band
@@ -582,6 +583,43 @@ func _reveal() -> void:
 	_attend(null)
 	# Then the hub (first_visit.gd → WorkshopController, Scene 7): the shelf rises into the ring and Onion
 	# says "Welcome to the workshop.".
+
+
+## The workshop's lanterns (and their roof beams) light up as the reveal's light reaches each one, nearest
+## first (Megan, Nov 18). They hang on the main scene so they outlast the opening; the hub takes them on
+## ([method Lantern.take_from_reveal]).
+func _light_lanterns() -> void:
+	for old in Lantern.from_reveal:   # a jump replayed the reveal
+		if is_instance_valid(old):
+			old.queue_free()
+	if is_instance_valid(Lantern.from_reveal_rafters):
+		Lantern.from_reveal_rafters.queue_free()
+	var middle := _layout.table.origin if _layout != null else _ripple_origin
+	var hung := Lantern.hang_style(App.main, _mouth, App.head().global_position, middle)
+	Lantern.from_reveal = hung
+	Lantern.from_reveal_rafters = App.main.get_node_or_null(^"Rafters") as Node3D
+	var beams: Array[MeshInstance3D] = []
+	if Lantern.from_reveal_rafters != null:
+		for beam: MeshInstance3D in Lantern.from_reveal_rafters.find_children("*", "MeshInstance3D", true, false):
+			beam.transparency = 1.0
+			beams.append(beam)
+	for lantern in hung:
+		lantern.visible = false
+	var speed := (PLAY_RADIUS * 1.6 + _away(_ripple_origin)) / RIPPLE_SECONDS   # the light's own speed
+	for beam in beams:   # the beams come with the first light, softly
+		create_tween().tween_property(beam, ^"transparency", 0.0, 1.5)
+	var order: Array[Lantern] = hung.duplicate()
+	order.sort_custom(func(a: Lantern, b: Lantern) -> bool:
+		return a.global_position.distance_to(_ripple_origin) < b.global_position.distance_to(_ripple_origin))
+	var waited := 0.0
+	for lantern in order:
+		var due: float = lantern.global_position.distance_to(_ripple_origin) / speed
+		if due > waited:
+			await get_tree().create_timer(due - waited).timeout
+			waited = due
+		if is_instance_valid(lantern):
+			lantern.visible = true
+			lantern.appear(1.2)
 
 
 ## Onion's line after the cauldron's puff (Scene 6; SCRIPT.md, approved Nov 17).

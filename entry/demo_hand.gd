@@ -171,20 +171,44 @@ func aim_pinch(target: Node3D) -> void:
 	], _aim_anchor, 0.0, false, target)
 
 
-## Where the aiming hand's pinch point rests: 30 cm out toward the target, a little right and below the eyes.
+## Where the aiming hand's pinch point rests: where a child's own right hand would be when pointing (Megan,
+## Nov 18: it sat right in front of the eyes and looked huge): 38 cm out toward the target, to the right and
+## well below the eyes.
 func _aim_anchor() -> Vector3:
 	if not is_instance_valid(_aim_at) or not _aim_at.is_inside_tree():
 		return Vector3.INF
 	var eye := App.head().global_position
 	var toward := (_aim_at.global_position - eye).normalized()
 	var right := toward.cross(Vector3.UP).normalized()
-	return eye + toward * 0.3 + right * 0.06 + Vector3.DOWN * 0.12
+	return eye + toward * 0.38 + right * 0.12 + Vector3.DOWN * 0.2
+
+
+## The turn that makes the hand's real index finger (wrist → tip, open) point along -Z: the model's finger is
+## not on -Z (its fixes were set by eye for the tap), so without it the hand pointed ~35° off (Megan, Nov 18).
+func _aim_fix() -> Quaternion:
+	if _aim_fix_cached != null:
+		return _aim_fix_cached
+	if _skeleton == null:
+		return Quaternion.IDENTITY
+	var tip_bone := _skeleton.find_bone(INDEX_TIP_BONE)
+	if tip_bone < 0:
+		return Quaternion.IDENTITY
+	var tip := _skeleton.global_transform * _skeleton.get_bone_global_pose(tip_bone)
+	var wrist := _skeleton.global_transform * _skeleton.get_bone_global_pose(0)
+	var finger := (global_basis.inverse() * (tip.origin - wrist.origin)).normalized()
+	if finger.length() < 0.5:
+		return Quaternion.IDENTITY
+	_aim_fix_cached = Quaternion(finger, Vector3.FORWARD)
+	return _aim_fix_cached
 
 
 ## Takes the hand away (soon, softly).
 func stop() -> void:
 	_mode = Mode.NONE
 	_key = null
+
+
+var _aim_fix_cached: Variant = null
 
 
 func _start(mode: Mode, keys: Array, anchor: Callable, pitch: float, fade_loop: bool, key: Variant) -> void:
@@ -251,9 +275,9 @@ func _pose(seconds: float) -> void:
 	if _gesture == Mode.SWEEP:
 		forward = _sweep_way   # an open hand sweeping: its fingers lead the way
 	if _gesture == Mode.AIM_PINCH:
-		var aim := (_aim_at.global_position - anchor).normalized()   # the fingers point straight at it
+		var aim := (_aim_at.global_position - anchor).normalized()   # the index finger points straight at it
 		global_position = anchor + Vector3.UP * up - aim * back
-		global_basis = Basis.looking_at(aim, Vector3.UP)
+		global_basis = Basis.looking_at(aim, Vector3.UP) * Basis(_aim_fix())
 	else:
 		global_position = anchor + Vector3.UP * up - forward * back
 		global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)

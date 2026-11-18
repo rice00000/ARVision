@@ -55,6 +55,32 @@ static var lights_on := true
 ## True while a game runs: steady glow, no embers.
 static var quiet := false
 static var alive: Array[Lantern] = []
+## Lanterns the reveal has already lit (Megan, Nov 18: they light up at the reveal, as the workshop wakes),
+## with their rafters: the hub takes them on instead of hanging new ones (no pop, no jump).
+static var from_reveal: Array[Lantern] = []
+static var from_reveal_rafters: Node3D
+
+
+## Hangs the workshop's lanterns in the current [member style] under [param parent] (unlit: [method appear]).
+static func hang_style(parent: Node, mouth: Vector3, eye: Vector3, middle: Vector3) -> Array[Lantern]:
+	if style == &"high":
+		return hang_high(parent, eye, middle)
+	return hang(parent, mouth, eye, middle)
+
+
+## The reveal's lanterns, if any are still there: hands them (and the rafters) to [param parent] and forgets
+## them. Empty when there was no reveal (a DEV jump).
+static func take_from_reveal(parent: Node) -> Array[Lantern]:
+	var taken: Array[Lantern] = []
+	for lantern in from_reveal:
+		if is_instance_valid(lantern):
+			lantern.reparent(parent)
+			taken.append(lantern)
+	if is_instance_valid(from_reveal_rafters):
+		from_reveal_rafters.reparent(parent)
+	from_reveal.clear()
+	from_reveal_rafters = null
+	return taken
 
 var lit := 1.0                               # 0..1, for fading in
 var size := SCALE                            # the model's scale (the high lanterns are smaller)
@@ -126,7 +152,7 @@ const BEAM_LENGTH := 4.4                     # without scanned walls
 const BEAM_WOOD := Color(0.30, 0.20, 0.13)
 const HIGH_SCALE := 0.2
 const HIGH_GLOW := 0.6
-const HIGH_DROP := 0.15                      # chain length below the beam (the model's own chain)
+const HIGH_DROP := -0.005                    # the chain's top ring (the model's top) just into the beam's underside: flush (Megan, Nov 18; was 0.15, which left the chain 13 cm short of the beam)
 ## Lantern spots, (row, metres to the side): spread round, none straight ahead.
 const HIGH_SPOTS: Array[Vector2] = [Vector2(0, -1.1), Vector2(0, 1.3), Vector2(1, -1.5), Vector2(1, 1.0), Vector2(2, -1.1), Vector2(2, 1.3)]
 
@@ -156,7 +182,7 @@ static func hang_high(parent: Node, eye: Vector3, middle: Vector3) -> Array[Lant
 		for spot in HIGH_SPOTS:
 			if int(spot.x) != row or spot.y < reach.x + 0.2 or spot.y > reach.y - 0.2:
 				continue
-			var at := centre + right * spot.y + Vector3.DOWN * (BEAM_SIZE.y * 0.5 + HIGH_DROP - 0.10 * HIGH_SCALE)
+			var at := centre + right * spot.y + Vector3.DOWN * (BEAM_SIZE.y * 0.5 + HIGH_DROP)   # the model's top is its origin
 			hung.append(make(parent, at, false, HIGH_SCALE, HIGH_GLOW, false))
 	return hung
 

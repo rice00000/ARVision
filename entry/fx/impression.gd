@@ -179,7 +179,7 @@ func _update_halo() -> void:
 
 # --- The bubble (the hub's menu, Megan Nov 18) -----------------------------------------------------
 
-const BUBBLE_RADIUS := 0.11         # round the piece's middle (its pieces are 12-16 cm wide)
+const BUBBLE_RADIUS := 0.125        # round the piece's middle (pieces 12-16 cm wide, up to 8 cm deep: they fit inside from any side; Megan, Nov 18: the shelf poked out at 0.11)
 const MIDDLE := Vector3(0.0, 0.075, 0.0)
 const FROST := Color(0.96, 0.97, 0.96)
 const RIM := Color(0.36, 0.36, 0.35)
@@ -224,7 +224,7 @@ func add_bubble() -> void:
 	shell.mesh = ball
 	shell.material_override = _shell_light
 	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	shell.scale.z = 0.5   # a lens more than a ball: the piece sits in it, nothing sticks out at the sides
+	shell.scale.z = 0.72   # a lens more than a ball, deep enough that the piece never pokes out
 	bubble.add_child(shell)
 	var rim := MeshInstance3D.new()
 	rim.name = "rim"

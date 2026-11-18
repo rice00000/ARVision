@@ -525,6 +525,28 @@ func test_the_demo_hand_pinches_the_gear_without_moving_it() -> void:
 	expect(low < 0.01, "and lowers again: it loops")
 
 
+func test_the_aim_and_pinch_hand_points_its_index_finger_at_the_target_from_where_a_hand_rests() -> void:
+	await boot(null, &"intro")
+	var eye := App.head().global_position
+	var target := Node3D.new()
+	app.add_child(target)
+	target.global_position = eye + Vector3(-0.3, -0.1, -0.6)
+	var demo := _demo()
+	demo.aim_pinch(target)
+	await wait(0.3)
+	var skeleton := demo.find_child("Skeleton3D", true, false) as Skeleton3D
+	expect(skeleton != null, "the GLB hand")
+	if skeleton == null:
+		return
+	var tip := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(DemoHand.INDEX_TIP_BONE))
+	var wrist := skeleton.global_transform * skeleton.get_bone_global_pose(0)
+	var finger := (tip.origin - wrist.origin).normalized()
+	var aim := (target.global_position - demo.global_position).normalized()
+	expect(rad_to_deg(finger.angle_to(aim)) < 5.0, "the index finger points at it (%.1f degrees off)" % rad_to_deg(finger.angle_to(aim)))
+	expect(demo.global_position.distance_to(eye) > 0.35, "not right in front of the eyes (%.2f m)" % demo.global_position.distance_to(eye))
+	expect(demo.global_position.y < eye.y - 0.12, "below the eyes, where a hand rests")
+
+
 func test_asking_for_the_gesture_already_showing_does_not_make_the_hand_blink() -> void:
 	await _scene()
 	var demo := _demo()

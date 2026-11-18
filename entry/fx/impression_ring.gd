@@ -28,7 +28,7 @@ signal chosen(impression: Impression)
 signal hovered(impression: Impression)
 
 const STILL_MAX := 5            # up to this many tasks: a still arc, nothing slides
-const STEP := 0.5               # radians between neighbours on the arc
+const STEP := 0.56              # radians between neighbours on the arc (bubbles never touch)
 const RADIUS := 0.26            # metres from the arc's centre to each bubble
 const ABOVE_RIM := 0.27         # the menu's middle over the cauldron's rim
 const REACH := 0.44             # the menu's middle is pulled toward the child until it is this far from the eyes

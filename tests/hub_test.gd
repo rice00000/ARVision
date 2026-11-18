@@ -226,3 +226,31 @@ func test_the_socket_sits_front_right_and_hides_under_the_bench_during_the_shelf
 	expect(await until(func() -> bool: return _in_hub(hub), 40.0), "back at the hub")
 	Engine.time_scale = 1.0
 	expect(socket.visible, "the socket is back")
+
+
+## Issue 2 (Megan, Nov 18): the house introduces itself the first time a hand comes to it; issue 5: a label
+## never plays on top of a line, nor in the hub's first moments.
+func test_the_house_says_its_teaser_on_the_first_hover_and_labels_wait_for_quiet() -> void:
+	var said := record(Events.said)
+	var hub := await _to_hub()
+	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
+	Engine.time_scale = 3.0
+	while App.session.running:
+		if App.session.trial != null and App.session.trial.is_running():
+			App.session.trial.finish(true)
+		await frames(1)
+	Engine.time_scale = 1.0
+	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.door != null and hub.ring.opened, 40.0), "back at the hub with the house")
+	expect(not _said_line(said, WorkshopController.SURPRISES), "the house came silently")
+	await wait(WorkshopController.LABEL_SETTLE + WorkshopController.LABEL_QUIET + 0.5)
+	var tries := 0
+	while not _said_line(said, WorkshopController.SURPRISES) and tries < 12:   # a hand comes to the house (again)
+		hub.ring.hovered.emit(hub.ring.door)
+		await wait(0.5)
+		tries += 1
+	expect(_said_line(said, WorkshopController.SURPRISES), "a hand at the house: its teaser")
+	var shelf_name := Impression.title_for(&"shelf")
+	var named := said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size()
+	hub.ring.hovered.emit(hub.ring.impressions[0])   # while the teaser is still being said
+	await frames(2)
+	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size(), named, "no label while Onion is still speaking")
