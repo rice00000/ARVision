@@ -236,3 +236,22 @@ func test_the_shelf_pause_eye_opens_the_looks_and_the_game_carries_on_after() ->
 	_pinch(hub.cauldron_target)
 	expect(await until(func() -> bool: return hub.row == null and not app.get_tree().paused, 10.0), "a tap: the looks sink and the game carries on")
 	expect(hub.state == &"game" and App.session.running, "the same game")
+
+
+func test_weis_room_from_the_house_has_no_menu_a_cauldron_to_go_back_and_teal_stones() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	expect(await _open(hub), "the menu opens")
+	var home := App.module(&"Home")
+	_pinch(hub.ring.door.target)
+	expect(await until(func() -> bool: return home.is_open, 15.0), "Wei's room opens")
+	await frames(3)
+	var panel := home.get("_panel") as Node3D
+	expect(panel.find_child("menu_back", true, false) == null, "no Menu: it led out of the workshop")
+	var back := panel.find_child("menu_resume", true, false) as Node3D
+	expect(back != null, "a way back")
+	var captions := back.find_children("*", "Label3D", true, false).map(func(l: Label3D) -> String: return l.text)
+	expect(captions.has("Workshop"), "it says Workshop (%s)" % [captions])
+	expect(HomeUI.teal_stones, "the stones are teal in the workshop")
+	_pinch(back as Target)
+	expect(await until(func() -> bool: return not home.is_open, 10.0), "the cauldron takes the child back")
+	expect(await until(func() -> bool: return hub.state == &"hub" and hub.ring.opened, 15.0), "to the workshop's menu")

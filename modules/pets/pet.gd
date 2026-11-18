@@ -70,7 +70,7 @@ func setup(pet_id: StringName, home: Node, saved: Dictionary) -> void:
 	_anim = _model.get_node(^"AnimationPlayer")
 	for clip in _anim.get_animation_list():
 		_anim.get_animation(clip).loop_mode = Animation.LOOP_LINEAR
-	var gem: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+	var gem: Node3D = HomeUI.gem()   # teal in the workshop
 	gem.position.y = -0.045
 	stone.add_child(gem)
 	stone.position = STONE_OFFSET

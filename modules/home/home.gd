@@ -49,6 +49,9 @@ var _wallet := Node3D.new()   # the magic stones the child has, beside the Menu 
 ## The workshop hides the floating ☰ from the child (Megan, Nov 17: the table gear is the child's menu; the
 ## grown-up uses Staff tools). Opening Wei's room from the gear's Home still works (open / room_requested).
 var hide_entry := false
+## Opened from the workshop's house (Megan, Nov 18, option A): no "Menu" (it led out of the workshop), Close is a
+## little cauldron "Workshop" (✕ means stop/finish there), and the Shop's stone is teal with the count on it.
+var workshop := false
 
 
 func _ready() -> void:
@@ -286,6 +289,18 @@ func _clear_panel() -> void:
 func _build() -> void:
 	if not is_open: return
 	_clear_panel()
+	if page == &"room" and workshop:
+		HomeUI.box(_panel, Vector3(0.52, 0.2, 0.025), Vector3(0, 0.185, -0.05), HomeUI.INK)
+		_subtitle_slot(0.285)
+		HomeUI.button(_panel, &"menu_resume", "Workshop", "Back to the workshop.", Vector3(-0.16, 0.2, 0), "cauldron")
+		var shop := HomeUI.button(_panel, &"home_shop", "Shop", "Shop. Spend your magic stones here.", Vector3(0, 0.2, 0), "stone")
+		var count: int = App.module(&"Inventory").count(&"magic_stone") if App.module(&"Inventory") else 0
+		HomeUI.box(shop, Vector3(0.05, 0.026, 0.01), Vector3(0.038, -0.035, 0.03), HomeUI.CREAM)   # the count pill, as on the house
+		var number := HomeUI.label(shop, str(count), Vector3(0.038, -0.035, 0.037), 30)
+		number.modulate = HomeUI.INK
+		number.outline_size = 0
+		HomeUI.button(_panel, &"home_box", "My things", "Your things. Pinch to open the box. Hold furniture and pinch here to put it away.", Vector3(0.16, 0.2, 0), "box")
+		return
 	if page == &"room":
 		# One bar above the view; the room and its furniture stay clear.
 		HomeUI.box(_panel, Vector3(0.68, 0.2, 0.025), Vector3(0, 0.185, -0.05), HomeUI.INK)

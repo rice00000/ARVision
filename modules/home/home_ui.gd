@@ -5,6 +5,20 @@ extends RefCounted
 const INK := Color(0.07, 0.10, 0.15)
 const CREAM := Color(0.95, 0.91, 0.78)
 const GOLD := Color(1.0, 0.68, 0.15)
+## The workshop's stones are teal (Megan, Nov 18: one stone look everywhere; violet was dropped). The
+## workshop sets this while it runs; Wei's own game keeps his violet.
+static var teal_stones := false
+const TEAL := Color(0.16, 0.66, 0.68)
+
+
+## A magic stone (Wei's model), teal in the workshop.
+static func gem() -> Node3D:
+	var stone: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+	if teal_stones:
+		var teal := material(TEAL)
+		for mesh: MeshInstance3D in stone.find_children("*", "MeshInstance3D", true, false):
+			mesh.material_override = teal
+	return stone
 
 
 static func material(colour: Color) -> StandardMaterial3D:
@@ -90,8 +104,49 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 	elif icon == "door":
 		box(node, Vector3(0.046, 0.078, 0.02), Vector3(0, 0, 0.025), INK)
 		box(node, Vector3(0.011, 0.011, 0.012), Vector3(0.012, -0.004, 0.04), GOLD)
+	elif icon == "cauldron":
+		# Back to the workshop (Megan, Nov 18): a little cauldron with green brew, tipped toward the child so the
+		# brew shows, with its two handles. Not a ✕ (in the workshop ✕ means stop or finish).
+		var cauldron := Node3D.new()
+		cauldron.position = Vector3(0, -0.008, 0.04)
+		cauldron.rotation.x = 0.55
+		node.add_child(cauldron)
+		var pot := MeshInstance3D.new()
+		var body := SphereMesh.new()
+		body.radius = 0.03
+		body.height = 0.05
+		pot.mesh = body
+		pot.material_override = material(Color(0.86, 0.82, 0.7))
+		cauldron.add_child(pot)
+		var brew := MeshInstance3D.new()
+		var top := CylinderMesh.new()
+		top.top_radius = 0.024
+		top.bottom_radius = 0.024
+		top.height = 0.004
+		brew.mesh = top
+		brew.material_override = material(Color(0.45, 0.72, 0.25))
+		brew.position = Vector3(0, 0.024, 0)   # just under the rim, above the pot's own surface
+		cauldron.add_child(brew)
+		var rim := MeshInstance3D.new()
+		var ring := TorusMesh.new()
+		ring.inner_radius = 0.023
+		ring.outer_radius = 0.03
+		rim.mesh = ring
+		rim.material_override = material(INK)
+		rim.position = Vector3(0, 0.025, 0)
+		cauldron.add_child(rim)
+		for side in [-1.0, 1.0]:
+			var handle := MeshInstance3D.new()
+			var loop := TorusMesh.new()
+			loop.inner_radius = 0.006
+			loop.outer_radius = 0.01
+			handle.mesh = loop
+			handle.material_override = material(INK)
+			handle.rotation.z = PI * 0.5
+			handle.position = Vector3(side * 0.032, 0.006, 0)
+			cauldron.add_child(handle)
 	elif icon == "stone":
-		var gem: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+		var gem := gem()
 		gem.scale = Vector3.ONE * 0.65
 		gem.position = Vector3(0, -0.026, 0.04)
 		node.add_child(gem)
@@ -122,7 +177,7 @@ static func check(parent: Node3D, at: Vector3, size: float, colour := INK) -> vo
 
 ## A magic stone and how many: the balance, or a price.
 static func stones(parent: Node3D, count: int, at: Vector3) -> void:
-	var gem: Node3D = load("res://content/items/visuals/magic_stone.tscn").instantiate()
+	var gem := gem()
 	gem.scale = Vector3.ONE * 0.5
 	gem.position = at + Vector3(-0.03, -0.02, 0)
 	parent.add_child(gem)

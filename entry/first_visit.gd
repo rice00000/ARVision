@@ -49,6 +49,9 @@ func run() -> void:
 	var home := App.module(&"Home")
 	if home != null and &"hide_entry" in home:
 		home.hide_entry = true   # the gear is the child's menu now (Scene 7/9)
+	if home != null and &"workshop" in home:
+		home.workshop = true     # Wei's room from the house: no Menu, a cauldron to go back, teal stones
+	HomeUI.teal_stones = true
 	controller = WorkshopController.new()
 	controller.name = "WorkshopController"
 	add_child(controller)
@@ -174,6 +177,10 @@ func _on_reported(what: StringName, data: Dictionary) -> void:
 
 func _exit_tree() -> void:
 	Events.celebrate = true
+	HomeUI.teal_stones = false
+	var home := App.module(&"Home") if App != null else null
+	if home != null and is_instance_valid(home) and &"workshop" in home:
+		home.workshop = false
 	Tidy.onion_voice = false
 	Tidy.shelf_frame = Transform3D.IDENTITY   # the opening's planned bench ends with the first visit
 	Entry.show_sim_props(true)

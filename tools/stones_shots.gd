@@ -79,6 +79,15 @@ func _ready() -> void:
 	Events.selected.emit(&"right", hub.row.impressions[2].target, Vector3.ZERO, Vector3.FORWARD)
 	await _pause(0.6)
 	await _shot("looks_edges", "Edges picked: the real room changes (sim), the ring moves")
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	await _until(func() -> bool: return hub.row == null and hub.ring.opened, 900)
+	await _pause(0.5)
+	Events.selected.emit(&"right", hub.ring.door.target, Vector3.ZERO, Vector3.FORWARD)
+	var home := App.module(&"Home")
+	await _until(func() -> bool: return home.is_open, 900)
+	_look(0.0)
+	await _pause(2.0)
+	await _shot("weis_room", "Wei's room from the house: Workshop (a cauldron) · Shop (teal stone, count) · My things")
 	get_tree().quit()
 
 
