@@ -133,9 +133,11 @@ func test_a_table_out_of_reach_is_reported() -> void:
 	expect(not layout.out_of_reach().is_empty(), "a table starting 40 cm out for a 50 cm reach: the socket is out of reach, and it says so")
 
 
+## Megan, Nov 17 late: the socket (panel) may lie under Wei's bench board: it fades there during the shelf game
+## (Workshop.hide_socket, tests/hub_test.gd). The cauldron stays all visit, so it is still kept clear.
 func test_the_cauldron_and_panel_make_way_for_the_bench() -> void:
 	var layout := EntryLayout.usual().plan()
-	for name: StringName in [&"cauldron", &"panel", &"cauldron_after", &"panel_after"]:
+	for name: StringName in [&"cauldron", &"cauldron_after"]:
 		var z := layout.zone(name)
 		if z == null:
 			continue

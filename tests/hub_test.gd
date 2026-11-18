@@ -176,3 +176,23 @@ func test_home_on_the_gear_fades_to_weis_room_and_back_to_the_hub() -> void:
 	expect(await until(func() -> bool: return _in_hub(hub), 15.0), "back at the hub, as it was")
 	expect(veil == null or not veil.visible, "the fade has cleared")
 	expect(not _said_line(said, WorkshopController.SURPRISES), "the Home line waits for the next game's end")
+
+
+## Megan, Nov 17 late: the socket sits at the near edge, right of middle; it fades under Wei's bench during the shelf.
+func test_the_socket_sits_near_right_and_hides_under_the_bench_during_the_shelf() -> void:
+	var hub := await _to_hub()
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	var socket := workshop.get("_mechanism") as Node3D
+	var eye := App.head().global_position
+	var to := Vector3(socket.global_position.x - eye.x, 0.0, socket.global_position.z - eye.z)
+	var ahead := -App.head().global_basis.z
+	ahead = Vector3(ahead.x, 0.0, ahead.z).normalized()
+	expect(ahead.cross(to).y < 0.0, "the socket is right of the child's middle")
+	expect(to.length() < 0.5, "and near the table's near edge (%.2f m)" % to.length())
+	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
+	expect(await until(func() -> bool: return hub.state == &"game" and not socket.visible, 10.0), "the socket fades under the bench")
+	Engine.time_scale = 4.0
+	await _finish_rounds()
+	expect(await until(func() -> bool: return _in_hub(hub), 40.0), "back at the hub")
+	Engine.time_scale = 1.0
+	expect(socket.visible, "the socket is back")

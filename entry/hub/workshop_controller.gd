@@ -146,8 +146,13 @@ func _run(activity: Summonable) -> void:
 	if workshop != null:
 		workshop.attend(null)
 	print("HUB game: ", activity.id())
+	var under_bench := activity.id() == &"shelf" and workshop != null   # Wei's bench board covers the socket
+	if under_bench:
+		workshop.hide_socket(true)
 	activity.summon(_workspace())
 	var outcome: StringName = await activity.finished
+	if under_bench:
+		workshop.hide_socket(false)
 	exit_token.set_open(false)
 	exit_token.visible = false
 	print("HUB ", activity.id(), " finished: ", outcome)

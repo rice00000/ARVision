@@ -154,6 +154,25 @@ func fade_socket(seconds := 1.2) -> void:
 	var tween := create_tween()
 	tween.tween_property(_mechanism, "scale", Vector3(1.0, 0.02, 1.0), seconds).set_trans(Tween.TRANS_SINE)
 	tween.tween_callback(func() -> void: _mechanism.visible = false)
+	_mechanism.set_meta(&"faded_for_good", true)
+
+
+## The socket and the gear in it fade under Wei's bench board while the shelf game stands over them
+## (Megan, Nov 17 late: the socket sits at the near edge, right of middle, where the bench board goes), and
+## come back after. [param hidden]: true to hide.
+func hide_socket(hidden: bool, seconds := 0.4) -> void:
+	for part: Node3D in [_mechanism, _gear]:
+		if not is_instance_valid(part) or part.get_meta(&"faded_for_good", false):
+			continue
+		if not part.has_meta(&"scale_shown"):
+			part.set_meta(&"scale_shown", part.scale)
+		var shown: Vector3 = part.get_meta(&"scale_shown")
+		if not hidden:
+			part.visible = true
+		var tween := create_tween()
+		tween.tween_property(part, "scale", Vector3(shown.x, shown.y * 0.02, shown.z) if hidden else shown, seconds).set_trans(Tween.TRANS_SINE)
+		if hidden:
+			tween.tween_callback(func() -> void: part.visible = false)
 
 
 ## Where the cauldron's mouth is.

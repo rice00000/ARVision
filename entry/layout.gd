@@ -463,6 +463,9 @@ var _mech_score := 0.0
 
 ## The shelf may turn this many degrees to the right of straight ahead (Wei's table point moves there), and
 ## the cauldron may stand this many degrees to the left (the usual CAULDRON_ANGLE first).
+## The socket's preferred direction, degrees to the child's right of straight ahead (Megan, Nov 17: near edge,
+## a little right of middle).
+const SOCKET_ANGLE := 15.0
 ## How much farther than the EASY reach the socket may be (5 cm: the measured reach is what feels easy, not the
 ## limit; the gear is set in once).
 static var socket_stretch := 0.05
@@ -720,19 +723,19 @@ func _try_panel(angle: int, distance: float, ctx: Dictionary) -> void:
 	var bench_clear := INF
 	for z: Zone in ctx.bench_zones:
 		bench_clear = minf(bench_clear, gap(plate, z))
-	if not make_way:   # it stays through the reveal and the first visit: clear of the bench too
-		clear = minf(clear, bench_clear)
+	# (Megan, Nov 17 late: the bench only stands during the shelf game now, and the socket and gear fade under
+	# its board then, so the socket need not be clear of it: Workshop.hide_socket.)
 	if distance - SOCKET_Z > hands + 0.02 + socket_stretch:   # the socket must be in easy reach
 		score -= 15.0 + (distance - SOCKET_Z - hands) * 20.0
 	score += 0.5 if make_way and bench_clear >= LOOKED_GAP else 0.0
-	score -= absf(angle) * 0.004 + absf(distance - 0.42) * 0.5 + p.distance_to(cauldron) * 0.5
+	# Megan, Nov 17 (late): the socket flat on the table at its NEAR edge, a little right of middle (it holds the
+	# gear's menu all visit): nearest the child that fits, toward SOCKET_ANGLE; no pull toward the cauldron.
+	score -= absf(angle - SOCKET_ANGLE) * 0.03 + distance * 1.5
 	score += 0.0 if clear >= GAP else -30.0 + clear
 	if clear >= GAP and score > ctx.best_score:   # only now the gear's landing spot (the slow part)
 		var spot := _gear_rest_for(p)
 		var landing := _circle(&"landing", spot, GEAR_RADIUS + FINGERS, 0.0)
 		var room := minf(minf(gap(landing, plate), gap(landing, ctx.pot)), gap(landing, ctx.beside))
-		if not make_way:
-			room = minf(room, minf(gap(landing, ctx.bench_zones[0]), gap(landing, ctx.bench_zones[2])))
 		score -= _arc_cost(spot, plate)
 		if away(spot) - GEAR_RADIUS - FINGERS > hands + 0.02:   # the gear's near side must be in reach
 			score -= 15.0 + (away(spot) - hands) * 20.0
@@ -1017,14 +1020,16 @@ func _zones() -> Array[Zone]:
 		moved.keeps = LOOKED_GAP
 		all.append(moved)
 	var m_phases := OPENING if mechanism_moves() else OPENING | after
-	all.append(_rect(&"panel", mechanism, _panel_half(), mechanism_yaw, HAND_ROOM, m_phases, "the child sets the gear into the socket"))
+	var panel := _rect(&"panel", mechanism, _panel_half(), mechanism_yaw, HAND_ROOM, m_phases, "the child sets the gear into the socket")
+	panel.may_overlap = [&"bench", &"shelf", &"things"]   # it fades under Wei's bench during the shelf game
+	all.append(panel)
 	if mechanism_moves():
 		var moved := _rect(&"panel_after", mechanism_after, _panel_half(), mechanism_yaw_after, 0.06, after, "the mechanism, turning, moved aside for the bench")
 		moved.keeps = LOOKED_GAP
 		all.append(moved)
 	all.append(_circle(&"gear_landing", gear_rest, GEAR_RADIUS + FINGERS, HAND_ROOM, OPENING, "the gear lands; the child picks it up"))
 	var ring := _circle(&"socket", socket, SOCKET_RADIUS + 0.008, 0.012, m_phases, "the socket's brass ring")
-	ring.may_overlap = [&"panel"]
+	ring.may_overlap = [&"panel", &"bench", &"shelf", &"things"]
 	all.append(ring)
 	if mechanism_moves():
 		var ring_after := _circle(&"socket_after", socket_after, SOCKET_RADIUS + 0.008, 0.012, after, "the socket's brass ring, moved")
