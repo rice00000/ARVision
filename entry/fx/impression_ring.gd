@@ -521,10 +521,17 @@ func _place() -> void:
 		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
 	var size := DOOR_SCALE * shrink
 	var row := places.filter(func(p: Impression) -> bool: return is_instance_valid(p))
+	# The places row curves round the child (Megan, Nov 18 11:21): every place the same distance from the eyes, so
+	# none looks bigger. Its middle sits DOOR_BACK behind the arc's front.
+	var middle := global_position - _toward * DOOR_BACK
+	var centre_at := Vector3(_eye.x, middle.y, _eye.z) if _eye != Vector3.INF else middle + _toward * 0.45
+	var reach := maxf(centre_at.distance_to(middle), 0.2)
+	var place_step := PLACE_GAP / reach
 	for i in row.size():
 		var place: Impression = row[i]
-		var across := (i - (row.size() - 1) * 0.5) * PLACE_GAP   # left to right as the child sees it
-		var at := global_position - _toward * DOOR_BACK + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest) - _side * across
+		var angle := (i - (row.size() - 1) * 0.5) * place_step   # left to right as the child sees it
+		var at := centre_at + (-_toward * cos(angle) - _side * sin(angle)) * reach \
+				+ Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
 		place.scale = Vector3.ONE * size
 		place.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
 		_face(place)

@@ -179,6 +179,9 @@ func test_the_eye_shows_the_looks_and_a_pinch_changes_the_real_room_and_is_saved
 	expect(await _open(hub), "the menu opens")
 	var row := hub.ring.places.map(func(p: Impression) -> StringName: return p.kind)
 	expect_eq(row, [&"help", &"eye", &"house", &"finish"], "? · eye · house · ✕")
+	var eye_at := App.head().global_position
+	var gaps := hub.ring.places.map(func(p: Impression) -> float: return p.bubble.global_position.distance_to(eye_at))
+	expect(gaps.max() - gaps.min() < 0.04, "the row curves: every place about the same distance from the eyes (%s)" % [gaps.map(func(g: float) -> String: return "%.2f" % g)])
 	_pinch(hub.ring.place_of(&"eye").target)
 	expect(await until(func() -> bool: return hub.row != null and hub.row_kind == &"looks" and hub.row.opened, 10.0), "the looks rise")
 	var looks := hub.row.impressions.map(func(p: Impression) -> StringName: return p.look)

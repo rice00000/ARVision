@@ -58,6 +58,12 @@ func _ready() -> void:
 	await _pause(0.3)
 	await _shot("stones_landed", "The badge shows the count; the shelf grew a row")
 	var cam := App.rig.head as Camera3D
+	var was := cam.global_transform
+	cam.look_at(hub.ring.global_position + Vector3.DOWN * 0.08)
+	cam.fov = 70.0
+	await _pause(0.2)
+	await _shot("menu_looked_at", "Looking straight at the menu (as a child does): the places row curves round the child, all one size")
+	cam.global_transform = was
 	cam.fov = 25.0
 	cam.look_at(hub.badge.global_position)
 	await _pause(0.2)
