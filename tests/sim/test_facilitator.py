@@ -131,15 +131,13 @@ class Panel(SimCase):
         lines = self.assert_log_ok(sim)
         self.assertTrue(any(line.get("what") == "round_abandoned" for line in lines))
 
-    def test_buttons_between_blocks_do_nothing_harmful(self):
+    def test_training_actions_only_appear_while_a_block_is_running(self):
         sim = self.start(plan(block("find", rounds=2), greeting="Hello! Today we look for toys on the table."))
         self.facilitator.open()  # during the greeting: no block yet
         self.assertEqual(self.facilitator.panel()["status"], "No block running")
-        for button in ("fac_easier", "fac_harder", "fac_skip"):
-            self.facilitator.press(button)
-        self.assertEqual(self.pressed(), [], "nothing to steer, nothing done")
+        buttons = {b["id"] for b in self.facilitator.panel()["buttons"]}
+        self.assertTrue(buttons.isdisjoint({"fac_easier", "fac_harder", "fac_skip", "fac_auto"}))
         self.assertIsNone(sim.observe()["session"]["pinned"])
-        self.facilitator.press("fac_auto")
         self.facilitator.press("fac_view")
         self.assertEqual(sim.observe()["view"]["title"], "High contrast")
         self.facilitator.press("fac_close")
@@ -150,13 +148,15 @@ class Panel(SimCase):
         self.assertEqual(len(self.reports(sim, "level")), 2)
         self.assertEqual(self.reports(sim, "round_abandoned"), [])
         self.facilitator.open()  # after the session
-        for button in ("fac_easier", "fac_harder", "fac_skip", "fac_auto", "fac_view", "fac_close"):
+        buttons = {b["id"] for b in self.facilitator.panel()["buttons"]}
+        self.assertTrue(buttons.isdisjoint({"fac_easier", "fac_harder", "fac_skip", "fac_auto"}))
+        for button in ("fac_view", "fac_close"):
             self.facilitator.press(button)
         self.assertFalse(sim.observe()["paused"])
         self.assertEqual(len(sim.events("session_finished")), 1)
         self.assertNotIn("level_pinned", [e["what"] for e in sim.events("reported")])
 
-    def test_skip_during_an_intro_skips_the_whole_block(self):
+    def test_skip_at_an_optional_intro_skips_the_whole_block(self):
         sim = self.start(plan(block("find", rounds=2, intro="Now we find toys. Look at the table, please."),
                               block("find", rounds=1, view="edges")))
         sim.run_until("block_started")
@@ -166,7 +166,7 @@ class Panel(SimCase):
         self.child.play(scripts={"find": ["right"]})
         ends = self.round_ends(sim)
         self.assertEqual([e["data"]["view"]["title"] for e in ends], ["Edges"])
-        self.assertEqual(self.reports(sim, "round_abandoned"), [], "no round had started")
+        self.assertEqual(len(self.reports(sim, "round_abandoned")), 1, "the immediately playable round was abandoned")
 
     def test_saves_tab_makes_switches_and_copies_saves(self):
         sim = self.start(None, profile="test_sim_saves")

@@ -1,12 +1,14 @@
-[gd_resource type="Resource" script_class="Task" format=3]
+[gd_resource type="Resource" script_class="Task" format=3 uid="uid://cq73wvvy1v5ht"]
 
-[ext_resource type="Script" path="res://world/task.gd" id="1_task"]
-[ext_resource type="Script" path="res://trials/session_plan.gd" id="2_plan"]
-[ext_resource type="Script" path="res://trials/block.gd" id="3_block"]
-[ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="4_tidy"]
-
-[ext_resource type="Script" path="res://world/task_level.gd" id="5_level"]
-[ext_resource type="Resource" path="res://trials/tidy/odd_color_adaptive.tres" id="6_colour_adaptive"]
+[ext_resource type="Script" uid="uid://btq5nanphne2n" path="res://world/task.gd" id="1_task"]
+[ext_resource type="Script" uid="uid://c2uh7fjvtafom" path="res://trials/session_plan.gd" id="2_plan"]
+[ext_resource type="Script" uid="uid://b0nl06crubwd" path="res://trials/block.gd" id="3_block"]
+[ext_resource type="Resource" uid="uid://bku6inhmruihs" path="res://trials/tidy/tidy.tres" id="4_tidy"]
+[ext_resource type="Script" uid="uid://r0plwybnwais" path="res://world/task_level.gd" id="5_level"]
+[ext_resource type="Resource" uid="uid://dpybbkc5dnhul" path="res://trials/tidy/odd_color_adaptive.tres" id="6_colour_adaptive"]
+[ext_resource type="Resource" path="res://trials/desk/desk.tres" id="7_desk"]
+[ext_resource type="Resource" path="res://trials/sandwich/sandwich.tres" id="8_sandwich"]
+[ext_resource type="Resource" path="res://trials/bookshelf/bookshelf.tres" id="9_bookshelf"]
 
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
@@ -23,6 +25,13 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_1")])
 
+[sub_resource type="Resource" id="shadow"]
+script = ExtResource("5_level")
+id = &"shadow"
+project = &"shadow"
+title = "Shadow Match"
+plan = SubResource("level_1")
+
 [sub_resource type="Resource" id="tidy_2"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
@@ -38,28 +47,86 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_2")])
 
+[sub_resource type="Resource" id="similar_shadows"]
+script = ExtResource("5_level")
+id = &"similar_shadows"
+project = &"shadow"
+title = "Similar Shadows"
+plan = SubResource("level_2")
+
 [sub_resource type="Resource" id="tidy_3"]
 script = ExtResource("3_block")
-trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.67
-pins = Dictionary[StringName, float]({&"outline": 1.0})
+trial = ExtResource("7_desk")
+rounds = 1
+difficulty = 0.0
 ray = false
 pause_between = 1.0
 
 [sub_resource type="Resource" id="level_3"]
 script = ExtResource("2_plan")
-title = "Tidy the shelf, level 3"
+title = "Ready to study"
 greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_3")])
+
+[sub_resource type="Resource" id="outline"]
+script = ExtResource("5_level")
+id = &"outline"
+project = &"outline"
+title = "Ready to Study"
+plan = SubResource("level_3")
+
+[sub_resource type="Resource" id="bookshelf_block"]
+script = ExtResource("3_block")
+trial = ExtResource("9_bookshelf")
+rounds = 1
+difficulty = 0.0
+ray = false
+pause_between = 1.5
+
+[sub_resource type="Resource" id="bookshelf_plan"]
+script = ExtResource("2_plan")
+title = "Bookshelf Match"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("bookshelf_block")])
+
+[sub_resource type="Resource" id="bookshelf"]
+script = ExtResource("5_level")
+id = &"bookshelf"
+project = &"bookshelf"
+title = "Bookshelf Match"
+plan = SubResource("bookshelf_plan")
+
+[sub_resource type="Resource" id="sandwich_block"]
+script = ExtResource("3_block")
+trial = ExtResource("8_sandwich")
+rounds = 1
+difficulty = 0.0
+ray = false
+
+[sub_resource type="Resource" id="sandwich_plan"]
+script = ExtResource("2_plan")
+title = "Make a Sandwich"
+greeting = ""
+farewell = ""
+blocks = Array[ExtResource("3_block")]([SubResource("sandwich_block")])
+
+[sub_resource type="Resource" id="sandwich"]
+script = ExtResource("5_level")
+id = &"sandwich"
+project = &"sandwich"
+title = "Make a Sandwich"
+plan = SubResource("sandwich_plan")
 
 [sub_resource type="Resource" id="tidy_4"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
 rounds = 2
 difficulty = 0.34
-pins = Dictionary[StringName, float]({&"match": 1.0})
+pins = Dictionary[StringName, float]({
+&"match": 1.0
+})
 ray = false
 pause_between = 1.0
 
@@ -70,12 +137,21 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_4")])
 
+[sub_resource type="Resource" id="size"]
+script = ExtResource("5_level")
+id = &"size"
+project = &"size"
+title = "Size Match"
+plan = SubResource("level_4")
+
 [sub_resource type="Resource" id="tidy_5"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
 rounds = 2
 difficulty = 0.67
-pins = Dictionary[StringName, float]({&"match": 2.0})
+pins = Dictionary[StringName, float]({
+&"match": 2.0
+})
 ray = false
 pause_between = 1.0
 
@@ -86,12 +162,21 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_5")])
 
+[sub_resource type="Resource" id="color"]
+script = ExtResource("5_level")
+id = &"color"
+project = &"color"
+title = "Color Match"
+plan = SubResource("level_5")
+
 [sub_resource type="Resource" id="tidy_6"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
 rounds = 2
 difficulty = 0.34
-pins = Dictionary[StringName, float]({&"clutter": 8.0})
+pins = Dictionary[StringName, float]({
+&"clutter": 8.0
+})
 ray = false
 pause_between = 1.0
 
@@ -102,30 +187,22 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("tidy_6")])
 
+[sub_resource type="Resource" id="clutter"]
+script = ExtResource("5_level")
+id = &"clutter"
+project = &"clutter"
+title = "Clutter Search"
+plan = SubResource("level_6")
+
 [sub_resource type="Resource" id="odd_colour_easy"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
 rounds = 2
 difficulty = 0.0
-pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 0.0})
-ray = false
-pause_between = 1.0
-
-[sub_resource type="Resource" id="odd_colour_medium"]
-script = ExtResource("3_block")
-trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.0
-pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 1.0})
-ray = false
-pause_between = 1.0
-
-[sub_resource type="Resource" id="odd_colour_hard"]
-script = ExtResource("3_block")
-trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.0
-pins = Dictionary[StringName, float]({&"match": 3.0, &"colour_step": 2.0})
+pins = Dictionary[StringName, float]({
+&"colour_step": 0.0,
+&"match": 3.0
+})
 ray = false
 pause_between = 1.0
 
@@ -136,6 +213,25 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_easy")])
 
+[sub_resource type="Resource" id="odd_color_1"]
+script = ExtResource("5_level")
+id = &"odd_color_1"
+project = &"odd_color"
+title = "Odd Color"
+plan = SubResource("odd_colour_plan_1")
+
+[sub_resource type="Resource" id="odd_colour_medium"]
+script = ExtResource("3_block")
+trial = ExtResource("4_tidy")
+rounds = 2
+difficulty = 0.0
+pins = Dictionary[StringName, float]({
+&"colour_step": 1.0,
+&"match": 3.0
+})
+ray = false
+pause_between = 1.0
+
 [sub_resource type="Resource" id="odd_colour_plan_2"]
 script = ExtResource("2_plan")
 title = "Odd Color, level 2"
@@ -143,12 +239,12 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_medium")])
 
-[sub_resource type="Resource" id="odd_colour_plan_3"]
-script = ExtResource("2_plan")
-title = "Odd Color, level 3"
-greeting = ""
-farewell = ""
-blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_hard")])
+[sub_resource type="Resource" id="odd_color_2"]
+script = ExtResource("5_level")
+id = &"odd_color_2"
+project = &"odd_color"
+title = "Odd Color"
+plan = SubResource("odd_colour_plan_2")
 
 [sub_resource type="Resource" id="odd_colour_adaptive_block"]
 script = ExtResource("3_block")
@@ -164,81 +260,6 @@ greeting = ""
 farewell = ""
 blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_adaptive_block")])
 
-[sub_resource type="Resource" id="shadow"]
-script = ExtResource("5_level")
-id = &"shadow"
-project = &"shadow"
-title = "Shadow Match"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_1")
-
-[sub_resource type="Resource" id="similar_shadows"]
-script = ExtResource("5_level")
-id = &"similar_shadows"
-project = &"shadow"
-title = "Similar Shadows"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_2")
-
-[sub_resource type="Resource" id="outline"]
-script = ExtResource("5_level")
-id = &"outline"
-project = &"outline"
-title = "Outline Match"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_3")
-
-[sub_resource type="Resource" id="size"]
-script = ExtResource("5_level")
-id = &"size"
-project = &"size"
-title = "Size Match"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_4")
-
-[sub_resource type="Resource" id="color"]
-script = ExtResource("5_level")
-id = &"color"
-project = &"color"
-title = "Color Match"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_5")
-
-[sub_resource type="Resource" id="clutter"]
-script = ExtResource("5_level")
-id = &"clutter"
-project = &"clutter"
-title = "Clutter Search"
-first_reward = 3
-repeat_reward = 2
-plan = SubResource("level_6")
-
-[sub_resource type="Resource" id="odd_color_1"]
-script = ExtResource("5_level")
-id = &"odd_color_1"
-project = &"odd_color"
-title = "Odd Color"
-plan = SubResource("odd_colour_plan_1")
-
-[sub_resource type="Resource" id="odd_color_2"]
-script = ExtResource("5_level")
-id = &"odd_color_2"
-project = &"odd_color"
-title = "Odd Color"
-plan = SubResource("odd_colour_plan_2")
-
-[sub_resource type="Resource" id="odd_color_3"]
-script = ExtResource("5_level")
-id = &"odd_color_3"
-project = &"odd_color"
-title = "Odd Color"
-plan = SubResource("odd_colour_plan_3")
-
 [sub_resource type="Resource" id="odd_color_adaptive"]
 script = ExtResource("5_level")
 id = &"odd_color_adaptive"
@@ -251,4 +272,4 @@ plan = SubResource("odd_colour_adaptive_plan")
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3"), SubResource("odd_color_adaptive")])
+levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("bookshelf"), SubResource("sandwich"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_adaptive")])

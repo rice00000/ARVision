@@ -6,6 +6,7 @@ extends TestCase
 const MotionTrial := preload("res://trials/motion/motion_trial.gd")
 const RANDOM := preload("res://trials/motion/motion.tres")
 const COMPETING := preload("res://trials/motion/motion_competing.tres")
+const WALL := preload("res://trials/motion/motion_demo.tres")
 const HEADINGS := [&"right", &"left", &"toward", &"away"]
 ## A wrong sweep counts once its hand has stopped this long (Pointer.sweep_stop_seconds and a margin).
 const SETTLE := 0.55
@@ -383,6 +384,45 @@ func test_success_aligns_the_dots_until_the_next_round() -> void:
 	expect_eq(material.get_shader_parameter(&"alignment"), 1.0, "aligned and still aligned after the round ended")
 	expect(await until(_round_is.bind(1), 3.0), "the next round starts after the pause")
 	expect_eq(_material().get_shader_parameter(&"alignment"), 0.0, "reset by the next round's setup")
+
+
+func test_every_wall_round_uses_the_same_flight_and_matches_the_opening() -> void:
+	var plan := plan_of(WALL, 3, false, 0.0, null, {&"direction": 1.0})
+	plan.blocks[0].pause_between = 3.0
+	await boot(plan)
+	var ended := record(Events.trial_ended)
+	var reports := record(Events.reported)
+	var impacts := func() -> Array: return reports.filter(func(args: Array) -> bool: return args[0] == &"wall_break")
+	App.session.run()
+	for index in 3:
+		var side := 1.0 if index % 2 == 0 else -1.0
+		plan.blocks[0].pins[&"direction"] = 1.0 if side > 0.0 else 2.0
+		await until(_round_is.bind(index))
+		var cloud := App.session.trial.get_node(^"Cloud") as MotionCloud
+		var eye := App.head().global_position
+		var centre := WallBreak.aim(eye, (cloud.global_position - eye).normalized())
+		var material := _material()
+		expect_eq(material.get_shader_parameter(&"flight_progress"), -1.0, "the next round starts with a fresh dot field")
+		var start := eye + Vector3(0.2, -0.4, -0.4)
+		input.set_hand(&"right", Transform3D(Basis.IDENTITY, start))
+		await wait(MotionTrial.ARM_SECONDS + 0.05)
+		await _glide(&"right", start, start + cloud.global_basis.x * side * 0.20, 0.25)
+		expect(ended.size() == index + 1 and ended[index][1], "the sweep scores while the dots fly")
+		expect_eq(impacts.call().size(), index, "the wall waits for the dots on every round")
+		var target := cloud.to_global(material.get_shader_parameter(&"flight_target"))
+		var across: Vector3 = material.get_shader_parameter(&"flight_across")
+		var up: Vector3 = material.get_shader_parameter(&"flight_up")
+		if index == 2:
+			input.look_at(eye + Vector3(0.6, 0.0, -1.0))
+		await wait(MotionCloud.FLIGHT_SECONDS)
+		var hits: Array = impacts.call()
+		expect_eq(hits.size(), index + 1, "the wall breaks after the same short flight")
+		if hits.size() == index + 1:
+			var hit: Dictionary = hits[index][1]
+			expect((hit.at.x - centre.at.x) * side > 0.15 and is_equal_approx(hit.at.z, centre.at.z), "the impact shifts toward the sweep on the same wall")
+			expect(target.distance_to(hit.at) < 0.03, "the locked impact matches the dots even after a head turn")
+			var footprint := Vector2(across.length(), up.length())
+			expect(footprint.is_equal_approx(hit.hole * MotionCloud.IMPACT_FOOTPRINT), "the volley covers the hole's width and height")
 
 
 func test_round_data_is_valid_json() -> void:

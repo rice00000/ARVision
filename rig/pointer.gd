@@ -62,12 +62,15 @@ const VERTICAL := 0.77
 var side: StringName
 ## The Target the ray points at now, or null.
 var aimed: Target
+## An interaction can occupy this hand while its pose continues to update.
+var ui_available := true
 
 @onready var _controller := get_parent() as XRController3D
 var _finger: Area3D
 var _marker: MeshInstance3D
 var _beam := MeshInstance3D.new()
 var _dot := MeshInstance3D.new()
+var _landing_ring := MeshInstance3D.new()
 var _ray_material := StandardMaterial3D.new()
 var _hit_at := Vector3.ZERO
 var _last_tip := Vector3.INF
@@ -101,7 +104,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER
-	_set_aim(cast() if tracked() else null)
+	_set_aim(cast() if ui_available and tracked() else null)
 	_marker.visible = App.xr == null and tracked()
 	_draw_ui_ray()
 
@@ -126,21 +129,27 @@ func _draw_ui_ray() -> void:
 			if target.show_ray and target.is_visible_in_tree() and target.collision_layer != 0:
 				show = true
 				break
-	show = show and tracked() and (App.xr != null or side == &"right")
+	show = show and ui_available and tracked() and (App.xr != null or side == &"right")
 	_beam.visible = show
 	_dot.visible = show and aimed is UITarget
+	_landing_ring.visible = false
 	if not show: return
 	var from := global_position
 	var direction := -global_basis.z
 	var distance := minf(length, 1.0)
+	var landing := App.reality.home_landing(from, direction, length) if aimed == null and App.reality else Vector3.INF
 	if aimed is UITarget:
 		distance = from.distance_to(_hit_at)
+	elif landing.is_finite():
+		distance = from.distance_to(landing)
+		_landing_ring.global_transform = Transform3D(Basis.IDENTITY, landing + Vector3.UP * 0.044)
+		_landing_ring.visible = true
 	var end := from + direction * distance
 	if App.xr == null:
 		from = App.head().global_transform * Vector3(0.22, -0.3, -0.2)
 		distance = from.distance_to(end)
 		direction = (end - from).normalized()
-	_ray_material.albedo_color = Color(1.0, 0.9, 0.45) if aimed is UITarget else Color(0.75, 0.85, 1.0)
+	_ray_material.albedo_color = Color(1.0, 0.9, 0.45) if aimed is UITarget or landing.is_finite() else Color(0.75, 0.85, 1.0)
 	var across := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
 	_beam.global_transform = Transform3D(Basis(across, direction * distance, across.cross(direction)), from + direction * distance * 0.5)
 	_dot.global_position = end
@@ -251,9 +260,18 @@ func grip() -> Transform3D:
 	return Transform3D(global_basis, tip())
 
 
-## The palm faces up: the back of the hand (the palm's own up) faces the floor.
-func palm_up() -> bool:
-	return tracked() and grip().basis.y.y < -0.7
+## The palm surface. As with fingertip input, the synthetic hand supplies a pose
+## on desktop. A missing XR palm cannot be inferred from the aiming ray.
+func palm() -> Transform3D:
+	if App.xr != null:
+		return App.rig.tracked_hand(side).palm()
+	if not tracked(): return TrackedHand.UNTRACKED
+	var axes := global_basis
+	return Transform3D(Basis(axes.x, axes.z, -axes.y), global_position)
+
+
+func hand_closed() -> bool:
+	return _controller.is_button_pressed(&"trigger_click") or _controller.is_button_pressed(&"grip_click")
 
 
 func tracked() -> bool:
@@ -261,8 +279,14 @@ func tracked() -> bool:
 
 
 func _on_button(action: String, pressed: bool) -> void:
+	if not ui_available: return
 	var active := pressed and tracked()
 	var target := cast() if active and action == "trigger_click" else null
+	if active and action == "trigger_click" and target == null and App.reality:
+		var landing := App.reality.home_landing(global_position, -global_basis.z, length)
+		if landing.is_finite():
+			App.reality.move_home_view(landing)
+			return
 	var on_ui := target is UITarget
 	# A menu opener must pause play before the raw pinch reaches gameplay.
 	if not on_ui:
@@ -347,3 +371,12 @@ func _build() -> void:
 	_dot.material_override = _ray_material
 	_dot.visible = false
 	add_child(_dot)
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.135
+	ring.outer_radius = 0.175
+	ring.rings = 16
+	ring.ring_segments = 6
+	_landing_ring.mesh = ring
+	_landing_ring.material_override = _ray_material
+	_landing_ring.visible = false
+	add_child(_landing_ring)

@@ -5,19 +5,32 @@ extends MultiMeshInstance3D
 ## height: [member spin] +1 anticlockwise seen from above, -1 clockwise. Its
 ## aim turns it off the circle (0 along it, PI back the other way); a pull
 ## keeps it within [member band] of [member radius]. A butterfly can be thrown
-## aside ([method dodge]), carried into the net ([method catch_in]) and let go
-## ([method release]).
+## aside ([method dodge]), carried through the hoop ([method catch_in]) and let
+## go when the bag fills or the round ends.
 
 enum { FLYING, TO_NET, IN_NET, FREE, GONE }
 
 const SPECIES: Array[StringName] = [&"monarch", &"morpho", &"brimstone", &"swallowtail", &"rose"]
 const WINGSPAN := 0.1
+const MODEL := preload("res://content/butterflies/butterfly.fbx")
+const SKIN := preload("res://content/butterflies/butterfly-skin.png")
+## In the model's units: the height of its wing plane, where the wings leave the body, and over how far they bend there.
+const MODEL_WING_HEIGHT := 0.95
+const MODEL_ROOT := 0.15
+const MODEL_ROOT_BEND := 0.35
 ## Radians a second a butterfly turns towards a new aim.
 const TURN := 2.5
 const DODGE_SECONDS := 0.7
+const HOOP_ENTRY_SECONDS := 0.1
 const TO_NET_SECONDS := 0.3
 const FREE_SECONDS := 2.4
 const IN_NET_SCALE := 0.7
+## Positions inside the bag, reused in arrival order.
+const BAG_SPOTS: Array[Vector3] = [
+	Vector3(-0.045, 0.025, 0.07), Vector3(0.045, 0.025, 0.07),
+	Vector3(-0.038, -0.033, 0.085), Vector3(0.038, -0.033, 0.085),
+	Vector3(-0.018, 0.014, 0.135), Vector3(0.018, -0.014, 0.135),
+]
 
 var centre := Vector3.ZERO
 var radius := 0.72
@@ -41,9 +54,12 @@ var _dodge_left := PackedFloat32Array()
 var _spot := PackedVector3Array()
 var _clock := PackedFloat32Array()
 var _net: Node3D
+var _bag: Array[int] = []
+var _next_spot := 0
+var _release_in := -1.0
 var _buffer := PackedFloat32Array()
-## A release waiting: towards, flying, seconds left.
-var _release: Array = []
+## Every swarm shares one mesh.
+static var _mesh: ArrayMesh
 
 
 func _init() -> void:
@@ -60,6 +76,9 @@ func reset(at: Vector3) -> void:
 	for array: Variant in [_state, _species, _pos, _facing, _height, _spin, _aim, _aim_to, _flutter, _dodge,
 			_dodge_left, _spot, _clock]:
 		array.resize(0)
+	_bag.clear()
+	_next_spot = 0
+	_release_in = -1.0
 	multimesh.instance_count = 0
 	custom_aabb = AABB(Vector3.ONE * -(radius + band + 1.0), Vector3.ONE * (radius + band + 1.0) * 2.0)
 
@@ -132,41 +151,45 @@ func steer(i: int, spin: float, aim: float) -> void:
 
 ## Darts away from [param from] for a moment, then flies on.
 func dodge(i: int, from: Vector3) -> void:
+	if _dodge_left[i] > 0.0:
+		return
 	var away := _pos[i] - from
 	away.y = absf(away.y) + 0.05
 	_dodge[i] = away.normalized() * 0.14
 	_dodge_left[i] = DODGE_SECONDS
 
 
-## Flies into the bag of [param net] and stays there, fluttering at [param spot] (the net's frame).
-func catch_in(i: int, net: Node3D, spot: Vector3) -> void:
+## Each catch flies through the moving hoop into the bag before making room.
+func catch_in(i: int, net: Node3D) -> void:
 	_net = net
+	_pos[i] = position_of(i)
 	_dodge_left[i] = 0.0
 	_state[i] = TO_NET
-	_spot[i] = spot
+	_spot[i] = BAG_SPOTS[_next_spot]
+	_next_spot = (_next_spot + 1) % BAG_SPOTS.size()
 	_clock[i] = 0.0
 
 
-## Every one in the net (and with [param flying], every one still flying) flies up and away towards
-## [param towards] (level), then is gone; [param after] seconds from now.
-func release(towards: Vector3, flying := false, after := 0.0) -> void:
-	if after > 0.0:
-		_release = [towards, flying, after]
-		return
-	for i in _state.size():
-		if _state[i] in [TO_NET, IN_NET] or flying and _state[i] == FLYING:
-			_state[i] = FREE
-			_clock[i] = 0.0
-			_spot[i] = (towards.rotated(Vector3.UP, randf_range(-0.8, 0.8)) * 0.8 + Vector3.UP * 0.6) / FREE_SECONDS
+func release_after(seconds: float) -> void:
+	_release_in = seconds
+
+
+func _release_one(i: int) -> void:
+	Events.play(&"flutter_away", _pos[i])
+	_state[i] = FREE
+	_clock[i] = 0.0
+	var outside := _net.to_global(Vector3.FORWARD * 0.18)
+	_spot[i] = (outside - _pos[i]).normalized() * 0.55
 
 
 func step(delta: float) -> void:
-	if not _release.is_empty():
-		_release[2] -= delta
-		if _release[2] <= 0.0:
-			var waiting := _release
-			_release = []
-			release(waiting[0], waiting[1])
+	if _release_in >= 0.0:
+		_release_in -= delta
+		if _release_in <= 0.0:
+			_release_in = -1.0
+			for i in _bag:
+				_release_one(i)
+			_bag.clear()
 	for i in _state.size():
 		_clock[i] += delta
 		var scale := 1.0
@@ -174,19 +197,17 @@ func step(delta: float) -> void:
 			FLYING:
 				_fly(i, delta)
 			TO_NET:
-				var weight := minf(1.0, _clock[i] / TO_NET_SECONDS)
-				_pos[i] = _pos[i].lerp(_net.global_transform * _spot[i], weight)
-				scale = lerpf(1.0, IN_NET_SCALE, weight)
-				if weight >= 1.0:
-					_state[i] = IN_NET
+				_fly_into_net(i, delta)
+				scale = lerpf(1.0, IN_NET_SCALE, minf(1.0, _clock[i] / TO_NET_SECONDS))
 			IN_NET:
 				var t := _clock[i] * 6.0
 				_pos[i] = _net.global_transform * (_spot[i] + Vector3(sin(t * 0.31), sin(t * 0.23), cos(t * 0.27)) * 0.015)
 				_facing[i] = _facing[i].rotated(Vector3.UP, delta * 0.4)
 				scale = IN_NET_SCALE
 			FREE:
-				_pos[i] += _spot[i] * delta
-				_facing[i] = _spot[i].normalized()
+				var velocity := _spot[i] + Vector3.UP * (minf(_clock[i], 1.0) * 0.22)
+				_pos[i] += velocity * delta
+				_facing[i] = velocity.normalized()
 				scale = IN_NET_SCALE * clampf(1.0 - (_clock[i] - 0.6) / (FREE_SECONDS - 0.6), 0.0, 1.0)
 				if _clock[i] >= FREE_SECONDS:
 					_state[i] = GONE
@@ -194,6 +215,19 @@ func step(delta: float) -> void:
 				scale = 0.0
 		_write(i, scale)
 	multimesh.buffer = _buffer
+
+
+func _fly_into_net(i: int, delta: float) -> void:
+	var before := _clock[i] - delta
+	var outside := before < HOOP_ENTRY_SECONDS
+	var target := _net.global_position if outside else _net.to_global(_spot[i])
+	var arrives_at := HOOP_ENTRY_SECONDS if outside else TO_NET_SECONDS
+	_pos[i] = _pos[i].lerp(target, minf(1.0, delta / (arrives_at - before)))
+	if _clock[i] >= TO_NET_SECONDS:
+		_state[i] = IN_NET
+		_bag.append(i)
+		if _bag.size() > BAG_SPOTS.size():
+			_release_one(_bag.pop_front())
 
 
 func _direction(i: int) -> Vector3:
@@ -237,31 +271,37 @@ func _write(i: int, scale: float) -> void:
 	_buffer[o + 11] = local.origin.z
 
 
-## One butterfly: a thin body along Z and two wing quads out to the sides (UV2 x: -1 left, 0 body, 1 right).
+## One butterfly, from the CC0 model in content/butterflies (its rest pose: wings flat along X, head
+## towards -Z), scaled to [constant WINGSPAN]. UV2 x is how much of the wing beat a vertex follows:
+## -1 the left wing, 1 the right, 0 the body, in between near the root so the wing bends there.
 static func _butterfly_mesh() -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var half := WINGSPAN * 0.5
-	var depth := WINGSPAN * 0.62
-	for side: float in [-1.0, 1.0]:
-		# UV x: 0 at the body, 1 at the tip; y: 0 at the front (-Z).
-		var corners := [Vector3(0.0, 0.0, -depth * 0.5), Vector3(side * half, 0.0, -depth * 0.5),
-			Vector3(side * half, 0.0, depth * 0.5), Vector3(0.0, 0.0, depth * 0.5)]
-		var uvs := [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]
-		for k: int in [0, 1, 2, 0, 2, 3]:
-			tool.set_uv2(Vector2(side, 0.0))
-			tool.set_uv(uvs[k])
-			tool.add_vertex(corners[k])
-	var length := 0.045
-	var width := 0.004
-	for quad: Array in [[Vector3(-width, 0.0, -length * 0.5), Vector3(width, 0.0, -length * 0.5), Vector3(width, 0.0, length * 0.5), Vector3(-width, 0.0, length * 0.5)],
-			[Vector3(0.0, -width, -length * 0.5), Vector3(0.0, width, -length * 0.5), Vector3(0.0, width, length * 0.5), Vector3(0.0, -width, length * 0.5)]]:
-		for k: int in [0, 1, 2, 0, 2, 3]:
-			tool.set_uv2(Vector2.ZERO)
-			tool.set_uv(Vector2.ZERO)
-			tool.add_vertex(quad[k])
-	var mesh := tool.commit()
+	if _mesh:
+		return _mesh
+	var model: Node = MODEL.instantiate()
+	var source := (model.find_child("Butterfly", true, false) as MeshInstance3D).mesh
+	var arrays := source.surface_get_arrays(0)
+	model.free()
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var aabb := source.get_aabb()
+	var scale := WINGSPAN / aabb.size.x
+	var middle := Vector3(0.0, MODEL_WING_HEIGHT, aabb.get_center().z)
+	var beat := PackedVector2Array()
+	beat.resize(vertices.size())
+	for i in vertices.size():
+		var x := vertices[i].x
+		beat[i] = Vector2(signf(x) * clampf((absf(x) - MODEL_ROOT) / MODEL_ROOT_BEND, 0.0, 1.0), 0.0)
+		vertices[i] = (vertices[i] - middle) * scale
+	var mesh := ArrayMesh.new()
+	var surface := []
+	surface.resize(Mesh.ARRAY_MAX)
+	surface[Mesh.ARRAY_VERTEX] = vertices
+	surface[Mesh.ARRAY_TEX_UV] = arrays[Mesh.ARRAY_TEX_UV]
+	surface[Mesh.ARRAY_TEX_UV2] = beat
+	surface[Mesh.ARRAY_INDEX] = arrays[Mesh.ARRAY_INDEX]
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface)
 	var material := ShaderMaterial.new()
 	material.shader = preload("res://trials/butterfly/butterfly.gdshader")
+	material.set_shader_parameter(&"skin", SKIN)
 	mesh.surface_set_material(0, material)
+	_mesh = mesh
 	return mesh

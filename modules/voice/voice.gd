@@ -47,12 +47,15 @@ var _gliding := 0.0                  # seconds left of a glide to a new place
 var _player := AudioStreamPlayer.new()
 var _hide_at := 0.0
 var _speaking := ""
-var _finish_at := 0.0
+var _finish_at := INF
 var _suspended_line := ""
+var _simulate_audio := false
+var _simulated_time := 0.0
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_simulate_audio = AudioServer.get_driver_name() == "Dummy"
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.pixel_size = PIXEL
 	_label.font_size = FONT_SIZE
@@ -78,10 +81,12 @@ func _ready() -> void:
 	_plate.name = "Plate"
 	_label.add_child(_plate)
 	App.rig.add_child(_label)
+	_player.bus = &"Voice"
 	add_child(_player)
 	Events.said.connect(_say)
 	Events.player_menu_toggled.connect(_player_menu)
-	_player.finished.connect(func() -> void: _end_line(true))
+	if not _simulate_audio:
+		_player.finished.connect(_end_line.bind(true))
 	Events.scene_changing.connect(func() -> void:
 		_suspended_line = ""
 		_player.stop()
@@ -105,13 +110,17 @@ func _player_menu(open: bool) -> void:
 		if not resume.is_empty(): _say(resume)
 
 
-func _process(_delta: float) -> void:
-	if _speaking != "" and _now() >= _finish_at:
-		_end_line(true)   # also covers a player that never reports the end (no sound device)
-	if _label.visible and _now() >= _hide_at:
+func _process(delta: float) -> void:
+	if _simulate_audio:
+		_simulated_time += delta # Silent audio follows game time in the lockstep simulator.
+	var now := _now()
+	if _speaking != "" and now >= _finish_at:
+		_player.stop()
+		_end_line(true)
+	if _label.visible and _speaking == "" and now >= _hide_at:
 		_label.visible = false
 	if _label.visible:
-		_follow(_delta)
+		_follow(delta)
 
 
 ## Keeps the subtitle where it stands in the room; it moves only when the head has turned far
@@ -196,9 +205,14 @@ func _say(text: String) -> void:
 	else:
 		push_warning("Voice: no baked clip for \"%s\" (open the project in the editor to bake it)" % text)
 	var shown := text.length() * seconds_per_char
-	_hide_at = _now() + maxf(2.0, maxf(shown, spoken))
+	var now := _now()
+	_hide_at = now + maxf(2.0, maxf(shown, spoken))
 	_speaking = text
-	_finish_at = _now() + (spoken + 0.15 if stream != null else maxf(1.0, shown))
+	_finish_at = INF
+	if stream == null:
+		_finish_at = now + maxf(1.0, shown)
+	elif _simulate_audio:
+		_finish_at = now + spoken
 
 
 ## The line being spoken now, or "" when none is.
@@ -226,4 +240,4 @@ func _end_line(completed: bool) -> void:
 
 
 func _now() -> float:
-	return Time.get_ticks_msec() / 1000.0
+	return _simulated_time if _simulate_audio else Time.get_ticks_msec() / 1000.0

@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://content/items/visuals/find_toy.gd" id="1"]
+
+[node name="Ring" type="Node3D"]
+script = ExtResource("1")
+shape = &"ring"
+colour = Color(0.75, 0.4, 0.9, 1)

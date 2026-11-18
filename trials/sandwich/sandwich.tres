@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TrialDef" format=3]
+
+[ext_resource type="Script" path="res://trials/trial_def.gd" id="1"]
+[ext_resource type="PackedScene" path="res://trials/sandwich/sandwich.tscn" id="2"]
+
+[resource]
+script = ExtResource("1")
+title = "Make a Sandwich"
+scene = ExtResource("2")
+skill = &"sandwich_spatial_order"
+hint_after = 22.0
+max_hint = 1
+time_limit = 0.0

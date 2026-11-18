@@ -65,11 +65,30 @@ func test_the_visible_menu_opens_staff_tools_and_returns_to_the_same_round() -> 
 	await select((home.find_child("menu_staff_tools", true, false) as Target).global_position)
 	expect(facilitator.is_open and not home.is_open and get_tree().paused, "only staff tools owns input")
 	expect(facilitator.find_child("fac_restart", true, false) != null, "the button opens the Tools page directly")
+	expect(facilitator.find_children("fac_jump_*", "Target", true, false).is_empty(), "Intro jumps are absent outside Intro")
+	expect(facilitator.find_child("fac_zones", true, false) == null, "Intro zones are absent outside Intro")
 	await press_facilitator("fac_close")
 	expect(home.is_open and not facilitator.is_open and get_tree().paused, "Menu returns to the player menu while paused")
 	await wait(0.35)
 	await select((home.find_child("menu_resume", true, false) as Target).global_position)
 	expect(App.session.trial == trial and not get_tree().paused, "Close resumes the same round")
+
+
+func test_intro_tools_follow_setup_and_scene_changes() -> void:
+	await boot(null, &"intro")
+	var intro := App.main.intro()
+	intro.run()
+	await until(func() -> bool: return intro.tools_ready)
+	await open_intro_tools()
+	var facilitator := App.module(&"Facilitator")
+	expect(facilitator.find_child("fac_jump_hello", true, false) != null, "Intro jumps remain available during setup")
+	expect(facilitator.find_child("fac_zones", true, false) == null, "no zone overlay before the layout exists")
+	await press_facilitator("fac_close")
+	await App.main.change_scene(&"find_object")
+	Events.staff_tools_requested.emit()
+	await frames(2)
+	expect(facilitator.find_children("fac_jump_*", "Target", true, false).is_empty(), "old Intro buttons are removed after switching scenes")
+	expect(facilitator.find_child("fac_room_intro", true, false) != null, "room intro still works from any scene")
 
 
 func test_shared_ray_focus_feedback_and_tracking_loss_work_while_paused() -> void:
@@ -89,17 +108,18 @@ func test_shared_ray_focus_feedback_and_tracking_loss_work_while_paused() -> voi
 	expect(pointer.aimed == button, "in-world UI cannot intercept a modal panel's ray")
 	expect(pointer.get_node(^"UIRay").visible and pointer.get_node(^"UICursor").visible, "ray and hit marker visible")
 	expect(button.get_node(^"Focus").visible, "button has a shared focus outline")
-	var feedback := record(Events.feedback)
+	var sounds := record(Events.sound)
+	var presses := func() -> int: return sounds.filter(func(args: Array) -> bool: return args[0] == &"ui_press").size()
 	input.click(&"right", &"trigger_click")
 	await frames(3)
 	expect_eq(App.module(&"Facilitator").get("_page_shown"), &"Saves", "the pinch selects the tab")
-	expect_eq(feedback.size(), 1, "one confirmation sound")
+	expect_eq(presses.call(), 1, "one confirmation sound")
 	input.track(&"right", false)
 	await frames(3)
 	expect(not button.hovered and pointer.aimed == null, "tracking loss clears the focus immediately")
 	expect(not pointer.get_node(^"UIRay").visible, "untracked hands have no ray")
 	input.click(&"right", &"trigger_click")
-	expect_eq(feedback.size(), 1, "tracking loss cannot confirm a stale target")
+	expect_eq(presses.call(), 1, "tracking loss cannot confirm a stale target")
 	input.menu()
 
 

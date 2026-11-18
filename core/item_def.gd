@@ -7,7 +7,7 @@ const DIR := "res://content/items/"
 @export var title := ""
 @export var kind := Kind.FURNITURE
 @export var scene: PackedScene
-@export_range(1, 20) var price := 1
+@export_range(0, 20) var price := 1
 @export var snap_to_floor := true
 
 var id: StringName:

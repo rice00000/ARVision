@@ -92,6 +92,7 @@ func _run() -> void:
 	var bar := _find(&"home_shop")
 	_onion.global_position = bar.get_parent().global_transform * SPOT
 	_onion.scale = Vector3.ONE * 0.01
+	Events.play(&"appear", _onion.global_position)
 	create_tween().tween_property(_onion, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	await say("This is your room!")
 	if run != _runs: return
@@ -112,6 +113,7 @@ func _run() -> void:
 	Events.report(&"room_intro", {event = &"done"})
 	Save.request()
 	_demo.queue_free()
+	Events.play(&"vanish", _onion.global_position)
 	var away := create_tween()
 	away.tween_property(_onion, "scale", Vector3.ONE * 0.01, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 	away.tween_callback(_onion.queue_free)
@@ -127,6 +129,7 @@ func _gift(run: int) -> void:
 	if run != _runs: return
 	inventory.add(&"magic_stone", GIFT)
 	Events.report(&"room_intro_gift", {stones = GIFT})
+	Events.play(&"stone", _onion.global_position)
 	Events.feedback.emit(&"good", _onion.global_position)
 
 

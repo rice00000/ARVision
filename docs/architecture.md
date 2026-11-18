@@ -43,9 +43,11 @@ Without a plan the [World](world.md) chooses: it plays one `Task` level (a plan)
 Children of `Main/Modules`; delete a node to unplug it. A trial that needs one lists it in `TrialDef.requires` and the session skips its blocks.
 
 - **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
-- **Feedback:** sound, shape mark and vibration for good / bad / hint.
+- **Feedback:** positional chimes, a cross for mistakes, a dot for hints, and the level-win flourish.
+- **Sound:** named effects (`Events.play(&"place", at)`), from where things happen; menus, My room and scene changes. [Mix and sources](../modules/sound/README.md).
+- **Music:** the piano loop under everything; it dips under the voice.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
-- **Magic:** the story's effects: gold sparkles on a right pick and a bigger puff when a level is done. Nothing flashes.
+- **Magic:** gold sparkles on a right pick and a brief transparent trophy animation on a level win.
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
 - **Home, Inventory, Rooms, Decor and Pets** handle the player menu, purchases, rewards, room selection, furniture layouts and pets. [Details](home.md).
 - **Facilitator** takes input from the player menu and keeps play paused. Tools holds Intro jumps and zones, restart and exit.

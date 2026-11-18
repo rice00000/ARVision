@@ -26,6 +26,7 @@ func _ready() -> void:
 	add_child(_mark)
 	Events.home_toggled.connect(_toggle)
 	Events.room_changed.connect(_room_changed)
+	Events.room_repositioned.connect(func() -> void: _root.global_transform = App.reality.room_frame)
 	Events.furniture_requested.connect(take_out)
 	Events.furniture_editing.connect(_edit)
 	Events.furniture_store_requested.connect(store_held)
@@ -67,6 +68,7 @@ func _room_changed(id: StringName) -> void:
 	current_room = id
 	_clear()
 	if App.reality and App.reality.home_room:
+		_root.global_transform = App.reality.room_frame
 		_render()
 
 
@@ -90,6 +92,7 @@ func take_out(id: StringName) -> void:
 		return
 	inventory.take(id)
 	_capture()
+	Events.play(&"appear", node.global_position)
 	Events.report(&"furniture_taken_out", {item = id, room = current_room, position = node.position})
 	Events.say("Pinch the furniture, move your hand, then let go. Touch the box to put it away.")
 
@@ -117,11 +120,12 @@ func _select(hand: StringName, target: Target, _origin: Vector3, _direction: Vec
 	if not editing or target == null or target.get_parent() != _root or held:
 		return
 	held = target
+	App.reality.room_walk_blocked = true
 	_hand = hand
 	_start_grip = App.rig.pointer(hand).grip()
 	_start_pose = held.transform
 	_mark.visible = true
-	Events.feedback.emit(&"hint", held.global_position)
+	Events.play(&"grab", held.global_position)
 
 
 func _process(_delta: float) -> void:
@@ -148,11 +152,14 @@ func _button(hand: StringName, action: StringName, pressed: bool) -> void:
 func _release(commit: bool) -> void:
 	if not commit:
 		held.transform = _start_pose
+		Events.play(&"slide", held.global_position)
 		Events.say("That place is full. Try an empty space.")
 	else:
+		Events.play(&"place", held.global_position)
 		Events.report(&"furniture_placed", {item = held.id, room = current_room, position = held.position})
 	Events.feedback.emit(&"good" if commit else &"hint", held.global_position)
 	held = null
+	App.reality.room_walk_blocked = false
 	_mark.visible = false
 	_capture()
 
@@ -162,8 +169,10 @@ func store_held() -> void:
 	var inventory := App.module(&"Inventory")
 	if inventory == null: return
 	var id := held.id
+	Events.play(&"stash", held.global_position)
 	held.free()
 	held = null
+	App.reality.room_walk_blocked = false
 	_mark.visible = false
 	inventory.add(id)
 	_capture()
@@ -210,6 +219,7 @@ func save_state() -> Dictionary:
 
 func load_state(data: Dictionary) -> void:
 	held = null
+	if App.reality: App.reality.room_walk_blocked = false
 	_mark.visible = false
 	_displaying = false
 	_clear()

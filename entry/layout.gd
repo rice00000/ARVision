@@ -84,7 +84,9 @@ const GAP := 0.03
 const LOOKED_GAP := 0.02
 ## Floating panels for the grown-up: they stand this far from the eyes.
 const SETUP_DISTANCE := 0.55
-const SETUP_SIZE := Vector2(0.46, 0.38)   # the plate and its buttons below
+const SETUP_PLATE_SIZE := Vector2(0.46, 0.34)
+const SETUP_SHORTCUT_HEIGHT := 0.08   # the row above the plate, including its gap
+const SETUP_SIZE := Vector2(SETUP_PLATE_SIZE.x, SETUP_PLATE_SIZE.y + SETUP_SHORTCUT_HEIGHT)
 
 ## When a zone is there: setup; the opening up to the gear seated; the reveal (the ripple shows the
 ## bench and shelf, Onion still aside); the shelf scene. "All set" and the dev jumps come back
@@ -1080,7 +1082,9 @@ func _zones() -> Array[Zone]:
 	hands.user = "the child's hands at work"
 	all.append(hands)
 
-	all.append(_panel_zone(&"setup_panel", setup_panel_at() - eye, SETUP_SIZE, setup_panel_at().y, SETUP | OPENING | REVEAL, "the setup panel and Start (the grown-up)"))
+	var setup := setup_panel_at()
+	all.append(_panel_zone(&"setup_panel", setup - eye, SETUP_SIZE, setup.y + SETUP_SHORTCUT_HEIGHT * 0.5,
+			SETUP | OPENING | REVEAL, "the setup panel and Start (the grown-up)"))
 	return all
 
 

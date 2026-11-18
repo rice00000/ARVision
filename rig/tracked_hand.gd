@@ -11,6 +11,7 @@ const OVER_MENUS := 126
 const INDEX := XRHandTracker.HAND_JOINT_INDEX_FINGER_TIP
 const THUMB := XRHandTracker.HAND_JOINT_THUMB_TIP
 const PALM := XRHandTracker.HAND_JOINT_PALM
+const UNTRACKED := Transform3D(Basis.IDENTITY, Vector3.INF)
 
 @export var side: StringName = &"right"
 
@@ -60,14 +61,30 @@ func has_joints() -> bool:
 
 
 func fingertip() -> Vector3:
-	return App.rig.global_transform * joints().get_hand_joint_transform(INDEX).origin
+	return _world_pose(joints().get_hand_joint_transform(INDEX)).origin
 
 
 func pinch() -> Transform3D:
 	var hand := joints()
 	var pose := hand.get_hand_joint_transform(PALM)
 	pose.origin = (hand.get_hand_joint_transform(INDEX).origin + hand.get_hand_joint_transform(THUMB).origin) * 0.5
-	return App.rig.global_transform * pose
+	return _world_pose(pose)
+
+
+## The palm surface, with +Z pointing out of the palm in Godot's hand skeleton.
+## Its pose is independent of the fingertip joints used for pinching and touch.
+func palm() -> Transform3D:
+	var hand := joints()
+	if hand == null or not hand.has_tracking_data or not _valid(hand, PALM):
+		return UNTRACKED
+	var pose := _world_pose(hand.get_hand_joint_transform(PALM))
+	pose.origin += pose.basis.z * clampf(hand.get_hand_joint_radius(PALM) * XRServer.world_scale, 0.012, 0.035)
+	return pose
+
+
+func _world_pose(pose: Transform3D) -> Transform3D:
+	pose.origin *= XRServer.world_scale
+	return App.rig.global_transform * XRServer.get_reference_frame() * pose
 
 
 func _valid(hand: XRHandTracker, joint: int) -> bool:

@@ -10,6 +10,8 @@ enum Style {CRACK, SPACE}
 const HOLE_SIZE := Vector2(2.4, 1.7)
 const FULL_SIZE_AT := 3.0
 const STAY_SECONDS := {Style.CRACK: 3.0, Style.SPACE: 6.0}
+const SWEEP_STAY_SECONDS := 1.9
+const SIDE_ANGLE := deg_to_rad(6.0)
 const SHARDS := preload("res://trials/motion/wall_shatter.gdshader")
 const IMPACT := preload("res://trials/motion/wall_impact.gdshader")
 const SHATTER: Array[AudioStream] = [preload("res://trials/motion/sounds/wall_shatter_left.ogg"),
@@ -19,26 +21,63 @@ const RIM_POINTS := 28
 const RIM_JAG := Vector2(0.84, 1.06)
 var piece_count := 0
 var _style := Style.CRACK
+var _stay_seconds := 0.0
 var _age := 0.0
 var _material := ShaderMaterial.new()
 var _impact := ShaderMaterial.new()
 
 
 ## Breaks the wall in front of [param eye] along [param look]; pieces fly along [param flow] (world).
-## [param log] false: the research log is not told (the unscored tutorial's example, not a round).
-static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRACK, log := true) -> void:
+static func burst(eye: Vector3, look: Vector3, flow: Vector3, style := Style.CRACK) -> void:
+	_burst_at(aim(eye, look), flow, style, STAY_SECONDS[style], true)
+
+
+## Brings the moving dots against the full opening before the wall breaks.
+static func strike_with(cloud: MotionCloud, eye: Vector3, flow: Vector3, style := Style.CRACK, log := true) -> Tween:
+	var look := (cloud.global_position - eye).normalized()
+	var target := aim(eye, look, cloud.global_basis.x.dot(flow))
+	var flight := cloud.fly_to(_surface_frame(target), target.hole)
+	flight.tween_callback(_burst_at.bind(target, flow, style, SWEEP_STAY_SECONDS, log))
+	return flight
+
+
+## A side offset along the original wall, held at centre if it would hit a different surface.
+static func aim(eye: Vector3, look: Vector3, side := 0.0) -> Dictionary:
 	var hit := App.reality.hit(eye, look)
 	var at: Vector3 = hit.position if hit else eye + look * 3.0
 	var normal: Vector3 = hit.normal if hit else -look
+	if side != 0.0 and absf(normal.y) < 0.3:
+		var across := Vector3.UP.cross(normal).normalized()
+		var offset := at + across * eye.distance_to(at) * tan(SIDE_ANGLE) * side
+		if hit:
+			var shifted := App.reality.hit(eye, (offset - eye).normalized())
+			if shifted and normal.dot(shifted.normal) > 0.98 and absf(normal.dot(shifted.position - at)) < 0.06:
+				at = shifted.position
+				normal = shifted.normal
+		else:
+			at = offset
+	var distance := eye.distance_to(at)
+	var hole := HOLE_SIZE * clampf(distance / FULL_SIZE_AT, 0.4, 1.0)
+	return {at = at, normal = normal, distance = distance, found = not hit.is_empty(), hole = hole}
+
+
+static func _surface_frame(target: Dictionary) -> Transform3D:
+	var normal: Vector3 = target.normal
+	var basis := Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.FORWARD)
+	return Transform3D(basis, target.at + normal * 0.025)
+
+
+## Shatter at a point resolved earlier, so the wall and the incoming dots meet even if the head moves.
+static func _burst_at(target: Dictionary, flow: Vector3, style: Style, stay_seconds: float, log: bool) -> void:
 	var effect := WallBreak.new()
 	effect._style = style
+	effect._stay_seconds = stay_seconds
 	App.stage.add_child(effect)
-	effect.global_transform = Transform3D(Basis.looking_at(-normal, Vector3.UP if absf(normal.y) < 0.9 else Vector3.FORWARD), at + normal * 0.025)
-	var hole := HOLE_SIZE * clampf(eye.distance_to(at) / FULL_SIZE_AT, 0.4, 1.0)
-	effect._build(hole, effect.global_basis.inverse() * flow, App.reality.camera_frame())
+	effect.global_transform = _surface_frame(target)
+	effect._build(target.hole, effect.global_basis.inverse() * flow, App.reality.camera_frame())
 	if log:
-		Events.report(&"wall_break", {found = not hit.is_empty(), at = at, normal = normal, distance = eye.distance_to(at),
-			hole = hole, style = Style.keys()[style].to_lower(), pieces = effect.piece_count, renderer = "gpu_voronoi"})
+		Events.report(&"wall_break", target.merged({style = Style.keys()[style].to_lower(),
+			pieces = effect.piece_count, renderer = "gpu_voronoi"}))
 
 
 func _build(size: Vector2, flow: Vector3, frame: CameraFrame) -> void:
@@ -151,8 +190,8 @@ func _vertex(tool: SurfaceTool, point: Vector2, z: float, centre: Vector2, rando
 func _process(delta: float) -> void:
 	_age += delta
 	_material.set_shader_parameter(&"age", _age)
-	_impact.set_shader_parameter(&"opacity", clampf((STAY_SECONDS[_style] + 0.5 - _age) / 0.5, 0, 1))
-	if _age > STAY_SECONDS[_style] + 0.5: queue_free()
+	_impact.set_shader_parameter(&"opacity", clampf((_stay_seconds + 0.5 - _age) / 0.5, 0, 1))
+	if _age > _stay_seconds + 0.5: queue_free()
 
 
 ## Left and right channels at the hole's edges, dropping with the pieces.
@@ -160,6 +199,7 @@ func _shatter(size: Vector2) -> void:
 	for side in 2:
 		var player := AudioStreamPlayer3D.new()
 		player.stream = SHATTER[side]
+		player.bus = &"SFX"
 		player.unit_size = 4.0
 		player.position = Vector3(size.x * (side - 0.5), 0.0, 0.0)
 		add_child(player)

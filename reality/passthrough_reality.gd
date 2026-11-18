@@ -116,7 +116,7 @@ static func note(what: StringName, data: Dictionary = {}) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not _hands_asked or _table or work_surface() in _surfaces:
+	if not _hands_asked or _table or _selected_patch or work_surface() in _surfaces:
 		return
 	var eye := App.head().global_position
 	var tips: Array[Vector3] = []
@@ -174,17 +174,16 @@ func _rescan_ready() -> bool:
 
 
 func _finish_rescan(surface: Surface) -> void:
+	var was_settled := is_settled
 	for old in surfaces(&"table"):
 		if not old.anchor and old != surface:
 			_surfaces.erase(old)
-	select_table(surface)
 	_rescan_after = 0
 	set_process(false)
 	note(&"room_table_rescanned", {centre = surface.transform.origin, forward = -surface.transform.basis.z, size = surface.size})
-	if is_settled:
+	select_table(surface)
+	if was_settled:
 		work_surface_reset.emit()
-	else:
-		_settle()
 
 
 ## Every depth look: finds the table, or checks the one found ([TableFinder]).
@@ -225,10 +224,10 @@ func _room_ready() -> void:
 	_depth.start()
 	if surface in _surfaces:
 		_settle()
-	else:
+	elif not is_settled:
 		# No scanned table: find it in the depth, and ask for the hands if that fails.
 		get_tree().create_timer(ASK_HANDS_AFTER).timeout.connect(func() -> void:
-			if work_surface() not in _surfaces:
+			if not is_settled and work_surface() not in _surfaces:
 				_hands_asked = true
 				Events.say("Put both hands flat on the table for a moment."))
 		get_tree().create_timer(ASK_HANDS_AFTER + GIVE_UP_AFTER).timeout.connect(_settle)

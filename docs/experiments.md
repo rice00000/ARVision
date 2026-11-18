@@ -6,6 +6,7 @@ What the team is likely to try (design doc, team sketch) and what the framework 
 |---|---|---|---|
 | **Find it** on the real table: name a toy among virtual clutter | objects in clutter, perception | `trials/find`, `work_surface()` | ready |
 | **Tidy up:** put each thing back on its shadow, outline, size or colour sticker | shape matching, vision for action | `trials/tidy` ([tidy up](tidy.md)) | ready (sim); headset unverified |
+| **Make a sandwich:** copy the layers in a 3D sample | relative position, recognition, vision for action | `trials/sandwich` ([sandwich](sandwich.md)) | ready (sim); headset unverified |
 | **Real objects:** point at the real cup the camera sees | recognition, real world | `trials/point_real`, Detector | ready (sim); Quest camera unverified |
 | **Global motion (RDK in 3D):** sweep in the dots' direction | motion perception | `trials/motion` (Megan's trial) | ready (sim); headset unverified |
 | **Catch the butterflies:** swing a net to meet butterflies circling the child | motion direction, vision for action | `trials/butterfly` ([butterflies](butterflies.md)) | ready (sim); headset unverified |

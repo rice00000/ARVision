@@ -133,7 +133,8 @@ func test_set_up_again_runs_the_four_steps() -> void:
 	_done()
 
 
-func test_play_mode_has_skip_setup_and_it_goes_to_start() -> void:
+## Merge with Wei (Nov 18): Skip setup starts the opening in one pinch (it used to stop at "All set").
+func test_play_mode_has_skip_setup_and_it_starts_the_opening() -> void:
 	await _boot_entry()
 	await until(func() -> bool: return entry.get("_panel") != null, 20.0)
 	PlayMode.set_dev(false, "test")
@@ -142,7 +143,7 @@ func test_play_mode_has_skip_setup_and_it_goes_to_start() -> void:
 	expect(await until(func() -> bool: return _target(&"entry_step_next") != null, 20.0), "setup runs in play")
 	expect(_target(&"entry_skip_setup") != null, "play: Skip setup is on the panel")
 	await _press(&"entry_skip_setup")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 10.0), "Skip setup goes to Start")
+	expect(await until(func() -> bool: return not entry.setting_up(), 10.0), "Skip setup starts the opening")
 	_done()
 
 

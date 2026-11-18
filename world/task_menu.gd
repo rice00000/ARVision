@@ -67,6 +67,7 @@ func _ready() -> void:
 	visible = not get_tree().paused
 	_build()
 	scale = Vector3(1.0, 0.05, 1.0)
+	Events.play(&"menu_open")
 	var unfold := create_tween()
 	unfold.tween_property(self, ^"scale", Vector3.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	unfold.tween_callback(func() -> void:
@@ -142,6 +143,7 @@ func fold() -> void:
 	_drag_hand = &""
 	_hover(null)
 	_update_rows()
+	Events.play(&"menu_close")
 	var tween := create_tween()
 	tween.tween_property(self, ^"scale", Vector3(1.0, 0.05, 1.0), 0.2)
 	tween.tween_callback(queue_free)
@@ -236,7 +238,7 @@ func _build() -> void:
 	menu_slot.scale = Vector3.ONE * MENU_SCALE
 	menu_slot.add_to_group(App.PLAYER_MENU_SLOT)
 	add_child(menu_slot)
-	var header := _label(_place.title, 50)
+	var header := _label("Levels", 50)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.position = Vector3(-width * 0.5, top - HEADER_ROW * 0.5, 0.0)
 	add_child(header)

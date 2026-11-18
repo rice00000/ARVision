@@ -14,7 +14,7 @@ extends Resource
 @export var pins: Dictionary[StringName, float] = {}
 ## How the real world is shown. Empty = normal.
 @export var view: View
-## Said once before the first round.
+## Replay tutorial for training, read before the first round in a probe.
 @export var intro := ""
 ## Point and pinch from afar with the hand ray. Off: the child reaches out and
 ## grabs (touch, pinch on it, or close the hand on it); the ray then shows only
@@ -22,3 +22,5 @@ extends Resource
 @export var ray := true
 ## Seconds between rounds.
 @export var pause_between := 1.5
+## Seconds after the last round. A negative value uses [member pause_between].
+@export var pause_after := -1.0

@@ -2,18 +2,18 @@ class_name MotionTutorial
 extends Node3D
 ## An unscored sideways sweep demonstrated with the same dot cloud and wall effect as the rounds.
 
-## The effect has been played; the tutorial's dots are still there until [signal settled].
+## The dots have started flying toward the wall.
 signal effect_started
 ## The hand starts to sweep.
 signal sweep_started
 ## The tutorial is over: the effect has settled and the dots are gone.
 signal settled
 const CLOUD := preload("res://trials/motion/motion_cloud.tscn")
-## Seconds the dots take to appear and to go.
+## Seconds the dots take to appear.
 const GROW := 0.5
 ## Seconds of flow alone, before the hand comes.
 const WATCH := 1.5
-## Seconds from the effect until the hand settles, then until the dots go.
+## Seconds from launch until the hand settles, then until the demo ends.
 const HAND_SETTLES := 0.8
 const SETTLE := 3.2
 ## The hand sweeps this far, metres, in comfortable hand space (not toward the cloud).
@@ -64,7 +64,6 @@ func play(condition: TrialCondition, frame: Transform3D) -> void:
 	_tween.tween_interval(HAND_SETTLES)
 	_tween.tween_callback(_demo.stop)   # the hand settles
 	_tween.tween_interval(SETTLE)
-	_tween.tween_property(_cloud, "scale", Vector3.ONE * 0.001, GROW)
 	_tween.tween_callback(_finish)
 
 
@@ -95,13 +94,10 @@ func _process(delta: float) -> void:
 		_trail.show_sweep(hand_from, hand_from.lerp(hand_to, smoothstep(DemoHand.SWEEP_START, DemoHand.SWEEP_END, _clock)))
 
 
-## The dots all go together and the wall breaks, as in Wei's round when the sweep goes the right way: the same
-## call, except that the research log is not told.
+## The same strike as in a successful round, outside the research log.
 func _effect() -> void:
 	_sweeping = false
-	_cloud.align()
-	var eye := App.head().global_position
-	WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _flow_world, WallBreak.Style.CRACK, false)
+	WallBreak.strike_with(_cloud, App.head().global_position, _flow_world, WallBreak.Style.CRACK, false)
 	effect_started.emit()
 
 

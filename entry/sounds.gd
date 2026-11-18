@@ -1,54 +1,35 @@
 class_name Sounds
 extends Node
-## The opening's small sounds. Each is played from where it happens (a position in the room),
-## softly, below the voice. A file that is missing is skipped: the scene stays silent there.
-## Files and licences: entry/assets/audio/README.md.
-##
-## Onion's pop has two candidates (A: gentle air bubble, C: light bubble pop) to compare in the
-## scene at the same timing and loudness: [member pop] picks one, [method toggle_pop] flips it.
+## The opening's small sounds, each played from where it happens (a position in the room), on the
+## SFX bus under the voice. Designed for this scene (tools/sound/design.py, sources in
+## entry/assets/audio/README.md): the cauldron's rattles are built hit by hit from a lid and
+## earthenware, the knock is muffled inside the pot, Onion's pop is a bubble with a glint, the gear
+## seats with a click and two notes, and the reveal is a harp sweep into a C-major bloom.
 
 const DIR := "res://entry/assets/audio/"
-const FILES := {
-	pre_rattle = "onion-pre-rattle-preview.mp3",
-	device_rattle = "device-rattle-preview.mp3",
-	seat = "device-seat-click-preview.mp3",
-	pop_a = "onion-pop-a.mp3",
-	pop_c = "onion-pop-c.mp3",
-	reveal = "workshop-reveal.mp3",
+const KEYS: Array[StringName] = [&"pre_rattle", &"rattle_soft", &"device_rattle", &"knock", &"pop", &"seat",
+	&"gear_land", &"reveal"]
+## Merge of Wei's designed sounds (Nov 18): the hub's extra cues have no files of their own yet, so they borrow
+## his, with pitch and level. The impressions each keep their own sound (Effects chat, Nov 17); Scene 4's lift
+## and drop differ, and the drop is never the seating click (a drop must not sound like success): it is his
+## gear_land.
+const BORROWS := {
+	impression_shelf = {file = &"knock", pitch = 1.0, db = -4.0},
+	impression_dots = {file = &"pop", pitch = 1.4, db = -6.0},
+	impression_turn_to_fit = {file = &"seat", pitch = 1.6, db = -8.0},
+	place = {file = &"seat", pitch = 1.0, db = -6.0},
+	gear_lift = {file = &"pop", pitch = 1.3, db = -10.0},
+	gear_drop = {file = &"gear_land", pitch = 1.0, db = 0.0},
 }
-## Loudness of each, in dB: all well under the speech. (The pops are matched by ear in the headset.)
-const LEVEL := {pre_rattle = -1.0, device_rattle = 8.0, seat = -16.0, pop_a = -13.0, pop_c = -15.0, reveal = -12.0}
-## A sound that has no file of its own yet borrows another's: the knock is the seating click, lower.
-## The hub's impressions each have their own sound (Effects chat, Nov 17): a wooden knock for the shelf, a
-## high soft pop for the dots, a bright click for the cup. Placeholders until real files are chosen.
-const BORROWS := {knock = {file = &"seat", pitch = 0.5, db = -14.0}, rattle_soft = {file = &"pre_rattle", pitch = 1.0, db = -9.0},
-		impression_shelf = {file = &"seat", pitch = 0.55, db = -12.0}, impression_dots = {file = &"pop_a", pitch = 1.5, db = -12.0},
-		impression_turn_to_fit = {file = &"seat", pitch = 1.8, db = -14.0}, place = {file = &"seat", pitch = 1.0, db = -16.0},
-		# Scene 4 (Megan's scene review, Nov 17): the gear lifted, and the gear set down away from the socket.
-		# They differ, and the set-down is never the seating click (a drop must not sound like success).
-		gear_lift = {file = &"pop_a", pitch = 1.3, db = -18.0}, gear_drop = {file = &"pop_c", pitch = 0.6, db = -16.0}}
-## Seconds of lead-in to skip, so the sound lands when the thing happens (pop C has ~0.8 s before its pop).
-const START := {pop_c = 0.8, gear_drop = 0.8}
-## The reveal pad is 5 s long; this fades it out after about this long.
-const REVEAL_SECONDS := 3.0
 
-## "a" or "c".
-var pop := "a"
 var played: Array[StringName] = []   # what has been played, for the tests
 
 var _streams := {}
 
 
 func _ready() -> void:
-	for key: StringName in FILES:
-		var path: String = DIR + FILES[key]
-		if ResourceLoader.exists(path):
-			_streams[key] = load(path)
-
-
-func toggle_pop() -> String:
-	pop = "c" if pop == "a" else "a"
-	return pop
+	for key in KEYS:
+		_streams[key] = load(DIR + String(key) + ".ogg")
 
 
 ## Plays [param key] at [param where] (world position).
@@ -60,20 +41,12 @@ func play(key: StringName, where: Vector3) -> void:
 		return
 	var player := AudioStreamPlayer3D.new()
 	player.stream = stream
-	player.volume_db = borrowed.get("db", LEVEL.get(key, -12.0))
+	player.volume_db = borrowed.get("db", 0.0)
 	player.pitch_scale = borrowed.get("pitch", 1.0)
+	player.bus = &"SFX"
 	player.unit_size = 1.0
 	player.max_db = 0.0
 	add_child(player)
 	player.global_position = where
 	player.finished.connect(player.queue_free)
-	player.play(START.get(key, 0.0))
-	if key == &"reveal":   # a shorter bloom: fade the 5 s file out
-		var fade := create_tween()
-		fade.tween_interval(REVEAL_SECONDS)
-		fade.tween_property(player, "volume_db", -60.0, 1.5)
-		fade.tween_callback(player.queue_free)
-
-
-func play_pop(where: Vector3) -> void:
-	play(&"pop_a" if pop == "a" else &"pop_c", where)
+	player.play()

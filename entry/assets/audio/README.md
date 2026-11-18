@@ -1,42 +1,25 @@
-# Scene one audio — downloaded October 31, 2026
+# Opening sounds
 
-Files supplied for build integration and audition. No scene code changed. All six MP3s decoded successfully with ffmpeg. Durations below are approximate container durations including MP3 padding, not exact cue onset/tail measurements.
+Built by `tools/sound/design.py` (`opening`) from the team's SFX library, November 17, 2026. Played by `entry/sounds.gd`.
 
-| File | Source / creator | License | Approx duration |
-| --- | --- | --- | --- |
-| onion-pre-rattle-preview.mp3 | Dinner Plate Impact with Vibration — OwlStorm | CC0 | 1.33 s |
-| device-rattle-preview.mp3 | Door Rattle — SumiXIV | CC0 | 2.93 s |
-| device-seat-click-preview.mp3 | Ceramic Click — Mafon2 | CC0 | 0.19 s |
-| onion-pop-a.mp3 | Gentle Air Bubble Burst — humordome | Pixabay Content License | 0.73 s |
-| onion-pop-c.mp3 | Light Bubble Pop — Virtual_Vibes | Pixabay Content License | 2.14 s |
-| workshop-reveal.mp3 | Floating Pad Magic — humordome | Pixabay Content License | 5.04 s |
-| onion-touch.ogg | SFX_Guide_Touch_Interact — made by the team (November 7, 2026) | Own work | 0.48 s, mono, peak −16 dB |
+| File | Moment | Made from |
+| --- | --- | --- |
+| pre_rattle.ogg | the cauldron trembles before Onion appears | a run of pan-lid and earthenware clinks (Articulated Sound, Essential Kitchen) |
+| rattle_soft.ogg | the faint rattle while waiting for a tap; the closing | pan-lid clinks |
+| device_rattle.ogg | the heavier tremble before the gear; the socket carriage | earthenware clinks, plastic gear clicks (Cinetools Clinks & Clanks), a low thud |
+| knock.ogg | the jolt inside the cauldron; the gear dropping back | a placement thud slowed and muffled (Cinetools Books & Magazines), a lid clink |
+| pop.ogg | Onion rises over the rim | a mouth pop (Deb Sound), bubbles (FilmCow), a glass C6, shaken bells (CB Sounddesign) |
+| gear_land.ogg | the gear lands on the table | tiny gear click (Bluezone, Sonniss GDC 2024), a wooden placement |
+| seat.ogg | the gear seats in the socket | gear clicks, a wooden thud, celesta G5→C6 |
+| reveal.ogg | the ripple shows the workshop | soft air swell (Cinetools Overtonics), harp glissando and C-major guitar chord (CB Sounddesign Dreamcatcher), wind bells |
+| onion-touch.ogg | touching Onion | made by the team (November 7, 2026), own work |
 
-## Source pages
+## The hub's extra cues (merge, Nov 18)
+No files of their own yet: they borrow Wei's sounds in `Sounds.BORROWS`, with pitch and level. Shelf piece = `knock`;
+dots piece = `pop` at pitch 1.4; cup piece = `seat` at pitch 1.6; "found its place" = `seat`; the gear lifted =
+`pop` at pitch 1.3, quiet; the gear set down away from the socket = `gear_land` (never the seating click: a drop
+must not sound like success). To audition in the headset.
 
-- https://freesound.org/people/OwlStorm/sounds/209006/
-- https://freesound.org/people/SumiXIV/sounds/848072/
-- https://freesound.org/people/Mafon2/sounds/371278/
-- https://pixabay.com/sound-effects/film-special-effects-bubble-pop-gentle-air-bubble-burst-short-451237/
-- https://pixabay.com/sound-effects/film-special-effects-light-bubble-pop-383738/
-- https://pixabay.com/sound-effects/musical-floating-pad-magic-452828/
+The calm piano (`entry/assets/calm-piano-1.mp3`, CC0, see `entry/assets/CREDITS.md`) stays under the opening (Megan,
+Nov 18) until she has asked Wei why his commit removed it.
 
-License references: https://creativecommons.org/publicdomain/zero/1.0/ and https://pixabay.com/service/license-summary/ . Pixabay files are not CC0; use within the game, not as a standalone sound pack. Preserve this source record.
-
-## File provenance and limits
-
-Freesound original WAV downloads require account access; these are the publicly supplied 128 kbps high-quality MP3 previews, clearly named -preview. No original WAV files were obtained. They are usable audition/integration candidates; replacing them with original-quality sources later is possible.
-
-Pixabay MP3s were retrieved from the audio resources exposed by each selected page after normal browser playback. They are page-provided MP3s, not an original recording/master guarantee. No alternate sound substituted. Browser download events did not yield local file paths, so the observed public audio resource URLs were used for retrieval.
-
-Downloaded bytes are unedited. No shortening, peak/loudness matching, onset softening, mono conversion, or fade has been applied. In-scene timing and levels, and Quest playback, are not verified.
-
-## Integration / audition notes
-
-- Pre-rattle is movement inside the cauldron before Onion appears; audition softening the opening impact.
-- Pop A and C remain alternatives. Compare at identical animation timing and source position with comparable perceived loudness; do not layer or permanently choose yet. Container durations differ and do not dictate emergence timing.
-- Device rattle precedes device jump, after Onion clears the opening.
-- Seating click plays once on completed release/snap, not socket hover.
-- Reveal pad accompanies ripple after mechanical activation; its 5-second version is preserved. A shorter 2–3-second edit remains an audition proposal.
-- Keep speech clear; no persistent distracting mechanical loop. Existing intro piano remains selected.
-- **Gear lift and set-down (Scene 4, Nov 17, borrowed in `Sounds.BORROWS`, no new files):** lift = `onion-pop-a.mp3` at pitch 1.3, −18 dB (a small high bubble: "up"); set-down away from the socket = `onion-pop-c.mp3` from its pop (0.8 s in) at pitch 0.6, −16 dB (a short low thump, centre ~170 Hz; the seating click is ~7.6 kHz, the lift ~1.4 kHz). The plate sound was tried first and dropped: pitched down it became a 1.7 s rumble peaking late at −32 dBFS, and could pass for the cauldron's rattle. The set-down never uses the seating click's file, so a drop never sounds like success. Both play from the gear. Placeholders to audition in the headset.

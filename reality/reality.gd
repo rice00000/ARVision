@@ -33,11 +33,49 @@ var announce_table := true
 
 var _surfaces: Array[Surface] = []
 var _selected_table: Surface
+var _selected_patch := false
 var _focus := Vector3.ZERO
 ## Leisure rooms are separate from measured AR surfaces; training is paused.
 var home_room: Node3D
 var room_frame := Transform3D.IDENTITY
 var room_size := Vector2(4.8, 4.8)
+var room_walk_enabled := false
+var room_walk_blocked := false
+const LANDING_RADIUS := 0.32
+
+
+func home_landing(origin: Vector3, direction: Vector3, reach: float) -> Vector3:
+	if not room_walk_enabled or room_walk_blocked or direction.y >= -0.08:
+		return Vector3.INF
+	var distance := (room_frame.origin.y - origin.y) / direction.y
+	if distance <= 0.0 or distance > reach:
+		return Vector3.INF
+	var at := origin + direction * distance
+	var local := room_frame.affine_inverse() * at
+	var half := room_size * 0.5 - Vector2.ONE * LANDING_RADIUS
+	if absf(local.x) > half.x or absf(local.z) > half.y:
+		return Vector3.INF
+	var eye := App.head().global_position
+	if Vector2(at.x - eye.x, at.z - eye.z).length() < 0.25:
+		return Vector3.INF
+	var shape := CylinderShape3D.new()
+	shape.radius = LANDING_RADIUS
+	shape.height = 1.8
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.transform.origin = at + Vector3.UP * 0.9
+	query.collision_mask = Pointer.MENU_LAYER
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	return at if get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty() else Vector3.INF
+
+
+func move_home_view(at: Vector3) -> void:
+	var offset := App.head().global_position - at
+	offset.y = 0.0
+	room_frame.origin += offset
+	home_room.global_transform = room_frame
+	Events.room_repositioned.emit()
 
 
 func show_home_room(scene: PackedScene) -> void:
@@ -75,7 +113,7 @@ func surfaces(surface_kind: StringName) -> Array[Surface]:
 ## Where tabletop stimuli go: the nearest table in reach, else a virtual patch
 ## in front of the child (no room scan, or no table in it).
 func work_surface() -> Surface:
-	if _selected_table in _surfaces:
+	if _selected_patch or _selected_table in _surfaces:
 		return _selected_table
 	var eye := App.head().global_transform
 	for table in surfaces(&"table"):
@@ -116,11 +154,13 @@ func add_surface(surface: Surface) -> void:
 	_surfaces.append(surface)
 
 
-## The table confirmed or marked by the facilitator.
-func select_table(surface: Surface) -> void:
+## Pins the work surface and ends the initial search. A virtual patch stays out of the measured surfaces.
+func select_table(surface: Surface, real := true) -> void:
 	_selected_table = surface
-	if surface not in _surfaces:
+	_selected_patch = not real
+	if real and surface not in _surfaces:
 		add_surface(surface)
+	_settle()
 
 
 func _settle() -> void:

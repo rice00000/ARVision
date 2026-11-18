@@ -19,11 +19,11 @@ func _press(id: String) -> void:
 	await frames(3)
 
 
-func test_catalogue_has_ten_furniture_and_three_room_scenes() -> void:
+func test_catalogue_has_sixteen_furniture_and_four_room_scenes() -> void:
 	await boot()
 	expect(ResourceLoader.has_cached("res://content/items/visuals/bed.tscn"), "item scenes stay loaded from startup")
-	expect_eq(ItemDef.all(ItemDef.Kind.FURNITURE).size(), 10, "all furniture ported")
-	expect_eq(ItemDef.all(ItemDef.Kind.ROOM).size(), 3, "three distinct rooms")
+	expect_eq(ItemDef.all(ItemDef.Kind.FURNITURE).size(), 16, "furniture includes the six Find the object toys")
+	expect_eq(ItemDef.all(ItemDef.Kind.ROOM).size(), 4, "starter room and three purchasable rooms")
 	for kind in [ItemDef.Kind.FURNITURE, ItemDef.Kind.ROOM]:
 		for item in ItemDef.all(kind):
 			var visual := item.scene.instantiate()
@@ -36,6 +36,10 @@ func test_catalogue_has_ten_furniture_and_three_room_scenes() -> void:
 func test_purchases_are_atomic_and_room_ownership_is_unique() -> void:
 	await boot()
 	var inventory := _inventory()
+	inventory.load_state({items = {&"magic_stone": 1}})
+	expect_eq(inventory.count(&"room_sun"), 1, "older inventories still own the starter room")
+	expect(not inventory.buy(&"room_sun"), "the starter room cannot be purchased")
+	inventory.take(&"magic_stone")
 	expect(not inventory.buy(&"chair"), "no money: purchase denied")
 	expect_eq(inventory.count(&"chair"), 0, "no item created")
 	inventory.add(&"magic_stone", 8)
@@ -85,6 +89,7 @@ func test_the_level_picker_waits_behind_player_and_staff_menus() -> void:
 	App.world.run()
 	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "level picker ready")
 	var menu := App.world.menu
+	expect_eq((menu.get_child(2) as Label3D).text, "Levels", "the panel heading")
 	var back := menu.get_child(0) as MeshInstance3D
 	var card := menu.get_node(^"task_tidy_shelf_similar_shadows") as Target
 	var at := card.global_position
@@ -129,7 +134,11 @@ func test_shop_needs_separate_confirmation_and_a_second_press_cannot_buy_twice()
 		expect(not BakedSpeech.paths_for(line).is_empty(), "baked: " + line)
 	_inventory().add(&"magic_stone", 5)
 	await frames(2)
-	var id: StringName = _home()._item().id
+	var id := &"toy_ball"
+	var furniture := ItemDef.all(ItemDef.Kind.FURNITURE)
+	for i in furniture.find(ItemDef.find(id)):
+		await _press("home_next")
+	expect_eq(_home()._item().id, id, "the Find the object ball is in the shop")
 	await _press("home_buy")
 	expect_eq(_inventory().count(id), 0, "preview costs nothing")
 	var stones: int = _inventory().count(&"magic_stone")
@@ -137,6 +146,7 @@ func test_shop_needs_separate_confirmation_and_a_second_press_cannot_buy_twice()
 	var decor := App.module(&"Decor")
 	expect_eq(_inventory().count(&"magic_stone"), stones - ItemDef.find(id).price, "one purchase")
 	expect_eq([_home().page, decor.items().size(), _inventory().count(id)], [&"room", 1, 0], "the new furniture stands in the room, not in the box")
+	expect_eq((decor.items()[0] as Target).id, id, "the purchased toy is placed")
 	expect(_home().find_child("home_confirm", true, false) == null, "confirmation target removed")
 	_home().close()
 
@@ -164,6 +174,30 @@ func test_shop_pages_switch_in_place_and_the_box_stores_or_opens() -> void:
 	await _press("home_box")
 	await _press("home_back")
 	expect_eq(_home().page, &"room", "back from the box to the room")
+	_home().close()
+
+
+func test_a_bought_room_can_be_visited_from_its_shop_preview() -> void:
+	await boot()
+	_inventory().add(&"magic_stone", 10)
+	await _press("menu_open")
+	await _press("menu_room")
+	await _press("home_shop")
+	await _press("home_tab_rooms")
+	expect_eq(_home()._item().id, &"room_sun", "the starter is the first room")
+	expect(_home().find_child("home_use_room", true, false) != null, "the starter shows Visit")
+	expect(_home().find_child("home_buy", true, false) == null, "the starter never shows Buy")
+	await _press("home_prev")
+	expect_eq(_home()._item().id, &"room_observatory", "browse to the observatory")
+	await _press("home_buy")
+	expect_eq(_inventory().count(&"room_observatory"), 0, "preview has no cost")
+	await _press("home_confirm")
+	expect_eq(_inventory().count(&"magic_stone"), 0, "confirmation charges the room price")
+	await _press("home_use_room")
+	expect_eq(_home().page, &"room", "visit returns to the room controls")
+	expect_eq(App.reality.home_room.scene_file_path, "res://content/rooms/observatory.tscn", "visit shows the purchased scene")
+	expect(App.reality.home_room.has_node(^"Roof") and App.reality.home_room.has_node(^"Sky"),
+		"the full room keeps its roof and sky")
 	_home().close()
 
 
@@ -226,6 +260,32 @@ func test_room_layouts_and_profiles_do_not_mix() -> void:
 	Profile.switch(original)
 	await frames(5)
 	expect_eq(decor.layouts.size(), 2, "both room layouts restored")
+
+
+func test_room_pinching_empty_floor_moves_the_view_and_keeps_the_layout() -> void:
+	await boot()
+	_inventory().add(&"chair")
+	_home().open()
+	_home()._show(&"room")
+	Events.furniture_requested.emit(&"chair")
+	await frames(3)
+	var chair: Target = App.module(&"Decor").items()[0]
+	var pose := chair.transform
+	var frame := App.reality.room_frame
+	var floor := frame * Vector3(1.35, 0.0, -1.4)
+	await select(floor)
+	var moved := App.reality.room_frame
+	var eye := App.head().global_position
+	expect(moved * Vector3(1.35, eye.y, -1.4) == eye, "head is above the destination")
+	expect_eq(chair.transform, pose, "furniture stays fixed in room coordinates")
+	expect(chair.global_position.is_equal_approx(moved * pose.origin), "furniture follows the room")
+	var near_chair := moved * (pose.origin + Vector3.RIGHT * 0.39)
+	await select(near_chair)
+	expect_eq(App.reality.room_frame, moved, "no landing beside furniture without clearance")
+	_home()._show(&"shop")
+	await select(moved * Vector3(1.85, 0, -1.25))
+	expect_eq(App.reality.room_frame, moved, "shopping disables teleporting")
+	_home().close()
 
 
 func test_successful_replays_earn_stones_but_skip_probe_and_failure_do_not() -> void:

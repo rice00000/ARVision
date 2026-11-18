@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 import unittest
 
-from support import Actor, Child, Facilitator, SimCase
+from support import Actor, Child, SimCase
 
 
 class Adventure(SimCase):
@@ -29,14 +29,16 @@ class Adventure(SimCase):
     def last_said(self, sim):
         return sim.events("said")[-1]["text"]
 
-    def switch_scene(self, sim, scene):
-        facilitator = Facilitator(sim)
-        facilitator.open()
-        facilitator.press("fac_scenes")
-        facilitator.press("fac_scene_" + scene)
+    def switch_scene(self, sim, actor, scene):
+        for button in ("menu_open", "menu_games", "menu_game_" + scene):
+            point = tuple(sim.observe()["player_menu_buttons"][button])
+            side = "left" if actor.body.local(point)[0] < 0 else "right"
+            actor.point(side, point, expect=button)
+            sim.wait(0.35)
         sim.wait(0.6)
         self.assertEqual(sim.observe()["scene"], scene)
         self.assertFalse(sim.observe()["paused"])
+        actor.look_at(tuple(sim.observe()["work_surface"]["position"]))
 
     def test_table_then_switch_to_the_wall(self):
         sim = self.launch(None, profile="test_sim_world", seat=(0.0, 0.0, 40))
@@ -54,10 +56,10 @@ class Adventure(SimCase):
         self.assertFalse(world["guide"]["visible"])
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
                          [(f"task_tidy_shelf_{name}", name == "shadow") for name in
-                          ("shadow", "similar_shadows", "outline", "size", "color", "clutter")], "the first three rows")
+                          ("shadow", "similar_shadows", "outline", "bookshelf", "sandwich", "size")], "the first three rows")
         self.assertEqual([(b["title"], b["reward"]) for b in world["menu"]["buttons"]],
-                         [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Outline Match L1", 3),
-                          ("Size Match L1", 3), ("Color Match L1", 3), ("Clutter Search L1", 3)])
+                         [("Shadow Match L1", 3), ("Similar Shadows L2", 3), ("Ready to Study L1", 3),
+                          ("Bookshelf Match L1", 3), ("Make a Sandwich L1", 3), ("Size Match L1", 3)])
         self.press(sim, actor, "task_tidy_shelf_shadow")
         self.assertEqual(sim.events("reported", "task_chosen")[-1]["data"], {"task": "tidy_shelf", "level": 1, "level_id": "shadow"})
         Child(sim, seed=3).play()
@@ -83,7 +85,7 @@ class Adventure(SimCase):
                          "level 2 lights up")
 
         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
-        self.switch_scene(sim, "global_motion")
+        self.switch_scene(sim, actor, "global_motion")
         world = self.menu_at(sim, "Spell wall", timeout=15)
         self.assertFalse(world["guide"]["visible"], "nothing new left elsewhere: the guide rests")
         self.assertEqual([(b["id"], b["current"]) for b in world["menu"]["buttons"]],
@@ -114,7 +116,7 @@ class Adventure(SimCase):
                 for place, scene in (("Alchemy table", "find_object"), ("Spell wall", "global_motion")):
                     if scene == "global_motion":
                         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))
-                        self.switch_scene(sim, scene)
+                        self.switch_scene(sim, actor, scene)
                     menu = self.menu_at(sim, place)["menu"]
                     reached = set()
                     while True:
@@ -132,11 +134,12 @@ class Adventure(SimCase):
                         next_menu = sim.observe()["world"]["menu"]
                         self.assertEqual(next_menu["first_row"], menu["first_row"] + 1, "one row per pinch")
                         menu = next_menu
-                    self.assertEqual(len(reached), 10 if scene == "find_object" else 6)
+                    self.assertEqual(len(reached), 11 if scene == "find_object" else 6)
                     if scene == "find_object":
+                        self.assertIn("task_tidy_shelf_bookshelf", reached)
                         self.assertIn("task_tidy_shelf_odd_color_adaptive", reached)
                         self.press(sim, actor, "level_scroll_up")
-                        self.assertEqual(sim.observe()["world"]["menu"]["first_row"], 1)
+                        self.assertEqual(sim.observe()["world"]["menu"]["first_row"], 2)
                 sim.close()
 
 

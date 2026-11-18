@@ -26,10 +26,6 @@ const PEEK_LIFT := 0.06
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
 const CAULDRON_WIDTH := 0.22
-## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md).
-const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
-## Music volume, decibels: well under the voice.
-const MUSIC_DB := -15.0
 
 ## DEMO: the child stays seated. Everything to reach or look at closely sits inside
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.
@@ -50,8 +46,12 @@ const RIPPLE_SECONDS := 5.0
 const CAULDRON_SINK := 0.6
 
 ## Dev or play (entry/play_mode.gd) replaced the DEBUG, SHOW_HANDS and SKIP_SETUP constants (Nov 10):
-## dev logs the beats, shows the hand outlines, what setup found and a "Skip setup" button; setup
-## itself runs in both modes.
+## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md). Kept in the merge of Wei's sounds (Megan,
+## Nov 18) until she has asked Wei why his commit removed it.
+const MUSIC := preload("res://entry/assets/calm-piano-1.mp3")
+## Music volume, decibels: well under the voice.
+const MUSIC_DB := -15.0
+## dev logs the beats and shows the hand outlines and what setup found.
 ## TESTING: how fast the opening plays (0.5 = half speed, 1.0 = normal). Speech
 ## itself stays normal; everything around it (moves, pauses, the ripple) slows.
 const TEST_SPEED := 1.0
@@ -73,7 +73,6 @@ var _rim := 0.15                    # height of the rim above the table, metres 
 var _mouth := Vector3.ZERO          # centre of the opening (the brew's surface), world
 var _mouth_radius := 0.05           # radius of the opening, metres (measured)
 var _left := Vector3.LEFT           # the child's left, flat (set when the cauldron is placed)
-var _music := AudioStreamPlayer.new()
 var _orb := Onion.new()             # Onion (the guide); moves around
 var _handed_over := false           # the workshop has Onion and the cauldron now
 var _clock := 0.0
@@ -97,7 +96,6 @@ var _bench := Transform3D.IDENTITY  # Wei's bench frame: at the eyes, facing the
 var _bench_below := 0.35            # its top, metres below that frame
 var _bench_half := 0.27             # its half width, metres
 var _ahead := Vector3.FORWARD       # straight ahead from the seat, flat (at the start)
-var _on_table: Variant = null       # where the cauldron goes on the confirmed table, or null (no real table)
 
 ## Sent when the child touches (or points at and pinches) the cauldron.
 signal _part_over(how: StringName)   # a part &"finished", or a jump button &"interrupted" it
@@ -118,9 +116,7 @@ var _show_hands_now := false        # the hands step shows the outlines in both 
 var shelf_push := SHELF_PUSH
 var _cauldron_distance := CAULDRON_DISTANCE   # metres from the eyes; the reach step may bring it in
 var _reach_seen := 0.0              # the farthest the hand slid out along the table, metres
-## Skip the four setup steps (the table is the one found, reach and sound are the defaults) and go
-## straight to the Start screen. Setup runs in both modes (Megan, Nov 8): only the tests skip it by
-## default (a test hook; the entry tests turn it back on), and a dev tester can press "Skip setup".
+## Tests can bypass the setup steps and wait at the Start screen.
 var skip_setup := PlayMode.testing_now()
 var _skip_rest_of_setup := false    # "Skip setup" was pressed (dev and play: Megan, Nov 17)
 ## "Redo setup" (staff tools): the next opening runs all four steps, without offering the last setup.
@@ -132,6 +128,7 @@ var plan_at_start := true
 var _plan_head := Transform3D.IDENTITY   # the head pose the room was planned from (at Start)
 var _planned := false
 var _sounds: Sounds
+var _music := AudioStreamPlayer.new()
 var _tapped := false               # the child has tapped the cauldron (it counts from when Onion is up)
 var _tap_open := false             # a tap on the cauldron counts now, even before it is asked for
 var _rattle_amp := 0.0             # how much the cauldron trembles, radians
@@ -212,8 +209,6 @@ func run() -> void:
 	Events.intro_zones_requested.connect(toggle_zones)
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
 	App.reality.announce_table = false
-	if not App.reality.is_settled:
-		await App.reality.settled
 	tools_ready = true
 	show_sim_props(false)
 	await _setup()
@@ -236,8 +231,6 @@ func run() -> void:
 		_pending = &""
 		if part == &"":
 			part = await _choose_part()
-		if not _music.playing:
-			_start_music()
 		Engine.time_scale = TEST_SPEED
 		var fast := part != &"all"
 		_set_up_for(&"hello" if part == &"all" else part)
@@ -272,8 +265,10 @@ func _plan_and_build() -> void:
 	_planned = true
 	_ahead = Vector3(-_plan_head.basis.z.x, 0.0, -_plan_head.basis.z.z).normalized()
 	_table = App.reality.work_surface()
-	_on_table = await _cauldron_on_table()
-	App.reality.select_table(_table)
+	var real := App.reality.surfaces(&"table").has(_table)
+	_layout = _new_layout(_table, real, _reach_measured)
+	App.reality.select_table(_table, real)
+	await _plan_layout()
 	# Wei's shelf (here and in the first visit) stands where the plan put the bench, not where the head is.
 	ShelfCopy.shelf_frame = _layout.bench
 	ShelfCopy.shelf_below = _layout.bench_below
@@ -805,6 +800,8 @@ func _step_sound_and_room() -> bool:
 			[["Room scan", &"wait"], ["Sound", &"wait"]],
 			[["Yes, I heard it", &"entry_step_next", SetupPanel.GREEN], ["Play again", &"entry_step_alt", SetupPanel.GREY]])
 	await _wait(0.5)
+	if _queued_part != &"":
+		return true
 	_chime()
 	var next_scan := 0.0
 	while true:
@@ -858,7 +855,7 @@ func _choose_part() -> StringName:
 	return part
 
 
-## The first setup answer, or &"skip" when Tools queued a jump.
+## The first setup answer, or &"skip" when Skip or Tools queued a part.
 func _take_press(ids: Array) -> StringName:
 	if get_tree().paused: return &""
 	if _queued_part != &"" or _skip_rest_of_setup: return &"skip"
@@ -924,7 +921,7 @@ func _show_detail(detail: Node3D, shown: bool) -> void:
 
 
 ## Leaves Onion and the cauldron standing for the next scene: a [Workshop] under Main takes
-## them (and the piano, which fades out), glides Onion beside the shelf, and in Find the
+## them, glides Onion beside the shelf, and in Find the
 ## object makes Onion the body of the World's "this way" guide.
 func _hand_over() -> void:
 	var workshop := Workshop.new()
@@ -971,17 +968,15 @@ func _on_target(target: Target) -> void:
 	if target != null and target.id == &"entry_mode":   # the setup panel's Mode toggle (adult)
 		(target.get_parent() as EntryButton).flash()
 		PlayMode.toggle()
-		if _panel != null and is_instance_valid(_panel):
-			_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
+		_panel.show_mode(PlayMode.name(), PlayMode.is_dev())
 		print("ENTRY mode: ", PlayMode.name(), " (toggle)")
 		return
-	if target != null and target.id == &"entry_skip_setup":   # straight to Start (dev and play)
+	# Merge with Wei (Nov 18): Skip setup starts the opening in one pinch, in both modes, with what setup has
+	# found so far (his tests); it no longer stops at "All set".
+	if target != null and target.id in [&"entry_skip_setup", &"entry_part_all"]:
 		(target.get_parent() as EntryButton).flash()
-		_skip_rest_of_setup = true
-		print("ENTRY setup: skip pressed")
-		return
-	if target != null and target.id == &"entry_part_all":
-		(target.get_parent() as EntryButton).flash()
+		if target.id == &"entry_skip_setup":
+			print("ENTRY setup: skip pressed")
 		jump_to(&"all")
 		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
@@ -1147,12 +1142,8 @@ func toggle_zones() -> void:
 
 # --- The shelf to the side ----------------------------------------------------
 
-## Works out the layout (EntryLayout) from the confirmed table, the head and the reach, and
-## returns the cauldron's spot on a real table (null without one: then [method _cauldron_spot]
-## finds the height by depth). A coroutine: the search runs on a worker thread.
-func _cauldron_on_table() -> Variant:
-	var real := App.reality.surfaces(&"table").has(_table)
-	_layout = _new_layout(_table, real, _reach_measured)
+## Runs the layout search on a worker thread while the scene keeps drawing.
+func _plan_layout() -> void:
 	# The plan is a search that takes a second or more on the headset: off the main thread, the scene
 	# keeps drawing meanwhile (the layout holds numbers only, no nodes).
 	var started := Time.get_ticks_msec()
@@ -1168,10 +1159,6 @@ func _cauldron_on_table() -> Variant:
 	var problems := _layout.report()
 	if problems != "":
 		print("ENTRY layout: ", problems.replace("\n", "; "))
-	if not real:
-		return null
-	print("ENTRY spot: on the confirmed table, ", _away(_layout.cauldron), " m away")
-	return _layout.cauldron
 
 
 ## A layout for [param table] from where the head is now, straight ahead from the seat.
@@ -1210,6 +1197,14 @@ var _aim_hit: Dictionary = {}       # the last flat tabletop the ray found: {pos
 func _step_table() -> bool:
 	_presses.clear()
 	_beat("TEST: is this the table?")
+	if not App.reality.is_settled:
+		_panel.show_step(2, SETUP_STEPS, "Find the table", "The headset is looking for a table.", [], [])
+		while true:
+			if _take_press([]) == &"skip":
+				return true
+			if App.reality.is_settled and not get_tree().paused:
+				break
+			await get_tree().process_frame
 	var eye := App.head().global_transform
 	var table := App.reality.work_surface()
 	var real := App.reality.surfaces(&"table").has(table)
@@ -1497,7 +1492,7 @@ func _cauldron_spot() -> Vector3:
 	var eye := _bench.origin
 	_left = _ahead.rotated(Vector3.UP, PI * 0.5)
 	var spot := _layout.cauldron
-	if _on_table != null:
+	if _layout.real_table:
 		var flat: Variant = _flat_at(eye, Vector3(spot.x, eye.y, spot.z))   # the real top's height, if depth sees it
 		if flat != null and absf((flat as Vector3).y - spot.y) < 0.05:
 			spot.y = (flat as Vector3).y
@@ -1510,11 +1505,7 @@ func _cauldron_spot() -> Vector3:
 			print("ENTRY spot: real table by depth, ", _away(flat), " m away, ", snappedf(eye.y - (flat as Vector3).y, 0.01), " m below the eyes")
 			return flat
 		await _wait(0.25)
-	if _layout.real_table:
-		spot.y = _table.transform.origin.y
-		print("ENTRY spot: at the table's height (depth saw no flat patch there), ", _away(spot), " m away")
-	else:
-		print("ENTRY spot: no table; at the bench's height, ", _away(spot), " m away")
+	print("ENTRY spot: no table; at the bench's height, ", _away(spot), " m away")
 	return spot
 
 
@@ -1974,7 +1965,7 @@ func _socket_track(from: Vector3, new_origin: Vector3, yaw: float, gear_goes: bo
 
 
 ## The gear pops up through the brew (small, with a little overshoot), clears the rim, then
-## arcs out, tilting and growing, and stands within reach. No flash, no sound but its own.
+## arcs out, tilting and growing, and lands within reach with a soft clack. No flash.
 func _emerge_gear() -> void:
 	_gear.visible = true
 	_gear.scale = Vector3.ONE * GEAR_OUT_SCALE
@@ -1987,6 +1978,7 @@ func _emerge_gear() -> void:
 	tween.tween_property(_gear, "global_position", clear, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_callback(_surprise)
 	tween.tween_method(_gear_arc.bind(clear, _gear_rest, 0.06), 0.0, 1.0, 1.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_callback(func() -> void: _sounds.play(&"gear_land", _gear_rest))
 	await tween.finished
 
 
@@ -2072,7 +2064,7 @@ func _knock() -> void:
 
 ## Onion pops up out of the cauldron: a rounded rise with a small overshoot, then settles.
 func _pop() -> void:
-	_sounds.play_pop(_peek_spot())
+	_sounds.play(&"pop", _peek_spot())
 	HelloFx.pop(self, _mouth, _mouth_radius).add_to_group(&"entry_transient")   # a few soft bubbles (Effects, fx-2)
 	var tween := _runner.create_tween()
 	tween.tween_property(_orb, "global_position", _peek_spot() + Vector3.UP * 0.01, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TrialDef" format=3]
+[gd_resource type="Resource" script_class="TrialDef" format=3 uid="uid://jik7v0kuge8r"]
 
 [ext_resource type="Script" uid="uid://cllhs4rgbqqgr" path="res://trials/trial_def.gd" id="1_def"]
 [ext_resource type="Script" uid="uid://cv8rg5v0yk35t" path="res://trials/trial_axis.gd" id="2_axis"]
@@ -48,7 +48,7 @@ title = "Catch the butterflies"
 scene = ExtResource("3_scene")
 skill = &"butterfly_catch"
 axes = Array[ExtResource("2_axis")]([SubResource("speed"), SubResource("butterflies"), SubResource("rings"), SubResource("radius"), SubResource("catch_radius"), SubResource("tolerance")])
-notes = "Speed is the driven axis. Each butterfly is judged on its own: the hoop must meet it head-on, so this trains reading one moving thing's direction and acting on it (vision for action), not global motion; its own skill. A chasing swing is a wrong try. The round is won when every butterfly is in the net."
+notes = "Speed is the driven axis. Meet each butterfly head-on. A chasing swing is a wrong try. The round is won when every butterfly has been caught."
 hint_after = 25.0
 hint_fade = 0.0
 max_hint = 1

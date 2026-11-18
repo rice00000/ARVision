@@ -63,6 +63,9 @@ class Child:
         if steps is None and self.policy.freezes(can_time_out):
             steps = ["freeze"]
         while self.result(started) is None:
+            if kind in ("desk", "sandwich") and self.sim.observe()["stimuli"]["layout"]["celebrating"]:
+                self.actor.wait(0.25)
+                continue
             step = steps.pop(0) if steps else None
             if steps is not None and step is None:
                 break  # script done; the round goes on without the child
@@ -99,11 +102,13 @@ class Child:
         trial = observation["session"]["trial"]
         eye = observation["head"]["position"]
         view = observation["view"]
-        if kind == "tidy":
+        if kind in ("tidy", "desk", "bookshelf"):
             layout = observation["stimuli"]["layout"]
             thing = self.next_thing(layout)
             free = len(self.free_cells(layout))
             return self.policy.tidy_odds(eye, thing, free, layout, trial["hint"])
+        if kind == "sandwich":
+            return self.policy.perception.accuracy
         if kind == "find":
             target, others = self.toys(started, observation)
             if target is None:
@@ -134,8 +139,10 @@ class Child:
             return
         elif kind == "find":
             self.find(started, name, arg or "right")
-        elif kind == "tidy":
+        elif kind in ("tidy", "desk", "bookshelf"):
             self.tidy(name, arg)
+        elif kind == "sandwich":
+            self.sandwich(name, arg)
         elif kind.startswith("motion"):
             self.motion(started, name, arg or ("right" if started["condition"]["round"] % 2 == 0 else "left"))
         else:
@@ -193,6 +200,18 @@ class Child:
     @staticmethod
     def free_cells(layout):
         return [c for c in layout["cells"] if c["key"] and not c["filled"]]
+
+    def sandwich(self, name, side=None):
+        layout = self.actor.observe()["stimuli"]["layout"]
+        expected = layout["recipe"][layout["placed"]]
+        options = [thing for thing in layout["things"] if not thing["placed"]]
+        others = [thing for thing in options if thing["key"] != expected]
+        if name == "wrong" and others:
+            thing = self.policy.rng.choice(others)
+        else:
+            thing = next(thing for thing in options if thing["key"] == expected)
+        self.actor.carry(side or "left", tuple(thing["centre"]), thing["thickness"] * 0.5,
+                         tuple(layout["plate"]), layout["release_delay"])
 
     def toys(self, started, observation):
         """The named toy (None if the child did not hear or see which) and the others."""

@@ -55,11 +55,12 @@ func focus(hand: StringName, on: bool) -> void:
 	if hot != hovered:
 		hovered = hot
 		hover_changed.emit(hot)
+		if hot: Events.play(&"ui_hover", global_position)
 
 
 func confirm() -> void:
 	_flash = 0.15
-	Events.feedback.emit(&"hint", global_position)
+	Events.play(&"ui_press", global_position)
 
 
 func _process(delta: float) -> void:

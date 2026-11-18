@@ -2,8 +2,7 @@ class_name PlayMode
 ## Dev or play: ONE switch for the opening and the visits (Megan, Nov 8), instead of separate
 ## constants. Read it with [method is_dev].
 ##
-## * **Both modes** run setup (hands, table, reach, sound and room): that is how the table and
-##   surface detection get checked. Wei's facilitator panel (the adult's menu) stays in both.
+## * **Both modes** offer setup (hands, table, reach, sound and room), Skip, and the facilitator panel.
 ## * **Dev** adds what a tester needs: what setup found (the chosen table's outline plus the other
 ##   tables, and the `ENTRY PLACEMENT:` line on screen),
 ##   the top-left scene marker, hand outlines, the DEV coherence panel and the try-carry key.

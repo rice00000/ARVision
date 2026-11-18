@@ -273,6 +273,7 @@ func _tutorial() -> void:
 		_onion.attend(null)
 
 
+
 func _motion_condition() -> TrialCondition:
 	var block := _plan.blocks[0]
 	return block.trial.condition(block.difficulty, 0, block.probe, block.pins)

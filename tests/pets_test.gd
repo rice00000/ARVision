@@ -66,14 +66,15 @@ func test_stones_come_from_training_time_only_and_one_at_a_time() -> void:
 	expect_eq(pet.progress, 0.0, "nothing more is earned until the stone is taken")
 
 
-func test_pet_carries_its_stone_to_the_stool_and_the_child_takes_it() -> void:
+func test_pet_brings_its_stone_close_on_the_floor_and_the_child_takes_it() -> void:
 	await boot()
 	var pet := _own(&"pet_dog")
 	pet.has_stone = true
 	await _room()
 	expect(pet.stone.visible and pet.is_visible_in_tree(), "the stone shows in its mouth")
-	expect(await until(func() -> bool: return pet.perched and pet.position.is_equal_approx(_pets().stool_top()), 30.0), "it hops onto the stool beside the child")
-	expect((pet.global_position + Vector3.UP * Pet.BODY).distance_to(App.head().global_position) < 0.75, "within a seated child's reach")
+	expect(await until(func() -> bool: return pet.position.is_equal_approx(pet._delivery_at)), "it brings the stone near the child")
+	expect(pet.is_grounded() and is_zero_approx(pet.position.y), "delivery alone keeps the pet on the floor")
+	expect(pet.position.length() < 1.1, "within easy ray reach from the seat")
 	await select(pet.stone.global_position)
 	expect(not pet.has_stone, "taken")
 	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 1, "one stone gained")
@@ -103,18 +104,23 @@ func test_petting_levels_up_after_one_then_three_pets_a_minute_apart() -> void:
 	App.module(&"Home").close()
 
 
-func test_a_palm_held_up_calls_the_pet_over() -> void:
+func test_a_palm_held_up_catches_a_pet_and_pulling_back_lets_it_hop_down() -> void:
 	await boot()
 	var pet := _own(&"pet_cat")
 	await _room()
 	var palm_up := Basis(Vector3.FORWARD, PI)
-	var at := App.head().global_position + Vector3(0.1, -0.3, -0.35)
+	var at := App.head().global_position + Vector3(-0.1, -0.45, -0.40)
 	input.set_hand(&"left", Transform3D(palm_up, at))
 	await wait(0.2)
 	expect(pet.act != Pet.Act.COME, "a brief turn of the hand calls nothing")
 	await wait(0.5)
-	expect_eq(pet.act, Pet.Act.COME, "it comes")
-	expect(await until(func() -> bool: return pet.perched, 30.0), "onto the stool")
+	expect(await until(func() -> bool: return pet.act == Pet.Act.ON_HAND), "onto the palm")
+	expect(pet.global_position.is_equal_approx(at), "feet at the palm")
+	input.set_hand(&"left", Transform3D(palm_up, at + Vector3.BACK * 0.19))
+	await wait(0.18)
+	expect_eq(pet.act, Pet.Act.JUMP_DOWN, "withdrawing starts the descent")
+	await wait(0.48)
+	expect(pet.is_grounded() and is_zero_approx(pet.position.y), "back on the floor")
 	App.module(&"Home").close()
 
 

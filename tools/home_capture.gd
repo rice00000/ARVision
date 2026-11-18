@@ -17,8 +17,13 @@ func _ready() -> void:
 	main.initial_scene = "find_object"
 	add_child(main)
 	await _frames(5)
-	App.module(&"Inventory").add(&"magic_stone", 8)
 	var home := App.module(&"Home")
+	if "--rooms-only" in OS.get_cmdline_user_args():
+		await _room_shots(home)
+		Profile.wipe()
+		get_tree().quit()
+		return
+	App.module(&"Inventory").add(&"magic_stone", 8)
 	await shot("menu_entry", "menu_open")
 	home.open()
 	await shot("menu", "menu_staff_tools", false)
@@ -113,6 +118,34 @@ func _ready() -> void:
 	await shot("confirm_restart", "fac_cancel_tool", false)
 	Profile.wipe()
 	get_tree().quit()
+
+
+func _room_shots(home: Node) -> void:
+	var inventory := App.module(&"Inventory")
+	var rooms := App.module(&"Rooms")
+	var voice := App.module(&"Voice")
+	var catalogue := ItemDef.all(ItemDef.Kind.ROOM)
+	inventory.add(&"magic_stone", 20)
+	home.open()
+	home._show(&"rooms")
+	App.sim_input.track(&"left", false)
+	App.sim_input.track(&"right", false)
+	for i in catalogue.size():
+		var item := catalogue[i]
+		home._index = i
+		home._build()
+		voice.skip()
+		await shot("shop_" + item.id)
+		if inventory.count(item.id) == 0: inventory.buy(item.id)
+		rooms.choose(item.id)
+		home._show(&"room")
+		home._panel.hide()
+		App.sim_input.look_at(App.reality.room_frame * Vector3(0, 1.14, -4.0))
+		await shot(item.id)
+		App.sim_input.look_at(App.reality.room_frame * Vector3(0, App.head().global_position.y, -4.0))
+		home._panel.show()
+		home._show(&"rooms")
+	home.close()
 
 
 func _frames(count: int) -> void:

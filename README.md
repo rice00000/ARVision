@@ -11,7 +11,7 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Menu → Staff tools** opens the facilitator panel on **Tools** for Intro jumps, the room intro, layout zones, restart and exit. **Scenes**, **Training** and **Saves** are tabs on the same panel. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps saved progress and leaves interrupted rounds unscored.
+**Menu → Staff tools** opens **Tools** for the room intro, restart and exit. Intro jumps appear only in Intro, and Zones only after its layout exists. **Training** and **Saves** share the panel. Training shows difficulty and skip controls only during a block. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps progress and leaves interrupted rounds unscored.
 
 **Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. For butterflies, pinch the net on the table, then swing it to meet them. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 
@@ -33,7 +33,7 @@ Run before submitting changes. For visual changes, also run `python tools/sim/wa
 core/      Events (signal bus), App, Profile, Save, Log, Module
 rig/       head and hands, Pointer, Target, SimInput, DesktopDriver
 reality/   Reality API: PassthroughReality (Quest), SimReality + rooms/ (no headset), View, Surface
-modules/   voice, feedback, cv (Detector), facilitator, magic (effects), picks (CSV), home, pets...: each one unpluggable
+modules/   voice, feedback, sound, music, cv (Detector), facilitator, magic (effects), picks (CSV), home, pets...: each one unpluggable
 trials/    Trial, TrialDef, Session; one folder per trial
 world/     World, Guide, TaskMenu; Adventure, Place, Task
 scenes/    Intro, Find the object, Global motion; Main switches the active scene
@@ -51,6 +51,7 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 - **Task:** a `Task` `.tres` in `content/tasks/`. Each level has a plan, short title, project and two rewards. [Level configuration](docs/world.md).
 - **Saved state:** `save_state()` / `load_state()` on a node ([Save](core/save.gd), as in XRVision).
 - **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
+- **Sound effect:** add a recipe to `tools/sound/design.py`, the cue to `modules/sound/sound.gd`, then `Events.play(&"cue", at)`. [Mix](modules/sound/README.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
 - **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).

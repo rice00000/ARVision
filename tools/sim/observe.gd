@@ -26,6 +26,7 @@ static func everything(clock: float, seq: int) -> Dictionary:
 		real_objects = real_objects(),
 		detections = detector.detections.map(func(found: Detection) -> Dictionary: return found.to_log()) if detector else [],
 		facilitator = panel(facilitator) if facilitator else null,
+		player_menu_buttons = player_menu_buttons(),
 		world = world(),
 		subtitle = subtitle(),
 	})
@@ -125,7 +126,10 @@ static func stimuli() -> Dictionary:
 		return {targets = [], markers = [], cloud = null, named = "", layout = null}
 	var targets := []
 	var markers := []
+	var tutorial := trial.get_node_or_null(^"ReplayTutorial")
 	for node: Node3D in trial.find_children("*", "Node3D", true, false):
+		if tutorial and tutorial.is_ancestor_of(node):
+			continue
 		if node is Target:
 			targets.append(target(node))
 		elif node is MeshInstance3D and not node.get_parent() is Target:
@@ -198,6 +202,20 @@ static func panel(facilitator: Node) -> Dictionary:
 				text = (button.find_children("*", "Label3D", false, false)[0] as Label3D).text,
 				disabled = disabled.get(button, false)})
 	return result
+
+
+static func player_menu_buttons() -> Dictionary:
+	var home := App.module(&"Home")
+	var buttons := {}
+	if home:
+		var entry: Target = home.get("_entry")
+		if entry.is_visible_in_tree():
+			buttons[entry.id] = entry.global_position
+		if home.is_open:
+			var menu: Node3D = home.get("_panel")
+			for button: Target in menu.find_children("*", "Target", false, false):
+				buttons[button.id] = button.global_position
+	return buttons
 
 
 static func subtitle() -> Variant:

@@ -1,12 +1,12 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://c71ic2x7gctt6"]
 
-[ext_resource type="Script" path="res://main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://dqeu4pnko6b2y" path="res://main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://reality/rooms/living_room.tscn" id="2_room"]
 [ext_resource type="PackedScene" path="res://rig/rig.tscn" id="3_rig"]
-[ext_resource type="Script" path="res://modules/voice/voice.gd" id="4_voice"]
-[ext_resource type="Script" path="res://modules/feedback/feedback.gd" id="5_feedback"]
-[ext_resource type="Script" path="res://modules/cv/detector.gd" id="6_detector"]
-[ext_resource type="Script" path="res://modules/facilitator/facilitator.gd" id="7_facilitator"]
+[ext_resource type="Script" uid="uid://4vcgvq8t7ahl" path="res://modules/voice/voice.gd" id="4_voice"]
+[ext_resource type="Script" uid="uid://bptjomtspl5wv" path="res://modules/feedback/feedback.gd" id="5_feedback"]
+[ext_resource type="Script" uid="uid://cymhgrxbeu1bi" path="res://modules/cv/detector.gd" id="6_detector"]
+[ext_resource type="Script" uid="uid://yot13jtfk267" path="res://modules/facilitator/facilitator.gd" id="7_facilitator"]
 [ext_resource type="Resource" path="res://content/views/normal.tres" id="10_normal"]
 [ext_resource type="Resource" path="res://content/views/high_contrast.tres" id="11_contrast"]
 [ext_resource type="Resource" path="res://content/views/greyscale.tres" id="12_grey"]
@@ -14,15 +14,17 @@
 [ext_resource type="Resource" path="res://content/views/edges.tres" id="14_edges"]
 [ext_resource type="Resource" path="res://content/views/dim.tres" id="15_dim"]
 [ext_resource type="Resource" path="res://content/views/spotlight.tres" id="16_spotlight"]
-[ext_resource type="Script" path="res://reality/view.gd" id="17_view"]
-[ext_resource type="Script" path="res://modules/magic/magic.gd" id="19_magic"]
-[ext_resource type="Script" path="res://modules/picks/picks.gd" id="20_picks"]
-[ext_resource type="Script" path="res://modules/inventory/inventory.gd" id="21_inventory"]
-[ext_resource type="Script" path="res://modules/rooms/rooms.gd" id="22_rooms"]
-[ext_resource type="Script" path="res://modules/placement/decor_layout.gd" id="23_decor"]
-[ext_resource type="Script" path="res://modules/home/home.gd" id="24_home"]
-[ext_resource type="Script" path="res://modules/pets/pets.gd" id="25_pets"]
-[ext_resource type="Script" path="res://entry/room_intro.gd" id="26_room_intro"]
+[ext_resource type="Script" uid="uid://cygbefcbaweqm" path="res://reality/view.gd" id="17_view"]
+[ext_resource type="Script" uid="uid://66r4eye1fq4a" path="res://modules/magic/magic.gd" id="19_magic"]
+[ext_resource type="Script" uid="uid://b538l2ldo1b52" path="res://modules/picks/picks.gd" id="20_picks"]
+[ext_resource type="Script" uid="uid://pg1ou0lbcjxr" path="res://modules/inventory/inventory.gd" id="21_inventory"]
+[ext_resource type="Script" uid="uid://cu0ue83oexmm0" path="res://modules/rooms/rooms.gd" id="22_rooms"]
+[ext_resource type="Script" uid="uid://e6qu8t1emqmu" path="res://modules/placement/decor_layout.gd" id="23_decor"]
+[ext_resource type="Script" uid="uid://xaahhff556jl" path="res://modules/home/home.gd" id="24_home"]
+[ext_resource type="Script" uid="uid://cogkxfcp7o4jv" path="res://modules/pets/pets.gd" id="25_pets"]
+[ext_resource type="Script" uid="uid://cjljyha2i37cx" path="res://entry/room_intro.gd" id="26_room_intro"]
+[ext_resource type="Script" path="res://modules/sound/sound.gd" id="27_sound"]
+[ext_resource type="Script" path="res://modules/music/music.gd" id="28_music"]
 
 [sub_resource type="Environment" id="environment"]
 background_mode = 1
@@ -31,57 +33,63 @@ ambient_light_source = 2
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 0.45
 
-[node name="Main" type="Node3D"]
+[node name="Main" type="Node3D" unique_id=1175462959]
 process_mode = 1
 script = ExtResource("1_main")
 sim_room = ExtResource("2_room")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1607382960]
 environment = SubResource("environment")
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-55, 25, 0)
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=34076685]
+transform = Transform3D(0.90630776, -0.34618863, 0.24240388, 0, 0.57357645, 0.81915206, -0.42261827, -0.74240386, 0.5198368, 0, 0, 0)
 light_energy = 0.9
 
-[node name="Rig" parent="." instance=ExtResource("3_rig")]
+[node name="Rig" parent="." unique_id=265374617 instance=ExtResource("3_rig")]
 
-[node name="Stage" type="Node3D" parent="."]
+[node name="Stage" type="Node3D" parent="." unique_id=1206304492]
 
-[node name="Modules" type="Node" parent="."]
+[node name="Modules" type="Node" parent="." unique_id=867422436]
 
-[node name="Voice" type="Node" parent="Modules"]
+[node name="Voice" type="Node" parent="Modules" unique_id=1321996462]
 script = ExtResource("4_voice")
 
-[node name="Feedback" type="Node" parent="Modules"]
+[node name="Feedback" type="Node" parent="Modules" unique_id=1410036492]
 script = ExtResource("5_feedback")
 
-[node name="Detector" type="Node" parent="Modules"]
+[node name="Detector" type="Node" parent="Modules" unique_id=1321935383]
 script = ExtResource("6_detector")
 
-[node name="Facilitator" type="Node" parent="Modules"]
+[node name="Facilitator" type="Node" parent="Modules" unique_id=679936984]
 script = ExtResource("7_facilitator")
 views = Array[ExtResource("17_view")]([ExtResource("10_normal"), ExtResource("11_contrast"), ExtResource("12_grey"), ExtResource("13_bw"), ExtResource("14_edges"), ExtResource("15_dim"), ExtResource("16_spotlight")])
 
-[node name="Magic" type="Node" parent="Modules"]
+[node name="Magic" type="Node" parent="Modules" unique_id=644224595]
 script = ExtResource("19_magic")
 
-[node name="Picks" type="Node" parent="Modules"]
+[node name="Picks" type="Node" parent="Modules" unique_id=420457793]
 script = ExtResource("20_picks")
 
-[node name="Inventory" type="Node" parent="Modules"]
+[node name="Inventory" type="Node" parent="Modules" unique_id=1264079624]
 script = ExtResource("21_inventory")
 
-[node name="Rooms" type="Node" parent="Modules"]
+[node name="Rooms" type="Node" parent="Modules" unique_id=264692947]
 script = ExtResource("22_rooms")
 
-[node name="Decor" type="Node" parent="Modules"]
+[node name="Decor" type="Node" parent="Modules" unique_id=927269608]
 script = ExtResource("23_decor")
 
-[node name="Pets" type="Node" parent="Modules"]
+[node name="Pets" type="Node" parent="Modules" unique_id=284928081]
 script = ExtResource("25_pets")
 
-[node name="Home" type="Node" parent="Modules"]
+[node name="Home" type="Node" parent="Modules" unique_id=262303556]
 script = ExtResource("24_home")
 
-[node name="RoomIntro" type="Node" parent="."]
+[node name="Sound" type="Node" parent="Modules" unique_id=1739204481]
+script = ExtResource("27_sound")
+
+[node name="Music" type="Node" parent="Modules" unique_id=1739204482]
+script = ExtResource("28_music")
+
+[node name="RoomIntro" type="Node" parent="." unique_id=189297261]
 script = ExtResource("26_room_intro")
