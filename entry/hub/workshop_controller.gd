@@ -298,8 +298,10 @@ func _restart() -> bool:
 func _hub() -> StringName:
 	state = &"hub"
 	_hub_since = _clock
-	if memory != null and memory.look in HubMemory.GAME_ONLY and App.reality != null:
-		App.reality.apply_view(memory.room_view())   # Spotlight has nothing to light in the hub (Megan, Nov 18)
+	if memory != null and App.reality != null:
+		# The child's look, every time the hub begins (Megan, Nov 18: the room stayed dark after a jump that cut the
+		# dots off mid-haze; the dots' 60 % dim lives on the room, which outlasts scenes). Spotlight: Normal here.
+		App.reality.apply_view(memory.room_view())
 	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
 	ambience.hub()
 	SceneMarker.show_text("Hub")

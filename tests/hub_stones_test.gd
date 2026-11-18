@@ -185,7 +185,8 @@ func test_the_eye_shows_the_looks_and_a_pinch_changes_the_real_room_and_is_saved
 	_pinch(hub.ring.place_of(&"eye").target)
 	expect(await until(func() -> bool: return hub.row != null and hub.row_kind == &"looks" and hub.row.opened, 10.0), "the looks rise")
 	var looks := hub.row.impressions.map(func(p: Impression) -> StringName: return p.look)
-	expect_eq(looks, [&"normal", &"high_contrast", &"edges", &"black_white"], "Normal · High contrast · Edges · Black and white")
+	# Megan, Nov 18: Wei's Greyscale and Dim room too; Spotlight only in a game's pause bubble.
+	expect_eq(looks, [&"normal", &"high_contrast", &"edges", &"black_white", &"greyscale", &"dim"], "the hub's six looks, no Spotlight")
 	expect(hub.row.impressions[0].is_picked(), "the current look (Normal) is ringed")
 	var edges: Impression = hub.row.impressions[2]
 	_pinch(edges.target)
@@ -324,3 +325,38 @@ func test_a_real_pinch_at_the_cauldron_pauses_the_shelf() -> void:
 	await wait(0.8)
 	await _real_pinch_at(hub.stop_bubble.target)
 	expect(await until(func() -> bool: return hub.state == &"hub" and not app.get_tree().paused, 20.0), "the ✕: back at the hub")
+
+
+## Megan, Nov 18: in a game's pause bubble the eye offers Spotlight too (it lights round the game's focus); back
+## in the hub the room shows Normal while Spotlight is the child's look.
+func test_spotlight_is_offered_in_a_game_and_the_hub_shows_normal() -> void:
+	var hub := await _to_hub()
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"shelf").target)
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 30.0), "the shelf plays")
+	_pinch(hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.eye_bubble != null, 5.0), "paused: eye · ✕")
+	await wait(0.7)
+	_pinch(hub.eye_bubble.target)
+	expect(await until(func() -> bool: return hub.row != null and hub.row_kind == &"looks" and hub.row.opened, 10.0), "the looks rise")
+	var looks := hub.row.impressions.map(func(p: Impression) -> StringName: return p.look)
+	expect(looks.has(&"spotlight"), "Spotlight is offered in a game")
+	var spotlight: Impression = hub.row.impressions[looks.find(&"spotlight")]
+	_pinch(spotlight.target)
+	await frames(3)
+	expect_eq(App.reality.view.title, "Spotlight", "the game shows it")
+	expect_eq(hub.memory.look, &"spotlight", "and it's the child's look")
+	_pinch(hub.cauldron_target)   # leave the looks: the game carries on
+	expect(await until(func() -> bool: return hub.row == null and not app.get_tree().paused, 10.0), "the game carries on")
+	await _finish_rounds()
+	expect(await until(func() -> bool: return hub.state == &"hub", 40.0), "back at the hub")
+	expect_eq(App.reality.view.title, "Normal", "the hub shows the room Normal")
+
+
+## Megan, Nov 18: the room stayed dark after a jump cut the dots off mid-haze. The hub begins in the child's look.
+func test_the_hub_begins_in_the_childs_look_whatever_was_left_on_the_room() -> void:
+	var dark := View.new()
+	dark.dim = 0.6
+	var hub := await _to_hub(func() -> void: App.reality.apply_view(dark))
+	expect(await until(func() -> bool: return hub.state == &"hub", 20.0), "the hub")
+	expect(is_zero_approx(App.reality.view.dim), "no dim left on the room")

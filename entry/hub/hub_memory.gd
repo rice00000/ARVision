@@ -7,7 +7,11 @@ extends Node
 ## The look is applied as [code]App.session.base_view[/code] as soon as the save loads, so it is on from the
 ## start of the next visit. Staff tools' "Next view" still overrides it for the grown-up.
 
-const LOOKS: Array[StringName] = [&"normal", &"high_contrast", &"edges", &"black_white"]
+## Megan, Nov 18: Wei's other filters are looks the child can turn on too (Greyscale, Dim room, Spotlight).
+## Spotlight lights only round a game's focus, so it's offered in a game's pause bubble only (GAME_ONLY); in the
+## hub the room shows Normal while it's the chosen look ([method room_view]).
+const LOOKS: Array[StringName] = [&"normal", &"high_contrast", &"edges", &"black_white", &"greyscale", &"dim", &"spotlight"]
+const GAME_ONLY: Array[StringName] = [&"spotlight"]
 
 var save_key := "hub"
 ## Game ids played at least once (finished or left).
@@ -74,6 +78,11 @@ func choose_look(id: StringName) -> void:
 		App.reality.apply_view(App.session.base_view)
 	Events.report(&"view_chosen", {look = String(id), title = view_of(id).title})
 	Save.request()
+
+
+## What the room shows in the hub (no game): the child's look, but Normal for a game-only look.
+func room_view() -> View:
+	return view_of(&"normal" if look in GAME_ONLY else look)
 
 
 static func view_of(id: StringName) -> View:

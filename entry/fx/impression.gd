@@ -234,7 +234,8 @@ const POP_DROPS := 7
 const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop", &"butterflies": "Butterflies",
 		&"stop": "Stop", &"finish": "Finish", &"help": "Help", &"eye": "Looks"}
 ## The looks the eye offers (design chat, Nov 18, DESIGN_STONES_AND_LEVELS §6): their names, said and shown.
-const LOOK_TITLES := {&"normal": "Normal", &"high_contrast": "High contrast", &"edges": "Edges", &"black_white": "Black and white"}
+const LOOK_TITLES := {&"normal": "Normal", &"high_contrast": "High contrast", &"edges": "Edges", &"black_white": "Black and white",
+		&"greyscale": "Greyscale", &"dim": "Dim room", &"spotlight": "Spotlight"}
 const INK := Color(0.114, 0.114, 0.133)   # #1D1D22 (design chat, Nov 18)
 const TILE := Color(0.953, 0.918, 0.824)  # #F3EAD2
 
