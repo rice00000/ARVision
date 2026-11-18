@@ -30,6 +30,8 @@ var activities: Array[Summonable] = []
 var ring: ImpressionRing
 var gear: GearMenu
 var exit_token: HubButton
+var lanterns: Array[Lantern] = []   # the workshop's warm lanterns (decor only, never pressed)
+var ambience: HubAmbience           # the quiet fireplace crackle under the hub
 var current: Summonable
 var state := &"idle"            # &"hub", &"game", &"home", &"closing", &"closed"
 var played: Array[StringName] = []
@@ -58,6 +60,8 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	_build_ring()
 	_build_gear()
 	_build_exit()
+	_hang_lanterns()
+	ambience = HubAmbience.make(self)
 	if first == &"motion":
 		first = &"dots"
 	var activity := _activity(first)
@@ -77,8 +81,11 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 				gear.set_enabled(false)
 				ring.quiet()
 				ring.visible = false   # not over Wei's room
+				_show_lanterns(false)
+				ambience.fade_out()
 				await home.call()
 				ring.visible = true
+				_show_lanterns(true)
 				ring.wake()
 			continue
 		await _run(_activity(choice))
@@ -94,6 +101,8 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 ## The hub: waits for a game's choice or a gear button.
 func _hub() -> StringName:
 	state = &"hub"
+	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
+	ambience.hub()
 	SceneMarker.show_text("Hub")
 	ring.wake()
 	gear.set_enabled(true)
@@ -135,6 +144,8 @@ func _run(activity: Summonable) -> void:
 	if activity == null:
 		return
 	state = &"game"
+	Lantern.quiet = true    # steady glow, no embers: nothing moves on its own beside a task
+	ambience.game()
 	current = activity
 	_exited = false
 	gear.set_enabled(false)
@@ -198,6 +209,7 @@ func _closing_starts() -> void:
 	gear.set_enabled(false)
 	_demo.stop()
 	exit_token.visible = false
+	ambience.fade_out(3.0)
 	await ring.sink(_mouth())   # Scene 10: the ring and its fog sink quietly into the cauldron first
 
 
@@ -232,6 +244,19 @@ func _build_gear() -> void:
 	Events.inventory_changed.connect(_update_stones)
 	gear.chosen.connect(_pick)
 	gear.set_enabled(false)
+
+
+## One lantern behind and above the cauldron, plus a few on the scanned walls (Megan, Nov 18). They fade in.
+func _hang_lanterns() -> void:
+	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else _mouth() + Vector3.LEFT * 0.4
+	lanterns = Lantern.hang(self, _mouth(), App.head().global_position, middle)
+	for lantern in lanterns:
+		lantern.appear(2.0)
+
+
+func _show_lanterns(on: bool) -> void:
+	for lantern in lanterns:
+		lantern.visible = on
 
 
 func _build_exit() -> void:
@@ -313,3 +338,7 @@ func _workspace() -> Transform3D:
 	if workshop != null and workshop.layout != null:
 		return workshop.layout.bench
 	return Transform3D(Basis.IDENTITY, App.head().global_position)
+
+
+func _exit_tree() -> void:
+	Lantern.quiet = false
