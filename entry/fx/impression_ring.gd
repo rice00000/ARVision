@@ -50,6 +50,13 @@ const REST_AFTER := 20.0        # seconds with no hand near before the menu rest
 const REST_SECONDS := 1.5
 const WAKE_SECONDS := 0.5
 const REST_SCALE := 0.7
+## Following the child (Megan, Nov 18: "menu should follow user"). The menu turns around the cauldron to face
+## them and its bubbles tilt toward their eyes, but calmly (nystagmus: nothing drifting under the eyes): only
+## once they have moved FOLLOW_TURN around the cauldron or FOLLOW_MOVE metres, never while a hand is near a
+## bubble, and as one slow glide.
+const FOLLOW_TURN := deg_to_rad(20.0)
+const FOLLOW_MOVE := 0.3
+const FOLLOW_SECONDS := 0.8
 
 ## Every ring alive (for [method HubGlow.quiet_all]).
 static var alive: Array[ImpressionRing] = []
@@ -67,6 +74,10 @@ var opened := false
 ## 0 awake .. 1 resting.
 var rest := 0.0
 
+## The cauldron's mouth the menu sits over (INF: a menu placed by hand, which doesn't follow).
+var mouth := Vector3.INF
+var _eye := Vector3.INF          # the eyes the bubbles face (moves only with a follow glide)
+var _follow: Tween
 var _toward := Vector3.FORWARD   # flat direction from the menu toward the child
 var _side := Vector3.RIGHT
 var _quiet := false
@@ -78,13 +89,15 @@ var _hovering: Dictionary = {}   # impression -> its name was said for this visi
 
 ## The menu facing [param eye], its tasks' middle at [param middle] ([method spot] gives the usual place),
 ## under [param parent]. [param _mouth]: kept for the old calls.
-static func make(parent: Node, choices: Array[Impression], middle: Vector3, eye: Vector3, _mouth := Vector3.INF) -> ImpressionRing:
+static func make(parent: Node, choices: Array[Impression], middle: Vector3, eye: Vector3, mouth_at := Vector3.INF) -> ImpressionRing:
 	var ring := ImpressionRing.new()
 	ring.name = "impression_ring"
 	parent.add_child(ring)
 	ring.global_position = middle
 	ring._toward = Vector3(eye.x - middle.x, 0.0, eye.z - middle.z).normalized()
 	ring._side = ring._toward.cross(Vector3.UP).normalized()
+	ring.mouth = mouth_at
+	ring._eye = eye
 	for impression in choices:
 		ring._take(impression)
 	ring.opened = true   # made open (the hub hides it and opens it with a tap)
@@ -99,6 +112,45 @@ static func spot(mouth: Vector3, eye: Vector3) -> Vector3:
 	var toward := Vector3(eye.x - over.x, 0.0, eye.z - over.z).normalized()
 	var lean := clampf(over.distance_to(eye) - REACH, 0.0, LEAN_MAX)
 	return over + toward * lean
+
+
+## Faces the menu to the child's eyes at [param eye] at once: over the mouth, leaning toward them.
+func aim(eye: Vector3) -> void:
+	if mouth != Vector3.INF:
+		global_position = spot(mouth, eye)
+	var flat := Vector3(eye.x - global_position.x, 0.0, eye.z - global_position.z)
+	if flat.length() > 0.01:
+		_toward = flat.normalized()
+		_side = _toward.cross(Vector3.UP).normalized()
+	_eye = eye
+
+
+## True when the child at [param eye] has moved far enough from the eyes the menu faces to follow them.
+func _strayed(eye: Vector3) -> bool:
+	if _eye == Vector3.INF:
+		return true
+	var centre := mouth if mouth != Vector3.INF else global_position
+	var was := Vector2(_eye.x - centre.x, _eye.z - centre.z)
+	var now := Vector2(eye.x - centre.x, eye.z - centre.z)
+	if was.length() > 0.05 and now.length() > 0.05 and absf(was.angle_to(now)) > FOLLOW_TURN:
+		return true
+	return eye.distance_to(_eye) > FOLLOW_MOVE
+
+
+## One slow glide to face [param eye]: round the cauldron the short way (never through it).
+func _follow_to(eye: Vector3) -> void:
+	if _follow != null and _follow.is_running():
+		return
+	var centre := mouth if mouth != Vector3.INF else global_position
+	var from := _eye
+	var a0 := Vector2(from.x - centre.x, from.z - centre.z)
+	var a1 := Vector2(eye.x - centre.x, eye.z - centre.z)
+	var turn := a0.angle_to(a1)
+	_follow = create_tween()
+	_follow.tween_method(func(k: float) -> void:
+		var flat := a0.rotated(turn * k).normalized() * lerpf(a0.length(), a1.length(), k)
+		aim(Vector3(centre.x + flat.x, lerpf(from.y, eye.y, k), centre.z + flat.y))
+		_place(), 0.0, 1.0, FOLLOW_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## The middle task (the carousel's front past STILL_MAX).
@@ -297,6 +349,8 @@ func rise(mouth: Vector3, seconds := OPEN_SECONDS) -> void:
 	_hovering.clear()
 	for impression in _all():
 		impression.reset_bubble()
+	if App.rig and App.head() != null:
+		aim(App.head().global_position)   # open facing where the child is now, not where they were
 	_place()
 	var pieces := _all()
 	var ends: Array[Vector3] = []
@@ -368,6 +422,11 @@ func _process(delta: float) -> void:
 			_hovering.erase(impression)
 		if near > 0.0:
 			hand_near = true
+	# Follow the child (only when calm: open, still, no hand near).
+	if opened and not turning and not hand_near and App.rig and App.head() != null:
+		var eye := App.head().global_position
+		if _strayed(eye):
+			_follow_to(eye)
 	# Rest and wake (Megan, Nov 18): a hand coming near wakes it; ~20 s with none, it settles.
 	if not opened or turning:
 		_idle = 0.0
@@ -452,7 +511,7 @@ func _place() -> void:
 				+ Vector3.DOWN * (absf(angle) * 0.02 + 0.03 * rest)
 		impression.scale = Vector3.ONE * size
 		impression.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
-		impression.look_at(impression.global_position + _toward, Vector3.UP, true)
+		_face(impression)
 		impression.scale = Vector3.ONE * size
 		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
 	var size := DOOR_SCALE * shrink
@@ -463,5 +522,13 @@ func _place() -> void:
 		var at := global_position - _toward * DOOR_BACK + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest) - _side * across
 		place.scale = Vector3.ONE * size
 		place.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
-		place.look_at(place.global_position + _toward, Vector3.UP, true)
+		_face(place)
 		place.scale = Vector3.ONE * size
+
+
+## Turns a bubble to the child's eyes (tilted up or down to them too), or flat toward them without eyes.
+func _face(piece: Impression) -> void:
+	var to := _eye - piece.global_position if _eye != Vector3.INF else _toward
+	if to.length() < 0.01 or absf(to.normalized().dot(Vector3.UP)) > 0.98:
+		to = _toward
+	piece.look_at(piece.global_position + to, Vector3.UP, true)

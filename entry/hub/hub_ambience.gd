@@ -7,8 +7,10 @@ extends AudioStreamPlayer
 ## "Low Embers Fireplace Crackling 52", a prepared 21.9 s loop; the seam is clean: both ends ~−30 dB).
 
 const FILE := "res://entry/assets/audio/workshop-fireplace-loop.ogg"
-const HUB_DB := -30.0       # Megan's starting level; adjust by ear in the headset
-const GAME_DB := -36.0      # a little further under the task sounds
+## The clip itself is quiet (mean −29 dB), so these sit near unity: at −30 it was ~−59 dB overall and
+## couldn't be heard (Megan, Nov 18). Still well under Onion's voice; adjust by ear in the headset.
+const HUB_DB := -8.0
+const GAME_DB := -14.0      # a little further under the task sounds
 const SILENT_DB := -60.0
 const FADE_IN := 4.0
 const FADE := 2.0

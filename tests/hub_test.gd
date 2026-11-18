@@ -66,7 +66,7 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect_eq(hub.ring.impressions[0].kind, &"shelf", "the shelf")
 	expect(not hub.ring.impressions[0].sealed, "the shelf is open")
 	expect(hub.ring.impressions[1].kind == &"dots" and hub.ring.impressions[1].sealed, "the dots wait in a closed bubble (there's more)")
-	expect(hub.ring.impressions[0].bud != null, "a bud under the shelf shows its next level")
+	expect(hub.ring.impressions.all(func(i: Impression) -> bool: return i.bud == null), "no buds in the menu (Megan, Nov 18)")
 	expect(await until(func() -> bool: return hub.state == &"hub", 10.0), "the hub waits")
 	expect(not hub.ring.visible and not hub.ring.opened, "the menu is closed: it waits for the child's tap")
 	expect(await until(func() -> bool: return hub.cauldron_lit(), 3.0), "the cauldron glows softly (\"you can tap me\")")
@@ -126,7 +126,10 @@ func test_a_cauldron_tap_in_a_game_pauses_it_and_its_x_ends_it_with_a_pinch_neve
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
-	Events.touched.emit(&"right", hub.cauldron_target)   # a tap on the cauldron
+	Events.touched.emit(&"right", hub.cauldron_target)   # a hand passing over the cauldron
+	await wait(0.5)
+	expect(hub.stop_bubble == null and not app.get_tree().paused, "a touch or hover over the cauldron never pauses a game")
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)   # a pinch on the cauldron
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "one ✕ bubble rises")
 	expect(app.get_tree().paused, "the game pauses")
 	await wait(0.7)
@@ -145,15 +148,15 @@ func test_the_paused_game_carries_on_after_six_seconds_or_a_second_tap() -> void
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
-	Events.touched.emit(&"right", hub.cauldron_target)
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused")
 	await wait(WorkshopController.STOP_WAIT + 1.0)
 	expect(hub.stop_bubble == null and not app.get_tree().paused, "after ~6 s the bubble sinks and the game goes on")
 	expect(App.session.running and hub.state == &"game", "the same game, still running")
-	Events.touched.emit(&"right", hub.cauldron_target)
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused again")
 	await wait(0.3)
-	Events.touched.emit(&"right", hub.cauldron_target)
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble == null and not app.get_tree().paused, 3.0), "a second tap: it carries on")
 	expect(App.session.running, "still running")
 
@@ -387,3 +390,28 @@ func test_the_butterflies_wait_locked_then_open_after_the_dots_and_play() -> voi
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running, 30.0), "Wei's butterflies play")
 	await _finish_rounds()
 	expect(await until(func() -> bool: return _in_hub(hub), 90.0), "and back to the hub")
+
+
+func test_the_menu_opens_facing_the_child_and_follows_them_calmly_round_the_cauldron() -> void:
+	var hub := await _to_hub()
+	expect(await _open(hub), "the menu opens")
+	var ring := hub.ring
+	var facing := func() -> float:
+		var eye := App.head().global_position
+		var flat := Vector3(eye.x - ring.global_position.x, 0.0, eye.z - ring.global_position.z).normalized()
+		return rad_to_deg(ring._toward.angle_to(flat))
+	expect(facing.call() < 5.0, "it opens facing the child (%.0f°)" % facing.call())
+	var toward: Vector3 = ring._toward
+	App.rig.global_position += App.rig.global_basis.x * 0.1   # a small sway: the menu stays still
+	await wait(1.2)
+	expect(ring._toward.is_equal_approx(toward), "a small sway moves nothing")
+	var mouth := ring.mouth
+	var from := App.rig.global_position
+	var round := Vector3(from.x - mouth.x, 0.0, from.z - mouth.z).rotated(Vector3.UP, deg_to_rad(70.0))
+	App.rig.global_position = Vector3(mouth.x + round.x, from.y, mouth.z + round.z)   # the child walks round
+	expect(await until(func() -> bool: return ring._follow != null and ring._follow.is_running(), 2.0), "the menu glides after them")
+	await wait(ImpressionRing.FOLLOW_SECONDS + 0.3)
+	expect(facing.call() < 5.0, "it faces them again (%.0f°)" % facing.call())
+	var front := ring.impressions[0]
+	var to_eye := (App.head().global_position - front.global_position).normalized()
+	expect(front.global_basis.z.normalized().dot(to_eye) > 0.95, "the bubbles turn to the child's eyes, never edge-on")

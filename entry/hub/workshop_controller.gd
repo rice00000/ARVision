@@ -53,7 +53,7 @@ const TOUR_LINES: Array[String] = ["Tap the cauldron for games.", "Pinch a bubbl
 const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
-const BUDS: Array[StringName] = [&"shelf", &"dots", &"butterflies"]
+const BUDS: Array[StringName] = []   # Megan, Nov 18: "get rid of buds in menu" (Impression.set_bud stays for later)
 ## What opens when (Megan, Nov 18): the dots after the first game, the butterflies after the dots, Turn to fit
 ## (the cup, the last game) after the butterflies and only once it can run (a saved cup setup and the CV server
 ## answering). One unlock per return to the hub. Locked games show with a padlock from the first visit.
@@ -232,7 +232,7 @@ func _offer(activity: Summonable, welcome := false, locked := false) -> void:
 	await ring.add(impression, _mouth())
 	if locked:
 		impression.set_sealed(true)   # shown, not open yet: a press says "Soon" (Megan: there's more to explore)
-	impression.set_bud(impression.kind in BUDS)
+	impression.set_bud(impression.kind in BUDS)   # none for now (Megan, Nov 18: no buds in the menu)
 	if welcome:
 		await Onion.line(WELCOME, self)
 	if workshop != null:
@@ -371,7 +371,10 @@ func _on_press(target: Target, pinched: bool) -> void:
 		return
 	var on_cauldron := target == cauldron_target or target == sign_target
 	if on_cauldron and (state == &"game" or state == &"asking"):
-		_cauldron_tapped = true   # a game: pause it (or carry on); the finish check: no, not yet
+		# A game: pause it (or carry on); the finish check: no, not yet. A pinch only (Megan, Nov 18: a hand
+		# passing over the cauldron mid-game paused it): games happen right around the cauldron.
+		if pinched:
+			_cauldron_tapped = true
 		return
 	if state != &"hub" or get_tree().paused:
 		return
