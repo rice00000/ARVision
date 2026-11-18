@@ -255,3 +255,19 @@ func test_weis_room_from_the_house_has_no_menu_a_cauldron_to_go_back_and_teal_st
 	_pinch(back as Target)
 	expect(await until(func() -> bool: return not home.is_open, 10.0), "the cauldron takes the child back")
 	expect(await until(func() -> bool: return hub.state == &"hub" and hub.ring.opened, 15.0), "to the workshop's menu")
+
+
+func test_staff_tools_restart_fresh_child_starts_a_new_save_from_the_hello() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"dots"]))
+	expect(await _open(hub), "the menu opens")
+	var before := Profile.id
+	input.menu()   # Staff tools (M)
+	await frames(2)
+	await press_facilitator("fac_scenes")
+	await frames(2)
+	await press_facilitator("fac_fresh_start")
+	expect(await until(func() -> bool: return App.main.current_scene == &"intro" and not App.main.switching, 30.0), "back to the opening")
+	expect(Profile.id != before, "a new save (the old child's progress is kept under Saves)")
+	expect(Profile.saves().has(before), "the old save is still there")
+	expect(HubMemory.get_or_make().played.is_empty(), "nothing played: every game locked again")
+	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 0, "no stones")

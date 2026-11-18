@@ -182,6 +182,11 @@ func _activate() -> void:
 		&"fac_new_save":
 			_typed = ""
 			_show(&"Naming")
+		&"fac_fresh_start":
+			Events.report(&"fresh_start", {from = String(Profile.id)})
+			App.main.current_scene = &"intro"   # the save switch reloads this scene: the opening, from the hello
+			_open_save(Profile.new_save())
+			return
 		&"fac_space":
 			_type(" ")
 		&"fac_erase":
@@ -395,6 +400,9 @@ func _build() -> void:
 		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.055),
 			Vector2(0.0, 0.032 - row * 0.063), scenes)
 		row += 1
+	# Megan, Nov 18: start over as a brand-new child, from the hello. A new save, so the current child's progress is
+	# kept (it is still under Saves); never a wipe.
+	_button("fac_fresh_start", "Restart: fresh child", Vector2(0.38, 0.055), Vector2(0.0, 0.032 - row * 0.063 - 0.012), scenes)
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)
