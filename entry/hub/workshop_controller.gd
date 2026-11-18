@@ -54,6 +54,8 @@ var cauldron_target: Target
 var glow := 0.0
 ## The child lifts the gear out to finish.
 var carry: Carry
+var lanterns: Array[Lantern] = []   # the workshop's warm lanterns (decor only, never pressed)
+var ambience: HubAmbience           # the quiet fireplace crackle under the hub
 var current: Summonable
 var state := &"idle"            # &"hub", &"game", &"home", &"closing", &"closed"
 var played: Array[StringName] = []
@@ -94,6 +96,8 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	_build_cauldron()
 	_build_carry()
 	_build_exit()
+	_hang_lanterns()
+	ambience = HubAmbience.make(self)
 	if first == &"motion":
 		first = &"dots"
 	var activity := _activity(first)
@@ -117,8 +121,11 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 			if home.is_valid():
 				state = &"home"
 				carry.stop()
-				await ring.sink(_mouth(), 0.9)   # the fog draws in: nothing over Wei's room
+				_show_lanterns(false)
+				ambience.fade_out()
+				await ring.sink(_mouth(), 0.9)   # the bubbles sink: nothing over the Virtual Workshop
 				await home.call()
+				_show_lanterns(true)
 				await ring.rise(_mouth())
 			continue
 		await _run(_activity(choice))
@@ -134,6 +141,8 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 ## The hub: waits for a choice in the menu, or the gear lifted out. Opens the menu on the child's tap.
 func _hub() -> StringName:
 	state = &"hub"
+	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
+	ambience.hub()
 	SceneMarker.show_text("Hub")
 	if ring.opened:
 		ring.wake()
@@ -203,6 +212,8 @@ func _run(activity: Summonable) -> void:
 	if activity == null:
 		return
 	state = &"game"
+	Lantern.quiet = true    # steady glow, no embers: nothing moves on its own beside a task
+	ambience.game()
 	current = activity
 	_exited = false
 	carry.stop()
@@ -274,9 +285,10 @@ func _closing_starts() -> void:
 	carry.stop()
 	_demo.stop()
 	exit_token.visible = false
+	ambience.fade_out(3.0)
 	if ring.visible:
 		_play(&"menu_close", _mouth())
-		await ring.sink(_mouth())   # Scene 10: the menu and its fog sink quietly into the cauldron first
+		await ring.sink(_mouth())   # Scene 10: the bubbles sink quietly into the cauldron first
 
 
 # --- Building ----------------------------------------------------------------------------------------
@@ -405,6 +417,25 @@ func _spin_gear(on: bool) -> void:
 		return
 	for spin: GearSpin in gear.find_children("*", "GearSpin", true, false):
 		spin.running = on
+
+
+## One lantern behind and above the cauldron, plus a few on the scanned walls (Megan, Nov 18). They fade in.
+func _hang_lanterns() -> void:
+	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else _mouth() + Vector3.LEFT * 0.4
+	if Lantern.style == &"high":
+		lanterns = Lantern.hang_high(self, App.head().global_position, middle)
+	else:
+		lanterns = Lantern.hang(self, _mouth(), App.head().global_position, middle)
+	for lantern in lanterns:
+		lantern.appear(2.0)
+
+
+func _show_lanterns(on: bool) -> void:
+	for lantern in lanterns:
+		lantern.visible = on
+	var rafters := get_node_or_null(^"Rafters") as Node3D
+	if rafters != null:
+		rafters.visible = on
 
 
 func _build_exit() -> void:
@@ -559,3 +590,7 @@ func _workspace() -> Transform3D:
 	if workshop != null and workshop.layout != null:
 		return workshop.layout.bench
 	return Transform3D(Basis.IDENTITY, App.head().global_position)
+
+
+func _exit_tree() -> void:
+	Lantern.quiet = false

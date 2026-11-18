@@ -23,3 +23,5 @@ must not sound like success). To audition in the headset.
 The calm piano (`entry/assets/calm-piano-1.mp3`, CC0, see `entry/assets/CREDITS.md`) stays under the opening (Megan,
 Nov 18) until she has asked Wei why his commit removed it.
 
+## Workshop fireplace (hub ambience, Nov 18, Megan's pick)
+`workshop-fireplace-loop.ogg` = sfxmint "Low Embers Fireplace Crackling 52" (https://sfxmint.com/sounds/ambience-fireplace, CC0), a prepared 21.9 s loop, converted from the supplied WAV to Ogg Vorbis q4 (no edits; ends both ~−30 dB RMS, so the seam is clean). Plays from `HubAmbience` (entry/hub/hub_ambience.gd), not positional: fades in over 4 s to −30 dB when the hub opens, −36 dB during a game, fades out for the Virtual Workshop and the closing. Levels to tune by ear in the headset; keep it well under Onion's voice.

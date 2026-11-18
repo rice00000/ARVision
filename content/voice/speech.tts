@@ -59,7 +59,14 @@
     "Pinch the check mark to buy it.",
     "Pinch Furniture to see the furniture.",
     "Pinch the arrow to go back to your room.",
-    "Now pinch it, move your hand, and let go where you see the tick."
+    "Now pinch it, move your hand, and let go where you see the tick.",
+    "It hasn't done that in ages!",
+    "Welcome to the workshop.",
+    "There are more waiting.",
+    "The room has a few surprises left in it.",
+    "We can come back to these.",
+    "Have another look. Which way are they moving?",
+    "Take your time. Watch them for a moment."
   ],
   "say_sources": [
     "core",
