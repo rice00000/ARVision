@@ -607,21 +607,23 @@ func _light_lanterns() -> void:
 			beams.append(beam)
 	for lantern in hung:
 		lantern.visible = false
-	var speed := (PLAY_RADIUS * 1.6 + _away(_ripple_origin)) / RIPPLE_SECONDS   # the light's own speed
 	for beam in beams:   # the beams come with the first light, softly
 		create_tween().tween_property(beam, ^"transparency", 0.0, 1.5)
 	var order: Array[Lantern] = hung.duplicate()
 	order.sort_custom(func(a: Lantern, b: Lantern) -> bool:
 		return a.global_position.distance_to(_ripple_origin) < b.global_position.distance_to(_ripple_origin))
-	var waited := 0.0
-	for lantern in order:
-		var due: float = lantern.global_position.distance_to(_ripple_origin) / speed
-		if due > waited:
-			await get_tree().create_timer(due - waited).timeout
-			waited = due
+	# With the beams, nearest first, a quick stagger (Megan, Nov 18 11:02: waiting for the ripple to reach each one
+	# left the far ones seconds late, beams up and no lanterns).
+	for i in order.size():
+		var lantern := order[i]
+		if i > 0:
+			await get_tree().create_timer(LANTERN_STAGGER).timeout
 		if is_instance_valid(lantern):
 			lantern.visible = true
 			lantern.appear(1.2)
+
+
+const LANTERN_STAGGER := 0.15   # seconds between lanterns lighting at the reveal
 
 
 ## Onion's line after the cauldron's puff (Scene 6; SCRIPT.md, approved Nov 17).
