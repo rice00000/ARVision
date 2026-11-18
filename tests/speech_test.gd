@@ -18,8 +18,10 @@ func test_every_session_line_is_baked() -> void:
 	_baked(defaults.farewell)
 	for file in DirAccess.get_files_at("res://content/sessions"):
 		var plan: SessionPlan = load("res://content/sessions/" + file)
-		_baked(plan.greeting)
-		_baked(plan.farewell)
+		if not plan.greeting.is_empty():
+			_baked(plan.greeting)
+		if not plan.farewell.is_empty():
+			_baked(plan.farewell)
 		for block in plan.blocks:
 			if not block.intro.is_empty():
 				_baked(block.intro)
@@ -43,6 +45,12 @@ func test_every_place_menu_intro_is_baked() -> void:
 		if file.ends_with(".tres"):
 			var place: Place = load("res://content/places/" + file)
 			_baked(place.arrive)
+
+
+func test_every_reward_amount_is_baked() -> void:
+	_baked("You earned one magic stone!")
+	for stones in range(2, 10):
+		_baked("You earned %d magic stones!" % stones)
 
 
 func test_voice_plays_the_line_and_cuts_off_the_last() -> void:

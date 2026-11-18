@@ -1,7 +1,7 @@
 extends Module
 ## The facilitator's panel opens from Menu → Staff tools or the left-hand
 ## menu pinch (desktop: M). Play pauses while it is open.
-## Scenes and saves manage the session. Tools holds developer actions.
+## Saves manages profiles. Tools holds developer actions.
 ##
 ## Training
 ##   Easier / Harder   pin the level 0.1 lower / higher for the rest of the session
@@ -32,7 +32,6 @@ var _pages: Dictionary[StringName, Node3D] = {}
 var _page_shown: StringName = &"Training"
 var _from_menu := false
 var _status := Label3D.new()
-var _scene_label := Label3D.new()
 var _intro_status := Label3D.new()
 var _confirm_label := Label3D.new()
 var _confirmed_action: StringName
@@ -123,17 +122,11 @@ func _activate() -> void:
 	if String(target.id).begins_with("fac_slot_"):
 		_open_save(StringName(String(target.id).trim_prefix("fac_slot_")))
 		return
-	if String(target.id).begins_with("fac_scene_"):
-		_view_index = 0
-		App.main.change_scene(StringName(String(target.id).trim_prefix("fac_scene_")))
-		return
 	if String(target.id).begins_with("fac_jump_"):
 		_close()
 		Events.intro_jump_requested.emit(StringName(String(target.id).trim_prefix("fac_jump_")))
 		return
 	match target.id:
-		&"fac_scenes":
-			_show(&"Scenes")
 		&"fac_credits":
 			_show(&"Credits")
 		&"fac_easier":
@@ -172,6 +165,8 @@ func _activate() -> void:
 			return
 		&"fac_tools", &"fac_cancel_tool":
 			_show(&"Tools")
+		&"fac_add_stones":
+			App.module(&"Inventory").add(&"magic_stone", 10)
 		&"fac_zones":
 			_close()
 			Events.intro_zones_requested.emit()
@@ -214,9 +209,6 @@ func _show(page: StringName) -> void:
 
 
 func _refresh() -> void:
-	_scene_label.text = "Current: %s" % Main.SCENES[App.main.current_scene].title
-	for id: StringName in Main.SCENES:
-		_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
 	_refresh_training()
 	_refresh_saves()
 	_name.text = "Name: %s_" % _typed
@@ -229,14 +221,18 @@ func _refresh_tools() -> void:
 	_clear_buttons(tools)
 	var can_jump := intro != null and intro.tools_ready
 	_intro_status.text = "Intro: " + intro.beat if can_jump else "Tools"
-	var parts := Entry.PARTS.keys() if can_jump else []
-	for i in parts.size():
-		var part: String = parts[i]
-		_button("fac_jump_" + part, Entry.PARTS[part], Vector2(0.18, 0.038),
-			Vector2(-0.095 + 0.19 * (i % 2), 0.065 - 0.044 * floori(i / 2.0)), tools)
-	var next := parts.size()
-	_button("fac_room_intro", "Room intro", Vector2(0.18, 0.038),
-		Vector2(-0.095 + 0.19 * (next % 2) if can_jump else 0.0, 0.065 - 0.044 * floori(next / 2.0)), tools)
+	var actions := []
+	if can_jump:
+		for part: String in Entry.PARTS:
+			actions.append(["fac_jump_" + part, Entry.PARTS[part]])
+	actions.append(["fac_room_intro", "Room intro"])
+	if App.module(&"Inventory"):
+		actions.append(["fac_add_stones", "+10 Magic Stones"])
+	for i in actions.size():
+		var column := -0.095 + 0.19 * (i % 2) if can_jump else 0.0
+		var row := floori(i / 2.0) if can_jump else i
+		_button(actions[i][0], actions[i][1], Vector2(0.18, 0.032),
+			Vector2(column, 0.065 - 0.038 * row), tools)
 	var zones := can_jump and intro.zones_available()
 	if zones:
 		_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
@@ -314,18 +310,11 @@ func _build() -> void:
 	back.mesh = quad
 	back.position = Vector3(0.0, 0.0, -0.012)
 	_panel.add_child(back)
-	var tabs := [["fac_scenes", "Scenes"], ["fac_training", "Training"], ["fac_saves", "Saves"],
+	var tabs := [["fac_training", "Training"], ["fac_saves", "Saves"],
 		["fac_tools", "Tools"], ["fac_close", "Close"]]
 	for i in tabs.size():
-		_button(tabs[i][0], tabs[i][1], Vector2(0.082, 0.045), Vector2(-0.172 + i * 0.086, 0.17), _panel)
-
-	var scenes := _page(&"Scenes")
-	_text(_scene_label, Vector2(0.0, 0.1), scenes)
-	var row := 0
-	for id: StringName in Main.SCENES:
-		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.055),
-			Vector2(0.0, 0.032 - row * 0.063), scenes)
-		row += 1
+		_button(tabs[i][0], tabs[i][1], Vector2(0.1, 0.045),
+			Vector2((i - (tabs.size() - 1) * 0.5) * 0.105, 0.17), _panel)
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)

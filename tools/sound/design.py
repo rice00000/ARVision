@@ -55,6 +55,8 @@ SRC = {
     'swish86': UP + 'Accusonus SFX Cellar/Whoosh/SFX Cellar - Whoosh 86.wav',
     'soft72': UP + 'Accusonus SFX Cellar/Whoosh/SFX Cellar - Whoosh 72.wav',
     'soft77': UP + 'Accusonus SFX Cellar/Whoosh/SFX Cellar - Whoosh 77.wav',
+    'thumb': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Data,Beep,Notifier,Thumb Pluck.wav',
+    'glassy': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Data,Beep,Glassy Pluck,High 2.wav',
     'soft54': UP + 'Accusonus SFX Cellar/Whoosh/SFX Cellar - Whoosh 54.wav',
 }
 
@@ -120,21 +122,19 @@ def hint():
 
 
 def win():
-    """A level won: harp sweep up into a C-major bloom, a celesta arpeggio, a warm chord and glitter."""
-    harp = src('harp_e', 0.0, 4.2)
-    harp = speed(harp, -4)                      # E major -> C major
-    harp = fade(harp, 0.01, 1.2)
-    arp = silence(0.01)
-    for k, nm in enumerate(['C5', 'E5', 'G5', 'C6', 'E6', 'G6']):
-        arp = mix((arp, 0, 0), (celesta(nm, 1.6, seed=k), 0.07 * k, -3.0 + (1.5 if nm == 'C6' else 0)))
-    chord = fade(src('guitar_c', 0.0, 3.2), 0.0, 1.6)
-    glitter = hp(fade(src('windbells', 0.2, 2.6), 0.05, 1.4), 3500)
-    low = lp(marimba('C3', 2.0, seed=4), 900)
-    y = mix((harp, 0.0, -8.0), (arp, 0.55, -4.0), (chord, 0.95, -6.0), (low, 0.95, -12.0),
-            (glitter, 0.9, -15.0), (sparkle(0.8, seed=21), 1.0, -16.0))
+    """A level won, timed to the trophy clip (modules/magic, 36 frames in 1.5 s): a pop as the cup appears
+    (0.04 s), a quick C-major run and glitter as the confetti bursts (0.13-0.21 s), a warm chord and wind bells
+    while it falls, fading with the clip at 1.25-1.5 s."""
+    run = mix(*[(celesta(n, 1.2, seed=k), 0.035 * k, -2.0 + (1.5 if n == 'C6' else 0))
+                for k, n in enumerate(['C5', 'E5', 'G5', 'C6', 'E6'])])
+    chord = fade(src('guitar_c', 0.0, 2.0), 0.0, 1.0)
+    glitter = hp(fade(src('windbells', 0.2, 1.8), 0.02, 0.9), 3500)
+    low = lp(marimba('C3', 1.6, seed=4), 900)
+    y = mix((hp(src('pop6'), 250), 0.0, -6.0), (plucks(['C5'], 0), 0.0, -4.0), (run, 0.06, -3.0),
+            (sparkle(0.5, seed=21), 0.13, -12.0), (chord, 0.15, -6.0), (low, 0.15, -12.0), (glitter, 0.18, -15.0))
     y = eq(y, low=(180, -3))
-    y = verb(y, size=0.6, wet=0.22, damp=0.45, ring=0.8)
-    y = length(trim(y, -60), 3.6, fout=1.2)
+    y = verb(y, size=0.5, wet=0.18, damp=0.45, ring=0.6)
+    y = length(trim(y, -60), 2.0, fout=0.75)
     export(level(y, -16.0), out('modules/feedback/sounds/win.ogg'), channels=2)
 
 
@@ -179,37 +179,48 @@ def ui():
         cue(length(trim(y, -50), 0.22, 0.08), f'ui_press_{i + 1}', -24.0)
 
 
+def thumb(note):
+    """The warm thumb-piano pluck the interface is built on."""
+    return pitched(src('thumb'), 576.2, note)
+
+
+def glassy(note):
+    """A clean high glass pluck, layered quietly an octave above [thumb] for a crisp edge."""
+    return pitched(src('glassy'), 1949.4, note)
+
+
+def pitched(y, f0, note):
+    """[y] trimmed and varispeeded so its pitch [f0] (Hz) lands on [note]."""
+    return speed(trim(y, -50), 12 * np.log2(note_hz(note) / f0))
+
+
+def plucks(notes, gap):
+    """[notes] in a quick run, each a thumb pluck with its glass octave."""
+    return mix(*[(mix((thumb(n), 0, 0), (glassy(n[:-1] + str(int(n[-1]) + 1)), 0, -12)), k * gap, -k * 0.7)
+                 for k, n in enumerate(notes)])
+
+
 def menu():
-    """The player menu opens: a breath of air up into a soft pop and two quiet glass notes; closing falls away."""
-    air = hp(src('air1', 1.35, 1.86), 300)
-    rise = fade(air, 0.25, 0.1)
-    notes = mix((glass('C6', 0.6), 0, 0), (glass('G6', 0.6, seed=2), 0.06, -3))
-    y = mix((rise, 0, -5), (hp(src('pop6'), 300), 0.47, -1), (notes, 0.48, -9))
-    cue(width(length(y, 1.0, 0.4), 1.2), 'menu_open', -26.0, stereo=True)
-    fall = speed(hp(src('air4', 1.78, 2.4), 300), -2)
-    y = mix((hp(src('pop9'), 300), 0.0, -4), (fade(fall, 0.01, 0.4), 0.02, -2), (glass('G5', 0.5), 0.0, -16))
-    cue(length(y, 0.75, 0.3), 'menu_close', -28.0, stereo=True)
+    """The panel shows and hides on the same frame, so both hit at once: a fifth rising to open, falling to close."""
+    cue(length(verb(plucks(['C5', 'G5'], 0.055), 0.25, 0.1, ring=0.3), 0.32, 0.18), 'menu_open', -26.0, stereo=True)
+    cue(length(verb(plucks(['G5', 'C5'], 0.055), 0.25, 0.1, ring=0.3), 0.3, 0.17), 'menu_close', -28.0, stereo=True)
 
 
 def transition():
-    """A scene changes behind the short fade: a slow soft breath of air."""
-    air = fade(hp(src('air3', 1.05, 2.5), 200), 0.35, 0.6)
-    y = mix((air, 0, 0), (lp(marimba('C3', 0.8), 600), 0.6, -18))
-    cue(y, 'transition', -29.0, stereo=True)
+    """A scene changes behind a 0.18 s fade: a short soft puff of air that peaks in the dark, a low pluck under it."""
+    air = fade(hp(src('air3', 1.6, 2.0), 300), 0.06, 0.3)
+    y = mix((air, 0, -4), (lp(thumb('C4'), 2500), 0.0, -6), (glassy('G5'), 0.0, -20))
+    cue(length(y, 0.5, 0.3), 'transition', -30.0, stereo=True)
 
 
 def room():
-    """Into My room: air rising into a short harp sweep and wind bells. Out: air falling past three glass notes."""
-    harp = fade(speed(src('harp_e', 0.0, 2.2), -4), 0.05, 0.9)
-    air = fade(hp(src('air2', 1.0, 1.9), 250), 0.4, 0.15)
-    bells = hp(fade(src('windbells', 0.2, 2.2), 0.1, 1.2), 3500)
-    y = mix((air, 0, -3), (harp, 0.35, -5), (bells, 0.75, -14), (glass('C6', 1.4), 0.86, -12))
-    y = verb(y, 0.55, 0.2, ring=0.6)
-    cue(length(y, 2.6, 1.0), 'room_enter', -23.0, stereo=True)
-    air = fade(hp(src('air4', 1.75, 2.6), 250), 0.02, 0.5)
-    notes = mix((glass('G6', 0.7), 0, 0), (glass('E6', 0.7, 1), 0.09, 0), (glass('C6', 1.0, 2), 0.18, 0))
-    y = verb(mix((air, 0, -2), (notes, 0.03, -10)), 0.45, 0.18, ring=0.5)
-    cue(length(y, 1.5, 0.6), 'room_exit', -26.0, stereo=True)
+    """Into My room: a quick rising C-major run with a light harp and wind bells. Out: the run falling."""
+    harp = fade(speed(src('harp_e', 0.0, 1.4), -4), 0.01, 0.8)
+    bells = hp(fade(src('windbells', 0.2, 1.4), 0.02, 0.9), 3500)
+    y = mix((plucks(['C5', 'E5', 'G5', 'C6'], 0.045), 0, 0), (harp, 0.03, -12), (bells, 0.12, -18))
+    cue(length(verb(y, 0.45, 0.16, ring=0.5), 1.3, 0.8), 'room_enter', -24.0, stereo=True)
+    y = plucks(['G5', 'E5', 'C5'], 0.045)
+    cue(length(verb(y, 0.35, 0.14, ring=0.4), 0.6, 0.35), 'room_exit', -27.0, stereo=True)
 
 
 # ---- handling things (placed where it happens) ----------------------------------------------------

@@ -74,6 +74,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	_picks.clear()
 	round_condition.set_value(&"target", ODD if _odd else String(_toys[_target]))
 	round_condition.set_value(&"toys", spots.size())
+	instruct("Find the toy I name. Reach out and grab it. Raise your hand if you need help.", false)
 	say("Find the %s with a different colour!" % _toys[_target] if _odd else "Find the %s!" % _toys[_target])
 
 

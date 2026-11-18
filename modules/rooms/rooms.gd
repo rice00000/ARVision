@@ -7,6 +7,7 @@ var is_open := false
 
 func _ready() -> void:
 	Events.home_toggled.connect(_toggle)
+	Events.furniture_editing.connect(func(active: bool) -> void: App.reality.room_walk_enabled = active)
 
 
 func choose(id: StringName) -> bool:
@@ -16,6 +17,7 @@ func choose(id: StringName) -> bool:
 		return false
 	selected = id
 	if is_open:
+		_anchor_frame()
 		_show()
 	Events.room_changed.emit(id)
 	Events.report(&"room_selected", {room = id})
@@ -25,12 +27,17 @@ func choose(id: StringName) -> bool:
 func _toggle(open: bool) -> void:
 	is_open = open
 	if open:
-		var eye := App.head().global_transform
-		var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
-		App.reality.room_frame = Transform3D(Basis.looking_at(forward), Vector3(eye.origin.x, 0, eye.origin.z))
+		_anchor_frame()
 		_show()
 	else:
+		App.reality.room_walk_enabled = false
 		App.reality.show_home_room(null)
+
+
+func _anchor_frame() -> void:
+	var eye := App.head().global_transform
+	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
+	App.reality.room_frame = Transform3D(Basis.looking_at(forward), Vector3(eye.origin.x, 0, eye.origin.z))
 
 
 func _show() -> void:

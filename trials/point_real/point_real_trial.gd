@@ -32,6 +32,7 @@ func _ready() -> void:
 func _setup(_round_condition: TrialCondition) -> void:
 	_label = ""
 	_attempts.clear()
+	instruct("Look around the room.", false)
 	_choose(App.module(&"Detector").detections)
 	if _label.is_empty():
 		say("Look around the room.")

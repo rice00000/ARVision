@@ -58,7 +58,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	_ending = StudyEnding.new()
 	_board.add_child(_ending)
 	_ending.completed.connect(_study_finished)
-	say("Match each thing to its outline. Pinch, carry, then let go.")
+	instruct("Match each thing to its outline. Pinch, carry, then let go.")
 
 
 ## The nearest outline underneath the released object, independent of the held object's identity.

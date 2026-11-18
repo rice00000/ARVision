@@ -74,7 +74,6 @@ script = ExtResource("5_level")
 id = &"outline"
 project = &"outline"
 title = "Ready to Study"
-completion = "Thanks for getting the desk ready!"
 plan = SubResource("level_3")
 
 [sub_resource type="Resource" id="bookshelf_block"]
@@ -97,7 +96,6 @@ script = ExtResource("5_level")
 id = &"bookshelf"
 project = &"bookshelf"
 title = "Bookshelf Match"
-completion = "The bookshelf is tidy. Nice work!"
 plan = SubResource("bookshelf_plan")
 
 [sub_resource type="Resource" id="sandwich_block"]
@@ -119,7 +117,6 @@ script = ExtResource("5_level")
 id = &"sandwich"
 project = &"sandwich"
 title = "Make a Sandwich"
-completion = "Lunch is ready. Nice work!"
 plan = SubResource("sandwich_plan")
 
 [sub_resource type="Resource" id="tidy_4"]
@@ -249,32 +246,6 @@ project = &"odd_color"
 title = "Odd Color"
 plan = SubResource("odd_colour_plan_2")
 
-[sub_resource type="Resource" id="odd_colour_hard"]
-script = ExtResource("3_block")
-trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.0
-pins = Dictionary[StringName, float]({
-&"colour_step": 2.0,
-&"match": 3.0
-})
-ray = false
-pause_between = 1.0
-
-[sub_resource type="Resource" id="odd_colour_plan_3"]
-script = ExtResource("2_plan")
-title = "Odd Color, level 3"
-greeting = ""
-farewell = ""
-blocks = Array[ExtResource("3_block")]([SubResource("odd_colour_hard")])
-
-[sub_resource type="Resource" id="odd_color_3"]
-script = ExtResource("5_level")
-id = &"odd_color_3"
-project = &"odd_color"
-title = "Odd Color"
-plan = SubResource("odd_colour_plan_3")
-
 [sub_resource type="Resource" id="odd_colour_adaptive_block"]
 script = ExtResource("3_block")
 trial = ExtResource("6_colour_adaptive")
@@ -301,4 +272,4 @@ plan = SubResource("odd_colour_adaptive_plan")
 [resource]
 script = ExtResource("1_task")
 title = "Tidy the shelf"
-levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("bookshelf"), SubResource("sandwich"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_3"), SubResource("odd_color_adaptive")])
+levels = Array[ExtResource("5_level")]([SubResource("shadow"), SubResource("similar_shadows"), SubResource("outline"), SubResource("bookshelf"), SubResource("sandwich"), SubResource("size"), SubResource("color"), SubResource("clutter"), SubResource("odd_color_1"), SubResource("odd_color_2"), SubResource("odd_color_adaptive")])

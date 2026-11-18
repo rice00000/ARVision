@@ -6,5 +6,4 @@
 
 [resource]
 script = ExtResource("1_adventure")
-level_done = "Well done, alchemist!"
 places = Array[ExtResource("2_place")]([ExtResource("3_motion")])

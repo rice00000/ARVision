@@ -90,12 +90,18 @@ func test_each_level_pays_its_configured_first_and_repeat_reward() -> void:
 	expect_eq(progress.reward(task, task.levels[1]), 3, "another level has its own first reward")
 
 
-func test_level_completion_waits_for_the_whole_reward_line() -> void:
+func test_level_completion_plays_one_reward_line_with_the_trophy() -> void:
 	await boot()
+	var said := record(Events.said)
 	var ended := record(App.module(&"Voice").line_finished)
+	var magic := App.module(&"Magic")
+	App.world._complete(TIDY, TIDY.levels[0])
+	expect(magic.has_node(^"LevelCelebration"), "the trophy appears immediately")
+	expect_eq(said, [["You earned 3 magic stones!"]], "speech starts with the trophy")
+	expect(await until(func() -> bool: return ended.size() == 1), "the first reward plays to the end")
 	await App.world._complete(TIDY, TIDY.levels[0])
-	expect_eq(ended, [["Well done, alchemist!", true], ["You earned 3 magic stones!", true]],
-		"both lines have played to the end before the menu can speak")
+	expect_eq(ended, [["You earned 3 magic stones!", true], ["You earned 2 magic stones!", true]],
+		"only the reward lines play, and completion waits for the voice")
 
 
 func test_turning_to_the_table_unfolds_its_menu() -> void:

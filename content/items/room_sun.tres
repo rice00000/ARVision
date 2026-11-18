@@ -6,4 +6,4 @@ script = ExtResource("1")
 title = "Sunny room"
 kind = 1
 scene = ExtResource("2")
-price = 1
+price = 0

@@ -31,8 +31,7 @@ const ARM_SECONDS := 0.8
 
 ## Tech demo: a right sweep breaks the real wall ahead ([WallBreak]).
 @export var break_wall := false
-## While Onion leads the motion route it speaks for the task: Wei's round line, his "Yes!..." and his
-## hint line stay quiet (wrong-direction feedback stays until the story chat replaces it).
+## While Onion leads the motion route, it supplies the success and help narration.
 static var onion_voice := false
 @export var wall_style: WallBreak.Style = WallBreak.Style.CRACK
 
@@ -47,6 +46,8 @@ var _tolerance := 0.0
 var _attempts: Array[Dictionary] = []
 ## Per hand, its latest wrong-way sweep, waiting for the hand to stop.
 var _wrong: Dictionary[StringName, Dictionary] = {}
+var _tutorial: MotionTutorial
+var _resume_at := ARM_SECONDS
 
 @onready var _cloud: MotionCloud = $Cloud
 @onready var _shimmer: AudioStreamPlayer3D = $Cloud/Shimmer
@@ -64,6 +65,7 @@ static func classify(displacement: Vector3, expected: Vector3, tolerance: float)
 func _setup(round_condition: TrialCondition) -> void:
 	_attempts.clear()
 	_wrong.clear()
+	_resume_at = ARM_SECONDS
 	_rng.randomize()
 	var pinned := int(round_condition.value(&"direction"))
 	var heading := pinned - 1
@@ -85,8 +87,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	round_condition.set_value(&"flow", _flow)
 	round_condition.set_value(&"signal_dots", signal_dots)
 	round_condition.set_value(&"seed", trial_seed)
-	if not onion_voice:
-		say("Which way do the dots go? Sweep your hand that way, then hold still.")
+	instruct("Watch the dots. Sweep your hand the way most of them go.", false)
 
 
 func focus_point() -> Vector3:
@@ -95,7 +96,7 @@ func focus_point() -> Vector3:
 
 func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float) -> void:
 	var onset := seconds() - duration
-	if onset < ARM_SECONDS:
+	if onset < _resume_at:
 		return
 	_trails[hand].show_sweep(from, to)
 	var result := classify(_frame.basis.inverse() * (to - from), _flow, _tolerance)
@@ -115,14 +116,48 @@ func _on_sweeping(hand: StringName, from: Vector3, to: Vector3, duration: float)
 	judge(&"good", _cloud.global_position)
 	if not onion_voice:
 		say("Yes! Now they all go together.")
-	if break_wall:
-		var eye := App.head().global_position
-		WallBreak.burst(eye, (_cloud.global_position - eye).normalized(), _frame.basis * _flow, wall_style)
-	_cloud.align()
+	_show_success()
 	finish(true, {attempts = _attempts.duplicate(), windups = windups.size(),
 		first_attempt_correct = _attempts[0].correct, first_onset_seconds = _attempts[0].onset_seconds,
 		response_onset_seconds = result.onset_seconds, gesture_seconds = result.duration_seconds,
 		angle_degrees = result.angle_degrees})
+
+
+func _show_success() -> void:
+	if not break_wall or condition.probe:
+		_cloud.align()
+		return
+	var flow := _frame.basis * _flow
+	var flight := WallBreak.strike_with(_cloud, App.head().global_position, flow, wall_style)
+	flight.tween_callback(_shimmer.stop)
+
+
+func _replay_tutorial(text: String) -> void:
+	if not break_wall:
+		say(text)
+		return
+	_tutorial_active = true
+	_wrong.clear()
+	_cloud.hide()
+	_shimmer.stream_paused = true
+	Events.say(text)
+	_tutorial = MotionTutorial.new()
+	add_child(_tutorial)
+	_tutorial.play(condition, _frame)
+	await _tutorial.settled
+	_tutorial.queue_free()
+	_tutorial = null
+	_cloud.show()
+	_shimmer.stream_paused = false
+	_resume_at = maxf(ARM_SECONDS, seconds() + 0.35)
+	_tutorial_active = false
+
+
+func _teardown() -> void:
+	if _tutorial:
+		_tutorial.stop()
+		_tutorial.queue_free()
+		_tutorial = null
 
 
 ## The hand stopped after going the wrong way: that was its answer.

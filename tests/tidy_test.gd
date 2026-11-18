@@ -264,7 +264,7 @@ func test_clutter_scatters_junk_that_fits_no_sticker_among_the_things() -> void:
 
 func test_odd_colour_levels_narrow_the_gap_with_three_blocks_and_one_blank_cubby() -> void:
 	var previous_gap := INF
-	for level_id in [&"odd_color_1", &"odd_color_2", &"odd_color_3"]:
+	for level_id in [&"odd_color_1", &"odd_color_2"]:
 		await boot(SHELF_TASK.level_by_id(level_id).plan)
 		App.session.run()
 		await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running())

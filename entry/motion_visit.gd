@@ -1,6 +1,6 @@
 class_name MotionVisit
 extends Node
-## Onion's unscored demonstration, the Steady Flow level, and the closing.
+## Onion's Steady Flow level and closing.
 
 const Motion := preload("res://trials/motion/motion_trial.gd")
 const Tidy := preload("res://trials/tidy/tidy_trial.gd")
@@ -49,14 +49,8 @@ func run_after_shelf() -> void:
 ## The motion part on its own (also the DEV jump "Motion").
 func run_motion() -> void:
 	_onion = App.main.get_node_or_null(^"Workshop") as Workshop
-	SceneMarker.show_text("Tutorial")
 	if _onion != null:
 		_onion.attend(null)
-	await _narrator.say("Watch what happens when they move together.")
-	await _narrator.say("Here, let me show you.")
-	await _tutorial()
-	await _narrator.say("Your turn.")
-	await _narrator.say("Watch which way the dots are moving, then sweep your hand that way.")
 	SceneMarker.show_text("Motion")
 	Motion.onion_voice = true
 	_in_motion = true
@@ -131,25 +125,6 @@ func _on_trial_ended(_skill: StringName, success: bool, _data: Dictionary) -> vo
 		await get_tree().create_timer(SETTLE, false).timeout
 		await _narrator.say("There! You did that.")
 		await _narrator.say("The room has a few surprises left in it.")
-
-
-## The unscored demonstration (chat A's MotionTutorial): dots at full coherence, the teaching hand's
-## sideways sweep, Wei's effect once; nothing logged, no round. Onion turns to follow it.
-func _tutorial() -> void:
-	var tutorial := MotionTutorial.new()
-	add_child(tutorial)
-	var condition := _motion_condition()
-	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var frame := Transform3D(Basis.looking_at(ahead), eye.origin + ahead * MotionCloud.distance(condition))
-	tutorial.effect_started.connect(func() -> void:
-		if _onion != null:
-			_onion.attend(frame.origin))
-	tutorial.play(condition, frame)
-	await tutorial.settled
-	tutorial.queue_free()
-	if _onion != null:
-		_onion.attend(null)
 
 
 func _motion_condition() -> TrialCondition:

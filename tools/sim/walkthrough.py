@@ -93,7 +93,7 @@ def walk(sim):
             look_at_table(child)
             child.actor.point("right", tuple(target["centre"]), expect=target["id"])
             sim.wait(0.15)
-            capture(sim, "11-success-ring", "Right pick: a ring over it, the toy lifts, a rising chime")
+            capture(sim, "11-right-pick", "Right pick: the toy lifts, gold sparkles rise and a chime plays")
             check(sim.events("trial_ended")[-1]["success"], "solved")
         else:
             child.play_round(started, ["right"])

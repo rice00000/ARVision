@@ -14,7 +14,7 @@ extends Resource
 @export var pins: Dictionary[StringName, float] = {}
 ## How the real world is shown. Empty = normal.
 @export var view: View
-## Said once before the first round.
+## Replay tutorial for training, read before the first round in a probe.
 @export var intro := ""
 ## Point and pinch from afar with the hand ray. Off: the child reaches out and
 ## grabs (touch, pinch on it, or close the hand on it); the ray then shows only

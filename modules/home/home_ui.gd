@@ -149,15 +149,18 @@ static func preview(parent: Node3D, item: ItemDef, at: Vector3, size: float) -> 
 	var visual: Node3D = item.scene.instantiate()
 	holder.add_child(visual)
 	if item.kind == ItemDef.Kind.ROOM:
-		visual.get_node(^"Sky").free()
-		visual.get_node(^"Roof").free()
-		visual.get_node(^"Front").free()
+		for part in [^"Sky", ^"Roof", ^"Front", ^"Sides"]:
+			visual.get_node(part).free()
 	var bounds := bounds_of(visual)
-	var ratio := size / maxf(bounds.size.x, maxf(bounds.size.y, bounds.size.z))
+	var extent := maxf(bounds.size.x, maxf(bounds.size.y, bounds.size.z))
+	if item.kind == ItemDef.Kind.FURNITURE:
+		# Leave room for the corners of wide furniture as the preview rotates.
+		extent = maxf(extent, bounds.size.length() / 1.25)
+	var ratio := size / extent
 	visual.scale = Vector3.ONE * ratio
 	visual.position = -bounds.get_center() * ratio
 	holder.position = at
-	holder.rotation = Vector3(0.28, -0.35, 0) if item.kind == ItemDef.Kind.ROOM else Vector3(0.10, -0.35, 0)
+	holder.rotation = Vector3(0.31, -0.23, 0) if item.kind == ItemDef.Kind.ROOM else Vector3(0.10, -0.35, 0)
 	return holder
 
 

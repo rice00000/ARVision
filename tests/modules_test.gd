@@ -60,7 +60,9 @@ func test_the_mix_puts_the_voice_over_the_sounds_over_the_piano() -> void:
 	var piano := App.module(&"Music").get("_player") as AudioStreamPlayer
 	expect(piano.playing and piano.bus == &"Music" and (piano.stream as AudioStreamOggVorbis).loop, "the piano loops")
 	Events.feedback.emit(&"good", Vector3(0.0, 0.8, -0.4))
-	expect_eq((App.module(&"Feedback").get_child(0) as AudioStreamPlayer3D).bus, &"SFX", "chimes on the SFX bus")
+	var feedback := App.module(&"Feedback")
+	expect_eq(feedback.get_child_count(), 1, "success plays a chime without a mark")
+	expect_eq((feedback.get_child(0) as AudioStreamPlayer3D).bus, &"SFX", "chimes on the SFX bus")
 
 
 func test_a_sound_plays_from_where_it_happens_and_leaves_with_its_scene() -> void:

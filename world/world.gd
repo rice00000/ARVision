@@ -176,6 +176,5 @@ func _choose() -> Array:
 func _complete(task: Task, level: TaskLevel) -> void:
 	var stones := App.main.progress.complete(task, level)
 	Events.report(&"task_done", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
-	await Events.say(level.completion if not level.completion.is_empty() else adventure.level_done, self)
 	if stones > 0:
 		await Events.say("You earned %d magic stones!" % stones if stones != 1 else "You earned one magic stone!", self)

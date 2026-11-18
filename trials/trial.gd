@@ -28,6 +28,7 @@ const GROUP := &"trial"
 var def: TrialDef
 ## The block has no ray ([member Block.ray]): the child must reach what it picks.
 var grab := false
+var tutorial_intro := ""
 ## Settings of the round in progress.
 var condition: TrialCondition
 ## Wrong attempts this round.
@@ -40,13 +41,20 @@ var _running := false
 var _elapsed := 0.0
 ## [member _elapsed] at which the next hint is due; 0 = none.
 var _hint_at := 0.0
+var _instruction := ""
+var _tutorial_button: EntryButton
+var _tutorial_active := false
 
 
 func _ready() -> void:
 	add_to_group(GROUP)
 	Events.selected.connect(func(hand: StringName, target: Target, origin: Vector3, direction: Vector3) -> void:
 		if _live():
-			_on_selected(hand, target, origin, direction))
+			if _tutorial_button and target == _tutorial_button.target:
+				_tutorial_button.flash()
+				_replay_tutorial(tutorial_intro if not tutorial_intro.is_empty() else _instruction)
+			else:
+				_on_selected(hand, target, origin, direction))
 	Events.touched.connect(func(hand: StringName, target: Target) -> void:
 		if _live():
 			_on_touched(hand, target))
@@ -75,7 +83,18 @@ func begin(round_condition: TrialCondition) -> void:
 	hint_level = 0
 	_elapsed = 0.0
 	_running = true
+	_instruction = ""
 	_setup(condition)
+	if not condition.probe and (not tutorial_intro.is_empty() or not _instruction.is_empty()):
+		if _tutorial_button == null:
+			_tutorial_button = EntryButton.new()
+			_tutorial_button.name = "ReplayTutorial"
+			add_child(_tutorial_button)
+			_tutorial_button.setup("Replay tutorial", &"replay_tutorial", Color(0.24, 0.31, 0.40), Vector2(0.20, 0.052), 0.01, 34)
+			_tutorial_button.target.show_ray = false
+		_tutorial_button.global_transform = in_front(0.85, -0.36).translated_local(Vector3(-0.42, 0.0, 0.0))
+		_tutorial_button.show()
+		_tutorial_button.target.collision_layer = Pointer.UI_LAYER
 	App.reality.focus_on(focus_point())
 	_arm_hint()
 	Events.trial_started.emit(condition.trial, condition.to_log())
@@ -86,6 +105,7 @@ func finish(success: bool, extra: Dictionary = {}) -> void:
 	if not _running:
 		return
 	_running = false
+	_hide_tutorial()
 	var data := condition.to_log()
 	data.merge({seconds = snappedf(_elapsed, 0.001), tries = tries, hint = hint_level,
 		first_try = success and tries == 0 and hint_level == 0}, true)
@@ -100,6 +120,7 @@ func abandon() -> void:
 	if not _running:
 		return
 	_running = false
+	_hide_tutorial()
 	_teardown()
 	Events.report(&"round_abandoned", {trial = condition.trial, round = condition.round_index})
 	ended.emit(false, false)
@@ -133,6 +154,13 @@ func seconds() -> float:
 
 func say(text: String) -> void:
 	Events.say(text)
+
+
+## Save an instruction for replay. A brief opening cue can also play as the first round starts.
+func instruct(text: String, announce := true) -> void:
+	_instruction = text
+	if announce and (condition.probe or condition.round_index == 0):
+		say(text)
 
 
 ## The child picked [param what] when [param target] was asked for. Call before
@@ -176,6 +204,10 @@ func _teardown() -> void:
 	pass
 
 
+func _replay_tutorial(text: String) -> void:
+	say(text)
+
+
 ## Show help at [param level], 1 = gentlest, up to [member TrialDef.max_hint].
 func _hint(_level: int) -> void:
 	pass
@@ -213,7 +245,7 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
-	if not _running:
+	if not _running or _tutorial_active:
 		return
 	_elapsed += delta
 	if _hint_at > 0.0 and _elapsed >= _hint_at:
@@ -224,7 +256,13 @@ func _process(delta: float) -> void:
 
 
 func _live() -> bool:
-	return _running and not get_tree().paused
+	return _running and not _tutorial_active and not get_tree().paused
+
+
+func _hide_tutorial() -> void:
+	if _tutorial_button:
+		_tutorial_button.hide()
+		_tutorial_button.target.collision_layer = 0
 
 
 func _arm_hint() -> void:

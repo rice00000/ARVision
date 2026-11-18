@@ -71,7 +71,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	_counter.add_child(_serving)
 	_serving.position = PLATE
 	_serving.completed.connect(_served)
-	say("Copy the sample from the bottom up. Pinch a piece, then let go above the plate.")
+	instruct("Copy the sample from the bottom up. Pinch a piece, then let go above the plate.")
 
 
 func _add_ingredient(key: String, at: Vector3) -> void:

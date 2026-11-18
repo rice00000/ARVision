@@ -64,6 +64,7 @@ signal home_toggled(open: bool)
 ## Staff tools: play Onion's room intro again (it opens the room).
 signal room_intro_requested
 signal room_changed(id: StringName)
+signal room_repositioned
 signal furniture_requested(id: StringName)
 signal furniture_editing(active: bool)
 signal furniture_store_requested

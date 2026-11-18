@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://content/items/visuals/find_toy.gd" id="1"]
+
+[node name="Cone" type="Node3D"]
+script = ExtResource("1")
+shape = &"cone"
+colour = Color(0.98, 0.8, 0.2, 1)

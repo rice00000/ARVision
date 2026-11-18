@@ -238,7 +238,7 @@ func _build() -> void:
 	menu_slot.scale = Vector3.ONE * MENU_SCALE
 	menu_slot.add_to_group(App.PLAYER_MENU_SLOT)
 	add_child(menu_slot)
-	var header := _label(_place.title, 50)
+	var header := _label("Levels", 50)
 	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	header.position = Vector3(-width * 0.5, top - HEADER_ROW * 0.5, 0.0)
 	add_child(header)

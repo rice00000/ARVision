@@ -127,8 +127,9 @@ func _run_block(announce_plan: bool) -> void:
 	trial = def.scene.instantiate()
 	trial.def = def
 	trial.grab = not block.ray
+	trial.tutorial_intro = block.intro
 	App.stage.add_child(trial)
-	if announce_plan:
+	if announce_plan and block.probe:
 		await Events.say(block.intro, self)
 	var round_index := 0
 	while not _skip and (block.rounds < 0 or round_index < block.rounds):

@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" path="res://content/rooms/gallery.tscn" id="2"]
 [resource]
 script = ExtResource("1")
-title = "Window gallery"
+title = "Ocean Loft"
 kind = 1
 scene = ExtResource("2")
 price = 4

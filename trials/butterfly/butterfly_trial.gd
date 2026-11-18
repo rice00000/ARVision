@@ -81,10 +81,9 @@ func _setup(round_condition: TrialCondition) -> void:
 		_net.lay(rest, _frame.origin)
 		say("Pick up the net from the table.")
 	if swarm:
-		if round_condition.round_index == 0:
-			say("Which way do most butterflies fly? Swing your net to meet them.")
+		instruct("Which way do most butterflies fly? Swing your net to meet them.", false)
 	else:
-		say("Catch the butterflies! Swing your net to meet them.")
+		instruct("Catch the butterflies! Swing your net to meet them.", false)
 
 
 ## Catch them all: a fresh flock on one or two circles.

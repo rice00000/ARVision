@@ -1,8 +1,8 @@
 extends Module
-## A judged response, given two ways: a sound and a mark where it happened
-## (tracked hands cannot vibrate). Never colour alone: good is two bright notes rising
-## and a ring, bad a soft low wooden "oh-oh" and a cross, hint a glassy ping and a dot.
-## A won level gets a harp-and-chime flourish. The sounds are in C major like the piano
+## A sound where each response happened: two rising notes for success, a soft
+## wooden "oh-oh" for a mistake, and a glassy ping for a hint.
+## Mistakes also get a cross and hints a dot.
+## A won level gets a flourish timed to the trophy clip. The sounds are in C major like the piano
 ## (tools/sound/design.py); takes alternate so a long session never repeats one note pair.
 
 const SOUNDS := {
@@ -11,7 +11,7 @@ const SOUNDS := {
 	hint = [preload("sounds/hint_1.ogg"), preload("sounds/hint_2.ogg")],
 }
 const WIN := preload("sounds/win.ogg")
-const COLOURS := {good = Color(0.3, 0.9, 0.4), bad = Color(0.95, 0.35, 0.3), hint = Color(1.0, 0.85, 0.3)}
+const COLOURS := {bad = Color(0.95, 0.35, 0.3), hint = Color(1.0, 0.85, 0.3)}
 
 var _take: Dictionary[StringName, int] = {}
 
@@ -29,6 +29,7 @@ func _play_fanfare(_task: StringName, _level: int, _stones: int) -> void:
 	var player := AudioStreamPlayer.new()
 	player.stream = WIN
 	player.bus = &"SFX"
+	player.volume_db = -8.0 # Leave room for the reward announcement.
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
@@ -46,7 +47,8 @@ func _on_feedback(kind: StringName, at: Vector3) -> void:
 	player.global_position = at
 	player.finished.connect(player.queue_free)
 	player.play()
-	_mark(kind, at)
+	if kind != &"good":
+		_mark(kind, at)
 
 
 ## A shape that pops up at [param at], faces the eyes and fades.
@@ -57,12 +59,7 @@ func _mark(kind: StringName, at: Vector3) -> void:
 	material.no_depth_test = true
 	material.albedo_color = COLOURS[kind]
 	var mark := Node3D.new()
-	if kind == &"good":
-		var ring := TorusMesh.new()
-		ring.inner_radius = 0.05
-		ring.outer_radius = 0.065
-		_add_mesh(mark, ring, material, Vector3(PI / 2.0, 0.0, 0.0))
-	elif kind == &"bad":
+	if kind == &"bad":
 		for angle in [PI / 4.0, -PI / 4.0]:
 			var bar := BoxMesh.new()
 			bar.size = Vector3(0.12, 0.022, 0.01)

@@ -501,7 +501,7 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 3, "the tutorial grants the first reward")
 	expect(_said_line(said, "There. Everything's found its place."), "Onion closes the level")
 	expect(_said_line(said, "Thank you for helping."), "and thanks the child")
-	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
+	expect(not _said_line(said, "You earned 3 magic stones!"), "Onion owns the tutorial closing")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
 	var more: UITarget
 	if not await until(func() -> bool: return app.find_child("visit_more_shelf", true, false) != null, 20.0):
@@ -688,22 +688,33 @@ func test_the_first_visit_does_not_claim_success_after_a_time_out() -> void:
 	expect(_said_line(said, "Thank you for helping."), "a neutral thank-you")
 
 
-func test_the_motion_route_leads_wei_s_rounds_with_onion_s_lines_only() -> void:
+func test_the_motion_route_starts_play_and_replays_the_tutorial_on_request() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	var said := record(Events.said)
 	await jump_to_intro_part(&"motion")   # Wei moved the jumps into the facilitator Tools (Nov 9)
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
-	expect(await _until_said(said, "Watch what happens when they move together.", 30.0), "Onion introduces the demonstration")
-	expect(await _until_said(said, "Your turn.", 30.0), "then the child's turn")
-	expect(await until(func() -> bool: return App.session.trial != null, 30.0), "Wei's motion round runs")
+	expect(await until(func() -> bool: return App.session.trial != null, 5.0), "the motion round starts straight away")
 	expect(Motion.onion_voice, "with Wei's own lines switched off")
 	await wait(1.0)
 	expect(not _said_line(said, "Which way do the dots go? Sweep your hand that way, then hold still."), "his round line is not said")
 	var task := preload("res://content/tasks/break_wall.tres")
 	var plan := task.level_by_id(&"steady_flow").plan
 	expect_eq(App.session.plan, plan, "Onion plays the same Steady Flow level as the menu")
-	expect(not _said_line(said, plan.blocks[0].intro), "Onion supplies the level introduction")
+	expect(not _said_line(said, plan.blocks[0].intro), "the tutorial waits for a press")
+	var trial := App.session.trial
+	var replay := trial.find_child("replay_tutorial", true, false) as UITarget
+	expect(replay != null, "there is a replay tutorial button")
+	if replay:
+		var ended := record(Events.trial_ended)
+		await select(replay.global_position)
+		expect(_said_line(said, plan.blocks[0].intro), "pinching the replay button plays the lesson")
+		expect(not trial.find_children("*", "MotionTutorial", true, false).is_empty(), "a demonstration runs on demand")
+		var elapsed := trial.seconds()
+		await wait(0.5)
+		expect_eq(trial.seconds(), elapsed, "watching the example does not spend round time")
+		expect(ended.is_empty(), "the example does not answer the round")
+		expect(await until(func() -> bool: return trial.seconds() > elapsed, 10.0), "the same round resumes")
 
 
 func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_success_is_marked_once() -> void:
@@ -714,7 +725,7 @@ func test_the_motion_ending_thanks_the_child_whatever_the_outcome_and_the_first_
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the motion route loads")
 	var visit := App.main.get_node(^"FirstVisit/Visit/Motion") as MotionVisit
 	Engine.time_scale = 4.0
-	expect(await until(func() -> bool: return visit.get("_in_motion"), 60.0), "the motion rounds start after the tutorial")
+	expect(await until(func() -> bool: return visit.get("_in_motion"), 60.0), "the motion rounds start")
 	Events.trial_ended.emit(&"motion", true, {})
 	Events.trial_ended.emit(&"motion", true, {})
 	expect(await _until_said(said, "There! You did that.", 40.0), "the first success gets its lines")

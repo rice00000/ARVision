@@ -2,6 +2,7 @@ extends Module
 ## Port of XRVision inventory. Every mutation reports and saves atomically.
 
 const STONE := &"magic_stone"
+const STARTER_ROOM := &"room_sun"
 var _items: Dictionary[StringName, int] = {}
 
 
@@ -10,11 +11,14 @@ func _ready() -> void:
 
 
 func count(id: StringName) -> int:
+	if id == STARTER_ROOM: return 1
 	return _items.get(id, 0)
 
 
 func all() -> Dictionary[StringName, int]:
-	return _items.duplicate()
+	var owned := _items.duplicate()
+	owned[STARTER_ROOM] = 1
+	return owned
 
 
 func add(id: StringName, amount := 1) -> void:
@@ -23,7 +27,7 @@ func add(id: StringName, amount := 1) -> void:
 
 
 func take(id: StringName) -> bool:
-	if count(id) == 0:
+	if id == STARTER_ROOM or count(id) == 0:
 		return false
 	_set_count(id, count(id) - 1)
 	_changed(&"inventory_taken", {item = id})
@@ -66,5 +70,6 @@ func save_state() -> Dictionary:
 
 
 func load_state(data: Dictionary) -> void:
-	_items.assign(data.get("items", {&"room_sun": 1}))
+	_items.assign(data.get("items", {}))
+	_items.erase(STARTER_ROOM)
 	Events.inventory_changed.emit()

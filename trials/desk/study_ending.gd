@@ -6,6 +6,10 @@ const STUDENT := preload("res://trials/desk/assets/student.glb")
 const CHAIR := preload("res://trials/desk/assets/chair.glb")
 const FLOOR := -0.68
 const SEAT := Vector3(0.065, FLOOR, -0.60)
+const TIP := Vector3(0, 0, 0.0725) # The graphite end of the centred model is +Z.
+const GRIP := TIP - Vector3(0, 0, 0.040)
+const GRAB_AT := 3.13
+const WRITE_AT := 3.55
 
 signal completed
 
@@ -16,7 +20,9 @@ var _clock := 0.0
 var _sit := 0.0
 var _write := 0.0
 var _cover: Node3D
+var _notebook: Target
 var _pencil: Target
+var _pencil_rest: Transform3D
 var _paper_point := Vector3.ZERO
 
 
@@ -38,13 +44,12 @@ func _ready() -> void:
 func start(keys: Dictionary[Target, String]) -> void:
 	phase = "settling"
 	_clock = -0.35
-	var notebook: Target = keys.find_key("notebook")
+	_notebook = keys.find_key("notebook")
 	_pencil = keys.find_key("pencil")
-	_paper_point = notebook.position + Vector3(-0.016, 0.015, 0)
 	# The source notebook has separate bottom cover, top cover and pages.
-	var top: Node3D = notebook.get_node(^"Model").find_child("Box002", true, false) as Node3D
+	var top := _notebook.get_node(^"Model").find_child("Box002", true, false) as Node3D
 	_cover = Node3D.new()
-	notebook.add_child(_cover)
+	_notebook.add_child(_cover)
 	_cover.position = Vector3(-Props.size_of("notebook").x * 0.5, 0, 0)
 	top.reparent(_cover)
 
@@ -55,14 +60,19 @@ func _process(delta: float) -> void:
 	_clock += delta
 	if _clock < 0.0:
 		return
-	var next_phase := "arriving" if _clock < 1.8 else "sitting" if _clock < 2.7 else "opening" if _clock < 3.55 else "studying"
+	if phase == "settling":
+		# The last item may still have been moving to its outline when start ran.
+		_pencil_rest = _pencil.transform
+		var model := _notebook.get_node(^"Model") as Node3D
+		_paper_point = _notebook.transform * (model.position + Vector3(0.003, 0.010, 0.012))
+	var next_phase := "arriving" if _clock < 1.8 else "sitting" if _clock < 2.7 else "opening" if _clock < WRITE_AT else "studying"
 	if next_phase != phase:
 		phase = next_phase
 		Events.report(&"desk_ending", {phase = phase})
 	_actor.show()
 	var walk := smoothstep(0.0, 1.8, _clock)
 	_sit = smoothstep(1.8, 2.7, _clock)
-	_write = smoothstep(2.7, 3.55, _clock)
+	_write = smoothstep(2.7, WRITE_AT, _clock)
 	_actor.position = (SEAT + Vector3(0.55, 0, -0.32)).lerp(SEAT, walk) + Vector3.DOWN * 0.12 * _sit
 	_cover.rotation.z = 2.7 * _write
 	_skeleton.reset_bone_poses()
@@ -77,17 +87,37 @@ func _process(delta: float) -> void:
 	_aim("UpperArm.L", "LowerArm.L", Vector3(0.12, -1, stride * 0.6))
 	_aim("UpperArm.R", "LowerArm.R", Vector3(-0.12, -1, -stride * 0.6))
 	if _sit > 0:
-		var writing_point := _paper_point + Vector3(sin(_clock * 8) * 0.009, 0.02, cos(_clock * 5) * 0.006)
-		_arm("L", Vector3(0.13, 0.07, -0.35), Vector3(1, -0.3, -0.4))
-		_arm("R", writing_point + Vector3(0, 0.065, -0.015) if _write > 0 else Vector3(0.05, 0.07, -0.35), Vector3(-1, -0.3, -0.4))
-		_hand("L", false)
-		_hand("R", _write > 0)
+		_arm("R", Vector3(0.005, 0.045, -0.425), Vector3(-1, -0.3, -0.4))
+		_hand("R", 0.0)
+		_write_with_pencil()
 		_aim("Neck", "Head", Vector3(0, 1, _sit * 0.45))
-		if _write > 0:
-			_pencil.position = _pencil.position.lerp(writing_point + Vector3(0, 0.04, 0.015), _write)
-			_pencil.rotation = Vector3(-1.0, 0, -0.2)
 	if _clock >= 5.95:
 		completed.emit()
+
+
+func _write_with_pencil() -> void:
+	var reach := smoothstep(2.7, GRAB_AT, _clock)
+	var carry := smoothstep(GRAB_AT, WRITE_AT, _clock)
+	var pinch := smoothstep(2.94, GRAB_AT, _clock)
+	_hand("L", pinch)
+	var grip_offset := _pencil_grip() - _bone_point("Hand.L")
+	var stroke := maxf(0.0, _clock - WRITE_AT)
+	var tip := _paper_point + Vector3(sin(stroke * 8.0) * 0.009, 0, sin(stroke * 5.0) * 0.006)
+	var writing_basis := Basis.looking_at(Vector3(0.34, -0.79, 0.51), Vector3.UP, true)
+	var attitude := _pencil_rest.basis.slerp(writing_basis, carry)
+	var grip := (_pencil_rest * GRIP).lerp(tip + writing_basis * (GRIP - TIP), carry)
+	grip.y += 0.037 * sin(PI * carry)
+	var wrist := Vector3(0.153, 0.047, -0.424).lerp(grip - grip_offset, reach)
+	_arm("L", wrist, Vector3(1, -0.3, -0.4))
+	# Reapply the grip after the forearm turns, then attach to the posed fingers.
+	_hand("L", pinch)
+	if _clock >= GRAB_AT:
+		# The wrist is solved against the same grip; use the actual joint positions.
+		_pencil.transform = Transform3D(attitude, _pencil_grip() - attitude * GRIP)
+
+
+func _pencil_grip() -> Vector3:
+	return _bone_point("Thumb3.L").lerp(_bone_point("Index3.L"), 0.5)
 
 
 func _aim(bone_name: String, child_name: String, direction: Vector3) -> void:
@@ -133,7 +163,7 @@ func _bone_point(bone_name: String) -> Vector3:
 	return (get_parent() as Node3D).to_local(_skeleton.to_global(pose.origin))
 
 
-func _hand(side: String, gripping: bool) -> void:
+func _hand(side: String, grip: float) -> void:
 	var bone := _skeleton.find_bone("Hand." + side)
 	_skeleton.set_bone_pose_scale(bone, Vector3.ONE * 0.65)
 	var pose := _skeleton.get_bone_global_pose(bone)
@@ -144,7 +174,8 @@ func _hand(side: String, gripping: bool) -> void:
 	_skeleton.set_bone_global_pose(bone, pose)
 	for finger in ["Index", "Middle", "Ring", "Pinky"]:
 		for joint in [2, 3, 4]:
-			var bend := -0.85 if gripping else -0.22
+			var curl := -0.65 if finger == "Index" else -1.0
+			var bend := lerpf(-0.22, curl, grip)
 			_skeleton.set_bone_pose_rotation(_skeleton.find_bone("%s%d.%s" % [finger, joint, side]), Quaternion(Vector3.RIGHT, bend))
 
 

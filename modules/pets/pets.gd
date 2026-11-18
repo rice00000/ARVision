@@ -58,6 +58,9 @@ func _ready() -> void:
 	_root.visible = false
 	add_child(_root)
 	Events.home_toggled.connect(_toggle)
+	Events.room_repositioned.connect(func() -> void:
+		_stop_gesture(false)
+		_root.global_transform = App.reality.room_frame)
 	Events.furniture_editing.connect(_room_page_changed)
 	Events.room_changed.connect(func(_id: StringName) -> void: _enter.call_deferred())
 	Events.inventory_changed.connect(_sync)

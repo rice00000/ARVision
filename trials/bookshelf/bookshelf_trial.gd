@@ -53,7 +53,7 @@ func _setup(round_condition: TrialCondition) -> void:
 			home.x = -home.x
 		var turn := PI * 0.5 if key == "pencil" else 0.0
 		_add_thing(key, Transform3D(Basis(Vector3.UP, turn), home), factor)
-	say("Pinch a thing, carry it to its glass shape, then let go.")
+	instruct("Pinch a thing, carry it to its glass shape, then let go.")
 
 
 func _build_shelf(mirrored: bool, foot_height: float) -> void:

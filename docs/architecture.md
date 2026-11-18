@@ -43,7 +43,7 @@ Without a plan the [World](world.md) chooses: it plays one `Task` level (a plan)
 Children of `Main/Modules`; delete a node to unplug it. A trial that needs one lists it in `TrialDef.requires` and the session skips its blocks.
 
 - **Voice:** subtitles + [baked speech](baked-speech.md) (audio files made ahead of time).
-- **Feedback:** sound, shape mark and vibration for good / bad / hint, and the level-win flourish.
+- **Feedback:** positional chimes, a cross for mistakes, a dot for hints, and the level-win flourish.
 - **Sound:** named effects (`Events.play(&"place", at)`), from where things happen; menus, My room and scene changes. [Mix and sources](../modules/sound/README.md).
 - **Music:** the piano loop under everything; it dips under the voice.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.

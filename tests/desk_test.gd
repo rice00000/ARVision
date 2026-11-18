@@ -46,11 +46,6 @@ func test_outline_level_uses_the_desk_and_keeps_saved_identity() -> void:
 	expect_eq(level.plan.blocks[0].trial, DESK, "the old shelf-outline path is replaced")
 	expect_eq(level.plan.blocks[0].rounds, 1, "one complete desk")
 	expect(not level.plan.blocks[0].ray, "reach and pinch")
-	await boot()
-	var said := record(Events.said)
-	await App.world._complete(TASK, level)
-	expect_eq(said[0][0], level.completion, "the desk has everyday completion wording")
-	expect(not String(said[0][0]).contains("alchemist"), "no forced alchemist story")
 
 
 func test_pickup_hover_and_help_never_reveal_the_matching_outline() -> void:

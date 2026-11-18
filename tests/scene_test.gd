@@ -4,32 +4,27 @@ extends TestCase
 const FIND := preload("res://trials/find/find.tres")
 
 
-func _press(id: String) -> void:
-	var panel: Node3D = App.module(&"Facilitator").get("_panel")
-	await select((panel.find_child(id, true, false) as Target).global_position)
+func _press_game_menu(id: String) -> void:
+	await wait(0.35)
+	await select((app.find_child(id, true, false) as Target).global_position)
 
 
-func test_the_menu_switches_freely_between_all_three_scenes() -> void:
+func test_the_player_menu_switches_between_games() -> void:
 	await boot(null, &"intro")
 	app.autostart = true
 	var rig := App.rig
 	var reality := App.reality
-	var facilitator := App.module(&"Facilitator")
-	for id: StringName in [&"global_motion", &"find_object", &"intro"]:
-		input.menu()
-		await frames(2)
-		await _press("fac_scenes")
-		var panel: Node3D = facilitator.get("_panel")
-		var current: Target = panel.find_child("fac_scene_" + String(app.current_scene), true, false)
-		expect(facilitator.get("_disabled")[current], "the current scene is marked and disabled")
-		await _press("fac_scene_" + String(id))
+	var home := App.module(&"Home")
+	for id: StringName in [&"global_motion", &"find_object"]:
+		await _press_game_menu("menu_open")
+		await _press_game_menu("menu_games")
+		expect(home.find_child("menu_game_" + String(app.current_scene), true, false) == null, "the current game cannot be reselected")
+		await _press_game_menu("menu_game_" + String(id))
 		expect(await until(func() -> bool: return app.current_scene == id and not app.switching), "switched to %s" % id)
-		expect(not facilitator.is_open and not get_tree().paused, "the menu closes and play resumes")
+		expect(not home.is_open and not get_tree().paused, "the menu closes and play resumes")
 		expect(App.rig == rig and App.reality == reality, "the rig and room stay")
 		expect_eq(get_tree().get_nodes_in_group(Module.GROUP).size(), app.get_node(^"Modules").get_child_count(), "modules stay without duplicates")
-		expect_eq(App.session.get_parent().name, {&"intro": &"Intro", &"find_object": &"FindTheObject", &"global_motion": &"GlobalMotion"}[id], "one active scene")
-	await wait(3.0)
-	expect(app.find_child("Entry", true, false) != null and App.world == null, "Intro can be replayed")
+		expect_eq(App.session.get_parent().name, {&"find_object": &"FindTheObject", &"global_motion": &"GlobalMotion"}[id], "one active scene")
 
 
 func test_switching_mid_round_clears_targets_voice_effects_and_view_without_scoring() -> void:
@@ -55,13 +50,12 @@ func test_switching_mid_round_clears_targets_voice_effects_and_view_without_scor
 	expect(ended.is_empty() and App.stage.get_child_count() == 0, "the old coroutine never starts another round")
 
 
-func test_game_targets_in_front_of_the_panel_cannot_block_a_scene_button() -> void:
+func test_game_targets_in_front_of_the_panel_cannot_block_a_game_button() -> void:
 	await boot()
-	input.menu()
-	await frames(2)
-	await _press("fac_scenes")
-	var panel: Node3D = App.module(&"Facilitator").get("_panel")
-	var button: Target = panel.find_child("fac_scene_global_motion", true, false)
+	await _press_game_menu("menu_open")
+	await _press_game_menu("menu_games")
+	await wait(0.35)
+	var button: Target = app.find_child("menu_game_global_motion", true, false)
 	var eye := App.head().global_position
 	var origin := eye + (button.global_position - eye).normalized() * 0.25 + Vector3.DOWN * 0.05
 	var blocker := Target.sphere(&"game_target", 0.08)
@@ -72,7 +66,7 @@ func test_game_targets_in_front_of_the_panel_cannot_block_a_scene_button() -> vo
 	await frames(2)
 	expect_eq(App.rig.pointer(&"right").cast(), button, "the panel gets the ray through the game target")
 	input.click(&"right", &"trigger_click")
-	expect(await until(func() -> bool: return app.current_scene == &"global_motion" and not app.switching), "the scene button works")
+	expect(await until(func() -> bool: return app.current_scene == &"global_motion" and not app.switching), "the game button works")
 
 
 func test_progress_survives_scene_switches_and_the_headset_keeps_its_pause() -> void:

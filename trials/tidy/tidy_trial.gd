@@ -193,19 +193,17 @@ func _setup(round_condition: TrialCondition) -> void:
 	if seeded:
 		randomize()   # back to chance for everything else
 	round_condition.set_value(&"stickers", ",".join(_cell_key))
-	if not onion_voice:
-		match _match:
-			SIZE:
-				say("Put each one on the shadow of its size!")
-			COLOUR:
-				say("Put each one on its colour!")
-			ODD_COLOUR:
-				say("Pinch the block with a different colour.")
-			COLOUR_PRACTICE:
-				if round_condition.round_index == 0:
-					say("Pinch the block with a different colour. To finish, open Menu and choose End practice.")
-			_:
-				say("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!")
+	match _match:
+		SIZE:
+			instruct("Put each one on the shadow of its size!", not onion_voice)
+		COLOUR:
+			instruct("Put each one on its colour!", not onion_voice)
+		ODD_COLOUR:
+			instruct("Pinch the block with a different colour.", not onion_voice)
+		COLOUR_PRACTICE:
+			instruct("Pinch the block with a different colour. To finish, open Menu and choose End practice.", not onion_voice)
+		_:
+			instruct("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!", not onion_voice)
 
 
 ## Where [param count] things lie on the bench: a jumbled zigzag across it, near and far in turn,

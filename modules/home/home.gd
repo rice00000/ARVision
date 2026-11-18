@@ -42,6 +42,7 @@ func _ready() -> void:
 	_panel.visible = false
 	add_child(_panel)
 	Events.selected.connect(_select)
+	Events.room_repositioned.connect(func() -> void: _anchor_panel(-0.035))
 	Events.scene_changing.connect(close)
 	Events.player_menu_requested.connect(open)
 	Events.room_requested.connect(func() -> void:
@@ -68,14 +69,17 @@ func open() -> void:
 	App.hold_pause(&"player_menu", true)
 	_update_entry()
 	Events.player_menu_toggled.emit(true)
-	var eye := App.head().global_transform
-	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
-	var height := clampf(-eye.basis.z.y * 0.48, -0.16, 0.16) - 0.035
-	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8),
-		eye.origin + forward * 0.48 + Vector3.UP * height)
+	_anchor_panel(clampf(-App.head().global_basis.z.y * 0.48, -0.16, 0.16) - 0.035)
 	_panel.visible = true
 	_show(&"menu")
 	Events.say("Point and pinch to keep playing, choose a game, or visit your room.")
+
+
+func _anchor_panel(height: float) -> void:
+	var eye := App.head().global_transform
+	var forward := Vector3(-eye.basis.z.x, 0, -eye.basis.z.z).normalized()
+	_panel.global_transform = Transform3D(Basis.looking_at(forward).scaled(Vector3.ONE * 0.8),
+		eye.origin + forward * 0.48 + Vector3.UP * height)
 
 
 func close() -> void:
@@ -157,7 +161,7 @@ func _activate() -> void:
 		&"home_use_room":
 			App.module(&"Rooms").choose(_item().id)
 			Events.say("Welcome to your room.")
-			_build()
+			_show(&"room")
 		&"home_place":
 			var id_to_place := _item().id
 			_show(&"room")
@@ -289,8 +293,12 @@ func _build() -> void:
 		HomeUI.button(_panel, &"home_cancel", "Cancel", "Go back without buying.", Vector3(-0.19, -0.19, 0.03), "cross")
 	_index = mini(_index, _catalogue().size() - 1)
 	var item := _item()
-	_preview = HomeUI.preview(_panel, item, Vector3(0, 0.065, 0.06), 0.19)
-	HomeUI.label(_panel, item.title, Vector3(0, -0.05, 0.04), 32)
+	if item.kind == ItemDef.Kind.ROOM:
+		HomeUI.label(_panel, item.title, Vector3(0.02, 0.172, 0.04), 32)
+		HomeUI.preview(_panel, item, Vector3(0, 0.080, 0.126), 0.245)
+	else:
+		_preview = HomeUI.preview(_panel, item, Vector3(0, 0.065, 0.06), 0.19)
+		HomeUI.label(_panel, item.title, Vector3(0, -0.05, 0.04), 32)
 	if _for_sale(item):
 		HomeUI.price(_panel, item.price, balance, Vector3(0, -0.095, 0.04))
 	if page in CONFIRM.values(): return
