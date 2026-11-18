@@ -19,8 +19,13 @@ extends Node3D
 ## Everything is pressed by pointing and pinching (a click on the laptop) or by a fingertip.
 ##
 ## The camera: the Quest's on a headset (PassthroughReality); on a laptop, its webcam.
-## The CV server (YOLO + SAM) runs on the laptop: python3 tools/cv_server.py
-## On a headset, give its address:  -- --cv-server=http://LAPTOP_IP:8765  (not yet tried).
+## The CV server (YOLO + SAM) runs on the laptop: python3 tools/cv_server.py (--host 0.0.0.0 for a headset).
+## On a headset, type the laptop's address on the board's number pad (the server prints it) and press
+## "Save address": it's kept on the headset (FitTracker.save_server) and the hub's Turn to fit uses it too.
+##
+## Since Nov 18 this scene is the grown-up's **setup page** (Staff tools → Scenes → "Turn to fit (real cup)"),
+## used before the child's session. The child plays Turn to fit in the workshop hub (TurnToFitActivity /
+## TurnToFitGame), which never shows this board.
 
 const TARGETS := ["left", "right", "toward"]
 const TITLES := {left = "handle left", right = "handle right", toward = "handle toward you"}
@@ -72,6 +77,8 @@ var _cards: Array[MeshInstance3D] = []
 var _board := {}                       # button id → EntryButton
 var _thumbs := {}                      # target name → card picture
 var _saved := false                    # the cards in use are the saved ones
+var _address := ""                     # the server address being typed on the number pad (digits and dots)
+var _address_label: Label3D
 
 
 func run() -> void:
@@ -153,6 +160,10 @@ func _press(id: StringName) -> void:
 		_stop()
 	elif id == &"fit_fits" and session == "turn" and game.playing:
 		game.commit()
+	elif key.begins_with("fit_key_"):
+		_type(key.trim_prefix("fit_key_"))
+	elif id == &"fit_server_save":
+		_save_address()
 	elif key.begins_with("fit_card_") and session == "pick" and game.playing:
 		if game.pick(int(key.trim_prefix("fit_card_"))).get("unclear", false):
 			_say_note("Hold the cup still, where the camera can see it, then pick again.")
@@ -195,6 +206,46 @@ func _on_captured(target: String, shape: PackedByteArray) -> void:
 func _add_card(target: String, shape: PackedByteArray) -> void:
 	shapes[target] = shape
 	_thumbs[target] = ImageTexture.create_from_image(FitTracker.picture(shape, PackedByteArray(), GOLD, 2))
+
+
+# --- the CV server's address (the number pad) -----------------------------------------------------
+
+## The address as typed: digits and dots, from "http://192.168.1.23:8765".
+static func address_of(url: String) -> String:
+	var host := url.trim_prefix("http://").trim_prefix("https://")
+	return host.split(":")[0] if host != "" else ""
+
+
+func _type(key: String) -> void:
+	match key:
+		"back":
+			_address = _address.left(-1)
+		"dot":
+			if _address.length() < 15:
+				_address += "."
+		_:
+			if _address.length() < 15:
+				_address += key
+	_show_address()
+
+
+func _save_address() -> void:
+	if _address.split(".", false).size() != 4:
+		_say_note("An address has four numbers with dots, e.g. 192.168.1.23 (the server prints it).")
+		return
+	var url := "http://%s:8765" % _address
+	FitTracker.save_server(url)
+	tracker.server = url
+	tracker.server_ok = true
+	_say_note("Server address saved on this headset: %s" % _address)
+	Events.report(&"turn_to_fit", {event = &"server_saved"})
+	_show_address()
+
+
+func _show_address() -> void:
+	if _address_label:
+		var saved := address_of(FitTracker.saved_server())
+		_address_label.text = "Server: %s%s" % [_address if _address != "" else "…", "  ✓ saved" if saved != "" and saved == _address else ""]
 
 
 # --- a saved setup (the cards and the cup's colours), per player --------------------------------
@@ -478,6 +529,21 @@ func _build() -> void:
 		button.position = Vector3(0, 0.12 - i * 0.04, 0)
 		_board[rows[i][0]] = button
 	_info = _label("", 18, Vector3(0, 0.165, 0), board)
+	# The number pad for the laptop's address (a headset can't be given it at launch), left of the buttons and low
+	# (clear of the menu tile and the gem).
+	_address = address_of(FitTracker.saved_server())
+	_address_label = _label("", 26, Vector3(-0.235, 0.0, 0), board)
+	var keys := ["1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "0", "back"]
+	for i in keys.size():
+		var key := EntryButton.new()
+		board.add_child(key)
+		key.setup({dot = ".", back = "←"}.get(keys[i], keys[i]), StringName("fit_key_" + keys[i]), BOARD, Vector2(0.045, 0.034), 0.004)
+		key.position = Vector3(-0.285 + (i % 3) * 0.05, -0.035 - (i / 3) * 0.04, 0)
+	var save_address := EntryButton.new()
+	board.add_child(save_address)
+	save_address.setup("Save address", &"fit_server_save", BOARD, Vector2(0.145, 0.034), 0.004)
+	save_address.position = Vector3(-0.235, -0.195, 0)
+	_show_address()
 	_refresh_board()
 	_draw(-1, PackedByteArray())
 

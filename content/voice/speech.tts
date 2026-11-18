@@ -66,7 +66,13 @@
     "The room has a few surprises left in it.",
     "We can come back to these.",
     "Have another look. Which way are they moving?",
-    "Take your time. Watch them for a moment."
+    "Take your time. Watch them for a moment.",
+    "This shadow is looking for its cup.",
+    "Turn the cup slowly, until it fits.",
+    "Hold the cup up, where I can see it.",
+    "Now just look at the cup. Press the button when it fits.",
+    "Hold it still. Which shadow is it making?",
+    "There. Everything's found its place."
   ],
   "say_sources": [
     "core",

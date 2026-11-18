@@ -4,6 +4,8 @@ POST /detect with a JPEG body. Reply:
     {"detections": [{"label": "cup", "confidence": 0.91, "box": [x0, y0, x1, y1]}]}
 Box corners run 0..1 from the image's top left; labels are COCO class names.
 
+GET /health: "ok" (Turn to fit asks this every few seconds; its hub piece is offered only while it answers).
+
 POST /segment?box=x0,y0,x1,y1 with a JPEG body (box in pixels, e.g. YOLO's cup box).
 Reply: a PNG mask the size of the picture, white = the object (MobileSAM, box prompt).
 Used for Turn to fit's capture step (claude/CV_TURN_TO_FIT_BUILD.md). The MobileSAM
@@ -87,6 +89,13 @@ def serve(detect, host, port, make_segment=None):
     segmenters = []  # MobileSAM loads on the first /segment, so /detect starts fast
 
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # "Are you there?" (Turn to fit's hub piece is offered only while the server answers)
+            if urlparse(self.path).path == "/health":
+                self._reply("text/plain", b"ok")
+            else:
+                self.send_error(404)
+
         def do_POST(self):
             url = urlparse(self.path)
             jpeg = self.rfile.read(int(self.headers["Content-Length"]))
@@ -117,7 +126,22 @@ def serve(detect, host, port, make_segment=None):
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"CV server on http://{host}:{server.server_port}/detect"
           + (" and /segment" if make_segment else ""), flush=True)
+    if host == "0.0.0.0":
+        print(f"On the headset, Turn to fit setup → Server: type {lan_address()}", flush=True)
     server.serve_forever()
+
+
+def lan_address():
+    """This laptop's address on the Wi-Fi (what the headset types in Turn to fit's setup)."""
+    import socket
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("10.255.255.255", 1))  # no packet is sent: it only picks the outgoing interface
+        return probe.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        probe.close()
 
 
 def main():

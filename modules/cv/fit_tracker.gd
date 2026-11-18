@@ -9,8 +9,14 @@ extends Node
 ##                       the first capture also teaches the cup's colours
 ##   every TRACK_EVERY   ShapeCV.track finds the cup by colour in the box → [signal stepped]
 ##
-## The server runs on the laptop: python3 tools/cv_server.py. Another address:  -- --cv-server=http://IP:8765
+## The server runs on the laptop: python3 tools/cv_server.py. Its address: [member server] (Staff tools →
+## Turn to fit setup saves it, see [method saved_server]), or  -- --cv-server=http://IP:8765
 ## Tests set [member use_server] false and give boxes and masks directly ([method set_box], [method add_capture]).
+##
+## Off the main thread (QUEST_POLISH_REVIEW A2, Nov 18): the camera readback stays on the main thread (Godot
+## needs it there), but the tracking (ShapeCV.track) and the JPEG encodes for the server run on the
+## WorkerThreadPool; one job of each kind at a time, and the results come back on the main thread. Detection
+## starts half a track step after tracking, so a grab and an encode never land in the same frame.
 
 const DEFAULT_SERVER := "http://127.0.0.1:8765"
 const TRACK_EVERY := 0.2
@@ -19,6 +25,11 @@ const DETECT_EVERY := 0.5
 const BOX_TIMEOUT := 1.5
 ## The panel picture: the 64 × 48 shape drawn this many times bigger.
 const PICTURE_SCALE := 5
+## The live shadow's picture: drawn this many times bigger, from a smoothed (bilinear) mask, so its edge is
+## soft instead of 5 mm steps (Megan, Nov 18, beat 1).
+const SMOOTH_SCALE := 6
+## Where the address of the CV server is kept on this device (Staff tools → Turn to fit setup).
+const SERVER_FILE := "user://cv_server.txt"
 
 ## Every TRACK_EVERY: the live shape (empty when the cup wasn't found) and the seconds since the last step.
 signal stepped(shape: PackedByteArray, dt: float)
@@ -39,6 +50,8 @@ var model := PackedFloat32Array()
 ## The last tracking result (ShapeCV.track), {} when there was none.
 var live := {}
 var track_ms := 0.0
+## False: track on the main thread, at once (tests that need a result in the same call).
+var threaded := true
 var server_ok := true
 ## The target waiting for /segment, or "".
 var capturing := ""
@@ -50,10 +63,17 @@ var _detecting := false
 var _capture_image: Image
 var _capture_box := Rect2i()
 var _detect_http := HTTPRequest.new()
+var _track_task := -1
+var _track_job := {}
+var _detect_task := -1
+var _detect_job := {}
 var _segment_http := HTTPRequest.new()
 
 
 func _ready() -> void:
+	var saved := saved_server()
+	if saved != "":
+		server = saved
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--cv-server="):
 			server = arg.trim_prefix("--cv-server=")
@@ -64,15 +84,18 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_collect()
 	_box_age += delta
 	if _box_age > BOX_TIMEOUT and use_server:
 		box = Rect2i()
 	_since_detect += delta
-	if use_server and _since_detect >= DETECT_EVERY and not _detecting:
+	_since_track += delta
+	var track_due := _since_track >= TRACK_EVERY
+	# Stagger: a grab for detection never shares a frame with the tracking grab (it waits a frame).
+	if use_server and _since_detect >= DETECT_EVERY and not _detecting and not track_due:
 		_since_detect = 0.0
 		_detect()
-	_since_track += delta
-	if _since_track >= TRACK_EVERY:
+	if track_due:
 		step(_since_track)
 		_since_track = 0.0
 
@@ -82,15 +105,65 @@ func grab() -> Image:
 	return source.call() if source.is_valid() else null
 
 
-## One tracking step (called by itself every TRACK_EVERY; tests may call it).
+## One tracking step (called by itself every TRACK_EVERY; tests may call it). Threaded: the work goes to the
+## WorkerThreadPool and [signal stepped] comes on a later frame; a step while the last one still runs is skipped.
 func step(dt: float) -> void:
-	live = {}
 	var image := grab()
-	if image != null and not model.is_empty() and box.size != Vector2i.ZERO:
+	var ready := image != null and not model.is_empty() and box.size != Vector2i.ZERO
+	if not threaded or not ready:
+		live = {}
+		if ready:
+			var start := Time.get_ticks_usec()
+			live = ShapeCV.track(image, box, model)
+			track_ms = (Time.get_ticks_usec() - start) / 1000.0
+		stepped.emit(live.shape if live.get("ok", false) else PackedByteArray(), dt)
+		return
+	if _track_task >= 0:
+		_track_job.dt = _track_job.dt + dt   # still working: this step's time joins the next result
+		return
+	var job := {image = image, box = box, model = model, dt = dt, result = {}, ms = 0.0}
+	_track_job = job
+	_track_task = WorkerThreadPool.add_task(func() -> void:
 		var start := Time.get_ticks_usec()
-		live = ShapeCV.track(image, box, model)
-		track_ms = (Time.get_ticks_usec() - start) / 1000.0
-	stepped.emit(live.shape if live.get("ok", false) else PackedByteArray(), dt)
+		job.result = ShapeCV.track(job.image, job.box, job.model)
+		job.ms = (Time.get_ticks_usec() - start) / 1000.0, false, "turn_to_fit_track")
+
+
+## Results of the worker jobs, back on the main thread.
+func _collect() -> void:
+	if _track_task >= 0 and WorkerThreadPool.is_task_completed(_track_task):
+		WorkerThreadPool.wait_for_task_completion(_track_task)
+		_track_task = -1
+		live = _track_job.result
+		track_ms = _track_job.ms
+		stepped.emit(live.shape if live.get("ok", false) else PackedByteArray(), _track_job.dt)
+	if _detect_task >= 0 and WorkerThreadPool.is_task_completed(_detect_task):
+		WorkerThreadPool.wait_for_task_completion(_detect_task)
+		_detect_task = -1
+		_send_detect(_detect_job.size, _detect_job.jpeg)
+
+
+func _exit_tree() -> void:
+	for task in [_track_task, _detect_task]:
+		if task >= 0:
+			WorkerThreadPool.wait_for_task_completion(task)
+	_track_task = -1
+	_detect_task = -1
+
+
+## The CV server's address saved on this device ("" = none).
+static func saved_server() -> String:
+	if not FileAccess.file_exists(SERVER_FILE):
+		return ""
+	return FileAccess.get_file_as_string(SERVER_FILE).strip_edges()
+
+
+## Saves the CV server's address on this device (Staff tools). "" forgets it.
+static func save_server(address: String) -> void:
+	var file := FileAccess.open(SERVER_FILE, FileAccess.WRITE)
+	if file:
+		file.store_string(address.strip_edges())
+		file.close()
 
 
 ## Tests and on-headset detectors: the cup's box, as if YOLO had just found it.
@@ -143,9 +216,19 @@ func _detect() -> void:
 	if image == null:
 		return
 	_detecting = true
-	_detect_http.set_meta(&"size", image.get_size())
+	if not threaded:
+		_send_detect(image.get_size(), image.save_jpg_to_buffer(0.85))
+		return
+	var job := {image = image, size = image.get_size(), jpeg = PackedByteArray()}
+	_detect_job = job
+	_detect_task = WorkerThreadPool.add_task(func() -> void: job.jpeg = job.image.save_jpg_to_buffer(0.85),
+		false, "turn_to_fit_jpeg")
+
+
+func _send_detect(size: Vector2i, jpeg: PackedByteArray) -> void:
+	_detect_http.set_meta(&"size", size)
 	if _detect_http.request_raw(server + "/detect", PackedStringArray(["Content-Type: image/jpeg"]),
-			HTTPClient.METHOD_POST, image.save_jpg_to_buffer(0.85)) != OK:
+			HTTPClient.METHOD_POST, jpeg) != OK:
 		_detecting = false
 
 
