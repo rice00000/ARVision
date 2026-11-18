@@ -60,10 +60,30 @@ func _ready() -> void:
 				failed.append("%s :: %s" % [path.get_file(), method.name])
 			case.queue_free()
 	Profile.wipe()
+	# Megan, Nov 18: every line the game says must be baked. A line said in the tests with no clip fails the run
+	# (lines a test makes up itself, written in a test script, don't count).
+	var missing := _unbaked_game_lines()
+	if not missing.is_empty():
+		print("\nUNBAKED SPEECH: %d line(s) the game says have no voice clip. Bake: python3 tools/bake_speech.py" % missing.size())
+		for text in missing:
+			print("  ", text)
+		failed.append("speech: %d unbaked line(s)" % missing.size())
 	print("\nTESTS: %d passed, %d failed" % [passed, failed.size()])
 	for name in failed:
 		print("  FAILED ", name)
 	get_tree().quit(failed.size())
+
+
+## The lines said with no baked clip, less those a test script wrote itself.
+func _unbaked_game_lines() -> PackedStringArray:
+	var tests := ""
+	for path in _scripts("res://tests"):
+		tests += FileAccess.get_file_as_string(path)
+	var missing := PackedStringArray()
+	for text in BakedSpeech.unbaked:
+		if not tests.contains(text):
+			missing.append(text)
+	return missing
 
 
 func _scripts(folder: String) -> Array[String]:

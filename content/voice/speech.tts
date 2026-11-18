@@ -15,6 +15,11 @@
     }
   },
   "lines": [
+    "stone",
+    "stones",
+    "hundred",
+    "and",
+    "minus",
     "1",
     "2",
     "3",
@@ -81,14 +86,19 @@
     "modules",
     "trials",
     "world",
-    "entry"
+    "entry",
+    "turn_to_fit"
   ],
   "resource_roots": [
     "content"
   ],
   "word_lists": [
     "trials/find/find_trial.gd:SHAPES",
-    "trials/point_real/point_real_trial.gd:labels"
+    "trials/point_real/point_real_trial.gd:labels",
+    "entry/fx/impression.gd:TITLES",
+    "entry/fx/impression.gd:LOOK_TITLES",
+    "entry/fx/stones_badge.gd:ONES",
+    "entry/fx/stones_badge.gd:TENS"
   ],
   "names": [
     "person",

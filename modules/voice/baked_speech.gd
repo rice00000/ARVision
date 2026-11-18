@@ -8,6 +8,8 @@ const INDEX := "res://content/voice/generated/index.json"
 static var _clips: Dictionary = {}
 static var _keys: Array = []
 static var _revision := ""
+## Every line asked for that had a part with no baked clip (the test runner fails on these; Megan, Nov 18).
+static var unbaked := PackedStringArray()
 
 
 static func normalize(text: String) -> String:
@@ -33,6 +35,8 @@ static func paths_for(text: String) -> PackedStringArray:
 				break
 		if found.is_empty():
 			push_error("[Speech] Unbaked text: %s. Add it to content/voice/speech.tts." % text)
+			if not unbaked.has(text):
+				unbaked.append(text)
 			return []
 		paths.append(_clips[found])
 		remaining = remaining.substr(found.length()).strip_edges()
