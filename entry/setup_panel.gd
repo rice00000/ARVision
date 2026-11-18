@@ -35,6 +35,7 @@ var _shown := false
 var _clock := 0.0
 var _mode_button: EntryButton
 var _skip_button: EntryButton
+var _new_save_button: EntryButton   # Megan, Nov 18: "New player save" on every setup screen
 
 ## The line at the foot of the plate.
 const HOW_TO_PRESS := "To press: aim the hand ray at a button, then pinch."
@@ -75,6 +76,12 @@ func _ready() -> void:
 	_mode_button.position = Vector3(-SIZE.x * 0.5 + 0.075, shortcut_y, 0.012)
 	add_child(_mode_button)
 	_mode_button.setup("", &"entry_mode", GREY, Vector2(0.15, 0.04), 0.01)
+	_new_save_button = EntryButton.new()
+	# Below the plate, left: the top row (Mode · Skip) has no room for a third button on a 46 cm plate.
+	_new_save_button.position = Vector3(-SIZE.x * 0.5 + 0.11, -SIZE.y * 0.5 - 0.03, 0.012)
+	add_child(_new_save_button)
+	_new_save_button.setup("", &"entry_new_save", GREY, Vector2(0.22, 0.04), 0.01)
+	show_new_save(false)
 	_skip_button = EntryButton.new()
 	_skip_button.position = Vector3(SIZE.x * 0.5 - SKIP_SIZE.x * 0.5, shortcut_y, 0.012)
 	add_child(_skip_button)
@@ -200,9 +207,16 @@ func show_mode(mode_name: String, dev: bool) -> void:
 	_mode_button.set_colour(Color(0.55, 0.42, 0.2) if dev else GREY)
 
 
+## The "New player save" toggle: on, Start (or Skip) begins the opening on a new save.
+func show_new_save(on: bool) -> void:
+	_new_save_button.set_text("New player save: " + ("on" if on else "off"))
+	_new_save_button.set_colour(GREEN if on else GREY)
+
+
 func _update_shortcuts() -> void:
 	var layer := Pointer.UI_LAYER if is_visible_in_tree() else 0
 	_mode_button.target.collision_layer = layer
+	_new_save_button.target.collision_layer = layer
 	_skip_button.target.collision_layer = layer
 
 

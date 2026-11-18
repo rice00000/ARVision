@@ -41,8 +41,8 @@ func test_about_a_second_of_quiet_after_the_signal_before_the_reveal() -> void:
 	await until(func() -> bool: return bool(entry.get("_part_running")), 10.0)
 	await until(func() -> bool: return sounds.played.has(&"seat"), 30.0)
 	var seated := Engine.get_process_frames()   # game time: the runner's --fixed-fps 60 outruns the clock
-	# A jump plays one part: Set in ends here, and in a full run the reveal starts right after it.
-	await until(func() -> bool: return not bool(entry.get("_part_running")), 10.0)
+	# A jump plays on (Megan, Nov 18): the reveal starts right after Set in.
+	await until(func() -> bool: return String(entry.beat).begins_with("6"), 10.0)
 	var gap := (Engine.get_process_frames() - seated) / 60.0
 	# The ring takes PlaceSignal.SECONDS; then Onion's 1 s rise; then the reveal (its light, or first the
 	# socket's slide where the layout moves it: neither starts while the ring plays).

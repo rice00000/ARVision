@@ -7,7 +7,7 @@ extends CanvasLayer
 ##   * the opening (Scenes 1-6): the next part, played fast; after the reveal, into the hub (with its welcome)
 ##   * a game (shelf, dots): every remaining round won
 ##   * Wei's room: back to the workshop
-##   * the hub, menu closed: open it
+##   * the hub, menu closed: open it; menu open: the leading game (and in its own row, the recommended level)
 ##   * otherwise, Onion talking: cut the line
 
 const NEXT_PART := {"1": &"touch", "2": &"emerge", "3": &"pickup", "4": &"place", "5": &"reveal"}
@@ -71,6 +71,12 @@ func skip() -> void:
 			Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
 			_say("menu opened")
 			return
+		if hub.state == &"hub" and not hub.ring.turning:   # Megan, Nov 18: the next game (its recommended level)
+			var piece: Impression = hub.row.leader() if hub.row != null and hub.row.opened else hub.ring.leader()
+			if piece != null and not piece.sealed:
+				Events.selected.emit(&"right", piece.target, Vector3.ZERO, Vector3.FORWARD)
+				_say("chose " + String(piece.kind))
+				return
 	elif entry != null and is_instance_valid(entry):
 		for id: StringName in [&"entry_skip_setup", &"entry_part_all"]:
 			var target := entry.find_child(String(id), true, false) as Target

@@ -65,6 +65,7 @@ func test_the_reveal_keeps_the_cauldron_puffs_and_speaks_with_no_shelf() -> void
 	expect(ref.get_ref() == null, "said as the puff has faded, not over it")
 	expect(not pivot.visible, "still no shelf while Onion speaks")
 	# Scene 7: the shelf no longer pops out here: the hub's ring offers it in the first visit.
-	expect(await until(func() -> bool: return not bool(entry.get("_part_running")), 20.0), "the reveal ends")
-	expect(box.visible, "with the cauldron still there")
-	expect(not pivot.visible and entry.find_child("shelf_impression", true, false) == null, "and no shelf (the hub offers it)")
+	# Megan, Nov 18: a jump plays on: after the reveal, the hub. The opening's cauldron goes on into it.
+	expect(await until(func() -> bool: return not is_instance_valid(entry) or String(entry.beat).begins_with("5"), 20.0), "the reveal ends")
+	expect(is_instance_valid(box) and box.visible, "with the cauldron still there")
+	expect(not is_instance_valid(pivot) or not pivot.visible, "and no shelf (the hub offers it)")

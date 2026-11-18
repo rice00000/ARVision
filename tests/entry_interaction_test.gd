@@ -1033,7 +1033,8 @@ func test_grabbing_the_gear_during_the_ask_takes_the_glow_and_the_hand_away_at_o
 	expect(await until(func() -> bool: return not _glowing(entry), 0.5), "the glow goes the moment it is grabbed")
 	expect(carry_node.held, "held")
 	expect(await until(func() -> bool: return not (entry.get("_demo") as DemoHand).visible, DemoHand.FADE_SECONDS + 0.3), "and the hand (shown from the ask on) fades away at once")
-	expect(await until(func() -> bool: return entry.get("_part_running") == false, 30.0), "the beat goes on to its end")
+	# Megan, Nov 18: a jump plays on (pickup, then set in, ...): the pickup beat ends when the next one starts.
+	expect(await until(func() -> bool: return not String(entry.beat).begins_with("4"), 30.0), "the beat goes on to its end")
 	expect(not _glowing(entry), "and the glow stays off")
 	input.press(&"right", &"trigger_click", false)
 
@@ -1664,7 +1665,7 @@ func test_an_instruction_the_child_still_needs_is_never_cut_and_a_press_on_onion
 	await _click_at(entry, pot.global_position + Vector3(0.0, -0.02, 0.0), 0.3)   # now the cauldron itself
 	await wait(0.3)
 	expect(entry.get("_tapped"), "a click on the cauldron is the tap")
-	expect(await until(func() -> bool: return not entry.get("_part_running"), 15.0), "and the beat goes on to its end")
+	expect(await until(func() -> bool: return not String(entry.beat).begins_with("2"), 15.0), "and the beat goes on to its end (a jump plays on)")
 	expect_eq(log.filter(func(e: Array) -> bool: return e[0] == "said" and e[1] == "Give the cauldron a little tap.").size(), 1, "still said once")
 
 

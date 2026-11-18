@@ -166,3 +166,23 @@ func test_redo_setup_in_the_staff_tools_runs_every_step_without_the_offer() -> v
 	expect(_target(&"entry_reuse_yes") == null, "Redo never offers the last setup")
 	expect(not Entry.redo_next, "and it is used once")
 	_done()
+
+
+## Megan, Nov 18: "New player save" on a setup screen, then Skip (or Start): the opening plays on a new save, from
+## the hello, with no setup questions; the old save is kept.
+func test_new_player_save_starts_the_opening_on_a_new_save() -> void:
+	await _boot_entry()
+	expect(await until(func() -> bool: return _target(&"entry_new_save") != null, 20.0), "the toggle is on the setup panel")
+	var before := Profile.id
+	HubMemory.get_or_make().mark_played(&"shelf")
+	Save.write()
+	await _press(&"entry_new_save")
+	expect(entry.new_save, "pinched: on")
+	await _press(&"entry_skip_setup")
+	expect(await until(func() -> bool: return Profile.id != before and App.main.current_scene == &"intro" and not App.main.switching, 30.0), "a new save")
+	expect(Profile.saves().has(before), "the old save is kept")
+	expect(HubMemory.get_or_make().played.is_empty(), "nothing played on the new one")
+	expect(await until(func() -> bool:
+		var opening := App.main.intro()
+		return opening != null and String(opening.beat).begins_with("1"), 30.0), "the opening plays from the hello, no setup asked")
+	_done()

@@ -119,8 +119,7 @@ func test_the_opening_reveal_shows_no_shelf_and_leaves_no_light_behind() -> void
 	var details: Array = entry.get("_details")
 	expect(await until(func() -> bool: return entry.find_children("reveal_light_*", "", true, false).is_empty(), 40.0),
 			"the light is gone once it has faded")
-	expect(await until(func() -> bool: return not bool(entry.get("_part_running")), 20.0), "the reveal part ends")
-	expect(details.all(func(d: Node3D) -> bool: return not d.visible), "no part of the shelf or its shapes is shown by the reveal")
+	expect(details.all(func(d: Node3D) -> bool: return not is_instance_valid(d) or not d.visible), "no part of the shelf or its shapes is shown by the reveal")
 
 
 func test_by_default_the_reveal_is_table_only_even_with_a_room_scan() -> void:

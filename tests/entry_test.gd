@@ -163,58 +163,51 @@ func test_start_plays_everything_into_the_world() -> void:
 	expect_eq(App.main.current_scene, &"first_visit", "in its own scene")
 
 
-func test_jumping_to_each_part_plays_only_that_part() -> void:
+## Megan, Nov 18: a jump sets everything as its part finds it, plays that part and then the rest of the story.
+func test_jumping_to_each_part_sets_it_up_and_plays_on() -> void:
 	await _boot_entry()
 	var said := record(Events.said)
 	await _to_setup_panel()
 	var orb: Node3D = entry.get("_orb")
+	var gear := entry.get("_gear") as Node3D
 
-	# Ripple first: the things are already on the table, Onion aside, workshop hidden.
-	await jump_to_intro_part(&"reveal")
-	await frames(2)
-	# (where the table is narrow the socket rides its drawn track at the start of the reveal; wait it out)
-	expect(await until(func() -> bool: return _docked(), 20.0), "ripple: the gear is already in its socket")
-	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "ripple: Onion is already up beside the socket (the lifted spot)")
-	expect(await _until_said(said, Entry.REVEAL_LINE, 60.0), "ripple: plays (the puff, then Onion's line)")
-	expect(not _said_line(said, "Oh! Hello there."), "ripple: no hello")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "ripple: the panel comes back")
-	expect_eq(_shown(entry.get("_details")), 0, "ripple: no shelf at the reveal (Scene 6; the hub offers it)")
-
-	# Hello: the workshop goes, the things go, Onion back inside.
+	# Hello: Onion inside, the gear hidden, no workshop.
 	await jump_to_intro_part(&"hello")
 	await frames(2)
-	expect_eq(_shown(entry.get("_details")), 0, "hello: the workshop is hidden again")
-	expect(not (entry.get("_gear") as Node3D).visible, "hello: the gear is still hidden")
+	expect_eq(_shown(entry.get("_details")), 0, "hello: the workshop is hidden")
+	expect(not gear.visible, "hello: the gear is hidden")
 	expect(await _until_said(said, "I'm Onion, by the way."), "hello: plays")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "hello: the panel comes back")
 
-	# Touch: waits for the touch, then back to the panel (nothing comes out).
+	# Touch: waits for the tap; after it the story goes on: the gear comes out.
 	await jump_to_intro_part(&"touch")
 	await _touch_cauldron()
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "touch: the panel comes back after the touch")
-	expect(not (entry.get("_gear") as Node3D).visible, "touch: nothing comes out")
+	expect(await until(func() -> bool: return gear.visible, 30.0), "touch: after the tap, the gear comes out")
 
-	# Emerge: Onion moves aside, the gear comes out and (for now) sets itself in, then back to the panel.
+	# Emerge: the gear out on the table, waiting to be picked up.
 	await jump_to_intro_part(&"emerge")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "emerge: the panel comes back")
-	expect((entry.get("_gear") as Node3D).visible and not _docked(), "emerge: the gear is out on the table, waiting to be picked up")
+	expect(await until(func() -> bool: return gear.visible and not _docked(), 30.0), "emerge: the gear is out on the table")
 
-	# Pick up, then set in: the stand-in child does each, and the gear ends turning in its socket.
-	await jump_to_intro_part(&"pickup")   # Wei moved the jumps into the facilitator Tools (Nov 9)
-	expect(await until(func() -> bool: return entry.get("_part_running") == false, 30.0), "pickup: the beat ends once the gear is held")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "pickup: the panel comes back")
+	# Pick up: the stand-in child takes it, and the story plays on: it is set in.
+	await jump_to_intro_part(&"pickup")
+	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 60.0), "pickup, then place: the gear is seated")
+
+	# Set in: the gear ends turning in its socket.
 	await jump_to_intro_part(&"place")
-	expect(await until(func() -> bool: return (entry.get("_sounds") as Sounds).played.has(&"seat"), 30.0), "place: the gear is seated (one click)")
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "place: the panel comes back")
-	expect(_docked(), "place: the gear is in its socket, turning")
+	expect(await until(func() -> bool: return _docked(), 30.0), "place: the gear is in its socket")
 
 	# Still one of each.
 	expect_eq(entry.find_children("*", "Target", true, false).filter(func(t: Target) -> bool: return t.id == &"entry_cauldron").size(), 1, "one cauldron")
 
-	# Shelf: straight into Wei's World.
-	await jump_to_intro_part(&"shelf")
-	expect(await _until_said(said, "The shapes on the shelf show where things go.", 60.0), "shelf: Onion leads the first level")
-	expect_eq(App.main.current_scene, &"first_visit", "shelf: in its own scene")
+	# Reveal: the gear already in, Onion up beside it; the puff and line, then on into the hub.
+	said.clear()
+	await jump_to_intro_part(&"reveal")
+	await frames(2)
+	expect(await until(func() -> bool: return _docked(), 20.0), "reveal: the gear is already in its socket")
+	expect(orb.global_position.distance_to(entry.call("_lifted_spot")) < 0.15, "reveal: Onion is already up beside the socket")
+	expect(await _until_said(said, Entry.REVEAL_LINE, 60.0), "reveal: plays (the puff, then Onion's line)")
+	expect(not _said_line(said, "Oh! Hello there."), "reveal: no hello")
+	expect_eq(_shown(entry.get("_details")), 0, "reveal: no shelf at the reveal (Scene 6; the hub offers it)")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "then the hub")
 
 
 ## Puts the right fingertip at [param point] (button space), the hand behind it pointing into the plate.
@@ -493,19 +486,92 @@ func test_a_jump_button_cuts_in_on_a_part_that_is_still_playing() -> void:
 	expect(await _until_said(said, Entry.REVEAL_LINE, 30.0), "the ripple plays at once")
 	expect(not (entry.get("_orb") as Onion).cue, "and the touch part is gone")
 	expect(not _said_line(said, "Oh! Hello there."), "without the earlier parts")
-	# Back at the panel, wait for a part again and cut straight into the shelf scene.
-	expect(await until(func() -> bool: return _target(&"entry_part_all") != null, 30.0), "the panel comes back")
+	# Cut in again, and straight into the shelf.
 	await jump_to_intro_part(&"touch")
 	await wait(0.5)
 	await jump_to_intro_part(&"shelf")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "a jump to the shelf works mid-part too")
 
 
-func test_dots_button_goes_to_the_global_motion_task() -> void:
+func test_dots_button_goes_to_the_dots_in_the_workshop() -> void:
 	await _boot_entry()
 	await _to_setup_panel()
 	await jump_to_intro_part(&"dots")
-	expect(await until(func() -> bool: return App.main.current_scene == &"global_motion" and not App.main.switching, 30.0), "the Dots button opens the global motion scene")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0), "the Dots button opens the workshop, not Wei's dots scene")
+	var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+	expect(await until(func() -> bool: return hub.current != null and hub.current.id() == &"dots", 30.0), "and the dots start")
+	var workshop := App.main.get_node_or_null(^"Workshop") as Workshop
+	expect(workshop != null and is_instance_valid(workshop.onion), "Onion and the cauldron came along")
+
+
+## Megan, Nov 18: a jump to one part plays it and then the rest of the opening, into the hub.
+func test_a_part_jump_plays_on_into_the_hub() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	await jump_to_intro_part(&"reveal")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "after the reveal, the hub")
+
+
+## Megan, Nov 18: a jump back from the reveal does not leave its lanterns lit.
+func test_a_jump_back_from_the_reveal_puts_the_lanterns_out() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	await jump_to_intro_part(&"reveal")
+	expect(await until(func() -> bool: return not Lantern.from_reveal.is_empty(), 10.0), "the reveal lights the lanterns")
+	await jump_to_intro_part(&"hello")
+	await frames(2)
+	expect(Lantern.from_reveal.is_empty(), "the hello has none")
+	expect(App.main.get_node_or_null(^"Rafters") == null or App.main.get_node(^"Rafters").is_queued_for_deletion(), "nor the beams")
+
+
+## Megan, Nov 18: a game jump builds the whole menu; the game's bubble is open.
+func test_a_game_jump_keeps_every_bubble() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	await jump_to_intro_part(&"shelf")
+	expect(await until(func() -> bool:
+		var found := app.find_child("WorkshopController", true, false) as WorkshopController
+		return found != null and found.state == &"game", 30.0), "the shelf starts")
+	var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)
+	expect_eq(kinds, [&"shelf", &"dots", &"butterflies", &"turn_to_fit"], "every game's bubble")
+
+
+## Megan, Nov 18: Restart in the hub rebuilds the room: a fresh hub with the cauldron, Onion and the gear.
+func test_restart_in_the_hub_keeps_the_workshop() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	Entry.go_to(&"hub")
+	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "the hub")
+	await until(func() -> bool: return App.main.get_node_or_null(^"Workshop") != null, 10.0)
+	await open_intro_tools()
+	await press_facilitator("fac_restart")
+	await frames(2)
+	await press_facilitator("fac_confirm_tool")
+	expect(await until(func() -> bool:
+		var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+		return App.main.current_scene == &"first_visit" and hub != null and hub.state == &"hub" \
+				and App.main.get_node_or_null(^"Workshop") != null, 60.0), "a fresh hub, through the opening's room")
+	var workshop := App.main.get_node(^"Workshop") as Workshop
+	expect(is_instance_valid(workshop.onion) and workshop.onion.is_visible_in_tree(), "Onion is there")
+	expect(is_instance_valid(workshop.get(&"_cauldron")), "and the cauldron")
+
+
+## Megan, Nov 18: Scenes holds the workshop's places; each goes through the opening's room.
+func test_scenes_go_to_the_workshops_places() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	input.menu()
+	await frames(2)
+	await press_facilitator("fac_scenes")
+	await frames(2)
+	for place: StringName in Entry.PLACES:
+		expect(App.module(&"Facilitator").find_child("fac_scene_" + String(place), true, false) != null, "a button for " + place)
+	expect(App.module(&"Facilitator").find_child("fac_scene_global_motion", true, false) == null, "not Wei's scenes")
+	await press_facilitator("fac_scene_butterflies")
+	expect(await until(func() -> bool:
+		var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+		return hub != null and hub.current != null and hub.current.id() == &"butterflies", 60.0), "Butterflies starts in the workshop")
 
 
 func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void:

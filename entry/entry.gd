@@ -59,6 +59,18 @@ const TEST_SPEED := 1.0
 const FIRST_THINGS_RISE := 0.04
 ## The parts, in order: button id suffix -> label.
 const PARTS := {hello = "Hello", touch = "Tap", emerge = "Gear", pickup = "Pick up", place = "Set in", reveal = "Reveal", shelf = "Shelf", motion = "Motion", dots = "Dots"}
+## The opening's parts in story order. A jump to one plays it and then the rest, into the hub (Megan, Nov 18).
+const OPENING: Array[StringName] = [&"hello", &"touch", &"emerge", &"pickup", &"place", &"reveal"]
+## Staff tools → Scenes (Megan, Nov 18): where a grown-up can send the child. Every place goes through this
+## opening's room, so the cauldron, Onion, the gear in its socket and the lanterns are always there.
+const PLACES := {&"opening": "Opening", &"hub": "Hub", &"shelf": "Shelf", &"dots": "Dots", &"butterflies": "Butterflies", &"turn_to_fit": "Turn to fit"}
+## The hub's games a jump can start in (&"motion" is the dots); &"hub" is the hub with nothing started.
+const HUB_JUMPS: Array[StringName] = [&"hub", &"shelf", &"motion", &"dots", &"butterflies", &"turn_to_fit"]
+## Set by [method go_to]: the place the next opening goes straight to, with no setup questions (single use).
+static var start_at: StringName = &""
+## The setup panel's "New player save" toggle (Megan, Nov 18): on, Start or Skip makes a new save (every game
+## locked again, no stones, the first-time lines; the old save stays under Saves) and plays the opening on it.
+var new_save := false
 ## Tests set this: a pretend child picks the gear up and sets it in (a headset has no tests).
 var simulate_child := false
 ## Setup has four steps: hands, table, reach, sound and room.
@@ -191,7 +203,9 @@ func _exit_tree() -> void:
 ## Plays the arrival, then starts the World.
 func run() -> void:
 	DevSkip.ensure()   # desktop only: "Skip ▸" / N to move through the scenes fast (Megan, Nov 18)
-	HubMemory.get_or_make()   # the child's saved look (the eye) is the base view from the start of the visit
+	var memory := HubMemory.get_or_make()   # the child's saved look (the eye) is the base view from the start of the visit
+	if memory != null and App.reality != null:
+		App.reality.apply_view(memory.room_view())   # and the room shows it now: nothing left from the last scene (a dim)
 	_runner = PartRunner.new()
 	add_child(_runner)
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
@@ -209,6 +223,9 @@ func run() -> void:
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _direction: Vector3) -> void: _on_target(target))
 	Events.intro_jump_requested.connect(jump_to)
 	Events.intro_zones_requested.connect(toggle_zones)
+	if start_at != &"":   # Staff tools → Scenes, or Restart in the hub: straight to that place
+		_queued_part = start_at
+		start_at = &""
 	# Setup is quiet: Wei's "Got it. That's your table." is not for the child.
 	App.reality.announce_table = false
 	tools_ready = true
@@ -235,17 +252,10 @@ func run() -> void:
 			part = await _choose_part()
 		Engine.time_scale = TEST_SPEED
 		var fast := part != &"all"
-		_set_up_for(&"hello" if part == &"all" else part)
-		if part == &"shelf":   # DEV: straight to the shelf, then the hub
-			FirstVisit.start_with = &"shelf"
+		_set_up_for(&"hello" if part == &"all" else (&"shelf" if part in HUB_JUMPS else part))
+		if part in HUB_JUMPS:   # straight into the hub, its whole menu there; a game starts at once (Megan, Nov 18)
+			FirstVisit.start_with = &"" if part == &"hub" else part
 			await _to_shelf(true)
-			return
-		if part == &"motion":   # DEV: straight to the motion route (in the first visit's scene)
-			FirstVisit.start_with = &"motion"
-			await _to_shelf(true)
-			return
-		if part == &"dots":
-			_to_dots()
 			return
 		_part_running = true
 		_play(part, fast, _runner)   # not awaited: a jump button can cut in
@@ -254,10 +264,8 @@ func run() -> void:
 		if how == &"interrupted":
 			continue
 		Engine.time_scale = 1.0
-		if part == &"all":
-			await _to_shelf(false)
-			return
-		print("ENTRY jump: ", part, " done")
+		await _to_shelf(false)   # Start, or a jump that played on from its part (Megan, Nov 18): into the hub
+		return
 
 
 ## Plans the room once, from ONE head pose taken now, and builds the cauldron, Onion, the shelf and the
@@ -310,20 +318,17 @@ func _placement_summary() -> void:
 ## Plays [param part] on [param runner]; it never gets to the end if the runner is freed.
 func _play(part: StringName, fast: bool, runner: PartRunner) -> void:
 	await get_tree().process_frame   # the main loop is waiting for _part_over by now
-	match part:
-		&"all":
-			await _hello(false)
-			await _touch()
-			await _out()
-			await _pickup()
-			await _place()
-			await _reveal()
-		&"hello": await _hello(fast)
-		&"touch": await _touch()
-		&"emerge": await _out()
-		&"pickup": await _pickup()
-		&"place": await _place()
-		&"reveal": await _reveal()
+	var from := 0 if part == &"all" else OPENING.find(part)
+	for i in range(maxi(from, 0), OPENING.size()):   # that part, then the rest of the story (Megan, Nov 18)
+		if runner != _runner:
+			return   # another jump cut in
+		match OPENING[i]:
+			&"hello": await _hello(fast and i == from)
+			&"touch": await _touch()
+			&"emerge": await _out()
+			&"pickup": await _pickup()
+			&"place": await _place()
+			&"reveal": await _reveal()
 	if runner == _runner and _part_running:
 		_part_over.emit(&"finished")
 
@@ -370,6 +375,11 @@ func _hello(fast := false) -> void:
 	_orb.actions.hop(_runner)   # a small startled hop
 	await _wait(0.5)   # then an angled peek into the opening
 	_attend(null)   # a glance back at the child, still leaning over the cauldron
+	# Megan, Nov 18: the cauldron shakes (its opening rattle) just before "Nearly ready.", then settles to the faint one.
+	_rattle(0.012)
+	_sounds.play(&"pre_rattle", _box.global_position)
+	await _wait(0.9)
+	_rattle(0.006)
 	await say("Nearly ready.")   # restored (story chat, Nov 18): a sheepish correction, still half over the cauldron
 	_orb.actions.lean_in(_runner, false)   # straightens up
 	await _wait(0.4)
@@ -465,7 +475,7 @@ func _out() -> void:
 	_attend(_gear)   # the settled gear
 	_carry.begin(_gear, _socket_at)   # the child may already pick it up while Onion talks
 	# (No look at the socket yet: the story moved that cue to placement, so the child can examine the gear first.)
-	await say("Aha! There it is! The table's missing piece.")   # story chat, Nov 18
+	await say("The table's missing piece!")   # Megan, Nov 18 (was "Aha! There it is! The table's missing piece.")
 	_attend(null)   # turns back to the child (Megan cut "I've been looking for that.")
 
 
@@ -604,11 +614,7 @@ func _reveal() -> void:
 ## first (Megan, Nov 18). They hang on the main scene so they outlast the opening; the hub takes them on
 ## ([method Lantern.take_from_reveal]).
 func _light_lanterns() -> void:
-	for old in Lantern.from_reveal:   # a jump replayed the reveal
-		if is_instance_valid(old):
-			old.queue_free()
-	if is_instance_valid(Lantern.from_reveal_rafters):
-		Lantern.from_reveal_rafters.queue_free()
+	_put_out_lanterns()   # a jump replayed the reveal
 	var middle := _layout.table.origin if _layout != null else _ripple_origin
 	var hung := Lantern.hang_style(App.main, _mouth, App.head().global_position, middle)
 	Lantern.from_reveal = hung
@@ -636,6 +642,17 @@ func _light_lanterns() -> void:
 			lantern.appear(1.2)
 
 
+## Takes down the reveal's lanterns and beams (a jump back to a part before the reveal: they are not lit yet).
+func _put_out_lanterns() -> void:
+	for old in Lantern.from_reveal:
+		if is_instance_valid(old):
+			old.queue_free()
+	Lantern.from_reveal = []
+	if is_instance_valid(Lantern.from_reveal_rafters):
+		Lantern.from_reveal_rafters.queue_free()
+	Lantern.from_reveal_rafters = null
+
+
 const LANTERN_STAGGER := 0.15   # seconds between lanterns lighting at the reveal
 
 
@@ -661,14 +678,6 @@ func _to_shelf(fast := false) -> void:
 	App.main.change_scene.call_deferred(&"first_visit", false)   # no black blink: the room just goes on   # Onion leads the first shelf level
 
 
-## The global motion task (Wei's dots scene) in the same passthrough room. Onion and the
-## cauldron are not carried over to it yet.
-func _to_dots() -> void:
-	_beat("jump: the dots")
-	ShelfCopy.shelf_frame = Transform3D.IDENTITY
-	Engine.time_scale = 1.0
-	_hand_over()
-	App.main.change_scene.call_deferred(&"global_motion")
 
 
 # --- Setup: four steps, for the grown-up -------------------------------------
@@ -688,6 +697,14 @@ func _setup() -> void:
 	_panel.show_mode(PlayMode.name(), PlayMode.is_dev())   # the adult's Mode toggle and "Skip setup"
 	var redo := redo_next
 	redo_next = false
+	if (_queued_part in PLACES or _queued_part == &"all") and not redo:   # a jump, or a new player save   # Staff tools → Scenes: no questions; the last table and reach if found
+		_panel.hide_all()
+		var table := SetupMemory.match_in(App.reality.surfaces(&"table"))
+		if table != null:
+			App.reality.select_table(table)
+			_use_reach(SetupMemory.last().reach)
+		print("ENTRY setup: skipped for a jump to ", _queued_part, ", the last table ", "reused" if table != null else "not found")
+		return
 	if skip_setup and not redo:   # "Redo setup" is the grown-up asking: it runs even where setup is skipped
 		_panel.hide_all()
 		print("ENTRY setup: skipped (tests)")
@@ -942,6 +959,8 @@ func _set_up_for(part: StringName) -> void:
 	_orb.actions.lean = 0.0
 	_carry.reset()
 	_surface_points.clear()
+	if part in OPENING and part != &"reveal":
+		_put_out_lanterns()   # Megan, Nov 18: a jump back from the reveal left the lanterns lit in the hello
 	_box.visible = true   # every part: the hub's menu is the cauldron (it no longer sinks after the ripple; Megan, Nov 18)
 	_box.scale = Vector3.ONE
 	_cauldron_gone = false
@@ -1034,10 +1053,19 @@ func _on_target(target: Target) -> void:
 		return
 	# Merge with Wei (Nov 18): Skip setup starts the opening in one pinch, in both modes, with what setup has
 	# found so far (his tests); it no longer stops at "All set".
+	if target != null and target.id == &"entry_new_save":
+		(target.get_parent() as EntryButton).flash()
+		new_save = not new_save
+		_panel.show_new_save(new_save)
+		print("ENTRY setup: new player save ", "on" if new_save else "off")
+		return
 	if target != null and target.id in [&"entry_skip_setup", &"entry_part_all"]:
 		(target.get_parent() as EntryButton).flash()
 		if target.id == &"entry_skip_setup":
 			print("ENTRY setup: skip pressed")
+		if new_save:
+			_start_on_new_save()
+			return
 		jump_to(&"all")
 		return
 	if target != null and String(target.id).begins_with("entry_") and target.id != &"entry_cauldron":
@@ -1176,6 +1204,27 @@ func _new_hand() -> Array:
 
 
 # --- Intro tools -------------------------------------------------------------
+
+## "New player save" was on and Start (or Skip) pressed: a new save, then the opening from the hello. Setup is not
+## asked again: the table stays chosen (the headset's room carries over) and the last saved reach is reused.
+func _start_on_new_save() -> void:
+	new_save = false
+	print("ENTRY setup: a new player save, then the opening")
+	Events.report(&"fresh_start", {from = String(Profile.id), by = "setup"})
+	start_at = &"all"
+	Profile.switch(Profile.new_save())
+
+
+## Staff tools → Scenes and Restart in the hub (Megan, Nov 18): the opening again, going straight to [param place]
+## (one of [constant PLACES]; &"opening" is the opening from its setup). Saved progress carries on.
+static func go_to(place: StringName) -> void:
+	print("ENTRY go to: ", place)
+	start_at = &"" if place == &"opening" else place
+	if App.main.current_scene == &"intro":
+		App.main.restart()
+	else:
+		App.main.change_scene(&"intro")
+
 
 func jump_to(part: StringName) -> void:
 	if _part_running:

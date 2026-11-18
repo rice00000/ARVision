@@ -139,7 +139,8 @@ func _activate() -> void:
 		return
 	if String(target.id).begins_with("fac_scene_"):
 		_view_index = 0
-		App.main.change_scene(StringName(String(target.id).trim_prefix("fac_scene_")))
+		_close()
+		Entry.go_to(StringName(String(target.id).trim_prefix("fac_scene_")))   # Megan, Nov 18: always through the workshop
 		return
 	if String(target.id).begins_with("fac_res_"):
 		_results.press(target.id)
@@ -225,7 +226,11 @@ func _activate() -> void:
 			Save.write()
 			if _confirmed_action == &"fac_restart":
 				_view_index = 0
-				App.main.restart()
+				if App.main.current_scene == &"first_visit":   # the hub: a fresh hub, its room rebuilt (Megan, Nov 18)
+					_close()
+					Entry.go_to(&"hub")
+				else:
+					App.main.restart()
 			elif _confirmed_action == &"fac_redo_setup":   # Megan, Nov 17: the layout turned out bad mid-session
 				_view_index = 0
 				_close()
@@ -262,9 +267,6 @@ func _show(page: StringName) -> void:
 
 func _refresh() -> void:
 	_scene_label.text = "Current: %s" % Main.SCENES[App.main.current_scene].title
-	for id: StringName in Main.SCENES:
-		if Main.SCENES[id].get("listed", true):
-			_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
 	_refresh_training()
 	_refresh_saves()
 	_refresh_results()
@@ -393,16 +395,16 @@ func _build() -> void:
 
 	var scenes := _page(&"Scenes")
 	_text(_scene_label, Vector2(0.0, 0.1), scenes)
-	var row := 0
-	for id: StringName in Main.SCENES:
-		if not Main.SCENES[id].get("listed", true):
-			continue   # reached only through another scene (the first visit, through the Intro)
-		_button("fac_scene_" + String(id), Main.SCENES[id].title, Vector2(0.38, 0.055),
-			Vector2(0.0, 0.032 - row * 0.063), scenes)
-		row += 1
+	# Megan, Nov 18: the places in the workshop (Entry.PLACES), two columns; each goes through the opening's room, so
+	# the cauldron, Onion and the gear are always there. Wei's own scenes are reached from his room.
+	var places: Array = Entry.PLACES.keys()
+	for i in places.size():
+		_button("fac_scene_" + String(places[i]), Entry.PLACES[places[i]], Vector2(0.18, 0.055),
+			Vector2(-0.095 + 0.19 * (i % 2), 0.032 - floori(i / 2.0) * 0.063), scenes)
+	var row := ceili(places.size() / 2.0)
 	# Megan, Nov 18: start over as a brand-new child, from the hello. A new save, so the current child's progress is
 	# kept (it is still under Saves); never a wipe.
-	_button("fac_fresh_start", "Restart: fresh child", Vector2(0.38, 0.055), Vector2(0.0, 0.032 - row * 0.063 - 0.012), scenes)
+	_button("fac_fresh_start", "Restart: new player save", Vector2(0.38, 0.055), Vector2(0.0, 0.032 - row * 0.063 - 0.012), scenes)
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)
