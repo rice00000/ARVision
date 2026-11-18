@@ -12,7 +12,7 @@ extends Node3D
 ## * **Tasks: a still arc** within touch reach, up to [constant STILL_MAX] all in view and none moving (Megan:
 ##   B). The middle one is a little bigger. ONE press picks any; the chosen bubble pops. Past
 ##   [constant STILL_MAX] it turns into a carousel whose ends peek out (a press on a side one slides it in).
-## * **Places: a lower row**, a little nearer: the Virtual Workshop (Wei's room) as a little house in a smaller
+## * **Places: a lower row**, set a little back: the Virtual Workshop (Wei's room) as a little house in a smaller
 ##   bubble with a brass porthole rim ([method set_door]).
 ## * **Chosen:** the bubble pops into droplets with a pop sound; the game's name appears over it in big retro
 ##   letters with a chime ([ChosenTitle]).
@@ -36,7 +36,8 @@ const LEAN_MAX := 0.2           # ...but never more than this far forward of the
 const FRONT_SCALE := 0.6        # the middle bubble (a piece is 12-16 cm, its bubble 22 cm, at scale 1)
 const SIDE_SCALE := 0.5
 const DOOR_SCALE := 0.42
-const DOOR_BELOW := 0.14        # the places row: this far below the tasks, a little nearer
+const DOOR_BACK := 0.06         # the house sits this far BEHIND the games' front, out of a resting hand's way (Megan, Nov 18: "too easy to click"; it was 8 cm nearer)
+const DOOR_BELOW := 0.14        # the places row: this far below the tasks
 const TURN_SECONDS := 1.2       # a carousel step (only past STILL_MAX)
 const RISE_SECONDS := 1.0       # a new bubble rising out of the brew into its place
 const OPEN_SECONDS := 1.2       # the bubbles rising when the menu opens
@@ -419,7 +420,7 @@ func _place() -> void:
 		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
 	if door != null and is_instance_valid(door):
 		var size := DOOR_SCALE * shrink
-		var at := global_position + _toward * 0.08 + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
+		var at := global_position - _toward * DOOR_BACK + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
 		door.scale = Vector3.ONE * size
 		door.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
 		door.look_at(door.global_position + _toward, Vector3.UP, true)

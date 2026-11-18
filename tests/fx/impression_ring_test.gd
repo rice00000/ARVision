@@ -172,7 +172,7 @@ func test_the_door_sits_below_the_tasks_and_a_press_chooses_it_at_once() -> void
 	var front := ring.front()
 	expect(door.global_position.y < front.global_position.y - 0.05, "below the tasks")
 	var flat := func(p: Vector3) -> float: return Vector2(p.x - eye.x, p.z - eye.z).length()
-	expect(flat.call(door.global_position) < flat.call(front.global_position), "and a little nearer the child")
+	expect(flat.call(door.global_position) > flat.call(front.global_position) + 0.04, "and set back behind the games, out of a resting hand's way")
 	expect(ring.impression_for(door.target) == door, "its target is known")
 	var picked := record(ring.chosen)
 	expect_eq(ring.press(door), &"chosen", "one press")
