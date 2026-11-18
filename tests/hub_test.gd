@@ -86,7 +86,7 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect(shelf.global_position.distance_to(eye) < 0.5, "the shelf piece is within touch reach (%.2f m)" % shelf.global_position.distance_to(eye))
 	expect(await until(func() -> bool: return (demo[0] as DemoHand).visible, WorkshopController.CUE_AFTER + 4.0),
 			"after ~5 s with no choice the hand shows aim-and-pinch")
-	expect(not hub.exit_token.visible, "no exit token in the hub")
+	expect(hub.stop_bubble == null, "no ✕ bubble in the hub")
 
 
 func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_waits_below() -> void:
@@ -94,7 +94,8 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running, 20.0), "the shelf plays")
-	expect(hub.exit_token.visible and hub.exit_token.open, "the exit token stands by the cauldron during the game")
+	expect(hub.menu_sign.visible, "the still ☰ stays over the brew during the game")
+	expect(hub.stop_bubble == null, "no ✕ until the child taps the cauldron")
 	expect(not hub.ring.visible, "the menu drew into the cauldron for the game")
 	expect(not hub.carry.enabled, "the gear can't be lifted during a game")
 	Engine.time_scale = 4.0
@@ -107,25 +108,52 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	expect(kinds.has(&"dots"), "the dots are in the menu (%s)" % [kinds])
 	expect(hub.ring.impressions.all(func(i: Impression) -> bool: return not i.sealed), "the dots' bubble opened")
 	expect(not kinds.has(&"turn_to_fit"), "Turn to fit only when it can run")
-	expect(hub.ring.door != null and hub.ring.door.visible, "Wei's room's door waits below the tasks now")
+	expect(hub.ring.door != null and hub.ring.door.visible, "the Virtual Workshop house waits below the tasks now")
 	expect(hub.ring.door.global_position.y < hub.ring.impressions[0].global_position.y - 0.05, "below the tasks")
-	expect(not _said_line(said, WorkshopController.SURPRISES), "its line waits for the next game (≤ 2 lines)")
+	var row := hub.ring.places.map(func(p: Impression) -> StringName: return p.kind)
+	expect_eq(row, [&"help", &"house", &"finish"], "the places row: ? · house · ✕")
+	var eye := App.head().global_position
+	var right := Vector3(eye.x - hub.ring.global_position.x, 0, eye.z - hub.ring.global_position.z).normalized().cross(Vector3.UP) * -1.0
+	expect(hub.ring.place_of(&"help").global_position.dot(right) < hub.ring.place_of(&"finish").global_position.dot(right), "? on the left, ✕ on the right")
+	expect(not _said_line(said, WorkshopController.SURPRISES), "the house's line waits for a hand to come to it")
 	expect(not _said_line(said, "Thank you for helping."), "cut")
 
 
-func test_the_exit_token_leaves_a_game_with_a_pinch_never_a_touch() -> void:
+func test_a_cauldron_tap_in_a_game_pauses_it_and_its_x_ends_it_with_a_pinch_never_a_touch() -> void:
 	var said := record(Events.said)
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
-	Events.touched.emit(&"right", hub.exit_token.target)   # a hand passing through it
+	Events.touched.emit(&"right", hub.cauldron_target)   # a tap on the cauldron
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "one ✕ bubble rises")
+	expect(app.get_tree().paused, "the game pauses")
+	await wait(0.7)
+	Events.touched.emit(&"right", hub.stop_bubble.target)   # a hand passing through it
 	await frames(3)
-	expect(App.session.running, "a touch (a sweep through it) never counts")
-	Events.selected.emit(&"right", hub.exit_token.target, Vector3.ZERO, Vector3.FORWARD)
+	expect(hub.stop_bubble != null and App.session.running, "a touch (a sweep through it) never counts")
+	Events.selected.emit(&"right", hub.stop_bubble.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return not App.session.running, 10.0), "a pinch ends the game")
+	expect(not app.get_tree().paused, "the pause is over")
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.LEFT_EARLY), 15.0), "Onion: \"We can come back to these.\"")
 	expect(await until(func() -> bool: return _in_hub(hub), 20.0), "back at the hub")
 	expect(not _said_line(said, "There. Everything's found its place."), "no claim of success")
+
+
+func test_the_paused_game_carries_on_after_six_seconds_or_a_second_tap() -> void:
+	var hub := await _to_hub()
+	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
+	Events.touched.emit(&"right", hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused")
+	await wait(WorkshopController.STOP_WAIT + 1.0)
+	expect(hub.stop_bubble == null and not app.get_tree().paused, "after ~6 s the bubble sinks and the game goes on")
+	expect(App.session.running and hub.state == &"game", "the same game, still running")
+	Events.touched.emit(&"right", hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused again")
+	await wait(0.3)
+	Events.touched.emit(&"right", hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble == null and not app.get_tree().paused, 3.0), "a second tap: it carries on")
+	expect(App.session.running, "still running")
 
 
 func test_lifting_the_gear_out_ends_the_visit_and_setting_it_back_does_nothing() -> void:
@@ -283,3 +311,54 @@ func test_the_dev_skip_moves_through_the_hub() -> void:
 	skip.skip()
 	expect(await until(func() -> bool: return hub.state == &"hub", 90.0), "skip wins the rounds: back at the hub")
 	Engine.time_scale = 1.0
+
+
+
+## The places row's ✕ (design chat, Nov 18): Onion asks first; a second ✕ finishes, a pause or a tap doesn't.
+func test_the_finish_x_asks_first_and_a_second_x_closes() -> void:
+	var said := record(Events.said)
+	var hub := await _to_hub()
+	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
+	await until(func() -> bool: return hub.state == &"game" and App.session.running, 20.0)
+	await _finish_rounds()
+	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.place_of(&"finish") != null and hub.ring.opened, 40.0), "the ✕ is in the places row")
+	await wait(1.0)
+	Events.selected.emit(&"right", hub.ring.place_of(&"finish").target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.ALL_DONE), 10.0), "Onion: \"All done for today?\"")
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 10.0), "one ✕ over the brew")
+	Events.selected.emit(&"right", hub.stop_bubble.target, Vector3.ZERO, Vector3.FORWARD)
+	await frames(3)
+	expect(hub.state != &"closing", "a press in its first half second is ignored")
+	await wait(WorkshopController.STOP_WAIT + 1.0)
+	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.opened, 10.0), "no choice: the menu rises again")
+	Events.selected.emit(&"right", hub.ring.place_of(&"finish").target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 10.0), "asked again")
+	await wait(0.7)
+	Engine.time_scale = 3.0
+	Events.selected.emit(&"right", hub.stop_bubble.target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return hub.state == &"closed", 90.0), "the second ✕: the closing")
+	Engine.time_scale = 1.0
+
+
+## The ? (design chat, Nov 18): four steps in order, the rest dimmed; a real action stops it.
+func test_the_help_tour_plays_four_steps_and_a_real_action_stops_it() -> void:
+	var said := record(Events.said)
+	var hub := await _to_hub()
+	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
+	await until(func() -> bool: return hub.state == &"game" and App.session.running, 20.0)
+	await _finish_rounds()
+	expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.place_of(&"help") != null and hub.ring.opened, 40.0), "the ? is in the places row")
+	await wait(2.0)
+	Events.selected.emit(&"right", hub.ring.place_of(&"help").target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.TOUR_LINES[0]), 10.0), "step 1: the cauldron")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.TOUR_LINES[1]), 10.0), "step 2: a bubble")
+	expect(hub.ring.door._body.find_children("*", "GeometryInstance3D", true, false).any(func(m: GeometryInstance3D) -> bool: return m.transparency > 0.3), "the others are dimmed")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.TOUR_LINES[3]), 20.0), "step 4: the gear")
+	expect(await until(func() -> bool: return not hub._touring, 10.0), "then it ends")
+	expect(hub.ring.door._body.find_children("*", "GeometryInstance3D", true, false).all(func(m: GeometryInstance3D) -> bool: return m.transparency < 0.01), "nothing dimmed after")
+	Events.selected.emit(&"right", hub.ring.place_of(&"help").target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return hub._touring, 5.0), "again")
+	hub.carry.picked_up.emit()   # a real action
+	await frames(2)
+	expect(not hub._touring, "a real action stops it at once")
+	hub.carry.released.emit(true)

@@ -38,6 +38,7 @@ const SIDE_SCALE := 0.5
 const DOOR_SCALE := 0.42
 const DOOR_BACK := 0.06         # the house sits this far BEHIND the games' front, out of a resting hand's way (Megan, Nov 18: "too easy to click"; it was 8 cm nearer)
 const DOOR_BELOW := 0.14        # the places row: this far below the tasks
+const PLACE_GAP := 0.17         # metres between the places' middles (gaps at least half a bubble: no crowding)
 const TURN_SECONDS := 1.2       # a carousel step (only past STILL_MAX)
 const RISE_SECONDS := 1.0       # a new bubble rising out of the brew into its place
 const OPEN_SECONDS := 1.2       # the bubbles rising when the menu opens
@@ -54,8 +55,10 @@ const REST_SCALE := 0.7
 static var alive: Array[ImpressionRing] = []
 
 var impressions: Array[Impression] = []
-## The places row (Wei's room's door), or null.
+## The places row's house (the Virtual Workshop), or null.
 var door: Impression
+## The places row, left to right (design chat, Nov 18): ? · house · ✕, or just the house.
+var places: Array[Impression] = []
 ## Carousel steps turned (past STILL_MAX only): piece i sits at (i - offset) * STEP.
 var offset := 0.0
 var turning := false
@@ -114,8 +117,11 @@ func front() -> Impression:
 	return best
 
 
-## The bubble (task or door) whose target is [param target], or null.
+## The bubble (task or place) whose target is [param target], or null.
 func impression_for(target: Target) -> Impression:
+	for place in places:
+		if is_instance_valid(place) and place.target == target:
+			return place
 	if door != null and is_instance_valid(door) and door.target == target:
 		return door
 	for impression in impressions:
@@ -124,20 +130,35 @@ func impression_for(target: Target) -> Impression:
 	return null
 
 
-## The places row's door (Wei's room); null takes it away.
+## The places row's house alone (the Virtual Workshop); null takes it away.
 func set_door(impression: Impression) -> void:
-	if door != null and is_instance_valid(door) and door != impression:
-		door.queue_free()
-	door = impression
-	if door != null:
-		_take(door, false)
+	set_places([impression] as Array[Impression] if impression != null else [] as Array[Impression], impression)
+
+
+## The places row, left to right ([param row]), with [param house] the Virtual Workshop among them.
+func set_places(row: Array[Impression], house: Impression) -> void:
+	for old in places:
+		if is_instance_valid(old) and old not in row:
+			old.queue_free()
+	places = row
+	door = house
+	for place in places:
+		_take(place, false)
 	_place()
+
+
+## The place of [param kind] in the row (&"help", &"house", &"finish"), or null.
+func place_of(kind: StringName) -> Impression:
+	for place in places:
+		if is_instance_valid(place) and place.kind == kind:
+			return place
+	return null
 
 
 ## The child pressed [param impression]: &"chosen" (it pops; [signal chosen] follows), &"sealed" (not open
 ## yet: the hub says "Soon") or &"busy" (still rising, sliding or closed).
 func press(impression: Impression) -> StringName:
-	if impression == null or (impression not in impressions and impression != door):
+	if impression == null or (impression not in impressions and impression not in places):
 		return &""
 	if impression.sealed:
 		return &"sealed"
@@ -149,7 +170,7 @@ func press(impression: Impression) -> StringName:
 
 
 func _choose(impression: Impression) -> void:
-	if _carousel() and impression != door and impression != front():
+	if _carousel() and impression not in places and impression != front():
 		await step_to(impression, false)
 	impression.touched()
 	impression.pop()
@@ -372,8 +393,9 @@ func _all() -> Array[Impression]:
 	for impression in impressions:
 		if is_instance_valid(impression):
 			list.append(impression)
-	if door != null and is_instance_valid(door):
-		list.append(door)
+	for place in places:
+		if is_instance_valid(place):
+			list.append(place)
 	return list
 
 
@@ -418,10 +440,13 @@ func _place() -> void:
 		impression.look_at(impression.global_position + _toward, Vector3.UP, true)
 		impression.scale = Vector3.ONE * size
 		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
-	if door != null and is_instance_valid(door):
-		var size := DOOR_SCALE * shrink
-		var at := global_position - _toward * DOOR_BACK + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
-		door.scale = Vector3.ONE * size
-		door.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
-		door.look_at(door.global_position + _toward, Vector3.UP, true)
-		door.scale = Vector3.ONE * size
+	var size := DOOR_SCALE * shrink
+	var row := places.filter(func(p: Impression) -> bool: return is_instance_valid(p))
+	for i in row.size():
+		var place: Impression = row[i]
+		var across := (i - (row.size() - 1) * 0.5) * PLACE_GAP   # left to right as the child sees it
+		var at := global_position - _toward * DOOR_BACK + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest) - _side * across
+		place.scale = Vector3.ONE * size
+		place.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
+		place.look_at(place.global_position + _toward, Vector3.UP, true)
+		place.scale = Vector3.ONE * size

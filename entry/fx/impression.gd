@@ -70,6 +70,10 @@ static func make(of_kind: StringName) -> Impression:
 			impression._cup()
 		&"house":
 			impression._house()
+		&"stop", &"finish":
+			impression._cross()
+		&"help":
+			impression._question()
 	impression._make_halo()
 	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
 	impression.target.position.y = 0.075
@@ -88,6 +92,8 @@ static func footprint(of_kind: StringName) -> Vector2:
 			return Vector2(0.16, 0.12)
 		&"house":
 			return Vector2(0.12, 0.06)
+		&"stop", &"finish", &"help":
+			return Vector2(0.12, 0.03)
 	return Vector2(0.16, 0.16)
 
 
@@ -186,7 +192,10 @@ const RIM := Color(0.36, 0.36, 0.35)
 const BRASS := Color(0.74, 0.56, 0.24)   # the house's porthole rim: a place, not a game
 const POP_DROPS := 7
 ## What the chosen bubble's title says (and the sound label).
-const TITLES := {&"shelf": "The Shelf", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop"}
+const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop",
+		&"stop": "Stop", &"finish": "Finish", &"help": "Help"}
+const INK := Color(0.114, 0.114, 0.133)   # #1D1D22 (design chat, Nov 18)
+const TILE := Color(0.953, 0.918, 0.824)  # #F3EAD2
 
 
 ## The name shown and said for [param of_kind].
@@ -482,6 +491,39 @@ func _cup() -> void:
 	handle.position = Vector3(0.066, 0.065, 0)
 	handle.scale = Vector3(1.0, 1.0, 1.3)
 	_body.add_child(handle)
+
+
+## The ✕ (design chat, Nov 18, `DESIGN_EXIT_AND_HELP.md`): a cream square tile with a near-black edge and a
+## near-black ✕ of two thick strokes, facing the child. Square on purpose (every other piece is round). In a
+## game it stops the game ("Stop"); in the places row it finishes the visit after Onion asks ("Finish").
+func _cross() -> void:
+	_box(Vector3(0.12, 0.12, 0.02), Vector3(0, 0.075, 0), TILE)
+	for turn: float in [PI * 0.25, -PI * 0.25]:
+		var stroke := _box(Vector3(0.088, 0.022, 0.008), Vector3(0, 0.075, 0.012), INK, false)
+		stroke.rotation.z = turn
+
+
+## The ? (design chat, Nov 18): a bold near-black "?" in the bubble; a press plays the controls tour ("Help").
+func _question() -> void:
+	var mark := Label3D.new()
+	mark.text = "?"
+	mark.font = load("res://entry/assets/fonts/luckiest_guy.woff2")
+	mark.font_size = 160
+	mark.pixel_size = 0.00075
+	mark.modulate = INK
+	mark.outline_modulate = TILE
+	mark.outline_size = 18
+	mark.shaded = false
+	mark.double_sided = false
+	mark.position = Vector3(0, 0.075, 0.01)
+	_body.add_child(mark)
+
+
+## How faded the piece and its bubble are (the help tour dims what it isn't showing: 0 = full, 0.5 = half).
+func set_dim(amount: float) -> void:
+	for mesh: GeometryInstance3D in find_children("*", "GeometryInstance3D", true, false):
+		if mesh != _halo:
+			mesh.transparency = clampf(amount, 0.0, 1.0)
 
 
 ## The Virtual Workshop (Wei's room; Megan, Nov 18: "a house not a door"): a little cream house with a

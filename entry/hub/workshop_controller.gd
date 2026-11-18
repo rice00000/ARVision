@@ -42,6 +42,14 @@ const GEAR_SEAT := 0.008
 const SOON := "Soon"
 const GAMES := "Games"          # the cauldron's label, the first few times a hand comes to it
 const GAMES_TIMES := 3
+const STOP_GUARD := 0.5         # a ✕ bubble ignores presses for its first half second (no double press)
+const STOP_WAIT := 6.0          # with no choice for this long, the ✕ bubble sinks and things carry on
+const STOP_SCALE := 0.45
+const TOUR_STEP := 5.0          # seconds per tour step (its line and one teaching-hand demo)
+const TOUR_DIM := 0.5           # everything the tour isn't showing fades to half
+## The controls tour (design chat, Nov 18; step 2 is a pinch, Megan 9:13): what each step says.
+const TOUR_LINES: Array[String] = ["Tap the cauldron for games.", "Pinch a bubble to choose.",
+		"This goes to the Virtual Workshop.", "Lift the gear to finish."]
 const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
@@ -50,7 +58,8 @@ const BUDS: Array[StringName] = [&"shelf", &"dots"]                # Entry.SOCKE
 var workshop: Workshop
 var activities: Array[Summonable] = []
 var ring: ImpressionRing
-var exit_token: HubButton
+## During a game: the cauldron's pause bubble (one ✕, "Stop"); in the hub: the finish check's ✕. Null otherwise.
+var stop_bubble: Impression
 ## The cauldron's tap target (opens the menu) and its glow.
 var cauldron_target: Target
 var glow := 0.0
@@ -80,6 +89,12 @@ var _games_said := 0
 var _hub_since := 0.0           # when the hub last began waiting (seconds)
 var _quiet_since := 0.0         # when Onion last finished a line
 var _clock := 0.0               # game time, seconds (unpaused)
+var _clock_real := 0.0          # time that runs while paused too (the pause bubble's own clock)
+var _stop_since := 0.0
+var _stop_chosen := false
+var _cauldron_tapped := false
+var _touring := false
+var _tour_id := 0
 var _cauldron_hover := false
 
 
@@ -105,7 +120,6 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	_build_ring()
 	_build_cauldron()
 	_build_carry()
-	_build_exit()
 	_hang_lanterns()
 	ambience = HubAmbience.make(self)
 	if first == &"motion":
@@ -127,6 +141,10 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 		var choice := await _hub()
 		if choice == &"gear_finish":
 			break
+		if choice == &"finish":
+			if await _ask_finish():
+				break
+			continue
 		if choice == &"gear_home":
 			if home.is_valid():
 				state = &"home"
@@ -157,8 +175,6 @@ func _hub() -> StringName:
 	SceneMarker.show_text("Hub")
 	if ring.opened:
 		ring.wake()
-	exit_token.visible = false
-	exit_token.set_open(false)
 	_begin_carry()
 	if workshop != null:
 		workshop.float_to(_onion_spot(), 1.0)
@@ -234,8 +250,6 @@ func _run(activity: Summonable) -> void:
 	if ring.opened or ring.visible:
 		_play(&"menu_close", _mouth())
 		await ring.sink(_mouth(), 0.9)   # Megan, Nov 18: the pieces sink into the cauldron with the fog during a game
-	exit_token.visible = true
-	exit_token.set_open(true)
 	if workshop != null:
 		workshop.attend(null)
 	print("HUB game: ", activity.id())
@@ -245,11 +259,11 @@ func _run(activity: Summonable) -> void:
 	if under_bench:
 		workshop.hide_socket(true)
 	activity.summon(_workspace())
+	_watch_cauldron()
 	var outcome: StringName = await activity.finished
 	if under_bench:
 		workshop.hide_socket(false)
-	exit_token.set_open(false)
-	exit_token.visible = false
+	_drop_stop_bubble()
 	print("HUB ", activity.id(), " finished: ", outcome)
 	Events.report(&"hub_activity_finished", {activity = activity.id(), outcome = outcome})
 	activity.fold()
@@ -272,13 +286,16 @@ func _run(activity: Summonable) -> void:
 			await _offer(dots)
 		await Onion.line(MORE, self)
 	if ring.door == null:
-		ring.set_door(Impression.make(&"house"))   # silent now: its line comes after the next game (the line budget)
+		# The places row, from after the first game (design chat, Nov 18): ? · house · ✕. The house says its own
+		# teaser the first time a hand comes to it; ? plays the controls tour; ✕ finishes the visit after Onion asks.
+		var house := Impression.make(&"house")
+		ring.set_places([Impression.make(&"help"), house, Impression.make(&"finish")] as Array[Impression], house)
 	for a in activities:   # Turn to fit (or anything) that can run now
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
 
 
-## A game is left early through the exit token: its round is dropped (skipped), "We can come back to these."
+## A game is left early through the cauldron's ✕: its round is dropped (interrupted), "We can come back to these."
 func _exit_game() -> void:
 	if current == null or _exited:
 		return
@@ -291,7 +308,7 @@ func _exit_game() -> void:
 func _closing_starts() -> void:
 	carry.stop()
 	_demo.stop()
-	exit_token.visible = false
+	_drop_stop_bubble()
 	ambience.fade_out(3.0)
 	if ring.visible:
 		_play(&"menu_close", _mouth())
@@ -306,6 +323,10 @@ func _build_ring() -> void:
 	ring.visible = false   # closed: the child's tap on the cauldron opens it
 	ring.opened = false
 	ring.chosen.connect(func(impression: Impression) -> void:
+		if impression.kind == &"help":
+			impression.reset_bubble()   # the menu stays: the tour plays over it
+			_tour()
+			return
 		_pick(&"gear_home" if impression == ring.door else impression.kind))
 	ring.hovered.connect(func(impression: Impression) -> void:
 		# A soft glass tink, a little higher for each bubble along the arc, then its name.
@@ -322,9 +343,20 @@ func _build_ring() -> void:
 
 
 func _on_press(target: Target, pinched: bool) -> void:
-	if state != &"hub" or target == null or get_tree().paused:
+	if target == null:
 		return
-	if target == cauldron_target or target == sign_target:
+	if stop_bubble != null and is_instance_valid(stop_bubble) and target == stop_bubble.target:
+		if pinched and _clock_real - _stop_since >= STOP_GUARD:
+			_stop_chosen = true   # pinch only: a sweep through it never counts
+		return
+	var on_cauldron := target == cauldron_target or target == sign_target
+	if on_cauldron and (state == &"game" or state == &"asking"):
+		_cauldron_tapped = true   # a game: pause it (or carry on); the finish check: no, not yet
+		return
+	if state != &"hub" or get_tree().paused:
+		return
+	_stop_tour()   # any real action ends the tour at once (and happens as usual)
+	if on_cauldron:
 		_open_menu()   # the cauldron takes a tap (Scene 2 taught it) or a pinch
 		return
 	if not pinched:
@@ -406,6 +438,7 @@ func _build_carry() -> void:
 				socket.rotation.y, pot.global_position if pot != null else Vector3.INF, 0.2)
 		carry.follow(pot, socket)
 	carry.picked_up.connect(func() -> void:
+		_stop_tour()
 		_play(&"gear_lift", _gear_at())
 		print("HUB gear lifted")
 		Onion.line(ALL_DONE, self))
@@ -452,25 +485,8 @@ func _show_lanterns(on: bool) -> void:
 		rafters.visible = on
 
 
-func _build_exit() -> void:
-	exit_token = HubButton.make(&"exit_task", &"exit", 0.05)
-	exit_token.pinch_only = true   # a sweep through it never counts (a sweep is the dots' answer)
-	add_child(exit_token)
-	var pot := workshop.cauldron().global_position if workshop != null else _mouth()
-	var eye := App.head().global_position
-	var to_eye := Vector3(eye.x - pot.x, 0.0, eye.z - pot.z).normalized()
-	# Low beside the cauldron, a little toward the middle of the table (Megan, Nov 17), and now IN FRONT of it,
-	# toward the child: at its side it sat half under Wei's bench board (Megan's laptop test, Nov 18).
-	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else eye + Vector3(0, -0.5, -0.6)
-	var inward := Vector3(middle.x - pot.x, 0.0, middle.z - pot.z)
-	inward = (inward - to_eye * inward.dot(to_eye)).normalized()
-	exit_token.global_position = pot + to_eye * 0.17 + inward * 0.06 + Vector3.UP * 0.06
-	exit_token.face(eye)
-	exit_token.visible = false
-	exit_token.pressed.connect(func(_id: StringName) -> void: _exit_game())
-
-
 func _pick(id: StringName) -> void:
+	_stop_tour()
 	if _picked == &"" and state == &"hub":
 		_picked = id
 		_picked_signal.emit()
@@ -479,6 +495,7 @@ func _pick(id: StringName) -> void:
 # --- Pause ---------------------------------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	_clock_real += delta
 	if not get_tree().paused:
 		_clock += delta
 	_cauldron_step(delta)
@@ -500,7 +517,9 @@ func _cauldron_step(delta: float) -> void:
 	if cauldron_target == null:
 		return
 	var open_to_tap := state == &"hub" and not ring.opened and not _opening and not get_tree().paused
-	cauldron_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap else 0   # nothing to aim at over the open menu
+	# During a game (and the finish check) the cauldron takes a tap too: it pauses the game (design chat, Nov 18).
+	var tap_in_game := state == &"game" or state == &"asking"
+	cauldron_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0   # nothing to aim at over the open menu
 	var want := 0.0
 	if open_to_tap and App.rig:
 		for side: StringName in [&"left", &"right"]:
@@ -509,7 +528,13 @@ func _cauldron_step(delta: float) -> void:
 				continue
 			if pointer.aimed == cauldron_target:
 				want = 1.0
-			if pointer.tracked():
+			if tap_in_game and pointer.tracked() and App.xr != null:
+				var poke := pointer.tip().distance_to(cauldron_target.global_position) <= _cauldron_radius()
+				var poked: bool = _poking.get(side, false)
+				_poking[side] = poke
+				if poke and not poked:
+					_cauldron_tapped = true
+			if pointer.tracked() and open_to_tap:
 				var gap := pointer.tip().distance_to(cauldron_target.global_position)
 				want = maxf(want, clampf(inverse_lerp(GLOW_NEAR_FROM, GLOW_NEAR_FULL, gap), 0.0, 1.0))
 				var inside := gap <= _cauldron_radius()
@@ -519,8 +544,8 @@ func _cauldron_step(delta: float) -> void:
 					_open_menu()   # a headset fingertip into the pot (desktop: the click)
 	if open_to_tap and not ever_opened:
 		want = maxf(want, 0.4)   # the first time it waits glowing softly ("you can tap me")
-	menu_sign.visible = open_to_tap
-	sign_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap else 0
+	menu_sign.visible = open_to_tap or state == &"game"   # the still ☰ stays over the brew during a game
+	sign_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0
 	# The sound label: a hand coming to the cauldron, the first few times, "Games".
 	if want >= 0.6 and not _cauldron_hover and open_to_tap:
 		_cauldron_hover = true
@@ -537,8 +562,8 @@ func _cauldron_step(delta: float) -> void:
 ## Says a bubble's (or the cauldron's) name, quietly: only when Onion has been quiet for a moment
 ## ([constant LABEL_QUIET] s) and not in the hub's first [constant LABEL_SETTLE] s, so a label never stacks
 ## on a line (Megan, Nov 18, issue 5). True if it was said.
-func _label(text: String) -> bool:
-	if text == "" or state != &"hub":
+func _label(text: String, anywhere := false) -> bool:
+	if text == "" or (state != &"hub" and not anywhere):
 		return false
 	var now := _clock
 	if now - _hub_since < LABEL_SETTLE or now - _quiet_since < LABEL_QUIET:
@@ -549,6 +574,161 @@ func _label(text: String) -> bool:
 	print("HUB label: ", text)
 	Onion.line(text, self)
 	return true
+
+
+# --- The ✕ bubble: pausing a game, the finish check (design chat, Nov 18) -------------------------------
+
+## While a game runs: a tap on the cauldron (or the ☰) pauses it and raises one ✕ bubble ("Stop"). Pinch it:
+## the game ends (interrupted). No choice in ~6 s, or a second tap: the bubble sinks and the game goes on.
+func _watch_cauldron() -> void:
+	_cauldron_tapped = false
+	while state == &"game" and current != null:
+		await get_tree().process_frame
+		if not _cauldron_tapped or stop_bubble != null:
+			continue
+		_cauldron_tapped = false
+		print("HUB cauldron tapped: the game pauses")
+		App.hold_pause(&"cauldron", true)
+		if current != null:
+			current.pause()
+		var chosen := await _offer_stop(&"stop")
+		App.hold_pause(&"cauldron", false)
+		if current != null:
+			current.resume()
+		if chosen:
+			print("HUB stop: the game ends")
+			_exit_game()
+		else:
+			print("HUB carry on")
+
+
+## The finish check (the places row's ✕): "All done for today?", then one ✕ over the brew. True = finish.
+func _ask_finish() -> bool:
+	state = &"asking"
+	_stop_tour()
+	await ring.sink(_mouth(), 0.6)
+	await Onion.line(ALL_DONE, self)
+	var yes := await _offer_stop(&"finish")
+	state = &"hub"
+	if not yes:
+		print("HUB finish: not yet")
+		await ring.rise(_mouth())
+	return yes
+
+
+## Raises one ✕ bubble of [param kind] from the brew and waits: true if it was pinched (it pops), false after
+## STOP_WAIT s or a tap on the cauldron (it sinks). Runs while the world is paused.
+func _offer_stop(kind: StringName) -> bool:
+	_stop_chosen = false
+	_cauldron_tapped = false
+	stop_bubble = Impression.make(kind)
+	stop_bubble.add_bubble()
+	add_child(stop_bubble)
+	var eye := App.head().global_position
+	var top := ImpressionRing.spot(_mouth(), eye) + Vector3.DOWN * 0.06
+	var size := STOP_SCALE
+	var rise := create_tween()
+	rise.tween_method(func(k: float) -> void:
+		stop_bubble.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k)
+		stop_bubble.global_position = _mouth().lerp(top, k) - Vector3.UP * Impression.MIDDLE.y * size * lerpf(0.2, 1.0, k)
+		stop_bubble.look_at(stop_bubble.global_position + Vector3(eye.x - top.x, 0.0, eye.z - top.z), Vector3.UP, true)
+		stop_bubble.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_play(&"menu_open", _mouth())
+	_stop_since = _clock_real
+	var labelled := false
+	while _clock_real - _stop_since < STOP_WAIT:
+		await get_tree().process_frame
+		if _stop_chosen:
+			break
+		if _cauldron_tapped:
+			break
+		if not labelled and _hand_near(stop_bubble.target.global_position, 0.12):
+			labelled = _label(Impression.title_for(kind), true)
+	var chosen := _stop_chosen
+	if chosen:
+		stop_bubble.touched()
+		stop_bubble.pop()
+		await get_tree().create_timer(0.35, true).timeout
+	else:
+		var at := stop_bubble.global_position
+		var sink := create_tween()
+		sink.tween_method(func(k: float) -> void:
+			stop_bubble.global_position = at.lerp(_mouth(), k)
+			stop_bubble.scale = Vector3.ONE * size * lerpf(1.0, 0.2, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		await sink.finished
+	_drop_stop_bubble()
+	_cauldron_tapped = false
+	_stop_chosen = false
+	return chosen
+
+
+func _drop_stop_bubble() -> void:
+	if stop_bubble != null and is_instance_valid(stop_bubble):
+		stop_bubble.queue_free()
+	stop_bubble = null
+
+
+func _hand_near(at: Vector3, within: float) -> bool:
+	if App.rig == null:
+		return false
+	for side: StringName in [&"left", &"right"]:
+		var pointer := App.rig.pointer(side)
+		if pointer != null and (pointer.global_position.distance_to(at) < within or (stop_bubble != null and pointer.aimed == stop_bubble.target)):
+			return true
+	return false
+
+
+# --- The controls tour (the ? bubble; design chat, Nov 18) -------------------------------------------------
+
+## Four steps, one control at a time: the thing shown stays bright while the rest of the menu dims to half, the
+## teaching hand shows the action, Onion says the line; ~5 s each, on by itself. Any real action stops it.
+func _tour() -> void:
+	if _touring or state != &"hub":
+		return
+	_touring = true
+	_tour_id += 1
+	var mine := _tour_id
+	print("HUB tour starts")
+	var gear := workshop.gear_node() if workshop != null else null
+	for step in TOUR_LINES.size():
+		if mine != _tour_id or state != &"hub":
+			break
+		var shown: Impression = null
+		match step:
+			1: shown = ring.front()
+			2: shown = ring.door
+			3: shown = ring.place_of(&"finish")
+		for piece in ring._all():
+			piece.set_dim(0.0 if piece == shown else TOUR_DIM)
+		_play(&"hover_tink", _mouth(), 0.9)
+		match step:
+			0: _demo.tap(_rim())
+			1, 2:
+				if shown != null:
+					_demo.aim_pinch(shown.target)
+			3:
+				if gear != null:
+					_demo.pinch_lift(gear)
+		var began := _clock
+		Onion.line(TOUR_LINES[step], self)
+		while _clock - began < TOUR_STEP and mine == _tour_id:
+			await get_tree().process_frame
+	if mine == _tour_id:
+		_end_tour()
+
+
+func _stop_tour() -> void:
+	if _touring:
+		_tour_id += 1
+		print("HUB tour stopped")
+		_end_tour()
+
+
+func _end_tour() -> void:
+	_touring = false
+	_demo.stop()
+	for piece in ring._all():
+		piece.set_dim(0.0)
 
 
 ## True while the cauldron's glow is lit.
