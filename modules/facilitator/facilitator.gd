@@ -13,6 +13,10 @@ extends Module
 ##   time: press one to play it.
 ##   + New save names one with an on-panel keyboard: Start fresh plays a new
 ##   game, Copy this save keeps a checkpoint of this one. See Profile.
+## Results (Graphs chat, Nov 17)
+##   the dots game's rounds as three graphs, one at a time (modules/results/results_view.gd):
+##   Rounds / Time / Coherence; This visit or All visits; Showing: Play, Pinned level, Dev or
+##   Older logs, never pooled. For the adult only: describes, never diagnoses.
 
 const PAGE_SIZE := 4
 const KEYS := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -49,6 +53,9 @@ var _saves_page := 0
 var _typed := ""
 var _face := _material(UIStyle.STAFF_BUTTON)   # polish V5: the grown-up look (core/ui_style.gd)
 var _greyed := _material(UIStyle.STAFF_DISABLED)
+## Results tab: the graph shown and its "you are here" button colour.
+var _results := ResultsView.new()
+var _chosen := _material(UIStyle.STAFF_PRIMARY)
 
 
 func _ready() -> void:
@@ -87,7 +94,11 @@ func _open(from_menu: bool) -> void:
 	_from_menu = from_menu
 	App.hold_pause(&"facilitator", true)
 	Events.facilitator_toggled.emit(true)
-	if from_menu and _page_shown != &"Tools": _show(&"Tools")
+	if App.results_after_closing:   # Scene 10: after a closing, Results first (End session is there)
+		App.results_after_closing = false
+		_show(&"Results")
+		_results.reload()
+	elif from_menu and _page_shown != &"Tools": _show(&"Tools")
 	(_panel.get_node(^"fac_close/Caption") as Label3D).text = "Menu" if from_menu else "Close"
 	var eye := App.head().global_transform
 	var forward := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
@@ -132,6 +143,10 @@ func _activate() -> void:
 		_view_index = 0
 		App.main.change_scene(StringName(String(target.id).trim_prefix("fac_scene_")))
 		return
+	if String(target.id).begins_with("fac_res_"):
+		_results.press(target.id)
+		_refresh_results()
+		return
 	if String(target.id).begins_with("fac_jump_"):
 		_close()
 		Events.intro_jump_requested.emit(StringName(String(target.id).trim_prefix("fac_jump_")))
@@ -156,6 +171,10 @@ func _activate() -> void:
 			App.session.skip_block()
 		&"fac_training":
 			_show(&"Training")
+		&"fac_results":
+			_show(&"Results")
+			_results.reload()   # the logs as they are now
+			_refresh_results()
 		&"fac_saves", &"fac_cancel":
 			_show(&"Saves")
 		&"fac_prev", &"fac_next":
@@ -177,8 +196,10 @@ func _activate() -> void:
 		&"fac_close":
 			_close(_from_menu)
 			return
-		&"fac_tools", &"fac_cancel_tool":
+		&"fac_tools":
 			_show(&"Tools")
+		&"fac_cancel_tool":
+			_show(&"Results" if _confirmed_action == &"fac_end_session" else &"Tools")
 		&"fac_zones":
 			_close()
 			Events.intro_zones_requested.emit()
@@ -187,10 +208,11 @@ func _activate() -> void:
 			_close()
 			Events.room_intro_requested.emit()
 			return
-		&"fac_restart", &"fac_exit", &"fac_redo_setup":
+		&"fac_restart", &"fac_exit", &"fac_redo_setup", &"fac_end_session":
 			_confirmed_action = target.id
 			_confirm_label.text = {fac_restart = "Restart this scene?", fac_exit = "Exit ARVision?",
-					fac_redo_setup = "Redo setup?\nThe opening starts again."}[String(target.id)]
+					fac_redo_setup = "Redo setup?\nThe opening starts again.",
+					fac_end_session = "End this session?\nARVision closes."}[String(target.id)]
 			_show(&"Confirm")
 		&"fac_confirm_tool":
 			Save.write()
@@ -206,6 +228,8 @@ func _activate() -> void:
 				else:
 					App.main.change_scene(&"intro")
 			else:
+				if _confirmed_action == &"fac_end_session":   # Scene 10: the grown-up ends it here
+					Events.report(&"session_ended", {by = "staff_results"})
 				get_tree().quit()
 			return
 	_refresh()
@@ -235,6 +259,7 @@ func _refresh() -> void:
 		_enable(_pages[&"Scenes"].get_node("fac_scene_" + String(id)), id != App.main.current_scene)
 	_refresh_training()
 	_refresh_saves()
+	_refresh_results()
 	_name.text = "Name: %s_" % _typed
 	var intro := App.main.intro()
 	var tools := _pages[&"Tools"]
@@ -280,6 +305,21 @@ func _refresh_saves() -> void:
 	_enable(_pages[&"Saves"].get_node(^"fac_next"), _saves_page < pages - 1)
 
 
+## Results tab: captions and which graph button is lit.
+func _refresh_results() -> void:
+	var page := _pages[&"Results"]
+	for id: StringName in ResultsView.GRAPHS:
+		var button: Target = page.get_node(String(id))
+		if ResultsView.GRAPHS[id] == &"coherence":
+			button.visible = _results.has_coherence()   # hub review: hidden until 2+ levels
+			button.collision_layer = Pointer.MENU_LAYER if button.visible else 0
+		(button.get_node(^"Face") as MeshInstance3D).material_override = \
+			_chosen if ResultsView.GRAPHS[id] == _results.graph_kind else _face
+	(page.get_node(^"fac_res_scope/Caption") as Label3D).text = _results.scope_caption()
+	(page.get_node(^"fac_res_group/Caption") as Label3D).text = _results.group_caption()
+	_enable(page.get_node(^"fac_res_task"), _results.has_more_tasks())
+
+
 ## Local date and time of a save's last write: "2026-10-15 14:32".
 func _when(time: int) -> String:
 	if time == 0:
@@ -298,9 +338,9 @@ func _build() -> void:
 	back.position = Vector3(0.0, 0.0, -0.012)
 	_panel.add_child(back)
 	var tabs := [["fac_scenes", "Scenes"], ["fac_training", "Training"], ["fac_saves", "Saves"],
-		["fac_tools", "Tools"], ["fac_close", "Close"]]
-	for i in tabs.size():
-		_button(tabs[i][0], tabs[i][1], Vector2(0.082, 0.045), Vector2(-0.172 + i * 0.086, 0.17), _panel)
+		["fac_results", "Results"], ["fac_tools", "Tools"], ["fac_close", "Close"]]
+	for i in tabs.size():   # Graphs chat: six tabs now (Results added), so a little narrower
+		_button(tabs[i][0], tabs[i][1], Vector2(0.068, 0.045), Vector2(-0.18 + i * 0.072, 0.17), _panel)
 
 	var scenes := _page(&"Scenes")
 	_text(_scene_label, Vector2(0.0, 0.1), scenes)
@@ -354,6 +394,17 @@ func _build() -> void:
 	_button("fac_restart", "Restart", Vector2(0.095, 0.045), Vector2(-0.077, -0.16), tools)   # it asks "Restart this scene?"
 	_button("fac_redo_setup", "Redo setup", Vector2(0.12, 0.045), Vector2(0.038, -0.16), tools)   # scene review, Nov 17
 	_button("fac_exit", "Exit app", Vector2(0.095, 0.045), Vector2(0.152, -0.16), tools)
+
+	var results := _page(&"Results")
+	var graphs := [["fac_res_rounds", "Rounds"], ["fac_res_time", "Time"], ["fac_res_coherence", "Coherence"]]
+	for i in graphs.size():   # hub review: a little narrower, so End session fits on the row
+		_button(graphs[i][0], graphs[i][1], Vector2(0.1, 0.042), Vector2(-0.165 + 0.105 * i, 0.118), results)
+	_button("fac_end_session", "End session", Vector2(0.11, 0.042), Vector2(0.16, 0.118), results)
+	_results.position = Vector3(0.0, -0.02, 0.0)
+	results.add_child(_results)
+	_button("fac_res_scope", "This visit", Vector2(0.15, 0.042), Vector2(-0.135, -0.168), results)
+	_button("fac_res_group", "Showing: Play", Vector2(0.17, 0.042), Vector2(0.035, -0.168), results)
+	_button("fac_res_task", "Next task", Vector2(0.09, 0.042), Vector2(0.165, -0.168), results)
 
 	var confirm := _page(&"Confirm")
 	_text(_confirm_label, Vector2(0, 0.06), confirm)

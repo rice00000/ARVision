@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://modules/results/results_panel_shots.gd" id="1"]
+
+[node name="ResultsPanelShots" type="Node"]
+script = ExtResource("1")
