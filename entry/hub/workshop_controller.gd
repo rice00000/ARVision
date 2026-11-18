@@ -146,7 +146,7 @@ func _run(activity: Summonable) -> void:
 	if workshop != null:
 		workshop.attend(null)
 	print("HUB game: ", activity.id())
-	var under_bench := activity.id() == &"shelf" and workshop != null   # Wei's bench board covers the socket
+	var under_bench := activity.id() == &"shelf" and workshop != null and workshop.socket_covered()   # under Wei's bench board
 	if under_bench:
 		workshop.hide_socket(true)
 	activity.summon(_workspace())

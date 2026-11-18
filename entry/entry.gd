@@ -198,6 +198,12 @@ func run() -> void:
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
 	PlayMode.log_start()   # every session records dev / play
 	SceneMarker.show_text("Opening")
+	# Visual pass (Megan, Nov 18): the floating ☰ Menu and the stones chip leave the child's view from the
+	# opening on (they showed top left through Scenes 1-6). The cauldron's fog offers every choice in the hub;
+	# the grown-up opens Staff tools with M or the left-palm pinch.
+	var home := App.module(&"Home")
+	if home != null and &"hide_entry" in home:
+		home.hide_entry = true
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void:
 		if _cauldron_touches_enabled() and target == _cauldron_target:
 			_on_target(target))
@@ -1653,6 +1659,8 @@ const GEAR_PLAY_SCALE := 0.6
 ## the child from the panel's middle it sits.
 const PANEL := Vector3(0.144, 0.002, 0.188)
 const SOCKET_RADIUS := 0.06
+## The socket ring's inside teeth (Visual pass, Megan Nov 18: a gear's socket, option C).
+const SOCKET_TEETH := 24
 ## The socket's track where the table moves it at the reveal: groove width, seconds to draw it, the carriage's pace
 ## (m/s, steady) and how long the groove takes to fade after.
 const TRACK_WIDTH := 0.036
@@ -1813,24 +1821,32 @@ func _build_mechanism() -> void:
 	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
 	var dark := _lit(Color(0.07, 0.08, 0.09))
 	var deep := _lit(Color(0.02, 0.025, 0.03))
-	# No plate (Megan): the socket is an INDENT in the table. Nothing stands up: a dark disc at table height
-	# with a darker step inside it (it reads as recessed), a thin brass lip round it, and the little cog
-	# turning on a flat dark disc just behind it. The whole footprint is the ring and the cog (PANEL).
-	var rim := _disc(SOCKET_RADIUS + 0.008, 0.001, 0.0006, dark)
-	rim.position.z = SOCKET_Z
-	_mechanism.add_child(rim)
-	var step := _disc(SOCKET_RADIUS - 0.006, 0.001, 0.0013, deep)
-	step.position.z = SOCKET_Z
-	_mechanism.add_child(step)
-	var lip := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = SOCKET_RADIUS + 0.004
-	torus.outer_radius = SOCKET_RADIUS + 0.008
-	torus.material = brass
-	lip.mesh = torus
-	lip.scale = Vector3(1.0, 0.12, 1.0)
-	lip.position = Vector3(0, 0.0012, SOCKET_Z)
-	_mechanism.add_child(lip)
+	# No plate (Megan): the socket is an INDENT in the table, flush, nothing stands up. Visual pass (Megan, Nov 18,
+	# option C): it reads as a gear's socket: a brass ring with teeth on its INSIDE edge (the planetary gear's
+	# missing outer ring: "the table's missing piece"), a dark inside and a brass axle pin in the middle, with a
+	# thin dark edge round the brass so it shows on a light table. Same footprint as before (SOCKET_RADIUS + 8 mm).
+	var edge := _disc(SOCKET_RADIUS + 0.008, 0.001, 0.0006, dark)
+	edge.position.z = SOCKET_Z
+	_mechanism.add_child(edge)
+	var band := _disc(SOCKET_RADIUS + 0.005, 0.001, 0.0009, brass)
+	band.position.z = SOCKET_Z
+	_mechanism.add_child(band)
+	var inside := _disc(SOCKET_RADIUS - 0.0035, 0.001, 0.0012, deep)
+	inside.position.z = SOCKET_Z
+	_mechanism.add_child(inside)
+	var teeth := Node3D.new()
+	teeth.name = "SocketTeeth"
+	teeth.position = Vector3(0, 0.0016, SOCKET_Z)
+	_mechanism.add_child(teeth)
+	for i in SOCKET_TEETH:
+		var tooth := Node3D.new()
+		tooth.rotation.y = i * TAU / SOCKET_TEETH
+		tooth.add_child(_slab(Vector3(0.0045, 0.0012, 0.0055), Vector3(SOCKET_RADIUS - 0.0045, 0, 0), brass))
+		teeth.add_child(tooth)
+	var pin := _disc(0.0055, 0.004, 0.002, brass)
+	pin.name = "SocketPin"
+	pin.position.z = SOCKET_Z
+	_mechanism.add_child(pin)
 	var window := _disc(0.026, 0.001, 0.0006, dark)   # the cog's flat dark place behind the ring
 	window.position.z = COG_Z
 	_mechanism.add_child(window)

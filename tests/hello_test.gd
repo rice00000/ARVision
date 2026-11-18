@@ -120,3 +120,20 @@ func test_hello_has_no_nearly_ready_and_one_second_of_quiet() -> void:
 	expect(quiet > 0.8 and quiet < 1.4, "about 1 s of quiet before the rattle (%.2f s)" % quiet)
 	expect(await until(func() -> bool: return said.any(func(a: Array) -> bool: return a[0] == "I'm Onion, by the way."), 30.0), "Onion introduces itself")
 	expect(not said.any(func(a: Array) -> bool: return a[0] == "Nearly ready."), "\"Nearly ready.\" is cut")
+
+
+## Visual pass (Megan, Nov 18): the floating ☰ Menu and the stones chip leave the child's view from the opening on.
+func test_the_floating_menu_and_stones_are_hidden_in_the_opening() -> void:
+	Engine.time_scale = 1.0
+	await boot(null, &"intro")
+	app.autostart = true
+	var entry: Entry = app.get_node(^"Intro/Entry")
+	entry.plan_at_start = false
+	entry.run()
+	await until(func() -> bool: return entry.tools_ready, 20.0)
+	entry.jump_to(&"hello")
+	await wait(2.0)
+	var home := App.module(&"Home")
+	expect(home != null and home.get("hide_entry") == true, "the opening hides the floating Menu")
+	var button: Node3D = home.get("_entry")
+	expect(button != null and not button.visible, "no ☰ Menu or stones in view during Hello")

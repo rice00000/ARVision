@@ -459,13 +459,16 @@ var panel_fixed := true
 ## While planning: let the panel glide aside at the reveal (false: it must be clear of the bench from the start).
 var make_way := false
 var _mech_score := 0.0
+## True when the socket's spot lies under Wei's bench, shelf or things: it then fades under the bench board during
+## the shelf game (Workshop.hide_socket). The planner avoids that when the table allows (Megan, Nov 18).
+var socket_under_bench := false
 
 
 ## The shelf may turn this many degrees to the right of straight ahead (Wei's table point moves there), and
 ## the cauldron may stand this many degrees to the left (the usual CAULDRON_ANGLE first).
-## The socket's preferred direction, degrees to the child's right of straight ahead (Megan, Nov 17: near edge,
-## a little right of middle).
-const SOCKET_ANGLE := 15.0
+## The socket's preferred direction, degrees to the child's right of straight ahead (Megan, Nov 18: the table's
+## FRONT RIGHT, out of the middle where the games go; was 15 degrees, a little right of middle).
+const SOCKET_ANGLE := 35.0
 ## How much farther than the EASY reach the socket may be (5 cm: the measured reach is what feels easy, not the
 ## limit; the gear is set in once).
 static var socket_stretch := 0.05
@@ -703,6 +706,11 @@ func _place_mechanism() -> void:
 		mechanism = ctx.best_at
 	_mech_score = ctx.best_score
 	mechanism.y = cauldron.y
+	var placed := _rect(&"plate", mechanism, _panel_half(), _facing(mechanism), 0.0)
+	socket_under_bench = false
+	for z: Zone in ctx.bench_zones:
+		if gap(placed, z) < LOOKED_GAP:
+			socket_under_bench = true
 
 
 ## Scores a panel at [param angle] degrees, [param distance] m out (higher is better) and keeps it in [param ctx]
@@ -723,13 +731,15 @@ func _try_panel(angle: int, distance: float, ctx: Dictionary) -> void:
 	var bench_clear := INF
 	for z: Zone in ctx.bench_zones:
 		bench_clear = minf(bench_clear, gap(plate, z))
-	# (Megan, Nov 17 late: the bench only stands during the shelf game now, and the socket and gear fade under
-	# its board then, so the socket need not be clear of it: Workshop.hide_socket.)
+	# The bench only stands during the shelf game; a socket under it fades there (Workshop.hide_socket). Megan,
+	# Nov 18: front right, so a spot clear of the bench is preferred when the table has one.
+	if bench_clear < LOOKED_GAP:
+		score -= 0.8   # a tie-breaker only: it must never move the cauldron or turn the shelf to win
 	if distance - SOCKET_Z > hands + 0.02 + socket_stretch:   # the socket must be in easy reach
 		score -= 15.0 + (distance - SOCKET_Z - hands) * 20.0
 	score += 0.5 if make_way and bench_clear >= LOOKED_GAP else 0.0
-	# Megan, Nov 17 (late): the socket flat on the table at its NEAR edge, a little right of middle (it holds the
-	# gear's menu all visit): nearest the child that fits, toward SOCKET_ANGLE; no pull toward the cauldron.
+	# The socket flat on the table at its NEAR edge (Megan, Nov 17 late), front right (Nov 18): nearest the child
+	# that fits, toward SOCKET_ANGLE; no pull toward the cauldron.
 	score -= absf(angle - SOCKET_ANGLE) * 0.03 + distance * 1.5
 	score += 0.0 if clear >= GAP else -30.0 + clear
 	if clear >= GAP and score > ctx.best_score:   # only now the gear's landing spot (the slow part)
