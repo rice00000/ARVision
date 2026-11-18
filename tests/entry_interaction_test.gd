@@ -1713,8 +1713,14 @@ func test_the_invitation_in_the_first_visit_is_not_cut_until_the_child_has_taken
 		if hub == null or hub.state != &"hub" or hub.ring == null or hub.ring.turning or hub.ring.impressions.is_empty():
 			return false
 		found.target = hub.ring.impressions[0].target
-		return true, 30.0), "the shelf waits in the hub's ring")
+		found.hub = hub
+		return true, 30.0), "the shelf waits in the hub's menu")
 	if found.has("target"):
+		var hub: WorkshopController = found.hub
+		await until(func() -> bool: return not app.get_tree().paused, 10.0)
+		if not hub.ring.opened:   # the cauldron is the menu: one tap opens it
+			Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+			await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0)
 		Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return _voice().speaking() != "", 30.0), "Onion speaks")
 	var line: String = _voice().speaking()

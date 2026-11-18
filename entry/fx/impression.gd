@@ -28,6 +28,13 @@ var _sounds: Sounds
 var _halo: MeshInstance3D
 var _halo_light: StandardMaterial3D
 var _body: Node3D
+## Its bubble in the hub's menu (Megan, Nov 18): a frosted backing, a clear shell, a pale rim and one still
+## highlight round the piece. Null until [method add_bubble].
+var bubble: Node3D
+## The small bud under the bubble showing what comes next in this game, as a silhouette (Megan, Nov 18).
+var bud: Node3D
+var _shell_light: StandardMaterial3D
+var _frost_light: StandardMaterial3D
 ## What a pinch or touch hits: id [code]impression_<kind>[/code] (the hub hears it through
 ## [signal Events.selected] / [signal Events.touched] and passes it to [method ImpressionRing.press]).
 var target: Target
@@ -59,6 +66,8 @@ static func make(of_kind: StringName) -> Impression:
 				_: impression._dots()
 		&"turn_to_fit":
 			impression._cup()
+		&"door":
+			impression._door()
 	impression._make_halo()
 	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
 	impression.target.position.y = 0.075
@@ -75,6 +84,8 @@ static func footprint(of_kind: StringName) -> Vector2:
 			return Vector2(0.19, 0.05) if dots_style == &"cloud" else Vector2(0.15, 0.05)
 		&"turn_to_fit":
 			return Vector2(0.16, 0.12)
+		&"door":
+			return Vector2(0.11, 0.03)
 	return Vector2(0.16, 0.16)
 
 
@@ -114,6 +125,11 @@ func touched() -> void:
 func set_sealed(on: bool) -> void:
 	sealed = on
 	_body.scale = Vector3.ONE * (SEALED_SCALE if on else 1.0)
+	if bubble != null:   # in the bubble menu: a closed bubble, frostier, no band (Megan, Nov 18)
+		_shell_light.albedo_color.a = 0.45 if on else 0.12
+		_frost_light.albedo_color.a = 0.85 if on else 0.6
+		_update_halo()
+		return
 	if on and _band == null:
 		_band = MeshInstance3D.new()
 		var torus := TorusMesh.new()
@@ -136,6 +152,9 @@ func unseal(seconds := 0.8) -> void:
 	sealed = false
 	var open := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	open.tween_property(_body, "scale", Vector3.ONE, seconds)
+	if bubble != null:   # the bubble clears
+		open.tween_property(_shell_light, "albedo_color:a", 0.12, seconds)
+		open.tween_property(_frost_light, "albedo_color:a", 0.6, seconds)
 	if _band:
 		open.tween_property(_band, "scale", Vector3(1.3, 0.2, 1.3), seconds * 0.6)
 		open.chain().tween_callback(func() -> void: _band.visible = false; _band.scale = Vector3.ONE)
@@ -150,6 +169,143 @@ func _update_halo() -> void:
 	var alpha := 0.5 * _waiting + 0.3 * _near
 	_halo.visible = alpha > 0.0
 	_halo_light.albedo_color.a = alpha
+
+
+# --- The bubble (the hub's menu, Megan Nov 18) -----------------------------------------------------
+
+const BUBBLE_RADIUS := 0.11         # round the piece's middle (its pieces are 12-16 cm wide)
+const MIDDLE := Vector3(0.0, 0.075, 0.0)
+const FROST := Color(0.96, 0.97, 0.96)
+const RIM := Color(0.36, 0.36, 0.35)
+
+
+## Puts the piece in its menu bubble: a milky frosted backing behind it (figure-ground on any wall; the piece's
+## own dark outline does the rest), a nearly clear shell, a thin darker rim and one still highlight. No colour
+## of its own, no shimmer, no wobble.
+func add_bubble() -> void:
+	if bubble != null:
+		return
+	bubble = Node3D.new()
+	bubble.name = "bubble"
+	add_child(bubble)
+	bubble.position = MIDDLE
+	_frost_light = _flat(FROST, 0.6)
+	var frost := _disc(BUBBLE_RADIUS * 0.94, _frost_light)
+	frost.position.z = -0.045
+	bubble.add_child(frost)
+	_shell_light = StandardMaterial3D.new()
+	_shell_light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_shell_light.albedo_color = Color(0.92, 0.97, 0.96, 0.12)
+	_shell_light.roughness = 0.1
+	_shell_light.metallic_specular = 1.0
+	_shell_light.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	var shell := MeshInstance3D.new()
+	shell.name = "shell"
+	var ball := SphereMesh.new()
+	ball.radius = BUBBLE_RADIUS
+	ball.height = BUBBLE_RADIUS * 2.0
+	ball.radial_segments = 40
+	ball.rings = 20
+	shell.mesh = ball
+	shell.material_override = _shell_light
+	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shell.scale.z = 0.5   # a lens more than a ball: the piece sits in it, nothing sticks out at the sides
+	bubble.add_child(shell)
+	var rim := MeshInstance3D.new()
+	rim.name = "rim"
+	var torus := TorusMesh.new()
+	torus.inner_radius = BUBBLE_RADIUS * 0.97
+	torus.outer_radius = BUBBLE_RADIUS * 1.02
+	rim.mesh = torus
+	rim.material_override = _flat(RIM, 1.0)
+	rim.rotation.x = PI * 0.5   # in the bubble's face
+	bubble.add_child(rim)
+	var shine := _disc(BUBBLE_RADIUS * 0.12, _flat(Color.WHITE, 0.85))
+	shine.position = Vector3(-0.45, 0.45, 0.6) * BUBBLE_RADIUS
+	bubble.add_child(shine)
+	(target.get_child(0) as CollisionShape3D).shape.set(&"radius", BUBBLE_RADIUS)   # the whole bubble answers
+	_halo.position = MIDDLE + Vector3(0.0, 0.0, -0.05)
+
+
+## The small bud under the bubble: the next level as a dark silhouette (the game's next look), or none.
+func set_bud(on: bool) -> void:
+	if not on:
+		if bud != null:
+			bud.queue_free()
+			bud = null
+		return
+	if bud != null or bubble == null:
+		return
+	bud = Node3D.new()
+	bud.name = "bud"
+	add_child(bud)
+	bud.position = MIDDLE + Vector3(0.0, -BUBBLE_RADIUS - 0.055, 0.01)
+	var frost := _disc(0.05, _flat(FROST, 0.75))
+	frost.position.z = -0.012
+	bud.add_child(frost)
+	var rim := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.049
+	torus.outer_radius = 0.053
+	rim.mesh = torus
+	rim.material_override = _flat(RIM, 1.0)
+	rim.rotation.x = PI * 0.5
+	bud.add_child(rim)
+	var next := Impression.make(kind)   # its silhouette: the next look comes from the game later (see the log)
+	next.remove_child(next.target)
+	next.target.free()
+	next.target = null
+	next._halo.visible = false
+	var dark := _flat(Color(0.32, 0.33, 0.33), 1.0)
+	for mesh: MeshInstance3D in next._body.find_children("*", "MeshInstance3D", true, false):
+		mesh.material_override = dark
+	next.scale = Vector3.ONE * 0.45
+	next.position = Vector3(0.0, -0.034, 0.0)
+	bud.add_child(next)
+
+
+## The chosen bubble pops: the shell swells and is gone in ~0.3 s; the piece stays (it sinks with the rest).
+func pop() -> void:
+	if bubble == null:
+		return
+	var tween := create_tween().set_parallel()
+	tween.tween_property(bubble, "scale", Vector3.ONE * 1.25, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_shell_light, "albedo_color:a", 0.0, 0.25)
+	tween.tween_property(_frost_light, "albedo_color:a", 0.0, 0.25)
+	tween.chain().tween_callback(func() -> void:
+		bubble.visible = false
+		bubble.scale = Vector3.ONE
+		_shell_light.albedo_color.a = 0.12
+		_frost_light.albedo_color.a = 0.6)
+
+
+## The bubble back (after a pop), for the next time the menu opens.
+func reset_bubble() -> void:
+	if bubble != null:
+		bubble.visible = true
+
+
+func _disc(radius: float, light: StandardMaterial3D) -> MeshInstance3D:
+	var disc := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = radius
+	mesh.bottom_radius = radius
+	mesh.height = 0.001
+	mesh.radial_segments = 48
+	disc.mesh = mesh
+	disc.material_override = light
+	disc.rotation.x = PI * 0.5   # faces +Z, the child
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return disc
+
+
+static func _flat(colour: Color, alpha: float) -> StandardMaterial3D:
+	var light := StandardMaterial3D.new()
+	light.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	light.albedo_color = Color(colour, alpha)
+	if alpha < 1.0:
+		light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return light
 
 
 # --- Looks ---------------------------------------------------------------------------------------
@@ -277,6 +433,16 @@ func _cup() -> void:
 	handle.position = Vector3(0.066, 0.065, 0)
 	handle.scale = Vector3(1.0, 1.0, 1.3)
 	_body.add_child(handle)
+
+
+func _door() -> void:
+	# Wei's room (fog menu, Megan Nov 18): a little navy door in a cream frame with a brass knob, in the
+	# menu's lower "places" row. Its own silhouette (tall, narrow), dark outline like the others.
+	_box(Vector3(0.11, 0.15, 0.025), Vector3(0, 0.075, 0), CREAM)
+	_box(Vector3(0.08, 0.13, 0.012), Vector3(0, 0.07, 0.016), NAVY, false)
+	var knob := _mesh(_cylinder(0.008, 0.008, 0.012), Color(0.8, 0.62, 0.26), false)
+	knob.rotation.x = PI * 0.5
+	knob.position = Vector3(0.024, 0.07, 0.026)
 
 
 func _make_halo() -> void:

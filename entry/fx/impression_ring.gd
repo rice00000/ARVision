@@ -1,234 +1,291 @@
 class_name ImpressionRing
 extends Node3D
-## The hub's games above the cauldron: a RING on the cauldron's smoke (Megan, Nov 17; SCENE_REVIEW_DECISIONS
-## Scene 7). The cauldron's job is the games only (shelf, dots, cup); the workshop's own controls (Finish
-## visit, Home, Back to the workshop) are the gear's.
-## * A soft stew-coloured fog rises from the mouth and sits still behind the ring: a plain, calm background
-##   for the choices in front of the busy real room (figure-ground for low vision). It never swirls.
-## * The ring never turns by itself (a moving target is a vision test in disguise; motion in the middle of
-##   the view is clutter). It turns only when a side choice is pressed.
-## * ONE press picks any choice: a side one is rotated to the front (eased, no overshoot) and then chosen;
-##   the front one is chosen at once. Chosen = its sound, a short pulse, then [signal chosen].
-## * The front choice is full size, leaning a little toward the child, with the halo behind it; the others
-##   sit round the ring at [constant SIDE_SCALE]. Every choice lights softly while a hand ray aims at it or
-##   a hand comes near.
-## * [method add]: a new game rises out of the cauldron into the ring and turns to the front ("hidden, not
-##   sealed": the dots after the first shelf, Turn to fit when it can run).
-## * No arrows and no swipe (a sideways sweep is the dots game's answer).
-## [method HubGlow.quiet_all] also quiets every ring (halo and fog) before a game starts.
+## The hub's menu: the cauldron's BUBBLE MENU (visual pass, Megan Nov 18; `claude/VISUAL_PASS_LOG.md`). The
+## class keeps its old name and calls so the hub and the tests carry on.
+##
+## * **The cauldron is the menu.** The menu starts closed (invisible). The hub opens it ([method rise]) when the
+##   child taps the cauldron (or the ☰ over it); it sinks back in ([method sink]) before a game, Wei's room or
+##   the closing.
+## * **Each choice rises in its own bubble** ([method Impression.add_bubble]): a frosted backing behind the
+##   piece, which keeps its dark outline (figure-ground on any wall), a nearly clear shell, a pale rim, one
+##   still highlight. No colour of its own, no shimmer, no wobble, no fog behind.
+## * **Tasks: a still arc** within touch reach, up to [constant STILL_MAX] all in view and none moving (Megan:
+##   B). The middle one is a little bigger. ONE press picks any; the chosen bubble pops. Past
+##   [constant STILL_MAX] it turns into a carousel whose ends peek out (a press on a side one slides it in).
+## * **Places: a lower row**, a little nearer: Wei's room's door, in a smaller bubble ([method set_door]).
+## * **Buds** under a bubble show the game's next level as a silhouette ([method Impression.set_bud]).
+## * **Rest:** after [constant REST_AFTER] s with no hand near, the bubbles shrink to [constant REST_SCALE] in
+##   place (still pressable); a hand coming near wakes them in ~0.5 s.
+## * [signal hovered] when a hand comes to a bubble: the hub says its name (a sound label).
 
 signal turned(front: Impression)
-## The child chose [param impression] (after any turn bringing it to the front).
+## The child chose [param impression].
 signal chosen(impression: Impression)
+## A hand came to [param impression] (aimed at it or close): the hub says its name.
+signal hovered(impression: Impression)
 
-const RADIUS := 0.2             # metres from the ring's middle to each choice
-const ABOVE_RIM := 0.16         # the choices' bases over the cauldron's rim: above it, not in front of its body
-const LEAN := 0.04              # the front one comes this much nearer the child
-const SIDE_SCALE := 0.7
-const TURN_SECONDS := 0.8       # a third of a turn; a longer turn takes a little longer
-const RISE_SECONDS := 1.0
-const NEAR_FROM := 0.25         # a hand this close starts to light a choice...
+const STILL_MAX := 5            # up to this many tasks: a still arc, nothing slides
+const STEP := 0.5               # radians between neighbours on the arc
+const RADIUS := 0.26            # metres from the arc's centre to each bubble
+const ABOVE_RIM := 0.27         # the menu's middle over the cauldron's rim
+const REACH := 0.44             # the menu's middle is pulled toward the child until it is this far from the eyes
+const LEAN_MAX := 0.2           # ...but never more than this far forward of the cauldron's mouth
+const FRONT_SCALE := 0.6        # the middle bubble (a piece is 12-16 cm, its bubble 22 cm, at scale 1)
+const SIDE_SCALE := 0.5
+const DOOR_SCALE := 0.42
+const DOOR_BELOW := 0.14        # the places row: this far below the tasks, a little nearer
+const TURN_SECONDS := 1.2       # a carousel step (only past STILL_MAX)
+const RISE_SECONDS := 1.0       # a new bubble rising out of the brew into its place
+const OPEN_SECONDS := 1.2       # the bubbles rising when the menu opens
+const NEAR_FROM := 0.25         # a hand this close starts to light a bubble...
 const NEAR_FULL := 0.08         # ...fully at this distance
-const FOG := Color(0.62, 0.78, 0.55)   # the stew's sage
-const FOG_ALPHA := 0.8
+const HOVER_AT := 0.6           # this lit: the bubble says its name (again only after the hand left it)
+const WAKE_NEAR := 0.35         # a hand this close to the menu's middle wakes it (and keeps it awake)
+const REST_AFTER := 20.0        # seconds with no hand near before the menu rests
+const REST_SECONDS := 1.5
+const WAKE_SECONDS := 0.5
+const REST_SCALE := 0.7
 
 ## Every ring alive (for [method HubGlow.quiet_all]).
 static var alive: Array[ImpressionRing] = []
 
 var impressions: Array[Impression] = []
-## Radians the ring is turned: choice i sits at i * step + offset; 0 = toward the child.
+## The places row (Wei's room's door), or null.
+var door: Impression
+## Carousel steps turned (past STILL_MAX only): piece i sits at (i - offset) * STEP.
 var offset := 0.0
 var turning := false
+## True while the menu is up (between [method rise] and [method sink]).
+var opened := false
+## 0 awake .. 1 resting.
+var rest := 0.0
 
-var _step := TAU / 3.0
-var _toward := Vector3.FORWARD   # flat direction from the ring's middle to the child
+var _toward := Vector3.FORWARD   # flat direction from the menu toward the child
+var _side := Vector3.RIGHT
 var _quiet := false
 var _waiting := 1.0
-var _fog: MeshInstance3D
-var _fog_light: StandardMaterial3D
-var _column_light: StandardMaterial3D
+var _idle := 0.0
+var _rest_tween: Tween
+var _hovering: Dictionary = {}   # impression -> its name was said for this visit of the hand
 
 
-## A ring of [param choices] over [param middle] (a point over the cauldron's mouth, at the choices' base
-## height), facing [param eye], on fog rising from [param mouth] (the cauldron's mouth; INF = no column),
-## under [param parent].
-static func make(parent: Node, choices: Array[Impression], middle: Vector3, eye: Vector3, mouth := Vector3.INF) -> ImpressionRing:
+## The menu facing [param eye], its tasks' middle at [param middle] ([method spot] gives the usual place),
+## under [param parent]. [param _mouth]: kept for the old calls.
+static func make(parent: Node, choices: Array[Impression], middle: Vector3, eye: Vector3, _mouth := Vector3.INF) -> ImpressionRing:
 	var ring := ImpressionRing.new()
 	ring.name = "impression_ring"
 	parent.add_child(ring)
 	ring.global_position = middle
 	ring._toward = Vector3(eye.x - middle.x, 0.0, eye.z - middle.z).normalized()
-	ring._make_fog(mouth)
+	ring._side = ring._toward.cross(Vector3.UP).normalized()
 	for impression in choices:
-		if impression.get_parent() == null:
-			ring.add_child(impression)
-		ring.impressions.append(impression)
+		ring._take(impression)
+	ring.opened = true   # made open (the hub hides it and opens it with a tap)
 	ring._place()
 	return ring
 
 
-## The choice in front now.
+## Where the menu's middle goes: over the cauldron's [param mouth], pulled toward the child at [param eye] so the
+## bubbles sit within touch reach (REACH from the eyes), but never more than LEAN_MAX forward of the mouth.
+static func spot(mouth: Vector3, eye: Vector3) -> Vector3:
+	var over := mouth + Vector3.UP * ABOVE_RIM
+	var toward := Vector3(eye.x - over.x, 0.0, eye.z - over.z).normalized()
+	var lean := clampf(over.distance_to(eye) - REACH, 0.0, LEAN_MAX)
+	return over + toward * lean
+
+
+## The middle task (the carousel's front past STILL_MAX).
 func front() -> Impression:
+	if impressions.is_empty():
+		return null
+	if not _carousel():
+		return impressions[(impressions.size() - 1) / 2]
 	var best: Impression = null
 	var best_angle := INF
 	for i in impressions.size():
-		var angle := absf(wrapf(i * _step + offset, -PI, PI))
+		var angle := absf(_angle(i))
 		if angle < best_angle:
 			best_angle = angle
 			best = impressions[i]
 	return best
 
 
-## The choice whose target is [param target], or null.
+## The bubble (task or door) whose target is [param target], or null.
 func impression_for(target: Target) -> Impression:
+	if door != null and is_instance_valid(door) and door.target == target:
+		return door
 	for impression in impressions:
 		if impression.target == target:
 			return impression
 	return null
 
 
-## The child pressed [param impression]: &"chosen" ([signal chosen] follows, after a turn bringing it to
-## the front if it wasn't), &"sealed" (not open: nothing happens) or &"busy" (still turning or rising).
+## The places row's door (Wei's room); null takes it away.
+func set_door(impression: Impression) -> void:
+	if door != null and is_instance_valid(door) and door != impression:
+		door.queue_free()
+	door = impression
+	if door != null:
+		_take(door, false)
+	_place()
+
+
+## The child pressed [param impression]: &"chosen" (it pops; [signal chosen] follows), &"sealed" (not open
+## yet: the hub says "Soon") or &"busy" (still rising, sliding or closed).
 func press(impression: Impression) -> StringName:
-	if impression == null or impression not in impressions:
+	if impression == null or (impression not in impressions and impression != door):
 		return &""
 	if impression.sealed:
 		return &"sealed"
-	if turning:
+	if turning or not opened:
 		return &"busy"
+	_wake_now()
 	_choose(impression)
 	return &"chosen"
 
 
 func _choose(impression: Impression) -> void:
-	if impression != front():
+	if _carousel() and impression != door and impression != front():
 		await step_to(impression, false)
 	impression.touched()
-	await get_tree().create_timer(0.35).timeout   # the pressed moment: its sound and pulse, then the game
+	impression.pop()
+	await get_tree().create_timer(0.35).timeout   # the pop and its sound, then the game
 	chosen.emit(impression)
 
 
-## Turns the ring (shortest way, eased, no overshoot) until [param impression] is in front.
+## Slides the carousel (past STILL_MAX only; shortest way, eased) until [param impression] is in front.
 func step_to(impression: Impression, with_sound := true) -> void:
 	var i := impressions.find(impression)
-	if i < 0 or impression.sealed:
+	if i < 0 or impression.sealed or not _carousel():
 		return
-	var by := -wrapf(i * _step + offset, -PI, PI)
+	var by := _wrapped(i - offset)
 	turning = true
 	var tween := create_tween()
 	tween.tween_method(func(o: float) -> void:
 		offset = o
-		_place(), offset, offset + by, TURN_SECONDS * maxf(1.0, absf(by) / _step * 0.8)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_place(), offset, offset + by, TURN_SECONDS * maxf(1.0, absf(by) * 0.8)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
+	offset = roundf(offset)
 	turning = false
+	_place()
 	if with_sound:
 		impression.sound()
 	turned.emit(impression)
 
 
-## A new game rises out of the cauldron (from [param from], e.g. its mouth) into the ring, which turns it
-## to the front; its sound plays as it arrives.
+## A new game rises out of the brew (from [param from]) into the arc, the others easing aside to make room
+## (one clear moment, ~1 s); its sound plays as it arrives. With the menu closed it simply joins.
 func add(impression: Impression, from: Vector3) -> void:
-	if impression.get_parent() == null:
-		add_child(impression)
-	impressions.append(impression)
-	var i := impressions.size() - 1
-	var by := -wrapf(i * _step + offset, -PI, PI)
-	var begin := offset
-	turning = true
-	var rise := create_tween()
-	rise.tween_method(func(k: float) -> void:
-		offset = begin + by * k
+	_take(impression)
+	if not opened or not visible:
+		if _carousel():
+			offset = float(impressions.size() - 1)
 		_place()
-		impression.global_position = from.lerp(impression.global_position, k)
-		impression.scale *= lerpf(0.3, 1.0, k), 0.0, 1.0, RISE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	await rise.finished
+		return
+	_wake_now()
+	turning = true
+	var starts: Array[Vector3] = []
+	for piece in impressions:
+		starts.append(piece.global_position if piece != impression else from)
+	if _carousel():
+		offset = float(impressions.size() - 1)
+	_place()
+	var ends: Array[Vector3] = []
+	var sizes: Array[Vector3] = []
+	for piece in impressions:
+		ends.append(piece.global_position)
+		sizes.append(piece.scale)
+	var tween := create_tween()
+	tween.tween_method(func(k: float) -> void:
+		for i in impressions.size():
+			impressions[i].global_position = starts[i].lerp(ends[i], k)
+		impression.scale = sizes[sizes.size() - 1] * lerpf(0.2, 1.0, k), 0.0, 1.0, RISE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await tween.finished
 	turning = false
 	_place()
 	impression.sound()
 	turned.emit(impression)
 
 
-## Fades every halo and the fog out (before a game); the ring stays and can be woken with [method wake].
+## Fades every halo; the menu stays and can be woken with [method wake].
 func quiet(seconds := 0.8) -> void:
 	_quiet = true
 	var tween := create_tween()
 	tween.tween_method(func(f: float) -> void:
 		_waiting = f
-		for impression in impressions:
-			if is_instance_valid(impression):
-				impression.set_near(0.0)
-		_fog_light.albedo_color.a = FOG_ALPHA * f
-		_column_light.albedo_color.a = FOG_ALPHA * 0.7 * f
-		_place(), _waiting, 0.0, seconds)
+		for impression in _all():
+			impression.set_near(0.0)
+		_place(), 1.0, 0.0, seconds)
 
 
-## The closing (Scene 10, Megan Nov 17): the ring and its fog sink quietly into the cauldron's [param mouth]
-## and are gone, before Onion's first goodbye line.
-func sink(mouth: Vector3, seconds := 1.2) -> void:
+## The menu closes: the bubbles sink back into the cauldron's [param mouth] and are gone (before a game, Wei's
+## room, or the closing).
+func sink(mouth: Vector3, seconds := 1.0) -> void:
 	_quiet = true
 	turning = true
+	var pieces := _all()
 	var starts: Array[Vector3] = []
-	for impression in impressions:
-		starts.append(impression.global_position if is_instance_valid(impression) else mouth)
+	var sizes: Array[Vector3] = []
+	for impression in pieces:
+		starts.append(impression.global_position)
+		sizes.append(impression.scale)
 	var tween := create_tween()
 	tween.tween_method(func(k: float) -> void:
-		for i in impressions.size():
-			var impression := impressions[i]
-			if is_instance_valid(impression):
-				impression.global_position = starts[i].lerp(mouth, k)
-				impression.scale = Vector3.ONE * lerpf(1.0, 0.2, k)
-				impression.set_waiting(0.0)
-				impression.set_near(0.0)
-		_fog_light.albedo_color.a = FOG_ALPHA * (1.0 - k)
-		_column_light.albedo_color.a = FOG_ALPHA * 0.7 * (1.0 - k), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		for i in pieces.size():
+			if is_instance_valid(pieces[i]):
+				pieces[i].global_position = starts[i].lerp(mouth, k)
+				pieces[i].scale = sizes[i] * lerpf(1.0, 0.2, k)
+				pieces[i].set_waiting(0.0)
+				pieces[i].set_near(0.0), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	await tween.finished
 	visible = false
+	opened = false
+	turning = false
 
 
-## Back after a game (Megan, Nov 18: the pieces sink with the fog during a game and rise again after): the
-## ring and its fog rise out of the cauldron's [param mouth] to their places, then wake.
-func rise(mouth: Vector3, seconds := 1.0) -> void:
+## The menu opens: the bubbles rise out of the cauldron's [param mouth] to their places (the child's tap on
+## the cauldron; back after a game).
+func rise(mouth: Vector3, seconds := OPEN_SECONDS) -> void:
 	visible = true
 	turning = true
 	_quiet = false
 	_waiting = 1.0
+	_idle = 0.0
+	rest = 0.0
+	_hovering.clear()
+	for impression in _all():
+		impression.reset_bubble()
 	_place()
+	var pieces := _all()
 	var ends: Array[Vector3] = []
 	var sizes: Array[Vector3] = []
-	for impression in impressions:
-		ends.append(impression.global_position if is_instance_valid(impression) else mouth)
-		sizes.append(impression.scale if is_instance_valid(impression) else Vector3.ONE)
+	for impression in pieces:
+		ends.append(impression.global_position)
+		sizes.append(impression.scale)
 	var tween := create_tween()
 	tween.tween_method(func(k: float) -> void:
-		for i in impressions.size():
-			var impression := impressions[i]
-			if is_instance_valid(impression):
-				impression.global_position = mouth.lerp(ends[i], k)
-				impression.scale = sizes[i] * lerpf(0.2, 1.0, k)
-				impression.set_near(0.0)
-		_fog_light.albedo_color.a = FOG_ALPHA * k
-		_column_light.albedo_color.a = FOG_ALPHA * 0.7 * k, 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		for i in pieces.size():
+			if is_instance_valid(pieces[i]):
+				pieces[i].global_position = mouth.lerp(ends[i], k)
+				pieces[i].scale = sizes[i] * lerpf(0.2, 1.0, k)
+				pieces[i].set_near(0.0), 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	await tween.finished
+	opened = true
 	turning = false
 	wake()
 
 
-## Lights the front one and the fog again (back at the hub after a game).
+## Lights the middle bubble again (after [method quiet]).
 func wake() -> void:
 	_quiet = false
 	_waiting = 1.0
-	_fog_light.albedo_color.a = FOG_ALPHA
-	_column_light.albedo_color.a = FOG_ALPHA * 0.7
 	_place()
 
 
-## True while anything of the ring is lit (a halo or the fog).
+## True while any bubble's halo is lit.
 func is_lit() -> bool:
-	if _fog_light.albedo_color.a > 0.003:
-		return true
-	return impressions.any(func(i: Impression) -> bool:
-		return is_instance_valid(i) and i.visible and i._halo.visible and i._halo_light.albedo_color.a > 0.003)
+	return _all().any(func(i: Impression) -> bool:
+		return i.is_visible_in_tree() and i._halo.visible and i._halo_light.albedo_color.a > 0.003)
 
 
 func _enter_tree() -> void:
@@ -239,74 +296,125 @@ func _exit_tree() -> void:
 	alive.erase(self)
 
 
-func _process(_delta: float) -> void:
-	if _quiet:
+func _process(delta: float) -> void:
+	if _quiet or not visible:
 		return
 	var pointers: Array[Pointer] = []
 	if App.rig:
-		for side: StringName in [&"left", &"right"]:
-			var pointer := App.rig.pointer(side)
+		for hand: StringName in [&"left", &"right"]:
+			var pointer := App.rig.pointer(hand)
 			if pointer:
 				pointers.append(pointer)
-	for impression in impressions:
-		if not is_instance_valid(impression) or impression.sealed:
-			continue
+	var hand_near := false
+	for pointer in pointers:
+		if pointer.global_position.distance_to(global_position) < WAKE_NEAR:
+			hand_near = true
+	for impression in _all():
 		var near := 0.0
 		for pointer in pointers:
 			if pointer.aimed == impression.target:
 				near = 1.0
 			var gap := pointer.global_position.distance_to(impression.target.global_position)
 			near = maxf(near, clampf(inverse_lerp(NEAR_FROM, NEAR_FULL, gap), 0.0, 1.0))
-		impression.set_near(near)
+		if not impression.sealed:
+			impression.set_near(near)
+		# The sound label: once each time a hand comes to it (sealed ones too: "Soon").
+		if near >= HOVER_AT and opened and not turning and not _hovering.get(impression, false):
+			_hovering[impression] = true
+			hovered.emit(impression)
+		elif near < 0.15:
+			_hovering.erase(impression)
+		if near > 0.0:
+			hand_near = true
+	# Rest and wake (Megan, Nov 18): a hand coming near wakes it; ~20 s with none, it settles.
+	if not opened or turning:
+		_idle = 0.0
+	elif hand_near:
+		_wake_now()
+	else:
+		_idle += delta
+		if _idle >= REST_AFTER and rest < 1.0 and (_rest_tween == null or not _rest_tween.is_running()):
+			_rest_to(1.0, REST_SECONDS)
 
 
-## Every choice at its place round the ring: the front one full size and leaning toward the child, the
-## rest smaller; all facing the child.
+func _take(impression: Impression, task := true) -> void:
+	if impression.get_parent() == null:
+		add_child(impression)
+	impression.add_bubble()
+	if task and impression not in impressions:
+		impressions.append(impression)
+
+
+func _wake_now() -> void:
+	_idle = 0.0
+	if rest > 0.0 and (_rest_tween == null or not _rest_tween.is_running() or rest > 0.99):
+		_rest_to(0.0, WAKE_SECONDS)
+
+
+func _rest_to(to: float, seconds: float) -> void:
+	if _rest_tween != null and _rest_tween.is_running():
+		_rest_tween.kill()
+	_rest_tween = create_tween()
+	_rest_tween.tween_method(func(r: float) -> void:
+		rest = r
+		_place(), rest, to, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _all() -> Array[Impression]:
+	var list: Array[Impression] = []
+	for impression in impressions:
+		if is_instance_valid(impression):
+			list.append(impression)
+	if door != null and is_instance_valid(door):
+		list.append(door)
+	return list
+
+
+func _carousel() -> bool:
+	return impressions.size() > STILL_MAX
+
+
+func _wrapped(steps: float) -> float:
+	var n := maxi(impressions.size(), 1)
+	var w := fposmod(steps, float(n))
+	return w - n if w > n * 0.5 else w
+
+
+## Where piece [param i] sits on the arc: radians from straight toward the child.
+func _angle(i: int) -> float:
+	if not _carousel():
+		return (i - (impressions.size() - 1) * 0.5) * STEP
+	return _wrapped(i - offset) * STEP
+
+
+## Every bubble at its place: the tasks on a still arc facing the child (the middle one a little bigger; past
+## STILL_MAX the far ones peek in at the ends), the door below and a little nearer.
 func _place() -> void:
-	var side := _toward.cross(Vector3.UP)
+	var shrink := lerpf(1.0, REST_SCALE, rest)
+	var arc_middle := global_position - _toward * RADIUS
 	var leader := front()
+	var middle_angle := 0.0 if _carousel() or impressions.size() % 2 == 1 else STEP * 0.5
+	var edge := STEP * (2.0 if _carousel() else 9.0)
 	for i in impressions.size():
 		var impression := impressions[i]
 		if not is_instance_valid(impression):
 			continue
-		var angle := wrapf(i * _step + offset, -PI, PI)
-		var frontness := clampf(1.0 - absf(angle) / (_step * 0.9), 0.0, 1.0)
-		var at := global_position + (_toward * cos(angle) + side * sin(angle)) * RADIUS + _toward * LEAN * frontness
-		impression.global_position = at
-		impression.look_at(at + _toward, Vector3.UP, true)
-		impression.scale = Vector3.ONE * lerpf(SIDE_SCALE, 1.0, frontness)
-		impression.set_waiting(_waiting if impression == leader and not turning else 0.0)
-
-
-## The stew's fog: one large soft cloud behind the ring's middle and a soft column down to the mouth.
-## Billboards with depth test (the choices in front draw over them); still: nothing in them moves.
-func _make_fog(mouth: Vector3) -> void:
-	_fog_light = _soft(FOG_ALPHA)
-	_fog = _quad(Vector2(0.95, 0.75), _fog_light)
-	_fog.name = "fog"
-	_fog.position = -_toward * (RADIUS + 0.08) + Vector3.UP * 0.1   # behind the back choice too
-	_column_light = _soft(FOG_ALPHA * 0.7 if mouth != Vector3.INF else 0.0)
-	var column := _quad(Vector2(0.26, 0.34), _column_light)
-	column.name = "fog_column"
-	column.position = -_toward * RADIUS * 0.3 + Vector3.DOWN * 0.04 if mouth == Vector3.INF else (mouth - global_position) + Vector3.UP * 0.12 - _toward * 0.02
-
-
-func _soft(alpha: float) -> StandardMaterial3D:
-	var light := StandardMaterial3D.new()
-	light.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	light.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	light.albedo_texture = Onion.soft_dot()
-	light.albedo_color = Color(FOG, alpha)
-	return light
-
-
-func _quad(size: Vector2, light: StandardMaterial3D) -> MeshInstance3D:
-	var mesh := QuadMesh.new()
-	mesh.size = size
-	mesh.material = light
-	var quad := MeshInstance3D.new()
-	quad.mesh = mesh
-	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(quad)
-	return quad
+		var angle := _angle(i)
+		impression.visible = absf(angle) <= edge + 0.01
+		var frontness := clampf(1.0 - (absf(angle) - middle_angle) / STEP, 0.0, 1.0)
+		var peek := _carousel() and absf(angle) > STEP * 1.5   # the ends: smaller (there's more)
+		var size := lerpf(SIDE_SCALE, FRONT_SCALE, frontness) * (0.75 if peek else 1.0) * shrink
+		var at := arc_middle + (_toward * cos(angle) + _side * sin(angle)) * RADIUS \
+				+ Vector3.DOWN * (absf(angle) * 0.02 + 0.03 * rest)
+		impression.scale = Vector3.ONE * size
+		impression.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
+		impression.look_at(impression.global_position + _toward, Vector3.UP, true)
+		impression.scale = Vector3.ONE * size
+		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
+	if door != null and is_instance_valid(door):
+		var size := DOOR_SCALE * shrink
+		var at := global_position + _toward * 0.08 + Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
+		door.scale = Vector3.ONE * size
+		door.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
+		door.look_at(door.global_position + _toward, Vector3.UP, true)
+		door.scale = Vector3.ONE * size

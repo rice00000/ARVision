@@ -38,6 +38,12 @@ func _choose_game(kind: StringName, timeout := 60.0) -> bool:
 		return false
 	if not await until(ready, timeout):
 		return false
+	var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+	await until(func() -> bool: return not app.get_tree().paused, 10.0)
+	if not hub.ring.opened:   # the cauldron is the menu: one tap opens it
+		Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+		if not await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0):
+			return false
 	Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
 	return true
 

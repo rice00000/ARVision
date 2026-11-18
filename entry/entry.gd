@@ -595,6 +595,12 @@ func _to_shelf(fast := false) -> void:
 		FirstVisit.invite = true   # the opening's own flow: the hub's first visit, with Onion's welcome
 	# (The shelf is no longer shown by the reveal: the real trial's things arrive as Wei's do.)
 	Engine.time_scale = 1.0   # Wei's World at normal speed
+	# The hub lifts the gear out to finish (visual pass, Nov 18): it must stand in its socket, and only the
+	# hub's own Carry may handle it from here (a DEV jump skips the reveal: seat it now).
+	if is_instance_valid(_carry):
+		_carry.stop()
+	if is_instance_valid(_gear) and not _gear.visible:
+		_dock_at_once()
 	_hand_over()
 	_beat("done: Wei's World")
 	App.main.change_scene.call_deferred(&"first_visit", false)   # no black blink: the room just goes on   # Onion leads the first shelf level
