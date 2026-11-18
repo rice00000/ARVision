@@ -254,3 +254,32 @@ func test_the_house_says_its_teaser_on_the_first_hover_and_labels_wait_for_quiet
 	hub.ring.hovered.emit(hub.ring.impressions[0])   # while the teaser is still being said
 	await frames(2)
 	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size(), named, "no label while Onion is still speaking")
+
+
+## Megan, Nov 18: a bubble is chosen by a click or pinch only, never by a touch or a hand passing by.
+func test_a_touch_on_a_bubble_never_chooses_it() -> void:
+	var hub := await _to_hub()
+	await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning and not app.get_tree().paused, 30.0)
+	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0), "the menu is open")
+	var shelf := hub.ring.impressions[0]
+	Events.touched.emit(&"right", shelf.target)
+	await wait(1.0)
+	expect_eq(hub.state, &"hub", "a touch didn't choose it")
+	Events.selected.emit(&"right", shelf.target, Vector3.ZERO, Vector3.FORWARD)
+	expect(await until(func() -> bool: return hub.state == &"game", 10.0), "a pinch does")
+
+
+## The desktop's dev skip (Megan, Nov 18): opens the menu, wins a game's rounds, brings the child back from Wei's room.
+func test_the_dev_skip_moves_through_the_hub() -> void:
+	var hub := await _to_hub()
+	var skip := DevSkip.new()
+	app.add_child(skip)
+	await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning and not app.get_tree().paused, 30.0)
+	skip.skip()
+	expect(await until(func() -> bool: return hub.ring.opened, 10.0), "skip opens the menu")
+	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
+	await until(func() -> bool: return hub.state == &"game" and App.session.running, 30.0)
+	skip.skip()
+	expect(await until(func() -> bool: return hub.state == &"hub", 90.0), "skip wins the rounds: back at the hub")
+	Engine.time_scale = 1.0

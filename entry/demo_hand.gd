@@ -209,6 +209,14 @@ func stop() -> void:
 
 
 var _aim_fix_cached: Variant = null
+var _ray: MeshInstance3D
+var _ray_material: StandardMaterial3D
+## The pointing pinch: how far the three other fingers curl (0 open .. 1 as in the closed pinch), the roll
+## about the finger's line (radians) that shows the thumb-index gap, and the ray's look.
+const AIM_CURL := 0.75
+const AIM_ROLL := 0.7
+const RAY_RADIUS := 0.0018
+const RAY_SHORT := 0.07          # the ray stops this short of the bubble's middle (at its edge)
 
 
 func _start(mode: Mode, keys: Array, anchor: Callable, pitch: float, fade_loop: bool, key: Variant) -> void:
@@ -277,12 +285,14 @@ func _pose(seconds: float) -> void:
 	if _gesture == Mode.AIM_PINCH:
 		var aim := (_aim_at.global_position - anchor).normalized()   # the index finger points straight at it
 		global_position = anchor + Vector3.UP * up - aim * back
-		global_basis = Basis.looking_at(aim, Vector3.UP) * Basis(_aim_fix())
+		# Turned about the finger's own line so the thumb-index gap faces the child (Megan, Nov 18).
+		global_basis = Basis.looking_at(aim, Vector3.UP) * Basis(Vector3.BACK, AIM_ROLL) * Basis(_aim_fix())
 	else:
 		global_position = anchor + Vector3.UP * up - forward * back
 		global_basis = Basis.looking_at(forward * cos(_pitch) + Vector3.UP * sin(_pitch), Vector3.UP)
 	_show_fingers(open, seconds)
 	_show_ring(anchor, seconds)
+	_show_ray(open)
 	var rounds := 1.0
 	if _fade_loop:
 		rounds = smoothstep(0.0, 0.5, seconds) * (1.0 - smoothstep(_length - 0.5, _length, seconds))
@@ -320,6 +330,8 @@ func _free_figure() -> void:
 	_figure = null
 	_ring = null
 	_ring_material = null
+	_ray = null
+	_ray_material = null
 	_player = null
 	_skeleton = null
 	_folded.clear()
@@ -448,6 +460,8 @@ func _show_fingers(open: float, seconds: float) -> void:
 		_shown_at = at
 		if _gesture == Mode.TAP and _skeleton != null:
 			_apply_tap_pose(1.0 - absf(at - 0.5) * 2.0)   # 0 at rest, 1 at the press
+		elif _gesture == Mode.AIM_PINCH and _skeleton != null:
+			_apply_aim_pose()
 
 
 ## The tap's fingers: the three other fingers folded, and the index finger [param press] (0 rest, 1 pressed)
@@ -458,6 +472,48 @@ func _apply_tap_pose(press: float) -> void:
 	for bone: int in _index_rest:
 		var rest: Quaternion = _index_rest[bone]
 		_skeleton.set_bone_pose_rotation(bone, rest.slerp(_index_pressed[bone], press * TAP_PRESS_GAIN))
+
+
+## The pointing pinch's fingers (Megan, Nov 18): the middle, ring and little fingers stay loosely curled, as in a
+## real Quest pinch; only the thumb and the index finger move.
+func _apply_aim_pose() -> void:
+	for bone: int in _folded:
+		var now := _skeleton.get_bone_pose_rotation(bone)
+		_skeleton.set_bone_pose_rotation(bone, now.slerp(_folded[bone], AIM_CURL))
+
+
+## The pointing ray (Megan, Nov 18): what makes a far pinch make sense. A thin line from the pinch point to the
+## bubble, like the child's own ray, a little brighter as the fingers close.
+func _show_ray(open: float) -> void:
+	if _gesture != Mode.AIM_PINCH or _figure == null or not is_instance_valid(_aim_at):
+		if _ray != null:
+			_ray.visible = false
+		return
+	if _ray == null:
+		_ray = MeshInstance3D.new()
+		var tube := CylinderMesh.new()
+		tube.top_radius = RAY_RADIUS
+		tube.bottom_radius = RAY_RADIUS
+		tube.height = 1.0
+		tube.radial_segments = 8
+		tube.rings = 1
+		_ray_material = StandardMaterial3D.new()
+		_ray_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ray_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_ray_material.albedo_color = Color(COLOUR, 0.0)
+		tube.material = _ray_material
+		_ray.mesh = tube
+		_ray.top_level = true
+		_ray.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_figure.add_child(_ray)
+	var from := global_position
+	var to := _aim_at.global_position
+	var length := maxf(from.distance_to(to) - RAY_SHORT, 0.02)
+	var way := (to - from).normalized()
+	_ray.visible = true
+	_ray.global_transform = Transform3D(Basis.looking_at(way, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5), from + way * length * 0.5)
+	_ray.scale = Vector3(1.0, length, 1.0)
+	_ray_material.albedo_color.a = _material.albedo_color.a * lerpf(1.3, 0.8, clampf(open, 0.0, 1.0))
 
 
 ## Where the "tap" clip is when the loop is at [param seconds]: down on the rim, pressed at 0.5, back.

@@ -321,12 +321,14 @@ func _build_ring() -> void:
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
 
 
-func _on_press(target: Target, _pinched: bool) -> void:
+func _on_press(target: Target, pinched: bool) -> void:
 	if state != &"hub" or target == null or get_tree().paused:
 		return
 	if target == cauldron_target or target == sign_target:
-		_open_menu()
+		_open_menu()   # the cauldron takes a tap (Scene 2 taught it) or a pinch
 		return
+	if not pinched:
+		return   # a bubble is chosen by a pinch (a click on the desktop) only: never by a touch or a hand passing by (Megan, Nov 18)
 	var impression := ring.impression_for(target)
 	if impression != null and ring.press(impression) == &"sealed":
 		_play(&"locked_bonk", impression.global_position)

@@ -190,6 +190,7 @@ func _exit_tree() -> void:
 
 ## Plays the arrival, then starts the World.
 func run() -> void:
+	DevSkip.ensure()   # desktop only: "Skip ▸" / N to move through the scenes fast (Megan, Nov 18)
 	_runner = PartRunner.new()
 	add_child(_runner)
 	_start_music()   # the quiet piano starts as soon as the scene loads (Megan)
