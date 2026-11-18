@@ -229,6 +229,9 @@ func test_the_dots_dim_the_room_put_subtitles_under_the_cloud_and_onion_answers_
 	FirstVisit.start_with = &"motion"
 	entry.call(&"_to_shelf", true)
 	await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 30.0)
+	expect(await until(func() -> bool: return _said_line(said, "So many little dots. It all looks a bit jumbled, doesn't it?"), 60.0), "Onion's intro to the dots")
+	var arrived := App.main.find_children("*", "MotionCloud", true, false)
+	expect(not arrived.is_empty(), "the dots come in as Onion speaks (Megan, Nov 18)")
 	Engine.time_scale = 4.0
 	expect(await until(func() -> bool:
 		var found := App.main.get_node_or_null(^"FirstVisit/Visit/Motion") as MotionVisit

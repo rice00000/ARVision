@@ -37,14 +37,22 @@ var _sweeping := false
 
 
 ## Starts the example in [param frame] (the cloud's place). Returns at once; [signal settled] says when it is over.
-func play(condition: TrialCondition, frame: Transform3D) -> void:
+## [param arrived]: the cloud that already came in with Onion's intro (Megan, Nov 18): taken over as it is, all its
+## dots turning to move together, with no second appearance.
+func play(condition: TrialCondition, frame: Transform3D, arrived: MotionCloud = null) -> void:
 	stop()
-	_cloud = CLOUD.instantiate() as MotionCloud
-	add_child(_cloud)
-	_cloud.global_transform = frame
 	var flow := Vector3.LEFT if heading == &"left" else Vector3.RIGHT
 	_flow_world = frame.basis * flow
-	_cloud.show_flow(condition, flow, int(condition.value(&"dots")), 7)
+	if arrived != null and is_instance_valid(arrived):
+		_cloud = arrived
+		_cloud.reparent(self)
+		_cloud.global_transform = frame
+		_cloud.set_signal_dots(int(condition.value(&"dots")))
+	else:
+		_cloud = CLOUD.instantiate() as MotionCloud
+		add_child(_cloud)
+		_cloud.global_transform = frame
+		_cloud.show_flow(condition, flow, int(condition.value(&"dots")), 7)
 	var eye := App.head().global_position
 	var ahead := -frame.basis.z
 	hand_from = eye + ahead * HAND_AHEAD + Vector3.DOWN * HAND_BELOW - _flow_world * SWEEP_LENGTH * 0.5
@@ -54,9 +62,10 @@ func play(condition: TrialCondition, frame: Transform3D) -> void:
 		add_child(_demo)
 		_trail = SweepTrail.new()
 		add_child(_trail)
-	_cloud.scale = Vector3.ONE * 0.001
 	_tween = create_tween()   # everything it waits on lives on this tween: stop() ends it
-	_tween.tween_property(_cloud, "scale", Vector3.ONE, GROW)
+	if arrived == null:
+		_cloud.scale = Vector3.ONE * 0.001
+		_tween.tween_property(_cloud, "scale", Vector3.ONE, GROW)
 	_tween.tween_interval(WATCH)
 	_tween.tween_callback(_start_sweep)
 	_tween.tween_interval(DemoHand.SWEEP_END)   # the hand is across

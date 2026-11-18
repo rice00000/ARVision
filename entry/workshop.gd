@@ -54,7 +54,7 @@ func take(parts: Dictionary) -> void:
 		var fade := create_tween()
 		fade.tween_property(music, "volume_db", -60.0, MUSIC_FADE)
 		fade.tween_callback(music.queue_free)
-	create_tween().tween_property(onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
+	_glide(_rest, 1.2)
 	Events.scene_changing.connect(_on_scene_changing)
 	Events.reported.connect(_on_reported)
 
@@ -66,7 +66,17 @@ func attend(what: Variant) -> void:
 
 ## Onion floats to [param where] over [param seconds].
 func float_to(where: Vector3, seconds := 1.0) -> void:
-	create_tween().tween_property(onion, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
+	_glide(where, seconds)
+
+
+## One glide at a time (Megan, Nov 18: Onion "glitched" at "Welcome to the workshop.": the take-over glide and
+## the hub's glide ran together, and Onion snapped 55 cm when one ended). A new glide replaces the last.
+var _gliding: Tween
+func _glide(where: Vector3, seconds: float) -> void:
+	if _gliding != null and _gliding.is_valid():
+		_gliding.kill()
+	_gliding = create_tween()
+	_gliding.tween_property(onion, "global_position", where, seconds).set_trans(Tween.TRANS_SINE)
 
 
 ## Where Onion is now.
@@ -295,5 +305,5 @@ func _process(_delta: float) -> void:
 	if not is_instance_valid(_guide):
 		return
 	if _guiding and not _guide.visible:   # the child found the place: back beside the shelf
-		create_tween().tween_property(onion, "global_position", _rest, 1.2).set_trans(Tween.TRANS_SINE)
+		_glide(_rest, 1.2)
 	_guiding = _guide.visible

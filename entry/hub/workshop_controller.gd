@@ -876,7 +876,7 @@ func _welcome() -> void:
 	if workshop != null and not ring.opened:
 		for look: Vector3 in [Vector3(-0.8, 0.5, -1.2), Vector3(0.8, 0.4, -1.2)]:   # affectionately round the room
 			workshop.attend(App.head().global_position + App.head().global_basis * look)
-			await get_tree().create_timer(0.6, false).timeout
+			await get_tree().create_timer(1.0, false).timeout   # slow glances: a fond look, not a twitch
 		workshop.attend(null)
 	if not ring.opened and not _opening:
 		await Onion.line(PARTICULAR, self)

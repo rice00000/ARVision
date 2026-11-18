@@ -70,17 +70,20 @@ func run_motion() -> StringName:
 	_subtitles_under_cloud(true)
 	if _plays == 1:
 		SceneMarker.show_text("Tutorial")
-		# Story chat, Nov 18 (revision): thoughtful curiosity, a shared discovery; Onion studies the dots.
+		# Story chat, Nov 18 (revision): thoughtful curiosity, a shared discovery; Onion studies the dots. Megan, Nov 18:
+		# the dots come in as Onion speaks: the cloud rises from below and behind the table, every dot its own way
+		# ("jumbled"), then some drift together; the demonstration takes that same cloud over.
+		var arrived := _arrive()
 		if _onion != null:
-			_onion.attend(App.head().global_position - App.head().global_basis.z * 1.2)
+			_onion.attend(_tutorial_frame().origin)
 		await _narrator.say("So many little dots. It all looks a bit jumbled, doesn't it?")
 		await get_tree().create_timer(0.7, false).timeout
+		if is_instance_valid(arrived):
+			arrived.set_signal_dots(int(_motion_condition().value(&"dots") * ARRIVAL_TOGETHER))
 		await _narrator.say("But look—some of them are moving together.")
 		await get_tree().create_timer(0.7, false).timeout
 		await _narrator.say("Watch which way they go.")
-		if _onion != null:
-			_onion.attend(null)
-		await _tutorial()
+		await _tutorial(arrived)
 		await _narrator.say("Your turn! Sweep your hand the same way the dots are moving.")
 	SceneMarker.show_text("Motion")
 	Motion.onion_voice = true
@@ -262,17 +265,46 @@ func _on_trial_started(_trial: StringName, _condition: Dictionary) -> void:
 
 ## The unscored demonstration (chat A's MotionTutorial): dots at full coherence, the teaching hand's
 ## sideways sweep, Wei's effect once; nothing logged, no round. Onion turns to follow it.
-func _tutorial() -> void:
+## The intro's dots: how many (of all) move together on "But look—some of them are moving together."
+const ARRIVAL_TOGETHER := 0.35
+## Their entrance: from this far below and behind the cloud's place (under the table's far edge), over this long.
+const ARRIVAL_FROM := Vector3(0.0, -0.32, -0.2)
+const ARRIVAL_SECONDS := 1.4
+
+
+## The dot cloud's place for the demonstration: straight ahead at the rounds' distance.
+func _tutorial_frame() -> Transform3D:
+	var eye := App.head().global_transform
+	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
+	return Transform3D(Basis.looking_at(ahead), eye.origin + ahead * MotionCloud.distance(_motion_condition()))
+
+
+## The dots arrive (Megan, Nov 18): the demonstration's cloud rises into its place from below and behind the table,
+## every dot moving its own way (none together yet), small and faint first. Unscored: before any round.
+func _arrive() -> MotionCloud:
+	var frame := _tutorial_frame()
+	var cloud := MotionTutorial.CLOUD.instantiate() as MotionCloud
+	add_child(cloud)
+	cloud.global_transform = frame
+	cloud.show_flow(_motion_condition(), Vector3.RIGHT, 0, 7)   # the tutorial's own flow (heading right), none together
+	var end := frame.origin
+	cloud.global_position = end + frame.basis * ARRIVAL_FROM
+	cloud.scale = Vector3.ONE * 0.35
+	var rise := create_tween().set_parallel()
+	rise.tween_property(cloud, "global_position", end, ARRIVAL_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	rise.tween_property(cloud, "scale", Vector3.ONE, ARRIVAL_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	return cloud
+
+
+func _tutorial(arrived: MotionCloud = null) -> void:
 	var tutorial := MotionTutorial.new()
 	add_child(tutorial)
 	var condition := _motion_condition()
-	var eye := App.head().global_transform
-	var ahead := Vector3(-eye.basis.z.x, 0.0, -eye.basis.z.z).normalized()
-	var frame := Transform3D(Basis.looking_at(ahead), eye.origin + ahead * MotionCloud.distance(condition))
+	var frame := _tutorial_frame()
 	tutorial.effect_started.connect(func() -> void:
 		if _onion != null:
 			_onion.attend(frame.origin))
-	tutorial.play(condition, frame)
+	tutorial.play(condition, frame, arrived)
 	await tutorial.settled
 	tutorial.queue_free()
 	if _onion != null:
