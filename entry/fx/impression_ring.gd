@@ -186,6 +186,34 @@ func sink(mouth: Vector3, seconds := 1.2) -> void:
 	visible = false
 
 
+## Back after a game (Megan, Nov 18: the pieces sink with the fog during a game and rise again after): the
+## ring and its fog rise out of the cauldron's [param mouth] to their places, then wake.
+func rise(mouth: Vector3, seconds := 1.0) -> void:
+	visible = true
+	turning = true
+	_quiet = false
+	_waiting = 1.0
+	_place()
+	var ends: Array[Vector3] = []
+	var sizes: Array[Vector3] = []
+	for impression in impressions:
+		ends.append(impression.global_position if is_instance_valid(impression) else mouth)
+		sizes.append(impression.scale if is_instance_valid(impression) else Vector3.ONE)
+	var tween := create_tween()
+	tween.tween_method(func(k: float) -> void:
+		for i in impressions.size():
+			var impression := impressions[i]
+			if is_instance_valid(impression):
+				impression.global_position = mouth.lerp(ends[i], k)
+				impression.scale = sizes[i] * lerpf(0.2, 1.0, k)
+				impression.set_near(0.0)
+		_fog_light.albedo_color.a = FOG_ALPHA * k
+		_column_light.albedo_color.a = FOG_ALPHA * 0.7 * k, 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	await tween.finished
+	turning = false
+	wake()
+
+
 ## Lights the front one and the fog again (back at the hub after a game).
 func wake() -> void:
 	_quiet = false

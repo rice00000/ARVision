@@ -139,8 +139,9 @@ func _run(activity: Summonable) -> void:
 	_exited = false
 	gear.set_enabled(false)
 	_demo.stop()
-	ring.quiet()
-	await HubGlow.quiet_all()
+	ring.quiet(0.3)
+	await HubGlow.quiet_all(0.3)
+	await ring.sink(_mouth(), 0.9)   # Megan, Nov 18: the pieces sink into the cauldron with the fog during a game
 	exit_token.visible = true
 	exit_token.set_open(true)
 	if workshop != null:
@@ -161,6 +162,7 @@ func _run(activity: Summonable) -> void:
 	Events.report(&"hub_activity_finished", {activity = activity.id(), outcome = outcome})
 	activity.fold()
 	current = null
+	await ring.rise(_mouth())   # and rise again with it, back at the hub
 	var first_game := played.is_empty()
 	if not played.has(activity.id()):
 		played.append(activity.id())
@@ -239,11 +241,12 @@ func _build_exit() -> void:
 	var pot := workshop.cauldron().global_position if workshop != null else _mouth()
 	var eye := App.head().global_position
 	var to_eye := Vector3(eye.x - pot.x, 0.0, eye.z - pot.z).normalized()
-	# At the cauldron's side toward the middle of the table (Megan, Nov 17), a little toward the child.
+	# Low beside the cauldron, a little toward the middle of the table (Megan, Nov 17), and now IN FRONT of it,
+	# toward the child: at its side it sat half under Wei's bench board (Megan's laptop test, Nov 18).
 	var middle := workshop.layout.table.origin if workshop != null and workshop.layout != null else eye + Vector3(0, -0.5, -0.6)
 	var inward := Vector3(middle.x - pot.x, 0.0, middle.z - pot.z)
 	inward = (inward - to_eye * inward.dot(to_eye)).normalized()
-	exit_token.global_position = pot + inward * 0.19 + to_eye * 0.06 + Vector3.UP * 0.06
+	exit_token.global_position = pot + to_eye * 0.17 + inward * 0.06 + Vector3.UP * 0.06
 	exit_token.face(eye)
 	exit_token.visible = false
 	exit_token.pressed.connect(func(_id: StringName) -> void: _exit_game())
