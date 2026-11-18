@@ -140,7 +140,7 @@ func test_the_roof_beams_hang_small_dim_lanterns_high_out_of_the_working_view() 
 			expect(absf(end.x - eye.x) < 2.3 and end.z - eye.z > -2.4, "a beam stops at the walls")
 
 
-func test_the_specks_stop_during_a_game_and_the_lights_switch_off_for_the_quest() -> void:
+func test_the_specks_stay_on_during_a_game_and_the_lights_switch_off_for_the_quest() -> void:
 	await boot(null, &"intro")
 	var eye := App.head().global_position
 	Lantern.quiet = false
@@ -150,7 +150,7 @@ func test_the_specks_stop_during_a_game_and_the_lights_switch_off_for_the_quest(
 	expect(specks.emitting, "specks drift in the hub")
 	Lantern.quiet = true
 	await wait(0.2)
-	expect(not specks.emitting, "no new specks during a game")
+	expect(specks.emitting, "the specks stay on during a game too (Megan, Nov 18)")
 	Lantern.quiet = false
 	Lantern.lights_on = false
 	var dark := Lantern.hang_high(app, eye, eye + Vector3(0, -0.45, -0.6))

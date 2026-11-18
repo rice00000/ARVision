@@ -32,7 +32,7 @@ const HIGH_LIGHT_ENERGY := 0.45
 const HIGH_LIGHT_RANGE := 0.9
 const HIGH_FLICKER := 0.22
 ## Light specks round the high lanterns (Megan, Nov 18: "C, but I want light specks"): a few tiny warm
-## motes drifting slowly round the glass and fading in and out. They stop during a game (quiet).
+## motes drifting slowly round the glass and fading in and out. On the whole time, games included (Megan, Nov 18).
 const SPECKS := 9
 const SPECK_SIZE := 0.02
 const SPECK_RADIUS := 0.14
@@ -422,7 +422,7 @@ func _process(delta: float) -> void:
 	_time += delta * FLICKER_SPEED
 	_calm = move_toward(_calm, 1.0 if quiet else 0.0, delta)   # eases over ~1 s
 	if _specks != null:
-		_specks.emitting = not quiet   # no new specks during a game; the last ones fade out
+		_specks.emitting = true   # Megan, Nov 18 1:01 PM: the specks stay on the whole time, games included
 	var breathe := _noise.get_noise_1d(_time) * 1.6   # ~−1..1
 	_apply(1.0 + clampf(breathe, -1.0, 1.0) * flicker * (1.0 - _calm))
 	if quiet or not embers or lit < 1.0 or not is_visible_in_tree():
