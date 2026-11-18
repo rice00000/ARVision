@@ -281,7 +281,7 @@ func _run(activity: Summonable) -> void:
 	if not said_more and dots != null and dots.is_available() and (dots_piece == null or dots_piece.sealed):
 		said_more = true
 		if dots_piece != null:
-			dots_piece.unseal()   # its bubble opens: the dots can be played now
+			await dots_piece.unseal()   # its lock opens and drops away, then the bubble clears: the dots can be played now
 		else:
 			await _offer(dots)
 		await Onion.line(MORE, self)

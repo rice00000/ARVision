@@ -133,9 +133,13 @@ func touched() -> void:
 func set_sealed(on: bool) -> void:
 	sealed = on
 	_body.scale = Vector3.ONE * (SEALED_SCALE if on else 1.0)
-	if bubble != null:   # in the bubble menu: a closed bubble, frostier, no band (Megan, Nov 18)
+	if bubble != null:   # in the bubble menu: a closed bubble, frostier, with a padlock badge (Megan, Nov 18)
 		_shell_light.albedo_color.a = 0.45 if on else 0.12
 		_frost_light.albedo_color.a = 0.85 if on else 0.6
+		if on and _lock == null:
+			_make_lock()
+		if _lock != null:
+			_lock.visible = on
 		_update_halo()
 		return
 	if on and _band == null:
@@ -161,6 +165,27 @@ func unseal(seconds := 0.8) -> void:
 	if _sounds == null:
 		_sounds = Sounds.new()
 		add_child(_sounds)
+	if _lock != null and _lock.visible:
+		# The unlock, made explicit (Megan, Nov 18): the shackle clicks open, the lock drops away and fades;
+		# then the frost clears and the piece grows to full size with its sparkle (below).
+		_sounds.play(&"locked_bonk", global_position, 1.6)   # the click
+		var click := create_tween()
+		click.tween_property(_shackle, "position:y", _shackle.position.y + 0.012, 0.25).set_trans(Tween.TRANS_SINE)
+		click.parallel().tween_property(_shackle, "rotation:y", 0.9, 0.25)
+		click.tween_interval(0.15)
+		var start := _lock.position
+		click.tween_method(func(m: float) -> void:
+			_lock.position = start + Vector3.DOWN * 0.09 * m * m
+			for mesh: GeometryInstance3D in _lock.find_children("*", "GeometryInstance3D", true, false):
+				mesh.transparency = m, 0.0, 1.0, 0.7)
+		click.tween_callback(func() -> void:
+			_lock.visible = false
+			_lock.position = start
+			_shackle.position.y -= 0.012
+			_shackle.rotation.y = 0.0
+			for mesh: GeometryInstance3D in _lock.find_children("*", "GeometryInstance3D", true, false):
+				mesh.transparency = 0.0)
+		await get_tree().create_timer(0.4).timeout
 	_sounds.play(&"unlock", global_position)   # a sparkly "it opened"
 	var open := create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	open.tween_property(_body, "scale", Vector3.ONE, seconds)
@@ -501,6 +526,48 @@ func _cross() -> void:
 	for turn: float in [PI * 0.25, -PI * 0.25]:
 		var stroke := _box(Vector3(0.088, 0.022, 0.008), Vector3(0, 0.075, 0.012), INK, false)
 		stroke.rotation.z = turn
+
+
+var _lock: Node3D
+var _shackle: MeshInstance3D
+
+
+## The padlock badge on a locked bubble's lower right edge (Megan, Nov 18: "make it explicit they're not yet
+## accessible"): a cream disc with a near-black rim, a brass lock body with a keyhole and its shackle.
+func _make_lock() -> void:
+	_lock = Node3D.new()
+	_lock.name = "lock"
+	bubble.add_child(_lock)
+	_lock.position = Vector3(0.62, -0.62, 0.8) * BUBBLE_RADIUS
+	var disc := _disc(0.045, _lit(TILE, false))
+	_lock.add_child(disc)
+	var rim := MeshInstance3D.new()
+	var ring_mesh := TorusMesh.new()
+	ring_mesh.inner_radius = 0.042
+	ring_mesh.outer_radius = 0.049
+	rim.mesh = ring_mesh
+	rim.material_override = _flat(INK, 1.0)
+	rim.rotation.x = PI * 0.5
+	_lock.add_child(rim)
+	var body := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.044, 0.034, 0.012)
+	body.mesh = box
+	body.material_override = _lit(BRASS, true)
+	body.position = Vector3(0, -0.006, 0.008)
+	_lock.add_child(body)
+	var hole := _disc(0.005, _flat(INK, 1.0))
+	hole.position = Vector3(0, -0.004, 0.0145)
+	_lock.add_child(hole)
+	_shackle = MeshInstance3D.new()
+	var loop := TorusMesh.new()
+	loop.inner_radius = 0.011
+	loop.outer_radius = 0.0175
+	_shackle.mesh = loop
+	_shackle.material_override = _lit(INK, false)
+	_shackle.rotation.x = PI * 0.5
+	_shackle.position = Vector3(0, 0.014, 0.008)
+	_lock.add_child(_shackle)
 
 
 ## The ? (design chat, Nov 18): a bold near-black "?" in the bubble; a press plays the controls tour ("Help").

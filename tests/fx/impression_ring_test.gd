@@ -90,8 +90,11 @@ func test_a_sealed_choice_says_soon_and_stays_closed() -> void:
 	var dots := ring.impressions[1]
 	expect_eq(ring.press(dots), &"sealed", "a sealed one can't be chosen")
 	expect(dots.bubble.visible, "its bubble stays closed")
+	var lock := dots.find_child("lock", true, false) as Node3D
+	expect(lock != null and lock.visible, "a padlock badge says it's not open yet")
 	dots.unseal()
-	await wait(0.9)
+	await wait(1.6)
+	expect(not lock.visible, "the lock opened and dropped away")
 	expect_eq(ring.press(dots), &"chosen", "once opened it can be chosen")
 
 
