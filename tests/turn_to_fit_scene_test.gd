@@ -24,6 +24,7 @@ func _start() -> TurnToFit:
 	var fit := app.find_child("Fit", true, false) as TurnToFit
 	fit.frame_source = func() -> Image: return _photo(_view)
 	fit.tracker.use_server = false
+	fit.tracker.threaded = false   # the same rounds every run (the threaded path: fit_tracker_test)
 	await fit.run()
 	return fit
 
@@ -153,3 +154,20 @@ func test_setup_goes_step_by_step_and_a_saved_setup_comes_back_next_time() -> vo
 	expect(not again.tracker.model.is_empty(), "and the cup's colours")
 	await _press(again, "fit_play_turn")
 	expect_eq(again.session, "turn", "play starts straight away")
+
+
+## The setup page (Megan, Nov 18): the laptop's address is typed on the board's number pad, once per headset.
+func test_the_number_pad_saves_the_laptops_address_on_the_headset() -> void:
+	var before := FitTracker.saved_server()
+	FitTracker.save_server("")
+	var fit := await _start()
+	var shown: Label3D = fit.get("_address_label")
+	expect(shown != null and shown.text.begins_with("Server:"), "the board shows the address line")
+	for key: String in ["1", "9", "2", "dot", "1", "6", "8", "dot", "1", "dot", "2", "3", "4", "back"]:
+		await _press(fit, "fit_key_" + key)
+	expect(shown.text.begins_with("Server: 192.168.1.23"), "typed: %s" % shown.text)
+	await _press(fit, "fit_server_save")
+	expect_eq(FitTracker.saved_server(), "http://192.168.1.23:8765", "saved on this headset")
+	expect_eq(fit.tracker.server, "http://192.168.1.23:8765", "and used now")
+	expect("saved" in shown.text, "the board says it's saved (%s)" % shown.text)
+	FitTracker.save_server(before)

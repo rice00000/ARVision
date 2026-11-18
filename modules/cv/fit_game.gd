@@ -7,7 +7,9 @@ extends RefCounted
 ##   Help, from most to least. It fades: STREAK wins in a row → one step less help,
 ##   STREAK misses in a row → one step more.
 ##     MIRROR   the live shadow is always drawn, and a fit is found by itself
-##     GLIMMER  the live shadow shows only when close (card score ≥ GLIMMER_SHOW)
+##     GLIMMER  the live shadow shows only when the cup is nearest THIS card: its score beats every
+##              other card's and reaches GLIMMER_SHOW (Megan, Nov 18: a mug is mostly body, so a wrong
+##              view already scored ~0.6 and the old rule showed the shadow almost all the time)
 ##     BLIND    no live shadow and no glow. The child looks at the real cup and presses
 ##              when they think it makes the card's shadow (commit); then the CV judges.
 ##              This is the vision step: predicting a view, not lining up two flat shapes.
@@ -20,8 +22,9 @@ enum Mode { TURN, PICK }
 enum Help { MIRROR, GLIMMER, BLIND }
 
 const HELP_NAMES := ["mirror", "glimmer", "blind"]
-## GLIMMER: the live shadow appears once the card's score reaches this.
-const GLIMMER_SHOW := 0.6
+## GLIMMER: the live shadow appears once the card's score reaches this AND beats every other card.
+## (Megan's mug: the right view scores 0.88–0.92 against its card, the wrong views 0.49–0.62.)
+const GLIMMER_SHOW := 0.75
 ## A commit or a pick is judged on the view the CV is sure of: best score ≥ JUDGE and ahead
 ## of the next best by FitMatcher.MARGIN. A little below FitMatcher.ENTER: there's no hold.
 const JUDGE := 0.8
@@ -107,8 +110,19 @@ func shows_live() -> bool:
 		Help.MIRROR:
 			return true
 		Help.GLIMMER:
-			return matcher.scores[card] >= GLIMMER_SHOW
+			return nearest_is_card()
 	return false
+
+
+## GLIMMER's rule: the cup is nearest this round's card (its score beats every other card's) and
+## close enough (≥ GLIMMER_SHOW).
+func nearest_is_card() -> bool:
+	if card < 0 or card >= matcher.scores.size() or matcher.scores[card] < GLIMMER_SHOW:
+		return false
+	for i in matcher.scores.size():
+		if i != card and matcher.scores[i] >= matcher.scores[card]:
+			return false
+	return true
 
 
 ## The child says "it fits now" (BLIND turn rounds only). Returns the round's record, or {}

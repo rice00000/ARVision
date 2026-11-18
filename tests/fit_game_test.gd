@@ -70,17 +70,21 @@ func test_mirror_round_ends_when_the_card_fits() -> void:
 	expect_eq(game.rounds[0].help, "mirror", "help used")
 
 
-func test_glimmer_shows_the_shadow_only_when_close() -> void:
+func test_glimmer_shows_the_shadow_only_when_the_cup_is_nearest_this_card() -> void:
 	var game := _game()
 	game.set_help(FitGame.Help.GLIMMER)
 	game.start(FitGame.Mode.TURN)
 	_show(game, "", 2)
 	expect(not game.shows_live(), "no cup: no shadow")
-	_show(game, _other(game), 3)
-	var other_score: float = game.matcher.scores[game.card]
-	expect_eq(game.shows_live(), other_score >= FitGame.GLIMMER_SHOW, "a far view shows it only above GLIMMER_SHOW (%.2f)" % other_score)
+	for view: String in VIEWS:
+		if view == _card(game):
+			continue
+		game.matcher.reset()
+		_show(game, view, 3)
+		expect(not game.shows_live(), "a wrong view (%s for %s, %.2f) never shows it" % [view, _card(game), game.matcher.scores[game.card]])
+	game.matcher.reset()
 	_show(game, _card(game), 2)
-	expect(game.shows_live() or not game.playing, "the card's view shows it (or already fits)")
+	expect(game.shows_live() or not game.playing, "the card's own view shows it (or already fits)")
 
 
 func test_blind_never_ends_by_itself_and_the_commit_is_judged() -> void:
