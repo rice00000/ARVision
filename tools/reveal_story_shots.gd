@@ -3,7 +3,8 @@ extends Node
 ## after a jump to the reveal (game time), from the seated child's eyes, wide enough for the cauldron,
 ## the socket and the bench.
 ##   xvfb-run -a -s "-screen 0 1280x800x24" godot --rendering-driver opengl3 --xr-mode off --path . \
-##       res://tools/reveal_story_shots.tscn -- --profile=test_capture [--prefix=after]
+##       res://tools/reveal_story_shots.tscn -- --profile=test_capture [--prefix=after] [--no-specks]
+##   --clip (with --fixed-fps 30 before --path): every frame for 10 s, to build/reveal_story/clip_<prefix>/.
 
 const TIMES := [1.0, 3.0, 4.5, 6.0, 8.0, 10.0, 12.0, 15.0]
 
@@ -15,6 +16,8 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--prefix="):
 			_prefix = arg.trim_prefix("--prefix=")
+		if arg == "--no-specks":
+			RevealFx.specks = false
 	DirAccess.make_dir_recursive_absolute(_out)
 	get_window().size = Vector2i(1280, 800)
 	Profile.wipe()
@@ -39,6 +42,14 @@ func _ready() -> void:
 	entry.jump_to(&"reveal")
 	await _until(func() -> bool: return bool(entry.get("_part_running")))
 	var start := Engine.get_process_frames()
+	if "--clip" in OS.get_cmdline_user_args():   # every frame for 10 s (run with --fixed-fps 30)
+		DirAccess.make_dir_recursive_absolute(_out.path_join("clip_" + _prefix))
+		for i in 300:
+			App.sim_input.look_at(middle)
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s/clip_%s/f%03d.png" % [_out, _prefix, i])
+		get_tree().quit()
+		return
 	for t: float in TIMES:
 		await _until(func() -> bool: return (Engine.get_process_frames() - start) / 60.0 >= t)
 		App.sim_input.look_at(middle)

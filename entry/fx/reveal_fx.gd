@@ -36,6 +36,14 @@ const ROOM_FAR := 4.0
 const TABLE_LINGER := 0.4
 const FADE_SECONDS := 1.4
 const TINT := Color(1.0, 0.86, 0.55)
+## Light specks where the band passes (Megan, Nov 18: "speckle effects during the reveal, to make it feel
+## like magic"): tiny warm motes lift off the table just behind the front, drift up 6-14 cm and fade. Only
+## over the table (none in the air past its edge), only while the front is moving; then they settle out.
+static var specks := true
+const SPECKS_PER_SECOND := 90.0
+const SPECK_LIFE := 1.8
+const SPECK_SIZE := 0.022
+const SPECK_COLOUR := Color(1.0, 0.93, 0.72)   # paler than the band, so they read on warm wood
 
 ## The front on the table, and on the room (metres from the socket), as last stepped.
 var table_radius := 0.0
@@ -51,7 +59,15 @@ var _table_materials: Array[ShaderMaterial] = []
 var _room_materials: Array[ShaderMaterial] = []
 var _on_radius := Callable()
 var _arriving := {}   # GeometryInstance3D -> its previous material_overlay
-var _held: Array = []   # [body, its process mode], out of the physics world while something rises
+var _held: Array = []
+var _motes: MultiMeshInstance3D
+var _mote_at: Array[Vector3] = []
+var _mote_vel: Array[Vector3] = []
+var _mote_age: Array[float] = []
+var _mote_size: Array[float] = []
+var _table: Surface
+var _owed := 0.0
+var _last_t := 0.0   # [body, its process mode], out of the physics world while something rises
 
 
 ## Starts the light from [param origin]: the table front reaches [param reach] metres in
@@ -65,6 +81,10 @@ func play(origin: Vector3, reach: float, seconds: float, on_radius: Callable) ->
 	var table: Surface = App.reality.work_surface() if App.reality else null
 	if table:
 		_table_materials.append(_plane(table, &"table", null))
+		if specks:
+			_table = table
+			_motes = _make_motes()
+			add_child(_motes)
 	if room_strength > 0.0 and App.reality:
 		var floor_y := (table.transform.origin.y - 0.72) if table else origin.y - 0.72
 		var floors := App.reality.surfaces(&"floor")
@@ -104,6 +124,77 @@ func _step(t: float) -> void:
 		material.set_shader_parameter(&"fade", room_fade)
 	if _on_radius.is_valid():
 		_on_radius.call(table_radius, room_radius)
+	_speckle(t)
+
+
+## Lifts a few motes off the table just inside the front (only where the table is), and moves the rest.
+func _speckle(t: float) -> void:
+	var dt := maxf(t - _last_t, 0.0)
+	_last_t = t
+	if _motes == null or _table == null:
+		return
+	var frame := _table.transform
+	var up := frame.basis.y.normalized()
+	if t <= _seconds and table_radius > 0.02:
+		_owed += dt * SPECKS_PER_SECOND * (0.4 + 0.6 * table_radius / maxf(_reach, 0.01))
+		var inverse := frame.affine_inverse()
+		var tries := 0
+		while _owed >= 1.0 and tries < 40:
+			tries += 1
+			var angle := randf() * TAU
+			var r := table_radius * randf_range(0.82, 1.0)
+			var at := _origin + (frame.basis.x.normalized() * cos(angle) + frame.basis.z.normalized() * sin(angle)) * r
+			var local := inverse * at
+			if absf(local.x) > _table.size.x * 0.5 or absf(local.z) > _table.size.y * 0.5:
+				continue   # past the table's edge: no motes in mid-air
+			_owed -= 1.0
+			_mote_at.append(frame * Vector3(local.x, 0.004, local.z))
+			_mote_vel.append(up * randf_range(0.035, 0.08) + Vector3(randf_range(-0.01, 0.01), 0.0, randf_range(-0.01, 0.01)))
+			_mote_age.append(0.0)
+			_mote_size.append(randf_range(0.6, 1.3))
+	var mesh := _motes.multimesh
+	var shown := 0
+	var k := 0
+	while k < _mote_at.size():
+		_mote_age[k] += dt
+		if _mote_age[k] >= SPECK_LIFE:
+			_mote_at.remove_at(k); _mote_vel.remove_at(k); _mote_age.remove_at(k); _mote_size.remove_at(k)
+			continue
+		_mote_vel[k] *= 1.0 - dt * 0.5
+		_mote_at[k] += _mote_vel[k] * dt
+		if shown < mesh.instance_count:
+			var u := _mote_age[k] / SPECK_LIFE   # in, a soft glow, out: a twinkle, never a flash
+			var alpha := smoothstep(0.0, 0.2, u) * (1.0 - smoothstep(0.55, 1.0, u)) * 0.95
+			mesh.set_instance_transform(shown, Transform3D(Basis().scaled(Vector3.ONE * _mote_size[k]), _mote_at[k]))
+			mesh.set_instance_color(shown, Color(SPECK_COLOUR, alpha))
+			shown += 1
+		k += 1
+	mesh.visible_instance_count = shown
+
+
+func _make_motes() -> MultiMeshInstance3D:
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.albedo_texture = Onion.soft_dot()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * SPECK_SIZE
+	quad.material = mat
+	var mesh := MultiMesh.new()
+	mesh.transform_format = MultiMesh.TRANSFORM_3D
+	mesh.use_colors = true
+	mesh.mesh = quad
+	mesh.instance_count = int(SPECKS_PER_SECOND * SPECK_LIFE * 1.3)
+	mesh.visible_instance_count = 0
+	var motes := MultiMeshInstance3D.new()
+	motes.name = "motes"
+	motes.multimesh = mesh
+	motes.top_level = true   # instance positions are world positions
+	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	motes.extra_cull_margin = 4.0
+	return motes
 
 
 ## A plane of light lying on [param surface]; the floor gets [param table]'s footprint left dark.

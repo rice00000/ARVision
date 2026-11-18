@@ -72,7 +72,8 @@
     "Hold the cup up, where I can see it.",
     "Now just look at the cup. Press the button when it fits.",
     "Hold it still. Which shadow is it making?",
-    "There. Everything's found its place."
+    "There. Everything's found its place.",
+    "And this little house is yours."
   ],
   "say_sources": [
     "core",

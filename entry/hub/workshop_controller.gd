@@ -164,20 +164,20 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	if first == &"motion":
 		first = &"dots"
 	var activity := _activity(first)
+	# The whole menu, also for a jump (Staff tools → Scenes): Megan, Nov 18, a jump to the dots showed one bubble,
+	# no locked games and no places. The jumped-to game is open for this visit even if it would still be locked.
+	await _offer(_activity(&"shelf"))
+	for unlock: Array in UNLOCKS:   # there's more: each waits in a locked bubble until it opens
+		var next := _activity(unlock[0])
+		if next != null:
+			await _offer(next, false, next != activity and not _unlocked(unlock))
+	if not played.is_empty():
+		_show_places()   # a later visit: the places row is there from the start
 	if activity != null:
-		await _offer(activity, false)
-		ever_opened = true   # a DEV jump: the child is past the first tap
+		ever_opened = true   # a jump: the child is past the first tap; the game starts at once
 		await _run(activity)
-	else:
-		await _offer(_activity(&"shelf"))
-		for unlock: Array in UNLOCKS:   # there's more: each waits in a locked bubble until it opens
-			var next := _activity(unlock[0])
-			if next != null:
-				await _offer(next, false, not _unlocked(unlock))
-		if not played.is_empty():
-			_show_places()   # a later visit: the places row is there from the start
-		if welcome:
-			_welcome()   # not awaited: talk never blocks play (story chat, Nov 18)
+	elif welcome:
+		_welcome()   # not awaited: talk never blocks play (story chat, Nov 18)
 	while true:
 		await _visit(home)
 		state = &"closing"
@@ -298,6 +298,8 @@ func _restart() -> bool:
 func _hub() -> StringName:
 	state = &"hub"
 	_hub_since = _clock
+	if memory != null and memory.look in HubMemory.GAME_ONLY and App.reality != null:
+		App.reality.apply_view(memory.room_view())   # Spotlight has nothing to light in the hub (Megan, Nov 18)
 	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
 	ambience.hub()
 	SceneMarker.show_text("Hub")
@@ -499,6 +501,30 @@ func _build_ring() -> void:
 		_label(SOON if impression.sealed else impression.label()))
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target, true))
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
+	Events.button.connect(_on_pinch_without_ray)
+
+
+## Megan, Nov 18: in the dots the pinch never reached the cauldron, so there was no way out. The dots run with
+## the pointing ray off (a sweep is the answer), and with it off a pinch selects nothing. During a game the
+## hub's own few targets (the cauldron, the ☰, the ✕ and the eye) still take a pinch aimed at them.
+func _on_pinch_without_ray(side: StringName, action: StringName, pressed: bool) -> void:
+	if not pressed or action != &"trigger_click" or state not in [&"game", &"asking"] or App.rig == null:
+		return
+	var pointer := App.rig.pointer(side)
+	if pointer == null or pointer.ray_on() or not pointer.tracked():
+		return   # with the ray on, the pointer selects it itself
+	var query := PhysicsRayQueryParameters3D.create(pointer.global_position,
+			pointer.global_position - pointer.global_basis.z * pointer.length, Pointer.TARGET_LAYER)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var hit: Dictionary = pointer.get_world_3d().direct_space_state.intersect_ray(query)
+	var target: Target = hit.collider as Target if not hit.is_empty() else null
+	var ours: Array[Target] = [cauldron_target, sign_target]
+	for bubble: Impression in [stop_bubble, eye_bubble]:
+		if bubble != null and is_instance_valid(bubble):
+			ours.append(bubble.target)
+	if target != null and target in ours:
+		_on_press(target, true)
 
 
 func _on_press(target: Target, pinched: bool) -> void:
@@ -1065,10 +1091,11 @@ func _looks_from_hub() -> void:
 ## The looks row: Normal · High contrast · Edges · Black and white, each a little picture of the same scene in
 ## that look, the current one ringed. A pinch applies one to the real room at once (it stays up); a tap on the
 ## cauldron or ROW_WAIT s without a press leaves, keeping the last one chosen.
-func _show_looks() -> void:
+func _show_looks(in_game := false) -> void:
 	var pieces: Array[Impression] = []
 	for id in HubMemory.LOOKS:
-		pieces.append(Impression.make_look(id))
+		if in_game or id not in HubMemory.GAME_ONLY:   # Spotlight only in a game (Megan, Nov 18)
+			pieces.append(Impression.make_look(id))
 	await _open_row(&"looks", pieces)
 	for piece in row.impressions:
 		piece.set_picked(memory != null and piece.look == memory.look)
@@ -1107,7 +1134,7 @@ func _watch_cauldron() -> void:
 		var with_eye := current != null and current.id() in [&"shelf", &"turn_to_fit"]
 		var chosen := await _offer_stop(&"stop", with_eye)
 		if _stop_pick == &"eye":
-			await _show_looks()   # still paused; leaving the looks, the game carries on
+			await _show_looks(true)   # still paused; leaving the looks, the game carries on
 			_stop_pick = &""
 		App.hold_pause(&"cauldron", false)
 		if current != null:

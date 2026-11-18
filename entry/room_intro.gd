@@ -15,6 +15,8 @@ const HAND_AFTER := 6.0
 const GIFT := 1
 ## Where Onion floats, in the menu panel's space: left of the bar and the shop.
 const SPOT := Vector3(-0.40, 0.05, 0.05)
+## Onion's first words in the child's room, once it has landed (Megan, Nov 18; was Wei's "This is your room!").
+const WELCOME := "And this little house is yours."
 ## What Onion says about each button it asks for.
 const LINES := {
 	&"home_shop": "Pinch Shop to see what you can buy.",
@@ -90,15 +92,15 @@ func _run() -> void:
 	_demo = DemoHand.new()
 	add_child(_demo)
 	var bar := _find(&"home_shop")
-	_onion.global_position = bar.get_parent().global_transform * SPOT
-	_onion.scale = Vector3.ONE * 0.01
-	Events.play(&"appear", _onion.global_position)
-	create_tween().tween_property(_onion, "scale", Vector3.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	await say("And this little place? This one's yours.")   # story chat revision, Nov 18 (was "This is your room!")
+	# Scene 12 (Megan, Nov 18): the first visit only, Onion swoops in, makes one joyful loop and lands at its
+	# spot beside the bar (OnionFlight). The room works throughout; the line follows the landing.
+	await OnionFlight.welcome(_onion, bar.get_parent().global_transform * SPOT)
+	if run != _runs: return
+	await say(WELCOME)
 	if run != _runs: return
 	await get_tree().create_timer(0.7).timeout
 	if run != _runs: return
-	await say("You can use your magic stones to choose things for your room.")
+	await say("You can use your magic stones to choose things for your room.")   # story chat revision, Nov 18
 	if run != _runs: return
 	await _gift(run)
 	if run != _runs: return

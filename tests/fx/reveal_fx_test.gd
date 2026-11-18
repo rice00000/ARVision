@@ -150,3 +150,28 @@ func test_with_shows_workshop_off_the_reveal_shows_no_shelf_and_ends_on_the_gear
 	expect(details.all(func(d: Node3D) -> bool: return not d.visible), "Wei's shelf and the things stay hidden")
 	expect(await until(func() -> bool: return not HubGlow.any_lit(), 8.0), "the afterglow goes by itself")
 	RevealFx.shows_workshop = keep
+
+
+func test_light_specks_lift_off_the_table_behind_the_front_and_settle_out() -> void:
+	await boot(null, &"intro")
+	var table := App.reality.work_surface()
+	var origin := table.transform.origin
+	var fx := _fx(origin)
+	fx.play(origin, 1.5, 1.5, Callable())
+	await wait(0.8)
+	expect(fx.get_node_or_null(^"motes") is MultiMeshInstance3D, "the specks are one multimesh (cheap)")
+	var motes: Array[Vector3] = fx.get("_mote_at")
+	expect(motes.size() > 10, "specks lift off as the light spreads (%d)" % motes.size())
+	var inverse := table.transform.affine_inverse()
+	for i in motes.size():
+		var local := inverse * motes[i]
+		expect(absf(local.x) <= table.size.x * 0.5 + 0.02 and absf(local.z) <= table.size.y * 0.5 + 0.02, "only over the table, none in mid-air (%d)" % i)
+		expect(local.y >= 0.0 and local.y < 0.2, "low over it, rising (%d)" % i)
+	await wait(0.7 + RevealFx.SPECK_LIFE + 0.2)
+	if is_instance_valid(fx):
+		expect_eq((fx.get("_mote_at") as Array).size(), 0, "once the front stops, the last specks fade out")
+	RevealFx.specks = false
+	var plain := _fx(origin)
+	plain.play(origin, 1.5, 1.0, Callable())
+	expect(plain.get_node_or_null(^"motes") == null, "RevealFx.specks = false turns them off")
+	RevealFx.specks = true

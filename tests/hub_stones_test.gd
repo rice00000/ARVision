@@ -271,3 +271,56 @@ func test_staff_tools_restart_fresh_child_starts_a_new_save_from_the_hello() -> 
 	expect(Profile.saves().has(before), "the old save is still there")
 	expect(HubMemory.get_or_make().played.is_empty(), "nothing played: every game locked again")
 	expect_eq(App.module(&"Inventory").count(&"magic_stone"), 0, "no stones")
+
+
+## Megan, Nov 18: the dots run with the ray off, so a real pinch at the cauldron selected nothing: no way out.
+func test_a_real_pinch_at_the_cauldron_pauses_the_dots_and_the_x_ends_them() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"dots").target)
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
+	expect(not App.rig.pointer(&"right").ray_on(), "the dots run with the ray off")
+	await _real_pinch_at(hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a real pinch at the cauldron: paused, the ✕ rises")
+	await wait(0.8)
+	await _real_pinch_at(hub.stop_bubble.target)
+	expect(await until(func() -> bool: return hub.state == &"hub" and not app.get_tree().paused, 20.0), "the ✕: back at the hub")
+
+
+## Megan, Nov 18: a jump (Staff tools → Scenes) to a game keeps the whole menu: the shelf, the locked games.
+func test_a_jump_to_the_dots_keeps_the_whole_menu() -> void:
+	var hub := await _to_hub(Callable(), &"dots")
+	expect(await until(func() -> bool: return hub.state == &"game", 30.0), "the dots start at once")
+	expect(_piece(hub, &"shelf") != null, "the shelf is in the menu")
+	var butterflies := _piece(hub, &"butterflies")
+	expect(butterflies != null and butterflies.sealed, "the butterflies wait locked")
+	expect(_piece(hub, &"dots") != null and not _piece(hub, &"dots").sealed, "the dots are open")
+	hub.current.leave()
+	expect(await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning, 60.0), "back at the hub")
+
+
+## Aims the simulated right hand at [param target] and pinches (the real input path, not Events.selected).
+func _real_pinch_at(target: Target) -> void:
+	var eye := App.head().global_position
+	var from := eye + Vector3.DOWN * 0.15
+	App.sim_input.set_hand(&"right", Transform3D(Basis.looking_at(target.global_position - from), from))
+	await frames(3)
+	App.sim_input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	App.sim_input.press(&"right", &"trigger_click", false)
+	await frames(2)
+
+
+## Megan, Nov 18 (2:04 pm): the shelf too; the cauldron only takes a pinch now (not a pass of the hand), so the
+## pinch has to get there with the ray off.
+func test_a_real_pinch_at_the_cauldron_pauses_the_shelf() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"shelf").target)
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the shelf plays")
+	await wait(1.0)
+	await _real_pinch_at(hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a real pinch at the cauldron: paused, the ✕ rises")
+	await wait(0.8)
+	await _real_pinch_at(hub.stop_bubble.target)
+	expect(await until(func() -> bool: return hub.state == &"hub" and not app.get_tree().paused, 20.0), "the ✕: back at the hub")

@@ -87,7 +87,8 @@ func test_fingertip_touch_plays_onions_sound_during_the_room_intro() -> void:
 	var onion := _onion()
 	var sound := onion.touch.get_child(onion.touch.get_child_count() - 1) as AudioStreamPlayer3D
 	expect(get_tree().paused, "My room pauses the activity")
-	await wait(0.5) # Onion finishes appearing.
+	expect(await until(func() -> bool: return not OnionFlight.flying(onion), 6.0), "Onion lands after its welcome flight")
+	await wait(0.6) # and settles from the bounce.
 	var at := onion.global_position
 	var away := at + Vector3.RIGHT * 0.2
 	var offset := Vector3.BACK * App.rig.pointer(&"right").tip_reach
@@ -126,3 +127,42 @@ func test_staff_tools_play_it_again_from_any_scene() -> void:
 	expect(await until(func() -> bool: return App.module(&"Home").page == &"room"), "the room opens")
 	expect(_intro().running, "and the intro plays although it was seen")
 	expect(await until(func() -> bool: return _onion() != null), "with Onion")
+
+
+func test_the_first_visit_onion_swoops_in_loops_lands_beside_the_bar_then_welcomes() -> void:
+	await boot()
+	_intro().automatic = true
+	var said := record(Events.said)
+	await _into_room()
+	expect(await until(func() -> bool: return _onion() != null), "Onion comes")
+	var onion := _onion()
+	var eye := App.head().global_position
+	expect(OnionFlight.flying(onion), "flying in")
+	var nearest := 99.0
+	var lowest := 99.0
+	var highest := -99.0
+	var start := onion.global_position
+	while OnionFlight.flying(onion):
+		nearest = minf(nearest, onion.global_position.distance_to(eye))
+		lowest = minf(lowest, onion.global_position.y)
+		highest = maxf(highest, onion.global_position.y)
+		await frames(1)
+	expect(start.distance_to(eye) > 1.5, "it comes from the far side of the room")
+	expect(nearest > 0.4, "it never comes close to the child's face (%.2f m)" % nearest)
+	expect(highest - lowest > 0.4, "a real loop, not a slide (%.2f m high)" % (highest - lowest))
+	var bar: Target = app.find_child("home_shop", true, false)
+	var spot: Vector3 = bar.get_parent().global_transform * RoomIntro.SPOT
+	await wait(0.6)
+	expect(onion.global_position.distance_to(spot) < 0.01, "it lands at its spot beside the bar")
+	expect(is_equal_approx(onion.scale.x, 1.0) and is_equal_approx(onion.scale.y, 1.0), "settled after the bounce")
+	expect(await until(func() -> bool: return said.any(func(args: Array) -> bool: return args[0] == RoomIntro.WELCOME), 5.0), "then: " + RoomIntro.WELCOME)
+	expect(get_tree().paused, "the room (menu) stays live while it flies")
+
+
+func test_staff_replay_and_a_later_visit_skip_nothing_but_the_seen_intro() -> void:
+	await boot()
+	_intro().automatic = true
+	_intro().seen = true
+	await _into_room()
+	await wait(0.5)
+	expect(_onion() == null, "after the first visit: no flight, no welcome")
