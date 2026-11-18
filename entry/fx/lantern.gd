@@ -26,6 +26,18 @@ const FLICKER := 0.10                        # ±10 % at most, smooth
 const FLICKER_SPEED := 0.55                  # noise samples per second: slow, irregular
 const HALO_SIZE := 0.34
 const HALO_ALPHA := 0.32
+const SOLID_ALPHA := 0.75                    # the solid halo's middle (its edge stays soft)
+const SOLID_COLOUR := Color(1.0, 0.78, 0.48)
+const HIGH_LIGHT_ENERGY := 0.45
+const HIGH_LIGHT_RANGE := 0.9
+const HIGH_FLICKER := 0.22
+## Light specks round the high lanterns (Megan, Nov 18: "C, but I want light specks"): a few tiny warm
+## motes drifting slowly round the glass and fading in and out. They stop during a game (quiet).
+const SPECKS := 9
+const SPECK_SIZE := 0.02
+const SPECK_RADIUS := 0.14
+const SPECK_LIFE := 4.5
+const SPECK_COLOUR := Color(1.0, 0.86, 0.58)                   # the high lanterns' lights flicker a little more (still smooth)
 const LIGHT_ENERGY := 0.6
 const LIGHT_RANGE := 1.3
 ## The lantern's own meshes sit on this render layer, which its light skips (a light 5 cm inside the
@@ -52,6 +64,12 @@ const CLEAR_OF_RING_DEG := 30.0
 static var style := &"high"
 ## The Quest switch: false = no dynamic lights at all (the glow alone still reads).
 static var lights_on := true
+## The halo: &"solid" (a fuller warm disc, blended over the room, so it reads on a light wall) or &"soft"
+## (the faint additive glow it was). Megan, Nov 18: "more visible rings, more solid".
+static var ring := &"solid"
+## The high lanterns each get a small flickering warm light on their beam and the ceiling (Quest: 6 small
+## lights, no shadows; off with [member lights_on]).
+static var high_lights := true
 ## True while a game runs: steady glow, no embers.
 static var quiet := false
 static var alive: Array[Lantern] = []
@@ -86,6 +104,8 @@ var lit := 1.0                               # 0..1, for fading in
 var size := SCALE                            # the model's scale (the high lanterns are smaller)
 var glow := 1.0                              # brightness, times GLOW_ENERGY / HALO_ALPHA (the high ones are dimmer)
 var embers := true
+var flicker := FLICKER
+var _specks: CPUParticles3D
 var light: OmniLight3D
 var _glass: StandardMaterial3D
 var _halo: ShaderMaterial
@@ -183,7 +203,12 @@ static func hang_high(parent: Node, eye: Vector3, middle: Vector3) -> Array[Lant
 			if int(spot.x) != row or spot.y < reach.x + 0.2 or spot.y > reach.y - 0.2:
 				continue
 			var at := centre + right * spot.y + Vector3.DOWN * (BEAM_SIZE.y * 0.5 + HIGH_DROP)   # the model's top is its origin
-			hung.append(make(parent, at, false, HIGH_SCALE, HIGH_GLOW, false))
+			var high := make(parent, at, false, HIGH_SCALE, HIGH_GLOW, false)
+			if high_lights and lights_on:
+				high.add_light(HIGH_LIGHT_ENERGY, HIGH_LIGHT_RANGE)
+				high.flicker = HIGH_FLICKER
+			high.add_specks()
+			hung.append(high)
 	return hung
 
 
@@ -309,7 +334,7 @@ func _build(with_light: bool) -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE * HALO_SIZE
 	_halo = ShaderMaterial.new()
-	_halo.shader = _halo_shader()
+	_halo.shader = _halo_shader(ring == &"solid")
 	_halo.set_shader_parameter(&"glow", Onion.soft_dot())
 	_halo.set_shader_parameter(&"tint", Color(WARM, HALO_ALPHA))
 	quad.material = _halo
@@ -320,16 +345,7 @@ func _build(with_light: bool) -> void:
 	halo.scale = Vector3.ONE * size / SCALE
 	add_child(halo)
 	if with_light and lights_on:
-		light = OmniLight3D.new()
-		light.light_color = Color(1.0, 0.74, 0.45)
-		light.light_energy = LIGHT_ENERGY
-		light.omni_range = LIGHT_RANGE
-		light.omni_attenuation = 1.4
-		light.shadow_enabled = false
-		light.light_bake_mode = Light3D.BAKE_DISABLED
-		light.light_cull_mask = 0xFFFFF & ~OWN_LAYER
-		light.position = glass_offset()
-		add_child(light)
+		add_light(LIGHT_ENERGY, LIGHT_RANGE)
 	_random.randomize()
 	_noise.seed = _random.randi()
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -338,6 +354,60 @@ func _build(with_light: bool) -> void:
 	_time = _random.randf_range(0.0, 100.0)
 	_next_ember = _random.randf_range(EMBER_EVERY.x * 0.5, EMBER_EVERY.y)
 	_apply(1.0)
+
+
+## A few tiny warm motes drifting round the glass (CPU particles: cheap, a handful per lantern).
+func add_specks() -> void:
+	var motes := CPUParticles3D.new()
+	motes.name = "specks"
+	motes.amount = SPECKS
+	motes.lifetime = SPECK_LIFE
+	motes.preprocess = SPECK_LIFE
+	motes.randomness = 1.0
+	motes.local_coords = true
+	motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	motes.emission_sphere_radius = SPECK_RADIUS * size / SCALE * 1.5
+	motes.direction = Vector3.UP
+	motes.spread = 180.0
+	motes.initial_velocity_min = 0.005
+	motes.initial_velocity_max = 0.02
+	motes.gravity = Vector3(0.0, 0.004, 0.0)
+	motes.damping_min = 0.002
+	motes.damping_max = 0.006
+	motes.scale_amount_min = 0.6
+	motes.scale_amount_max = 1.2
+	var ramp := Gradient.new()   # fade in, glow, fade out: a soft twinkle, never a flash
+	ramp.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	ramp.colors = PackedColorArray([Color(SPECK_COLOUR, 0.0), Color(SPECK_COLOUR, 0.9), Color(SPECK_COLOUR, 0.9), Color(SPECK_COLOUR, 0.0)])
+	motes.color_ramp = ramp
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.albedo_texture = Onion.soft_dot()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * SPECK_SIZE
+	quad.material = mat
+	motes.mesh = quad
+	motes.position = glass_offset()
+	add_child(motes)
+	_specks = motes
+
+
+## A small warm light at the glass (no shadows; it skips the lantern's own iron).
+func add_light(energy: float, reach: float) -> void:
+	light = OmniLight3D.new()
+	light.light_color = Color(1.0, 0.74, 0.45)
+	light.light_energy = energy
+	light.omni_range = reach
+	light.omni_attenuation = 1.4
+	light.shadow_enabled = false
+	light.light_bake_mode = Light3D.BAKE_DISABLED
+	light.light_cull_mask = 0xFFFFF & ~OWN_LAYER
+	light.position = glass_offset()
+	light.set_meta(&"energy", energy)
+	add_child(light)
 
 
 func _enter_tree() -> void:
@@ -351,8 +421,10 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	_time += delta * FLICKER_SPEED
 	_calm = move_toward(_calm, 1.0 if quiet else 0.0, delta)   # eases over ~1 s
+	if _specks != null:
+		_specks.emitting = not quiet   # no new specks during a game; the last ones fade out
 	var breathe := _noise.get_noise_1d(_time) * 1.6   # ~−1..1
-	_apply(1.0 + clampf(breathe, -1.0, 1.0) * FLICKER * (1.0 - _calm))
+	_apply(1.0 + clampf(breathe, -1.0, 1.0) * flicker * (1.0 - _calm))
 	if quiet or not embers or lit < 1.0 or not is_visible_in_tree():
 		return
 	_next_ember -= delta
@@ -366,9 +438,12 @@ func _apply(bright: float) -> void:
 	if _glass != null:
 		_glass.emission_energy_multiplier = GLOW_ENERGY * level
 	if _halo != null:
-		_halo.set_shader_parameter(&"tint", Color(WARM, HALO_ALPHA * level))
+		if ring == &"solid":
+			_halo.set_shader_parameter(&"tint", Color(SOLID_COLOUR, SOLID_ALPHA * clampf(level / glow, 0.0, 1.2) * lit))
+		else:
+			_halo.set_shader_parameter(&"tint", Color(WARM, HALO_ALPHA * level))
 	if light != null:
-		light.light_energy = LIGHT_ENERGY * level
+		light.light_energy = float(light.get_meta(&"energy", LIGHT_ENERGY)) * level
 
 
 ## One tiny ember: rises from the roof with a slight drift, fades, and is gone.
@@ -399,24 +474,29 @@ func _ember() -> void:
 
 
 ## A soft warm billboard pulled a little toward the viewer, so the lantern's own body doesn't cut it in half.
-static func _halo_shader() -> Shader:
+## [param solid]: blended over the room (a fuller disc that reads on a light wall), else added (faint).
+static func _halo_shader(solid := false) -> Shader:
 	var shader := Shader.new()
 	shader.code = """
 shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+render_mode unshaded, %s, depth_draw_never, cull_disabled, shadows_disabled;
+const float PULL = %s;
+const float SPREAD = %s;
 uniform sampler2D glow : source_color, filter_linear;
 uniform vec4 tint : source_color;
 void vertex() {
 	vec3 centre = (MODELVIEW_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	vec3 toward = normalize(-centre);
 	float size = length(MODEL_MATRIX[0].xyz);
-	VERTEX = centre + vec3(VERTEX.xy * size, 0.0) + toward * 0.12;
+	VERTEX = centre + vec3(VERTEX.xy * size * SPREAD, 0.0) + toward * PULL;
 	POSITION = PROJECTION_MATRIX * vec4(VERTEX, 1.0);
 }
 void fragment() {
 	vec4 g = texture(glow, UV);
-	ALBEDO = tint.rgb * g.a * tint.a;
-	ALPHA = 1.0;
+	%s
 }
-"""
+""" % (["blend_add", "0.12", "1.0", "ALBEDO = tint.rgb * g.a * tint.a;\n\tALPHA = 1.0;"] if not solid else
+		# Solid: a fuller disc pushed just BEHIND the lantern, so the iron and glass stand in front of a
+		# ring of warm light instead of being fogged over.
+		["blend_mix", "-0.10", "1.35", "ALBEDO = tint.rgb;\n\tALPHA = pow(g.a, 0.6) * tint.a;"])
 	return shader

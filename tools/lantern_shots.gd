@@ -7,13 +7,20 @@ extends Node
 
 var _out := ProjectSettings.globalize_path("res://build/lanterns")
 var _hub: WorkshopController
+var _name := ""
 
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--style="):
 			Lantern.style = StringName(arg.trim_prefix("--style="))
-	_out = ProjectSettings.globalize_path("res://build/lanterns_%s" % Lantern.style)
+		if arg.begins_with("--ring="):
+			Lantern.ring = StringName(arg.trim_prefix("--ring="))
+		if arg.begins_with("--high-lights="):
+			Lantern.high_lights = arg.trim_prefix("--high-lights=") == "1"
+		if arg.begins_with("--out="):
+			_name = arg.trim_prefix("--out=")
+	_out = ProjectSettings.globalize_path("res://build/lanterns_%s" % (_name if _name != "" else String(Lantern.style)))
 	DirAccess.make_dir_recursive_absolute(_out.path_join("clip"))
 	get_window().size = Vector2i(1280, 800)
 	Profile.wipe()
@@ -54,10 +61,13 @@ func _ready() -> void:
 	_look(atan2(target.y - eye.y, flat.length()), atan2(-flat.x, -flat.z))
 	await _pause(0.3)
 	await _shot("6_close", NAN, NAN, 40.0)
-	if not "--clip" in OS.get_cmdline_user_args():
+	if not ("--clip" in OS.get_cmdline_user_args() or "--clip-up" in OS.get_cmdline_user_args()):
 		get_tree().quit()
 		return
 	Lantern.alive[0].set("_next_ember", 1.0)   # make sure the clip shows one ember
+	if "--clip-up" in OS.get_cmdline_user_args():
+		cam.fov = 95.0
+		_look(0.55, 0.0)
 	for i in 180:
 		await get_tree().create_timer(1.0 / 30.0).timeout
 		await RenderingServer.frame_post_draw

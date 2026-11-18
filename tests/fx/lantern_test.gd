@@ -127,7 +127,9 @@ func test_the_roof_beams_hang_small_dim_lanterns_high_out_of_the_working_view() 
 		expect(up > 12.0, "high: above the level gaze, ~40° above the table where the child works (%.0f°)" % up)
 		expect(glass.y < top, "under the ceiling")
 		expect(_flat_angle(eye, glass, middle) > 25.0, "none straight ahead")
-		expect(lantern.light == null and not lantern.embers, "no light, no embers")
+		expect(not lantern.embers, "no embers")
+		expect(lantern.light != null and not lantern.light.shadow_enabled and lantern.light.omni_range <= Lantern.HIGH_LIGHT_RANGE, "a small flickering light, no shadows")
+		expect(lantern.find_child("specks", false, false) is CPUParticles3D, "light specks round it")
 		expect(lantern.size < Lantern.SCALE and lantern.glow < 1.0, "smaller and dimmer")
 	var rafters := app.get_node(^"Rafters")
 	expect(rafters.get_child_count() == Lantern.BEAM_ROWS.size(), "the beams")
@@ -136,3 +138,23 @@ func test_the_roof_beams_hang_small_dim_lanterns_high_out_of_the_working_view() 
 		var ends: Array[Vector3] = [beam.global_transform * Vector3(-half, 0, 0), beam.global_transform * Vector3(half, 0, 0)]
 		for end in ends:
 			expect(absf(end.x - eye.x) < 2.3 and end.z - eye.z > -2.4, "a beam stops at the walls")
+
+
+func test_the_specks_stop_during_a_game_and_the_lights_switch_off_for_the_quest() -> void:
+	await boot(null, &"intro")
+	var eye := App.head().global_position
+	Lantern.quiet = false
+	var hung := Lantern.hang_high(app, eye, eye + Vector3(0, -0.45, -0.6))
+	var specks := hung[0].find_child("specks", false, false) as CPUParticles3D
+	await wait(0.2)
+	expect(specks.emitting, "specks drift in the hub")
+	Lantern.quiet = true
+	await wait(0.2)
+	expect(not specks.emitting, "no new specks during a game")
+	Lantern.quiet = false
+	Lantern.lights_on = false
+	var dark := Lantern.hang_high(app, eye, eye + Vector3(0, -0.45, -0.6))
+	Lantern.lights_on = true
+	for lantern in dark:
+		expect(lantern.light == null, "lights off: no dynamic light")
+		expect(lantern.find_child("halo", false, false) != null, "the solid ring still shows")
