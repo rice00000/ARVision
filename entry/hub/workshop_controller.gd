@@ -1009,7 +1009,7 @@ func _choose_level(activity: Summonable) -> bool:
 		var piece := activity.make_impression() as Impression
 		piece.title = level.title
 		piece.level = level
-		if piece.kind == &"shelf":
+		if not LevelPiece.dress(piece, level) and piece.kind == &"shelf":
 			piece.set_rows(_shelf_rows())
 		shown.append(piece)
 	await ring.sink(_mouth(), 0.4)
