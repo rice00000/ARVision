@@ -28,7 +28,7 @@ App="*res://core/app.gd"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/speech_baker/plugin.cfg", "res://addons/yolo/plugin.cfg")
+enabled=PackedStringArray("res://addons/speech_baker/plugin.cfg", "res://addons/yolo/plugin.cfg", "res://addons/cv_server/plugin.cfg")
 
 [layer_names]
 
