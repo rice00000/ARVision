@@ -72,6 +72,9 @@ static var ring := &"solid"
 static var high_lights := true
 ## True while a game runs: steady glow, no embers.
 static var quiet := false
+## How much of the dots' room dim the lanterns share, 0..1 (Megan, Nov 18 4:43): they fade with the haze to the
+## room's 60 % dim, so they don't glow brighter than the dimmed room; back as the haze clears (MotionVisit._haze).
+static var dimmed := 0.0
 static var alive: Array[Lantern] = []
 ## Lanterns the reveal has already lit (Megan, Nov 18: they light up at the reveal, as the workshop wakes),
 ## with their rafters: the hub takes them on instead of hanging new ones (no pop, no jump).
@@ -434,7 +437,7 @@ func _process(delta: float) -> void:
 
 
 func _apply(bright: float) -> void:
-	var level := bright * lit * glow
+	var level := bright * lit * glow * (1.0 - clampf(dimmed, 0.0, 1.0))
 	if _glass != null:
 		_glass.emission_energy_multiplier = GLOW_ENERGY * level
 	if _halo != null:

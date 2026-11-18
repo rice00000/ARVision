@@ -43,6 +43,19 @@ var bubble: Node3D
 var bud: Node3D
 var _shell_light: StandardMaterial3D
 var _frost_light: StandardMaterial3D
+## The hover cue (Megan, Nov 18 5:29, option B): a warm glow round the outside of the bubble, its rim turning gold,
+## and the bubble swelling a little ([member swell], applied by the ring). The old halo sat behind the frost, unseen.
+const HOVER_GOLD := Color(0.79, 0.54, 0.12)          # the rim at full hover (#C98A1E)
+const HOVER_BRASS := Color(1.0, 0.80, 0.38)          # the house's brass rim, brightened
+const HOVER_SWELL := 0.08                            # +8 % at full hover
+var _rim_light: StandardMaterial3D
+var _rim_colour: Color
+var _outer_glow: MeshInstance3D
+var _outer_glow_light: ShaderMaterial
+## 0..1, eased toward how near the hand is: the ring scales the bubble by 1 + HOVER_SWELL * swell.
+var swell := 0.0
+## The size the ring last placed it at (before the swell).
+var base_size := 0.0
 ## What a pinch or touch hits: id [code]impression_<kind>[/code] (the hub hears it through
 ## [signal Events.selected] / [signal Events.touched] and passes it to [method ImpressionRing.press]).
 var target: Target
@@ -214,6 +227,11 @@ func unseal(seconds := 0.8) -> void:
 
 
 func _update_halo() -> void:
+	if bubble != null and _rim_light != null:
+		var hover := 0.0 if sealed else _near
+		_outer_glow.visible = hover > 0.01
+		_outer_glow_light.set_shader_parameter(&"strength", hover)
+		_rim_light.albedo_color = _rim_colour.lerp(HOVER_BRASS if kind == &"house" else HOVER_GOLD, hover)
 	if sealed:
 		_halo.visible = false
 		return
@@ -291,14 +309,50 @@ func add_bubble() -> void:
 	if kind == &"house":
 		torus.inner_radius = BUBBLE_RADIUS * 0.95
 		torus.outer_radius = BUBBLE_RADIUS * 1.06   # a thicker brass porthole
-	rim.material_override = _lit(BRASS, true) if kind == &"house" else _flat(RIM, 1.0)
+	_rim_light = _lit(BRASS, true) if kind == &"house" else _flat(RIM, 1.0)
+	_rim_colour = _rim_light.albedo_color
+	rim.material_override = _rim_light
 	rim.rotation.x = PI * 0.5   # in the bubble's face
 	bubble.add_child(rim)
+	_outer_glow = _make_outer_glow()
+	bubble.add_child(_outer_glow)
 	var shine := _disc(BUBBLE_RADIUS * 0.12, _flat(Color.WHITE, 0.85))
 	shine.position = Vector3(-0.45, 0.45, 0.6) * BUBBLE_RADIUS
 	bubble.add_child(shine)
 	(target.get_child(0) as CollisionShape3D).shape.set(&"radius", BUBBLE_RADIUS)   # the whole bubble answers
 	_halo.position = MIDDLE + Vector3(0.0, 0.0, -0.05)
+
+
+## The hover glow: a soft warm ring just outside the bubble's rim, fading out over ~6 cm (at scale 1).
+func _make_outer_glow() -> MeshInstance3D:
+	var glow := MeshInstance3D.new()
+	glow.name = "hover_glow"
+	var quad := QuadMesh.new()
+	var reach := BUBBLE_RADIUS * 1.5
+	quad.size = Vector2.ONE * reach * 2.0
+	glow.mesh = quad
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, shadows_disabled;
+uniform vec4 colour : source_color = vec4(1.0, 0.78, 0.44, 1.0);
+uniform float strength = 0.0;
+uniform float inner = 0.66;   // the rim, as a share of the quad's half-width
+void fragment() {
+	float d = length(UV - 0.5) * 2.0;
+	float ring = smoothstep(inner - 0.03, inner + 0.01, d) * (1.0 - smoothstep(inner, 1.0, d));
+	ALBEDO = colour.rgb;
+	ALPHA = colour.a * strength * 0.85 * ring;
+}
+"""
+	_outer_glow_light = ShaderMaterial.new()
+	_outer_glow_light.shader = shader
+	_outer_glow_light.set_shader_parameter(&"inner", BUBBLE_RADIUS * 0.99 / reach)
+	glow.material_override = _outer_glow_light
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	glow.position.z = -0.02
+	glow.visible = false
+	return glow
 
 
 ## The small bud under the bubble: the next level as a dark silhouette (the game's next look), or none.

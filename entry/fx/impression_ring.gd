@@ -29,7 +29,7 @@ signal hovered(impression: Impression)
 
 const STILL_MAX := 5            # up to this many tasks: a still arc, nothing slides
 const STEP := 0.56              # radians between neighbours on the arc (bubbles never touch)
-const RADIUS := 0.26            # metres from the arc's centre to each bubble
+const RADIUS := 0.26            # the arc's old radius: STEP * RADIUS is the spacing between neighbours along the arc
 const ABOVE_RIM := 0.27         # the menu's middle over the cauldron's rim
 const REACH := 0.44             # the menu's middle is pulled toward the child until it is this far from the eyes
 const LEAN_MAX := 0.2           # ...but never more than this far forward of the cauldron's mouth
@@ -408,6 +408,8 @@ func _process(delta: float) -> void:
 	for pointer in pointers:
 		if pointer.global_position.distance_to(global_position) < WAKE_NEAR:
 			hand_near = true
+	var nears := {}
+	var nearest: Impression = null   # the hover cue lights one bubble only, the nearest (the others are ~15 cm away)
 	for impression in _all():
 		var near := 0.0
 		for pointer in pointers:
@@ -415,8 +417,15 @@ func _process(delta: float) -> void:
 				near = 1.0
 			var gap := pointer.global_position.distance_to(impression.target.global_position)
 			near = maxf(near, clampf(inverse_lerp(NEAR_FROM, NEAR_FULL, gap), 0.0, 1.0))
+		nears[impression] = near
+		if near > 0.0 and not impression.sealed and (nearest == null or near > nears[nearest]):
+			nearest = impression
+	for impression in _all():
+		var near: float = nears[impression]
 		if not impression.sealed:
-			impression.set_near(near)
+			var cue := near if impression == nearest else 0.0
+			impression.set_near(cue)
+			_swell(impression, cue if opened and not turning else 0.0, delta)
 		# The sound label: once each time a hand comes to it (sealed ones too: "Soon").
 		if near >= HOVER_AT and opened and not turning and not _hovering.get(impression, false):
 			_hovering[impression] = true
@@ -439,6 +448,17 @@ func _process(delta: float) -> void:
 		_idle += delta
 		if _idle >= REST_AFTER and rest < 1.0 and (_rest_tween == null or not _rest_tween.is_running()):
 			_rest_to(1.0, REST_SECONDS)
+
+
+## Eases [param impression]'s hover swell toward [param want] (~0.15 s) and resizes it round its middle.
+func _swell(impression: Impression, want: float, delta: float) -> void:
+	var was := impression.swell
+	impression.swell = move_toward(was, want, delta / 0.15)
+	if is_equal_approx(was, impression.swell) or impression.base_size <= 0.0:
+		return
+	var middle := impression.global_transform * Impression.MIDDLE
+	impression.scale = Vector3.ONE * impression.base_size * (1.0 + Impression.HOVER_SWELL * impression.swell)
+	impression.global_position += middle - impression.global_transform * Impression.MIDDLE   # it grows round its middle
 
 
 func _take(impression: Impression, task := true) -> void:
@@ -494,11 +514,15 @@ func _angle(i: int) -> float:
 	return _wrapped(i - offset) * STEP
 
 
-## Every bubble at its place: the tasks on a still arc facing the child (the middle one a little bigger; past
-## STILL_MAX the far ones peek in at the ends), the door below and a little nearer.
+## Every bubble at its place: the tasks on a still arc round the child's eyes (the middle one a little bigger; past
+## STILL_MAX the far ones peek in at the ends), the places row below on the same kind of curve.
 func _place() -> void:
 	var shrink := lerpf(1.0, REST_SCALE, rest)
-	var arc_middle := global_position - _toward * RADIUS
+	# The games curve round the child too, like the places row (Megan, Nov 18 4:32): every game the same distance
+	# from the eyes and at one height. (The arc used to bend away round the cauldron: the ends were ~10 cm further
+	# and lower, and the shelf on the far left was hard to reach.) Neighbours keep their spacing along the arc.
+	var games_centre := Vector3(_eye.x, global_position.y, _eye.z) if _eye != Vector3.INF else global_position + _toward * 0.45
+	var games_reach := maxf(games_centre.distance_to(global_position), 0.2)
 	var leader := leader()
 	var middle_angle := 0.0 if _carousel() or centre >= 0 or impressions.size() % 2 == 1 else STEP * 0.5
 	var edge := STEP * (2.0 if _carousel() else 9.0)
@@ -512,12 +536,14 @@ func _place() -> void:
 		var peek := _carousel() and absf(angle) > STEP * 1.5   # the ends: smaller (there's more)
 		var size := lerpf(SIDE_SCALE, FRONT_SCALE, frontness) * (0.75 if peek else 1.0) * shrink
 		# The first game on the child's left (they read left to right): -_side is the child's right.
-		var at := arc_middle + (_toward * cos(angle) - _side * sin(angle)) * RADIUS \
-				+ Vector3.DOWN * (absf(angle) * 0.02 + 0.03 * rest)
+		var round_eyes := angle * RADIUS / games_reach   # the same spacing along the arc as before
+		var at := games_centre + (-_toward * cos(round_eyes) - _side * sin(round_eyes)) * games_reach \
+				+ Vector3.DOWN * 0.03 * rest
+		impression.base_size = size
 		impression.scale = Vector3.ONE * size
 		impression.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
 		_face(impression)
-		impression.scale = Vector3.ONE * size
+		impression.scale = Vector3.ONE * size * (1.0 + Impression.HOVER_SWELL * impression.swell)
 		impression.set_waiting(_waiting * 0.6 if impression == leader and not turning and not _quiet else 0.0)
 	var size := DOOR_SCALE * shrink
 	var row := places.filter(func(p: Impression) -> bool: return is_instance_valid(p))
@@ -532,10 +558,11 @@ func _place() -> void:
 		var angle := (i - (row.size() - 1) * 0.5) * place_step   # left to right as the child sees it
 		var at := centre_at + (-_toward * cos(angle) - _side * sin(angle)) * reach \
 				+ Vector3.DOWN * (DOOR_BELOW + 0.02 * rest)
+		place.base_size = size
 		place.scale = Vector3.ONE * size
 		place.global_position = at - Vector3.UP * Impression.MIDDLE.y * size
 		_face(place)
-		place.scale = Vector3.ONE * size
+		place.scale = Vector3.ONE * size * (1.0 + Impression.HOVER_SWELL * place.swell)
 
 
 ## Turns a bubble to the child's eyes (tilted up or down to them too), or flat toward them without eyes.

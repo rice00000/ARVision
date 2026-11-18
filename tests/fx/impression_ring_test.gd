@@ -19,18 +19,28 @@ func _ring(sealed_dots := false) -> ImpressionRing:
 	return ring
 
 
+## The hands away from the bubbles (a hand near one swells it: the hover cue, Megan Nov 18 5:29).
+func _hands_away(ring: ImpressionRing) -> void:
+	input.point(&"right", ring.global_position + Vector3(0.8, 0.0, 0.0), ring.global_position + Vector3(1.6, 0, 0))
+	input.point(&"left", ring.global_position + Vector3(-0.8, 0.0, 0.0), ring.global_position + Vector3(-1.6, 0, 0))
+	await frames(2)
+
+
 func test_the_choices_stand_still_in_bubbles_on_an_arc_the_middle_one_biggest() -> void:
 	await boot(null, &"intro")
 	var ring := _ring()
+	await _hands_away(ring)
 	var eye := App.head().global_position
 	var front := ring.front()
 	expect_eq(front.kind, &"dots", "the middle choice is the front one")
 	for impression in ring.impressions:
 		expect(impression.bubble != null and impression.bubble.visible, "%s is in its bubble" % impression.kind)
+		# Round the child like the places row (Megan, Nov 18 4:32): the ends no further and no lower than the middle.
+		var to_eyes := Vector2(impression.bubble.global_position.x - eye.x, impression.bubble.global_position.z - eye.z).length()
+		var front_to_eyes := Vector2(front.bubble.global_position.x - eye.x, front.bubble.global_position.z - eye.z).length()
+		expect(absf(to_eyes - front_to_eyes) < 0.005, "%s is as far from the eyes as the middle one (%.3f, %.3f)" % [impression.kind, to_eyes, front_to_eyes])
+		expect(absf(impression.bubble.global_position.y - front.bubble.global_position.y) < 0.03, "%s is at the middle one's height" % impression.kind)
 		if impression != front:
-			expect(Vector2(front.global_position.x - eye.x, front.global_position.z - eye.z).length()
-					< Vector2(impression.global_position.x - eye.x, impression.global_position.z - eye.z).length(),
-					"the middle one is nearest the child (%s)" % impression.kind)
 			expect(is_equal_approx(impression.scale.x, ImpressionRing.SIDE_SCALE), "%s sits a little smaller" % impression.kind)
 			expect(impression.scale.x / front.scale.x >= 0.6, "%s is at least 60 %% of the middle one" % impression.kind)
 			var gap := (impression.global_position - front.global_position).length()
@@ -48,6 +58,7 @@ func test_the_choices_stand_still_in_bubbles_on_an_arc_the_middle_one_biggest() 
 func test_one_press_picks_any_bubble_at_once_and_it_pops() -> void:
 	await boot(null, &"intro")
 	var ring := _ring()
+	await _hands_away(ring)
 	var cup := ring.impressions[2]
 	var where := cup.global_position
 	var picked := record(ring.chosen)
@@ -200,7 +211,28 @@ func test_it_rests_with_no_hand_near_and_wakes_when_one_comes() -> void:
 	input.point(&"right", ring.global_position + Vector3(0.1, -0.05, 0.1), ring.global_position)
 	await wait(ImpressionRing.WAKE_SECONDS + 0.3)
 	expect(ring.rest < 0.01, "a hand coming near wakes it")
-	expect(is_equal_approx(front.scale.x, full), "full size again")
+	expect(is_equal_approx(front.base_size, full), "full size again (before the hand's hover swell)")
+	expect(front.scale.x > full and front.scale.x <= full * (1.0 + Impression.HOVER_SWELL) + 0.001, "the hand near it swells it a little")
+
+
+func test_a_hand_near_a_bubble_glows_its_rim_and_swells_it_and_it_settles_after() -> void:
+	await boot(null, &"intro")
+	var ring := _ring()
+	await _hands_away(ring)
+	var shelf := ring.impressions[0]
+	var size := shelf.scale.x
+	var middle := shelf.bubble.global_position
+	expect(not shelf._outer_glow.visible, "no glow with no hand near")
+	input.point(&"right", shelf.bubble.global_position + Vector3(0.0, 0.0, 0.05), shelf.bubble.global_position)
+	await wait(0.4)
+	expect(shelf._outer_glow.visible, "a warm glow round the outside")
+	expect(shelf._rim_light.albedo_color.is_equal_approx(Impression.HOVER_GOLD), "its rim turns gold")
+	expect(is_equal_approx(shelf.scale.x, size * (1.0 + Impression.HOVER_SWELL)), "it swells 8 %% (%.3f)" % (shelf.scale.x / size))
+	expect(shelf.bubble.global_position.distance_to(middle) < 0.002, "round its middle: it doesn't jump")
+	expect(not ring.impressions[1]._outer_glow.visible and is_equal_approx(ring.impressions[1].scale.x, ring.impressions[1].base_size), "the others don't")
+	await _hands_away(ring)
+	await wait(0.4)
+	expect(not shelf._outer_glow.visible and is_equal_approx(shelf.scale.x, size), "it settles when the hand goes")
 
 
 func test_resting_pieces_can_still_be_pressed() -> void:

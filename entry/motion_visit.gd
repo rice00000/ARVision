@@ -49,6 +49,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	Motion.onion_voice = false
+	Lantern.dimmed = 0.0
 	if _veil_node != null and is_instance_valid(_veil_node):
 		_veil_node.queue_free()
 
@@ -143,9 +144,11 @@ func _haze(on: bool) -> void:
 	while t < seconds:
 		t += get_process_delta_time()
 		step.dim = lerpf(from, to, clampf(t / seconds, 0.0, 1.0))
+		Lantern.dimmed = step.dim   # the lanterns dim with the room (Megan, Nov 18 4:43)
 		reality.view = step
 		reality._apply()   # no log line per step; the last one is logged below
 		await get_tree().process_frame
+	Lantern.dimmed = to
 	reality.apply_view(DIM if on else App.session.base_view)
 
 

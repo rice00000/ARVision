@@ -119,7 +119,10 @@ var menu_sign: Node3D
 var sign_target: Target
 var _games_said := 0
 var _hub_since := 0.0           # when the hub last began waiting (seconds)
-var _quiet_since := 0.0         # when Onion last finished a line
+var _quiet_since := 0.0         # when Onion last finished a line (a story line: sound labels don't count)
+var _labels: Dictionary = {}    # the sound labels said so far (text → true), so they never hold up the next one
+var _label_turn := 0            # bumped by each new label: a cut label doesn't go on to say its count
+var _label_now := ""            # the label being said (with its count), "" once it has finished
 var _clock := 0.0               # game time, seconds (unpaused)
 var _clock_real := 0.0          # time that runs while paused too (the pause bubble's own clock)
 var _stop_since := 0.0
@@ -150,9 +153,12 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	add_child(_demo)
 	var voice := App.module(&"Voice")
 	if voice != null and voice.has_signal(&"line_finished"):
-		voice.line_finished.connect(func(_text: String, _completed: bool) -> void:
-			_quiet_since = _clock)
-		Events.said.connect(func(_text: String) -> void: _quiet_since = INF)   # speaking now: wait for its end
+		voice.line_finished.connect(func(text: String, _completed: bool) -> void:
+			if not _labels.has(text):
+				_quiet_since = _clock)
+		Events.said.connect(func(text: String) -> void:
+			if not _labels.has(text):
+				_quiet_since = INF)   # Onion speaking now: wait for its end
 	memory = HubMemory.get_or_make()
 	if memory != null:
 		played = memory.played   # the same array: what's played is saved as it happens
@@ -825,24 +831,40 @@ func _cauldron_step(delta: float) -> void:
 
 ## Says a bubble's (or the cauldron's) name, quietly: only when Onion has been quiet for a moment
 ## ([constant LABEL_QUIET] s) and not in the hub's first [constant LABEL_SETTLE] s, so a label never stacks
-## on a line (Megan, Nov 18, issue 5). True if it was said.
+## on a line (Megan, Nov 18, issue 5). A newer label cuts an older one at once, and labels never make each other
+## wait (Megan, Nov 18 5:14). True if it was said.
 func _label(text: String, anywhere := false, then := "") -> bool:
 	if text == "" or (state != &"hub" and not anywhere):
 		return false
 	var now := _clock
 	if now - _hub_since < LABEL_SETTLE or now - _quiet_since < LABEL_QUIET:
 		return false
+	if text == _label_now:
+		return false   # the same bubble again: its name is still going (with its count)
 	var voice := App.module(&"Voice")
 	if voice != null and voice.has_method(&"speaking") and voice.speaking() != "":
-		return false
+		# Megan, Nov 18 5:14: the name must match where the hand is now. A label still playing is cut and the new
+		# one plays at once; one of Onion's lines is never talked over.
+		if not _labels.has(voice.speaking()) or not voice.has_method(&"skip"):
+			return false
+		voice.skip()
 	print("HUB label: ", text)
-	if then == "":
-		Onion.line(text, self)
-	else:
-		(func() -> void:
-			await Onion.line(text, self)
+	_labels[text] = true
+	if then != "":
+		_labels[then] = true
+	_label_turn += 1
+	var turn := _label_turn
+	_label_now = text
+	(func() -> void:
+		await Onion.line(text, self)
+		if not is_instance_valid(self):
+			return   # the hub went (a scene change) mid-name
+		if then != "" and turn == _label_turn:   # not cut by the next bubble's name: then its count
 			await get_tree().create_timer(0.3, false).timeout   # a short breath, then the count
-			Onion.line(then, self)).call()
+			if turn == _label_turn:
+				await Onion.line(then, self)
+		if is_instance_valid(self) and turn == _label_turn:
+			_label_now = "").call()
 	return true
 
 

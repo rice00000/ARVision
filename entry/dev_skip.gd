@@ -5,7 +5,9 @@ extends CanvasLayer
 ## next useful thing:
 ##   * setup panel: Skip setup, then Start
 ##   * the opening (Scenes 1-6): the next part, played fast; after the reveal, into the hub (with its welcome)
-##   * a game (shelf, dots): every remaining round won
+##   * a game: every remaining round won (the shelf, the dots, the butterflies); Turn to fit: the go ends as a
+##     full go (Megan, Nov 18 6:05: skip works in every game, for prototype testing). Either way the hub gives the
+##     game's stones and opens the next game, as after a real one.
 ##   * Wei's room: back to the workshop
 ##   * the hub, menu closed: open it; menu open: the leading game (and in its own row, the recommended level)
 ##   * otherwise, Onion talking: cut the line
@@ -67,6 +69,9 @@ func skip() -> void:
 		if hub.state == &"game" and App.session.running:
 			_finish_rounds()
 			return
+		if hub.state == &"game" and finish_go(hub.current as TurnToFitActivity):
+			_say("Turn to fit: the go finished")
+			return
 		if hub.state == &"hub" and not hub.ring.opened:
 			Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
 			_say("menu opened")
@@ -99,6 +104,17 @@ func skip() -> void:
 		_say("line cut")
 		return
 	_say("nothing to skip here")
+
+
+## Ends Turn to fit's go now, as a full go ("done": the hub gives its stones). False if no go is running.
+static func finish_go(activity: TurnToFitActivity) -> bool:
+	if activity == null or activity.current == null or not is_instance_valid(activity.current):
+		return false
+	var game := activity.current
+	if game.get(&"_ending") or game.go == null:
+		return false
+	game.call(&"_end")
+	return true
 
 
 func _finish_rounds() -> void:

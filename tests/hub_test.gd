@@ -238,6 +238,7 @@ func test_the_dots_dim_the_room_put_subtitles_under_the_cloud_and_onion_answers_
 		return found != null and found.in_motion() and App.session.trial != null, 90.0), "the dots rounds run")
 	var visit := App.main.get_node_or_null(^"FirstVisit/Visit/Motion") as MotionVisit
 	expect(is_equal_approx(App.reality.view.dim, MotionVisit.DIM.dim), "the room is dimmed to 60 %% for the rounds (%.2f)" % App.reality.view.dim)
+	expect(is_equal_approx(Lantern.dimmed, MotionVisit.DIM.dim), "the lanterns dim with the room (Megan, Nov 18 4:43)")
 	var voice := App.module(&"Voice")
 	expect(voice != null and is_equal_approx(voice.fixed_elevation, MotionVisit.SUBTITLE_BELOW), "subtitles sit under the dot cloud")
 	Events.report(&"motion_wrong", {})
@@ -245,6 +246,7 @@ func test_the_dots_dim_the_room_put_subtitles_under_the_cloud_and_onion_answers_
 	expect(not _said_line(said, "Not that way. Watch the dots and try again."), "not Wei's")
 	await _finish_rounds()
 	expect(await until(func() -> bool: return not visit.in_motion() and App.reality.view.dim < 0.01, 30.0), "the haze clears once after the last round")
+	expect(Lantern.dimmed < 0.01, "the lanterns are back to full as the haze clears")
 	expect(await until(func() -> bool: return voice == null or is_nan(voice.fixed_elevation), 5.0), "subtitles back to their usual place")
 	Engine.time_scale = 1.0
 	FirstVisit.start_with = &""
@@ -319,13 +321,28 @@ func test_the_house_says_its_name_and_the_stones_and_labels_wait_for_quiet() -> 
 		tries += 1
 	expect(_said_line(said, "Virtual Workshop"), "a hand at the house: its name")
 	expect(_said_line(said, count), "then the count: \"%s\"" % count)
+	# Megan, Nov 18 5:14: the name matches where the hand is now. Moving on while the house's name is being said cuts
+	# it: the next bubble's name plays at once, and the house's count doesn't follow.
+	await wait(WorkshopController.LABEL_QUIET + 1.5)
+	var voice := App.module(&"Voice")
 	hub.ring.hovered.emit(hub.ring.door)
 	await frames(2)
+	expect(voice.speaking() == "Virtual Workshop", "the house's name is being said")
+	var counts := said.filter(func(args: Array) -> bool: return args[0] == count).size()
 	var shelf_name := Impression.title_for(&"shelf")
+	hub.ring.hovered.emit(hub.ring.impressions[0])
+	await frames(2)
+	expect_eq(voice.speaking(), shelf_name, "the next bubble's name plays at once, cutting the last one")
+	await wait(3.0)
+	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == count).size(), counts, "the cut house doesn't go on to its count")
+	# One of Onion's own lines is never talked over by a name.
 	var named := said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size()
-	hub.ring.hovered.emit(hub.ring.impressions[0])   # while the teaser is still being said
+	Onion.line(WorkshopController.STONES_SPEND, hub)
+	await frames(2)
+	hub.ring.hovered.emit(hub.ring.impressions[0])
 	await frames(2)
 	expect_eq(said.filter(func(args: Array) -> bool: return args[0] == shelf_name).size(), named, "no label while Onion is still speaking")
+	expect_eq(voice.speaking(), WorkshopController.STONES_SPEND, "Onion's line goes on")
 
 
 ## Megan, Nov 18: a bubble is chosen by a click or pinch only, never by a touch or a hand passing by.

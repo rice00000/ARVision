@@ -84,6 +84,21 @@ func test_the_glow_breathes_gently_in_the_hub_and_holds_steady_during_a_game() -
 	Lantern.quiet = false
 
 
+func test_the_lanterns_dim_with_the_dots_haze() -> void:
+	await boot(null, &"intro")
+	var lantern := Lantern.make(app, App.head().global_position + Vector3(0, 0.3, -1.0))
+	Lantern.quiet = true
+	await wait(1.6)
+	var full := lantern._glass.emission_energy_multiplier
+	Lantern.dimmed = MotionVisit.DIM.dim
+	await wait(0.1)
+	expect(is_equal_approx(lantern._glass.emission_energy_multiplier, full * (1.0 - MotionVisit.DIM.dim)), "dimmed by the room's 60 %%")
+	Lantern.dimmed = 0.0
+	await wait(0.1)
+	expect(is_equal_approx(lantern._glass.emission_energy_multiplier, full), "back to full after the haze")
+	Lantern.quiet = false
+
+
 func test_with_the_light_switch_off_there_is_no_dynamic_light_but_the_glass_still_glows() -> void:
 	await boot(null, &"intro")
 	Lantern.lights_on = false
