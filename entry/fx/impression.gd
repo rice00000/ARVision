@@ -2,7 +2,7 @@ class_name Impression
 extends Node3D
 ## The small, solid stand-in for one hub activity (Effects chat, Nov 17): what the child touches to choose
 ## it. Big (12-16 cm), solid, one strong colour each with a dark outline, and a silhouette of its own, so
-## telling them apart is never a vision test: the shelf is a square frame, the dots token a round disc,
+## telling them apart is never a vision test: the shelf is a square frame, the dots a cloud,
 ## the cup a cup with a handle. Their sounds differ too (see [method touched]).
 ##
 ## The hub asks for one through [method make] from [code]Summonable.make_impression()[/code]. In the
@@ -19,10 +19,6 @@ var level: TaskLevel
 var look := &""
 ## The shelf piece's rows (1..4): it grows a row with each shelf level finished (design chat, Nov 18).
 var rows := 2
-## The dots game's look. Megan, Nov 17 late, picked &"cloud" (a cream cloud with five navy dots: a silhouette
-## unlike the square shelf and the cup). The others stay for previews (tools/dots_icon_preview): &"disc" (the
-## old navy disc), &"comets" (read as ice-cream cones), &"lantern" (a brass firefly lantern).
-static var dots_style := &"cloud"
 ## The size it stands at (the mesh's own size is its full size).
 var size := Vector3.ONE
 
@@ -39,8 +35,6 @@ var _body: Node3D
 ## Its bubble in the hub's menu (Megan, Nov 18): a frosted backing, a clear shell, a pale rim and one still
 ## highlight round the piece. Null until [method add_bubble].
 var bubble: Node3D
-## The small bud under the bubble showing what comes next in this game, as a silhouette (Megan, Nov 18).
-var bud: Node3D
 var _shell_light: StandardMaterial3D
 var _frost_light: StandardMaterial3D
 var _difficulty_bar: MeshInstance3D
@@ -83,11 +77,7 @@ static func make(of_kind: StringName) -> Impression:
 		&"shelf":
 			impression._shelf()
 		&"dots":
-			match dots_style:
-				&"comets": impression._dots_comets()
-				&"cloud": impression._dots_cloud()
-				&"lantern": impression._dots_lantern()
-				_: impression._dots()
+			impression._dots_cloud()
 		&"turn_to_fit":
 			impression._cup()
 		&"house":
@@ -121,7 +111,7 @@ static func footprint(of_kind: StringName) -> Vector2:
 		&"shelf":
 			return Vector2(0.16, 0.08)
 		&"dots":
-			return Vector2(0.19, 0.05) if dots_style == &"cloud" else Vector2(0.15, 0.05)
+			return Vector2(0.19, 0.05)
 		&"turn_to_fit":
 			return Vector2(0.16, 0.12)
 		&"house":
@@ -401,43 +391,6 @@ void fragment() {
 	return glow
 
 
-## The small bud under the bubble: the next level as a dark silhouette (the game's next look), or none.
-func set_bud(on: bool) -> void:
-	if not on:
-		if bud != null:
-			bud.queue_free()
-			bud = null
-		return
-	if bud != null or bubble == null:
-		return
-	bud = Node3D.new()
-	bud.name = "bud"
-	add_child(bud)
-	bud.position = MIDDLE + Vector3(0.0, -BUBBLE_RADIUS - 0.055, 0.01)
-	var frost := _disc(0.05, _flat(FROST, 0.75))
-	frost.position.z = -0.012
-	bud.add_child(frost)
-	var rim := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.049
-	torus.outer_radius = 0.053
-	rim.mesh = torus
-	rim.material_override = _flat(RIM, 1.0)
-	rim.rotation.x = PI * 0.5
-	bud.add_child(rim)
-	var next := Impression.make(kind)   # its silhouette: the next look comes from the game later (see the log)
-	next.remove_child(next.target)
-	next.target.free()
-	next.target = null
-	next._halo.visible = false
-	var dark := _flat(Color(0.32, 0.33, 0.33), 1.0)
-	for mesh: MeshInstance3D in next._body.find_children("*", "MeshInstance3D", true, false):
-		mesh.material_override = dark
-	next.scale = Vector3.ONE * 0.45
-	next.position = Vector3(0.0, -0.034, 0.0)
-	bud.add_child(next)
-
-
 ## The chosen bubble pops (Megan, Nov 18): the shell swells a little and bursts into a ring of small droplets
 ## that fly out a few centimetres and vanish (~0.3 s), with a bright pop. The piece stays still in place.
 func pop() -> void:
@@ -559,39 +512,6 @@ func set_rows(count: int, seconds := 0.0) -> void:
 		grow.tween_property(_body, "position:y", 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
-func _dots() -> void:
-	# A round token standing on its edge: navy with seven big cream dots (still, never moving).
-	var r := 0.075
-	var disc := _mesh(_cylinder(r, r, 0.035), NAVY)
-	disc.rotation.x = PI * 0.5
-	disc.position = Vector3(0, r + 0.012, 0)
-	var foot := _box(Vector3(0.08, 0.012, 0.05), Vector3(0, 0.006, 0), NAVY.darkened(0.3))
-	var spots := [Vector2.ZERO]
-	for i in 6:
-		spots.append(Vector2.from_angle(i * TAU / 6.0 + PI / 6.0) * r * 0.58)
-	for spot: Vector2 in spots:
-		var dot := _mesh(_cylinder(0.014, 0.014, 0.006), CREAM, false)
-		dot.rotation.x = PI * 0.5
-		dot.position = Vector3(spot.x, r + 0.012 + spot.y, 0.019)
-
-
-func _dots_comets() -> void:
-	# Three cream dots rising TOGETHER (all up: never a left/right cue beside a left/right answer), each with a
-	# short tapering trail below it, on a navy disc standing on its edge.
-	var r := 0.075
-	var disc := _mesh(_cylinder(r, r, 0.03), NAVY)
-	disc.rotation.x = PI * 0.5
-	disc.position = Vector3(0, r + 0.012, 0)
-	_box(Vector3(0.08, 0.012, 0.05), Vector3(0, 0.006, 0), NAVY.darkened(0.3))
-	for spot: Vector2 in [Vector2(-0.032, 0.012), Vector2(0.032, 0.012), Vector2(0.0, 0.04)]:
-		var at := Vector3(spot.x, r + 0.012 + spot.y, 0.02)
-		var head := _mesh(_sphere(0.016), CREAM, false)
-		head.position = at
-		head.scale = Vector3(1, 1, 0.45)
-		var tail := _mesh(_cylinder(0.014, 0.002, 0.05), CREAM.darkened(0.12), false)
-		tail.position = at + Vector3.DOWN * 0.03
-
-
 func _dots_cloud() -> void:
 	# A puffy cloud (four round lobes, flat front) with five big dots on it: "a cloud of dots". In the dots
 	# game's own colours (Megan, Nov 18): a night-blue cloud like the dimmed room, pale icy-blue dots like the
@@ -605,33 +525,6 @@ func _dots_cloud() -> void:
 		dot.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED   # they glow a little, as in the game
 		dot.rotation.x = PI * 0.5
 		dot.position = Vector3(spot.x, spot.y + 0.01, 0.024)
-
-
-func _dots_lantern() -> void:
-	# A small brass lantern: a dark frame, a warm glowing inside with three bright dots ("fireflies"), a ring on top.
-	var brass := Color(0.72, 0.55, 0.25)
-	_box(Vector3(0.1, 0.014, 0.06), Vector3(0, 0.007, 0), brass)
-	_box(Vector3(0.1, 0.014, 0.06), Vector3(0, 0.136, 0), brass)
-	for x: float in [-0.045, 0.045]:
-		_box(Vector3(0.01, 0.12, 0.01), Vector3(x, 0.072, 0.025), brass.darkened(0.3))
-	var inside := _box(Vector3(0.08, 0.115, 0.04), Vector3(0, 0.072, 0), Color(1.0, 0.8, 0.4), false)
-	var glow := inside.material_override as StandardMaterial3D
-	glow.emission_enabled = true
-	glow.emission = Color(1.0, 0.75, 0.35)
-	glow.emission_energy_multiplier = 0.6
-	for spot: Vector3 in [Vector3(-0.02, 0.05, 0.022), Vector3(0.02, 0.07, 0.022), Vector3(-0.005, 0.1, 0.022)]:
-		var fly := _mesh(_sphere(0.012), CREAM, false)
-		fly.position = spot
-		fly.scale = Vector3(1, 1, 0.4)
-	var ring := MeshInstance3D.new()
-	var torus := TorusMesh.new()
-	torus.inner_radius = 0.012
-	torus.outer_radius = 0.02
-	ring.mesh = torus
-	ring.material_override = _lit(brass, true)
-	ring.rotation.x = PI * 0.5
-	ring.position = Vector3(0, 0.16, 0)
-	_body.add_child(ring)
 
 
 func _sphere(radius: float) -> SphereMesh:

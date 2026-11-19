@@ -309,9 +309,7 @@ Notes:
 
 ---
 
-## 10. Motion: the example, the choice and your own sweep
-
-(Built from the story's motion brief; the dots' place and the choice's place are the layout chat's, the story's lines the organizer's.)
+## 10. Motion: the example and your own sweep
 
 **The example (`MotionTutorial`).** See: the dots, all going one way sideways; after a moment a see-through hand slides across in front of you, fingers leading, leaving a white streak; when it is across, ALL the dots go together and the wall effect plays once; then the dots fade. Nothing is asked of you and nothing counts.
 - [ ] You can tell, without a word, that the hand sweeps the SAME way the dots go. Left / right / unclear.
@@ -319,12 +317,6 @@ Notes:
 - [ ] The streak behind the hand looks like the streak your own sweep leaves.
 - [ ] The wall effect is gentle enough ("restrained"): too much / right / too little. (It is Wei's; the layout chat is measuring it.)
 - [ ] The dots really are gone when it ends.
-
-**The choice (`MotionChoice`).** See: a round dark disc with a cluster of still dots on it, next to the shelf-level buttons; nothing on it moves.
-- [ ] You know it is the dots game without being told. Yes / no.
-- [ ] Looking at it for a long time does nothing. Holding a hand near it, in front of it, does nothing (it lifts a little). Resting a fingertip on it as it appears does nothing.
-- [ ] Touching it with a fingertip chooses it, first time ______ of 5. A pinch aimed at it from afar chooses it, ______ of 5.
-- [ ] Reaching for a shelf-level button next to it never chooses it by accident: ______ times.
 
 **Your own sweep (Wei's detection, seated, one hand).** Do each, five times, with the hand you like; note how many the game saw (the white streak and the whoosh show a sweep was seen; the dots go together when it was the right way):
 - [ ] An ordinary sweep, about 30 cm in a second: ______ of 5.

@@ -1,7 +1,7 @@
 extends TestCase
 ## The hub's bubble menu over the cauldron (entry/fx/impression_ring.gd; Megan, Nov 18): a still arc of
 ## bubbles (a carousel with peeking ends past five), one press picks any and it pops, sealed ones stay closed,
-## a new one rises in, lights what the hand aims at, goes dark before a game; the door row below; buds; rests
+## a new one rises in, lights what the hand aims at, goes dark before a game; the door row below; rests
 ## after a while with no hand near and wakes when one comes; sinks and rises. The cup has no base.
 
 const KINDS: Array[StringName] = [&"shelf", &"dots", &"turn_to_fit"]
@@ -163,18 +163,6 @@ func test_a_new_choice_rises_into_the_arc_and_the_others_make_room() -> void:
 	await wait(ImpressionRing.RISE_SECONDS + 0.2)
 	expect(dots.bubble != null and dots.visible, "the new one is in its bubble, in the arc")
 	expect((dots.global_position - shelf.global_position).length() > 0.1, "beside the shelf, apart")
-
-
-func test_buds_show_the_next_level_under_a_bubble() -> void:
-	await boot(null, &"intro")
-	var ring := _ring()
-	var shelf := ring.impressions[0]
-	shelf.set_bud(true)
-	expect(shelf.bud != null, "a bud")
-	expect(shelf.bud.global_position.y < shelf.bubble.global_position.y - 0.05, "under the bubble")
-	expect(shelf.bud.find_children("*", "Target", true, false).is_empty(), "it can't be pressed by itself")
-	shelf.set_bud(false)
-	expect(shelf.bud == null, "and goes when there's nothing more")
 
 
 func test_the_door_sits_below_the_tasks_and_a_press_chooses_it_at_once() -> void:

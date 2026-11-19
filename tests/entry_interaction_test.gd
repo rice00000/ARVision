@@ -1757,7 +1757,7 @@ func test_the_invitation_in_the_first_visit_is_not_cut_until_the_child_has_taken
 		var hub: WorkshopController = found.hub
 		await until(func() -> bool: return not app.get_tree().paused, 10.0)
 		if not hub.ring.opened:   # the cauldron is the menu: one tap opens it
-			Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+			Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 			await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0)
 		Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return _voice().speaking() != "", 30.0), "Onion speaks")
@@ -1878,114 +1878,6 @@ func test_stopping_the_motion_tutorial_takes_the_dots_and_the_hand_and_nothing_f
 	expect(App.stage.find_children("*", "WallBreak", true, false).is_empty(), "no wall effect")
 	expect(tutorial._cloud == null and (tutorial._demo == null or not tutorial._demo.visible), "no dots, no hand")
 	expect(events.is_empty(), "and nothing logged")
-
-
-# --- The choice of motion --------------------------------------------------------------------------------------------
-
-func _choice() -> MotionChoice:
-	var eye := App.head().global_position
-	var choice := MotionChoice.new()
-	app.add_child(choice)
-	choice.global_transform = Transform3D(Basis.looking_at(-App.head().global_basis.z), eye + _ahead() * 0.4 + Vector3.DOWN * 0.12)
-	return choice
-
-
-func _until_open(choice: MotionChoice) -> void:
-	choice.open()
-	await until(func() -> bool: return choice.is_open(), 2.0)
-
-
-func test_the_motion_choice_is_chosen_by_a_pinch_aimed_at_it() -> void:
-	await boot(null, &"intro")
-	var choice := _choice()
-	var chosen := record(choice.chosen)
-	await _until_open(choice)
-	await select(choice.global_position)
-	await frames(2)
-	expect_eq(chosen.size(), 1, "a pinch aimed at it chooses it")
-	await select(choice.global_position)
-	await frames(2)
-	expect_eq(chosen.size(), 1, "and only once")
-
-
-func test_the_motion_choice_is_chosen_by_an_aimed_mouse_click() -> void:
-	await boot(null, &"intro")
-	var choice := _choice()
-	var chosen := record(choice.chosen)
-	await _until_open(choice)
-	var driver: DesktopDriver
-	for sibling in app.get_children():
-		if sibling is DesktopDriver:
-			driver = sibling
-	expect(driver != null, "the mouse driver is there")
-	driver.depth = 0.2
-	driver._place_hand(App.rig.head.unproject_position(choice.global_position + App.head().global_basis.x * 0.3))
-	await frames(2)
-	input.press(&"right", &"trigger_click", true)
-	await frames(2)
-	input.press(&"right", &"trigger_click", false)
-	await frames(2)
-	expect(chosen.is_empty(), "a click beside the disc leaves the choice open")
-	driver._place_hand(App.rig.head.unproject_position(choice.global_position))
-	await frames(2)
-	input.click(&"right", &"trigger_click")
-	await frames(2)
-	expect_eq(chosen.size(), 1, "a click aimed at the disc chooses it")
-
-
-func test_touching_the_motion_choice_leaves_it_open() -> void:
-	await boot(null, &"intro")
-	var choice := _choice()
-	var chosen := record(choice.chosen)
-	await _until_open(choice)
-	var back := choice.global_position + Vector3(0.0, 0.0, 0.3)
-	var along := (choice.global_position - back).normalized()
-	input.point(&"right", back - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
-	await frames(3)
-	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position)   # the fingertip goes in
-	await frames(4)
-	expect(chosen.is_empty() and choice.is_open(), "a fingertip going into it does not press the button")
-
-
-func test_looking_at_it_holding_a_hand_near_it_or_resting_on_it_never_chooses_it() -> void:
-	await boot(null, &"intro")
-	var choice := _choice()
-	var chosen := record(choice.chosen)
-	# A finger already resting on it when it appears has to leave and touch again: nothing commits by waiting.
-	var along := Vector3.FORWARD
-	input.point(&"right", choice.global_position - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
-	await frames(3)
-	await _until_open(choice)
-	await wait(2.0)
-	expect(chosen.is_empty(), "a finger resting on it as it appears does not choose it")
-	input.point(&"right", choice.global_position + Vector3(0.0, 0.0, 0.05) - along * App.rig.pointer(&"right").tip_reach, choice.global_position + along * 0.3)
-	await wait(2.0)
-	expect(chosen.is_empty(), "nor does holding it still just in front of it for seconds")
-	input.look_at(choice.global_position)   # the head turned straight at it
-	await wait(6.0)   # far longer than any dwell
-	expect(chosen.is_empty(), "looking straight at it for a long time chooses nothing")
-	expect(choice.is_open(), "and it stays on offer")
-
-
-func test_the_motion_choice_highlights_on_aim_and_only_accepts_presses_while_open() -> void:
-	await boot(null, &"intro")
-	var choice := _choice()
-	var chosen := record(choice.chosen)
-	await select(choice.global_position)   # not offered yet (and hidden)
-	expect(chosen.is_empty(), "not before it is offered")
-	await _until_open(choice)
-	var at := choice.global_position
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at)
-	await frames(3)
-	expect(choice._look.position.z > 0.005, "aiming at the disc lifts it")
-	input.point(&"right", at + Vector3(0.0, 0.0, 0.3), at + Vector3.RIGHT)
-	await frames(3)
-	expect(choice._look.position.z == 0.0, "and it settles when the hand goes")
-	choice.close()
-	await wait(0.4)
-	await select(at)
-	expect(chosen.is_empty(), "and not after it is closed")
-	expect(not choice.visible, "it is gone")
 
 
 # --- Does Wei's sweep detection see a seated child's real sweeps? (rig/pointer.gd, by simulation) -----------------

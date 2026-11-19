@@ -36,7 +36,7 @@ func _ready() -> void:
 	var hub := _hub
 	var eng_cam := App.rig.head as Camera3D
 	var eng_was := eng_cam.global_transform
-	eng_cam.look_at(hub.menu_sign.global_position)
+	eng_cam.look_at(hub.cauldron_menu.engraving.global_position)
 	eng_cam.fov = 30.0
 	await _pause(0.3)
 	await _shot("cauldron_engraving", "The ☰ engraved on the cauldron's belly (no floating bars)")
@@ -52,7 +52,7 @@ func _ready() -> void:
 	Events.selected.emit(&"right", hub.row.leader().target, Vector3.ZERO, Vector3.FORWARD)
 	await _until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null)
 	await _pause(2.0)
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	await _until(func() -> bool: return hub.eye_bubble != null)
 	await _pause(0.6)
 	await _shot("pause_eye_x", "Shelf paused: eye · ✕ over the brew")
@@ -87,7 +87,7 @@ func _ready() -> void:
 	Events.selected.emit(&"right", hub.row.impressions[2].target, Vector3.ZERO, Vector3.FORWARD)
 	await _pause(0.6)
 	await _shot("looks_edges", "Edges picked: the real room changes (sim), the ring moves")
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	await _until(func() -> bool: return hub.row == null and hub.ring.opened, 900)
 	await _pause(0.5)
 	Events.selected.emit(&"right", hub.ring.door.target, Vector3.ZERO, Vector3.FORWARD)
@@ -105,7 +105,7 @@ func _ready() -> void:
 	_look(-0.6)
 	await _pause(1.0)
 	await _shot("after_goodbye", "After the goodbye: the cauldron waits (a tap starts again)")
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	await _until(func() -> bool: return hub.carry.enabled, 900)
 	await _pause(0.5)
 	await _shot("restart_gear_out", "Restart: Onion and the socket are back, the gear is on the table to set in")
@@ -113,7 +113,7 @@ func _ready() -> void:
 
 
 func _open(hub: WorkshopController) -> void:
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 
 
 func _press(hub: WorkshopController, kind: StringName) -> void:

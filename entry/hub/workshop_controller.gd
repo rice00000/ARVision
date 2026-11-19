@@ -13,7 +13,7 @@ extends Node
 ##   hears its name. The first visit offers the shelf, with the dots beside it in a closed bubble ("Soon")
 ##   ("Welcome to the workshop."); after ~5 s with the menu open and no choice the teaching hand shows
 ##   aim-and-pinch. After the first game the dots' bubble opens ("There are more waiting.", once). Turn to fit
-##   joins only when it can run. Buds under the shelf and the dots show their next level as a silhouette.
+##   joins only when it can run.
 ## * **Places:** below the tasks from after the first game: ? (the controls tour) · eye (the child's look for the
 ##   real room) · the Virtual Workshop house (with the stones badge) · ✕ (finish, after Onion asks).
 ## * **Stones and levels** (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md`): after every game its
@@ -26,7 +26,7 @@ extends Node
 ## * **During a game** the bubbles sink into the cauldron, the gear can't be lifted, and the
 ##   exit-task token stands low in front of the cauldron: a pinch on it ends the game (the round is skipped),
 ##   "We can come back to these.", back to the hub (the menu rises again by itself).
-## * **Pause** (headset menu, Staff tools) pauses the world; the running game is told (Summonable.pause/resume).
+## * **Pause** (headset menu, Staff tools) pauses the world and the running game.
 ##   Nothing in the hub times out, and a lost hand never counts as a choice.
 
 signal _picked_signal
@@ -54,7 +54,6 @@ const COME_ALONG := "Come along. There's something I'd like to show you."
 const ROW_WAIT := 8.0           # a game's own row or the looks: this long with no press, they sink
 const LEFT_EARLY := "We can come back to these."
 const ALL_DONE := "All done for today?"
-const GLOW := Color(1.0, 0.86, 0.55)    # HubGlow's warm tint
 const GLOW_NEAR_FROM := 0.35            # a hand this close to the cauldron starts its glow...
 const GLOW_NEAR_FULL := 0.12            # ...fully at this distance
 const GEAR_SEAT := 0.008
@@ -75,8 +74,6 @@ const TOUR_LINES: Array[String] = ["Tap the cauldron to find your games.", "Pinc
 		"This little house leads to your Virtual Workshop.", "When you're ready to finish, lift the gear."]
 const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may play
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
-## Games whose bubble shows a bud (their next level, as a silhouette).
-const BUDS: Array[StringName] = []   # Megan, Nov 18: "get rid of buds in menu" (Impression.set_bud stays for later)
 ## What opens when: Real Life after the first game (Nov 18: the most fun, so it comes first), then the dots, the
 ## butterflies, Odd Color, and Turn to fit (the cup, the last game) only once it can run (a saved cup setup and
 ## the CV server answering). One unlock per return to the hub. Locked games show with a padlock from the first visit.
@@ -93,9 +90,7 @@ var activities: Array[Summonable] = []
 var ring: ImpressionRing
 ## During a game: the cauldron's pause bubble (one ✕, "Stop"); in the hub: the finish check's ✕. Null otherwise.
 var stop_bubble: Impression
-## The cauldron's tap target (opens the menu) and its glow.
-var cauldron_target: Target
-var glow := 0.0
+var cauldron_menu: WorkshopCauldronMenu
 ## The child lifts the gear out to finish.
 var carry: Carry
 var lanterns: Array[Lantern] = []   # the workshop's warm lanterns (decor only, never pressed)
@@ -116,15 +111,9 @@ var eye_bubble: Impression
 var ever_opened := false
 var _picked: StringName = &""
 var _demo: DemoHand
-var _was_paused := false
 var _exited := false
 var _opening := false
-var _glow_light: StandardMaterial3D
-var _glow_quad: MeshInstance3D
 var _poking: Dictionary = {}    # side -> the fingertip is inside the cauldron's reach
-## The ☰ over the brew while the menu is closed (Megan, Nov 18: like a phone's menu sign), and its target.
-var menu_sign: Node3D
-var sign_target: Target
 var _games_said := 0
 var _hub_since := 0.0           # when the hub last began waiting (seconds)
 var _quiet_since := 0.0         # when Onion last finished a line (a story line: sound labels don't count)
@@ -174,7 +163,9 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	if memory != null:
 		played = memory.played   # the same array: what's played is saved as it happens
 	_build_ring()
-	_build_cauldron()
+	cauldron_menu = WorkshopCauldronMenu.new()
+	add_child(cauldron_menu)
+	cauldron_menu.build(workshop.cauldron() if workshop != null else null, _mouth(), App.head().global_position)
 	_build_carry()
 	_hang_lanterns()
 	ambience = HubAmbience.make(self)
@@ -379,7 +370,6 @@ func _offer(activity: Summonable, welcome := false, locked := false) -> void:
 	await ring.add(impression, _mouth())
 	if locked:
 		impression.set_sealed(true)   # shown, not open yet: a press says "Soon" (Megan: there's more to explore)
-	impression.set_bud(impression.kind in BUDS)   # none for now (Megan, Nov 18: no buds in the menu)
 	if impression.kind == &"shelf":
 		impression.set_rows(_shelf_rows())   # one row more for each shelf level finished
 	if welcome:
@@ -399,7 +389,6 @@ func _run(activity: Summonable) -> void:
 	_exited = false
 	carry.stop()
 	_demo.stop()
-	ring.quiet(0.3)
 	await HubGlow.quiet_all(0.3)
 	if ring.opened or ring.visible:
 		await ring.sink(_mouth(), 0.9)   # Megan, Nov 18: the pieces sink into the cauldron with the fog during a game
@@ -571,7 +560,7 @@ func _on_pinch_without_ray(side: StringName, action: StringName, pressed: bool) 
 	query.hit_from_inside = true
 	var hit: Dictionary = pointer.get_world_3d().direct_space_state.intersect_ray(query)
 	var target: Target = hit.collider as Target if not hit.is_empty() else null
-	var ours: Array[Target] = [cauldron_target, sign_target]
+	var ours: Array[Target] = [cauldron_menu.target, cauldron_menu.sign_target]
 	for bubble: Impression in [stop_bubble, eye_bubble]:
 		if bubble != null and is_instance_valid(bubble):
 			ours.append(bubble.target)
@@ -594,7 +583,7 @@ func _on_press(target: Target, pinched: bool) -> void:
 		if pinched and _clock_real - _stop_since >= STOP_GUARD:
 			_stop_pick = &"eye"
 		return
-	var on_cauldron := target == cauldron_target or target == sign_target
+	var on_cauldron := target == cauldron_menu.target or target == cauldron_menu.sign_target
 	if row != null:
 		# A game's own row or the looks: a tap on the cauldron takes them away; a pinch picks (a look stays up).
 		if on_cauldron:
@@ -641,114 +630,6 @@ func _lit() -> Impression:
 	if state == &"hub" and ring != null and not get_tree().paused:
 		return ring.lit
 	return null
-
-
-## The cauldron's tap target (the whole pot and a margin, like the opening's) and its warm glow on the brew.
-func _build_cauldron() -> void:
-	var pot := workshop.cauldron() if workshop != null else null
-	var mouth := _mouth()
-	var width := 0.3
-	if pot != null:
-		width = maxf(0.2, (mouth.y - pot.global_position.y) * 2.0 + 0.1)
-	cauldron_target = Target.sphere(&"hub_cauldron", width * 0.5)
-	add_child(cauldron_target)
-	cauldron_target.global_position = (pot.global_position + mouth) * 0.5 if pot != null else mouth
-	_glow_light = StandardMaterial3D.new()
-	_glow_light.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_glow_light.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_glow_light.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	_glow_light.albedo_texture = Onion.soft_dot()
-	_glow_light.albedo_color = Color(GLOW, 0.0)
-	_glow_light.cull_mode = BaseMaterial3D.CULL_DISABLED
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * 0.24
-	quad.material = _glow_light
-	_glow_quad = MeshInstance3D.new()
-	_glow_quad.name = "cauldron_glow"
-	_glow_quad.mesh = quad
-	_glow_quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_glow_quad)
-	_glow_quad.global_position = mouth + Vector3.UP * 0.01
-	_glow_quad.rotation = Vector3(-PI * 0.5, 0.0, 0.0)   # lies on the brew
-	_build_sign(mouth)
-
-
-## The ☰ engraved on the cauldron's belly, facing the child (Megan, Nov 18: "I like the three line icon, just make
-## it look like a cauldron engraving"): three short grooves cut into the pot, darker than the clay, part of the
-## cauldron (it rattles with it), never floating. They warm with the cauldron's glow. Tapping them or the cauldron
-## opens the menu.
-var _groove_light: StandardMaterial3D
-func _build_sign(mouth: Vector3) -> void:
-	menu_sign = Node3D.new()
-	menu_sign.name = "menu_engraving"
-	var pot := workshop.cauldron() if workshop != null else null
-	var eye := App.head().global_position
-	var toward := Vector3(eye.x - mouth.x, 0.0, eye.z - mouth.z).normalized()
-	var belly := mouth + Vector3.DOWN * 0.05
-	var radius := 0.06
-	if pot != null:
-		var box := _bounds(pot)
-		if box.size != Vector3.ZERO:
-			# Measured without the legs and handles: the belly's middle is a little under the rim, and its radius
-			# is the narrower of the pot's two widths (the handles stick out sideways).
-			belly = Vector3(mouth.x, mouth.y - (mouth.y - box.position.y) * 0.32, mouth.z)   # the belly's widest band
-			radius = _surface_toward(pot, belly, toward, minf(box.size.x, box.size.z) * 0.5)
-		pot.add_child(menu_sign)
-	else:
-		add_child(menu_sign)
-	menu_sign.global_position = belly + toward * (radius - 0.002)   # on the surface, cut in a little
-	menu_sign.look_at(menu_sign.global_position + toward, Vector3.UP, true)
-	_groove_light = StandardMaterial3D.new()
-	_groove_light.albedo_color = Color(0.16, 0.13, 0.1)   # a dark cut in the pale pot
-	_groove_light.roughness = 0.9
-	_groove_light.emission_enabled = true
-	_groove_light.emission = GLOW
-	_groove_light.emission_energy_multiplier = 0.0
-	var size := clampf(radius * 0.55, 0.022, 0.045)
-	for row in 3:
-		var groove := MeshInstance3D.new()
-		var capsule := CapsuleMesh.new()
-		capsule.radius = size * 0.11
-		capsule.height = size
-		groove.mesh = capsule
-		groove.material_override = _groove_light
-		groove.rotation.z = PI * 0.5   # lying across
-		groove.scale = Vector3(1.0, 1.0, 0.45)   # cut into the surface, not standing on it
-		groove.position = Vector3(0.0, (1 - row) * size * 0.36, 0.0)
-		menu_sign.add_child(groove)
-	sign_target = Target.sphere(&"hub_menu_sign", 0.04)
-	add_child(sign_target)   # under the hub, not the pot: the workshop itself carries no touch targets
-	sign_target.global_position = menu_sign.global_position
-
-
-## How far the pot's own surface reaches from [param centre] along [param toward], at that height: its mesh points
-## within a band around the line (the legs and handles stick out elsewhere). [param fallback] when none.
-func _surface_toward(node: Node3D, centre: Vector3, toward: Vector3, fallback: float) -> float:
-	var best := 0.0
-	var side := toward.cross(Vector3.UP)
-	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
-		if mesh.mesh == null:
-			continue
-		var faces := mesh.mesh.get_faces()
-		var xf := mesh.global_transform
-		for point in faces:
-			var p := xf * point - centre
-			if absf(p.y) < 0.015 and absf(p.dot(side)) < 0.02:
-				best = maxf(best, p.dot(toward))
-	return best if best > 0.01 else fallback
-
-
-## The world box round every mesh under [param node].
-func _bounds(node: Node3D) -> AABB:
-	var box := AABB()
-	var first := true
-	for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false):
-		if mesh.mesh == null:
-			continue
-		var b := mesh.global_transform * mesh.get_aabb()
-		box = b if first else box.merge(b)
-		first = false
-	return box
 
 
 ## The gear in its socket can be lifted out (Carry): out = the visit ends.
@@ -835,47 +716,35 @@ func _process(delta: float) -> void:
 	if not get_tree().paused:
 		_clock += delta
 	_cauldron_step(delta)
-	var paused := get_tree().paused
-	if paused == _was_paused:
-		return
-	_was_paused = paused
-	print("HUB ", "paused" if paused else "resumed", " (", state, ")")
-	if current != null:
-		if paused:
-			current.pause()
-		else:
-			current.resume()
 
 
 ## The cauldron glows while the menu is closed in the hub and a hand comes near or aims at it; a fingertip
 ## going into its reach taps it.
 func _cauldron_step(delta: float) -> void:
-	if cauldron_target == null:
+	if cauldron_menu == null:
 		return
 	var open_to_tap := state == &"hub" and not ring.opened and not _opening and not get_tree().paused
 	# During a game (and the finish check) the cauldron takes a tap too: it pauses the game (design chat, Nov 18).
 	var tap_in_game := state == &"game" or state == &"asking" or state == &"closed"   # closed: a tap restarts
-	cauldron_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0   # nothing to aim at over the open menu
+	cauldron_menu.set_targetable(open_to_tap or tap_in_game)
 	var want := 0.0
 	if open_to_tap and App.rig:
 		for side: StringName in [&"left", &"right"]:
 			var pointer := App.rig.pointer(side)
 			if pointer == null:
 				continue
-			if pointer.aimed == cauldron_target:
+			if pointer.aimed == cauldron_menu.target:
 				want = 1.0
 			if pointer.tracked() and open_to_tap:
-				var gap := pointer.tip().distance_to(cauldron_target.global_position)
+				var gap := pointer.tip().distance_to(cauldron_menu.target.global_position)
 				want = maxf(want, clampf(inverse_lerp(GLOW_NEAR_FROM, GLOW_NEAR_FULL, gap), 0.0, 1.0))
-				var inside := gap <= _cauldron_radius()
+				var inside := gap <= cauldron_menu.radius
 				var was: bool = _poking.get(side, false)
 				_poking[side] = inside
 				if inside and not was and App.xr != null:
-					_on_press(cauldron_target, false)   # a headset fingertip into the pot (desktop: the click)
+					_on_press(cauldron_menu.target, false)   # a headset fingertip into the pot (desktop: the click)
 	if open_to_tap and not ever_opened:
 		want = maxf(want, 0.4)   # the first time it waits glowing softly ("you can tap me")
-	_groove_light.emission_energy_multiplier = glow * 0.8   # the engraving warms with the cauldron's glow
-	sign_target.collision_layer = Pointer.TARGET_LAYER if open_to_tap or tap_in_game else 0
 	# The sound label: a hand coming to the cauldron, the first few times, "Games".
 	if want >= 0.6 and not _cauldron_hover and open_to_tap:
 		_cauldron_hover = true
@@ -884,9 +753,7 @@ func _cauldron_step(delta: float) -> void:
 			_label(GAMES)
 	elif want < 0.45:
 		_cauldron_hover = false
-	glow = move_toward(glow, want, delta * (3.0 if want > glow else 1.5))
-	_glow_light.albedo_color.a = glow * 0.35
-	_glow_quad.visible = glow > 0.003
+	cauldron_menu.update_glow(want, delta)
 
 
 ## Says a bubble's (or the cauldron's) name, quietly: only when Onion has been quiet for a moment
@@ -1011,7 +878,7 @@ func _welcome() -> void:
 	if not ring.opened and not _opening:
 		await get_tree().create_timer(BREATH, false).timeout
 		_play(&"unlock", _mouth())   # the mechanism clicks ready
-		glow = 1.0
+		cauldron_menu.glow = 1.0
 		# Megan, Nov 18: the menu opens by itself here and Find Objects waits in front, glowing; the child pinches it.
 		_open_menu()
 		if workshop != null:
@@ -1227,8 +1094,6 @@ func _watch_cauldron() -> void:
 		_cauldron_tapped = false
 		print("HUB cauldron tapped: the game pauses")
 		App.hold_pause(&"cauldron", true)
-		if current != null:
-			current.pause()
 		# The eye beside the ✕ in the shelf and Turn to fit (not the dots: their dim must stay the same every round).
 		var with_eye := current != null and (current.id() in BENCH_GAMES or current.id() == &"turn_to_fit")
 		var chosen := await _offer_stop(&"stop", with_eye)
@@ -1236,8 +1101,6 @@ func _watch_cauldron() -> void:
 			await _show_looks(true)   # still paused; leaving the looks, the game carries on
 			_stop_pick = &""
 		App.hold_pause(&"cauldron", false)
-		if current != null:
-			current.resume()
 		if chosen:
 			print("HUB stop: the game ends")
 			_exit_game()
@@ -1426,15 +1289,6 @@ func _end_tour() -> void:
 		piece.set_dim(0.0)
 
 
-## True while the cauldron's glow is lit.
-func cauldron_lit() -> bool:
-	return glow > 0.003
-
-
-func _cauldron_radius() -> float:
-	return ((cauldron_target.get_child(0) as CollisionShape3D).shape as SphereShape3D).radius
-
-
 # --- Helpers -------------------------------------------------------------------------------------------
 
 func _impression_of(activity: Summonable) -> Impression:
@@ -1501,8 +1355,7 @@ func _cauldron_aside() -> Vector3:
 
 ## Glides the cauldron and its tap targets and glow by [param offset].
 func _slide_cauldron(offset: Vector3) -> void:
-	for part: Node3D in [cauldron_target, _glow_quad, sign_target]:
-		create_tween().tween_property(part, "global_position", part.global_position + offset, 0.6).set_trans(Tween.TRANS_SINE)
+	cauldron_menu.slide(offset, 0.6)
 	_play(&"rattle_soft", workshop.cauldron().global_position)
 	await workshop.slide_cauldron(offset, 0.6).finished
 

@@ -73,7 +73,8 @@ func _process(delta: float) -> void:
 
 
 func _on_selected(_hand: StringName, target: Target, _origin: Vector3, _direction: Vector3) -> void:
-	if target != null and target.get_parent() in _buttons:
+	var button := target.get_parent() as EntryButton if target != null else null
+	if button != null and button in _buttons:
 		_press(target.id)
 
 

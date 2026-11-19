@@ -42,8 +42,6 @@ const CAULDRON_DISTANCE := EntryLayout.CAULDRON_DISTANCE
 ## Size of the things that come out (placeholders), metres. Must fit through the opening.
 ## Seconds the ripple takes to spread across the play circle. Slow and soft: no flash.
 const RIPPLE_SECONDS := 5.0
-## Seconds the cauldron takes to sink away at the reveal (it is gone when the first ring reaches it).
-const CAULDRON_SINK := 0.6
 
 ## Dev or play (entry/play_mode.gd) replaced the DEBUG, SHOW_HANDS and SKIP_SETUP constants (Nov 10):
 ## Quiet piano under the opening (CC0, see entry/assets/CREDITS.md). Kept in the merge of Wei's sounds (Megan,
@@ -75,9 +73,6 @@ var new_save := false
 var simulate_child := false
 ## Setup has four steps: hands, table, reach, sound and room.
 const SETUP_STEPS := 4
-## TESTING: a screen "pass the headset to the child" before the reach step, which measures
-## whoever wears the headset then. Off: the same person does all four steps.
-const HANDOFF_BEFORE_REACH := false
 
 var _table: Surface
 var _box := Node3D.new()            # the cauldron on the table
@@ -148,7 +143,6 @@ var _reach_measured := 0.0          # the reach the layout uses: _reach_seen whe
 var _layout: EntryLayout            # WHERE everything stands (entry/layout.gd), worked out once after setup
 var _zones: EntryZoneOverlay        # DEV: the zone map drawn on the table (the "Zones" button)
 var _made_way := false              # the cauldron and the panel stand at their spots for the revealed room
-var _cauldron_gone := false         # the cauldron has sunk away (or is sinking)
 var _puff: CauldronPuff             # the cauldron's answer to the reveal's light (Scene 6), while it plays
 var _puffed := false                # this reveal's puff has started
 var _band_done := false             # this reveal's band has spread as far as it goes
@@ -443,14 +437,6 @@ func _tap_cycle() -> void:
 			await runner.wait(0.9)
 
 
-## Runs [param what] after [param seconds] on the part's runner (cancelled with the part).
-func _later(seconds: float, what: Callable) -> void:
-	var runner := _runner
-	await runner.wait(seconds)
-	if runner == _runner and is_instance_valid(runner):
-		what.call()
-
-
 ## Beside the mouth, on the side away from the demonstration hand's body: the layout's offset
 ## (EntryLayout.onion_mouth_offset: the story chat's 7 cm to the child's left, moved only if the
 ## hand's measured sweep would touch Onion).
@@ -509,16 +495,6 @@ func _pickup() -> void:
 	# (no line: "Quite a little thing, isn't it?" was cut, Megan Nov 1) a moment with the gear in hand
 	await _wait(1.0)
 	_attend(null)
-
-
-## The cauldron shrinks away into the table over about a second, then hides (once).
-func _cauldron_away() -> void:
-	if _cauldron_gone:
-		return
-	_cauldron_gone = true
-	var tween := _runner.create_tween()
-	tween.tween_property(_box, "scale", Vector3(0.02, 0.02, 0.02), CAULDRON_SINK).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_callback(func() -> void: _box.visible = false)
 
 
 ## A soft steady glow over the whole gear (the casing) while its pick-up is being shown.
@@ -812,17 +788,6 @@ func _hand_seen(side: StringName) -> bool:
 ## quarters of it, between 35 and 60 cm. "Use usual spot" keeps the usual 50 cm.
 func _step_reach() -> bool:
 	_presses.clear()
-	if HANDOFF_BEFORE_REACH:
-		_panel.show_step(3, SETUP_STEPS, "Pass the headset", "Hand the headset to the child. Next they find how far they reach.",
-				[], [["Ready", &"entry_step_next", SetupPanel.GREEN]])
-		var handed := &""
-		while handed == &"":
-			handed = _take_press([&"entry_step_next"])
-			if handed == &"":
-				await get_tree().process_frame
-		if handed == &"skip":
-			return true
-		_presses.clear()
 	_beat("setup 3: the reach")
 	var table := App.reality.work_surface()
 	_reach_seen = 0.0
@@ -964,7 +929,6 @@ func _set_up_for(part: StringName) -> void:
 		_put_out_lanterns()   # Megan, Nov 18: a jump back from the reveal left the lanterns lit in the hello
 	_box.visible = true   # every part: the hub's menu is the cauldron (it no longer sinks after the ripple; Megan, Nov 18)
 	_box.scale = Vector3.ONE
-	_cauldron_gone = false
 	_gear.visible = false
 	_gear_spin.running = false
 	_mech_spin.running = false
@@ -1283,16 +1247,6 @@ func _new_layout(table: Surface, real: bool, measured: float) -> EntryLayout:
 	layout.real_table = real
 	layout.reach = measured
 	return layout
-
-
-## The point of [param table] nearest [param near] (seen from above), [param margin] in from its edges.
-func _nearest_on(table: Surface, near: Vector3, margin: float) -> Vector3:
-	var local := table.transform.affine_inverse() * near
-	var half := (table.size * 0.5 - Vector2.ONE * margin).max(Vector2.ZERO)
-	local.x = clampf(local.x, -half.x, half.x)
-	local.z = clampf(local.z, -half.y, half.y)
-	local.y = 0.0
-	return table.transform * local
 
 
 # --- TESTING: confirm the table ---------------------------------------------
@@ -1698,18 +1652,8 @@ func _process(delta: float) -> void:
 		_box.rotation.z = sin(_clock * 38.0) * _rattle_amp
 
 
-## Onion rises just over the rim.
-func _peek() -> void:
-	await _move(_orb, _peek_spot(), 0.6)
-
-
 func _peek_spot() -> Vector3:
 	return _mouth + Vector3.UP * PEEK_LIFT
-
-
-## Onion ducks back under the brew.
-func _duck() -> void:
-	await _move(_orb, _inside(), 0.3)
 
 
 ## Onion comes up through the opening, then moves aside: to the right of the cauldron
@@ -1735,11 +1679,6 @@ func _lifted_spot() -> Vector3:
 	return _layout.onion_lifted_after if _made_way else _layout.onion_lifted
 
 
-## Moves Onion smoothly to [param where].
-func _orb_to(where: Vector3) -> void:
-	_move(_orb, where, 1.2)
-
-
 ## Just beyond the shelf's end on the cauldron's side, high up: where Onion waits during Wei's
 ## World, never over a cubby, the things or the panel (EntryLayout.onion_rest).
 func _beside_shelf() -> Vector3:
@@ -1748,12 +1687,6 @@ func _beside_shelf() -> Vector3:
 
 # --- The gear and the table mechanism ---------------------------------------
 
-## The prototype's gear is a light stand-in built from a few primitives (a base, a ring, three
-## planets on a carrier, a sun gear: a few hundred triangles). The real planetary gear (Hamid
-## Bairouk, Blendkit royalty-free, NOT CC0, about 57k triangles) works too: put it at GEAR_FILE and
-## set USE_REAL_GEAR. Check its licence and whether the repository is public before committing it.
-const GEAR_FILE := "res://entry/assets/planetary-gears.glb"
-const USE_REAL_GEAR := false
 ## It comes out of the cauldron small (the opening is about 9 cm across) and grows to its playing size.
 const GEAR_OUT_SCALE := 0.4
 const GEAR_PLAY_SCALE := 0.6
@@ -1793,21 +1726,11 @@ func _build_gear() -> void:
 	add_child(_gear)
 	_gear_spin = GearSpin.new()
 	_gear.add_child(_gear_spin)
-	var model: Node3D
-	var player: AnimationPlayer
-	if USE_REAL_GEAR and ResourceLoader.exists(GEAR_FILE):
-		model = (load(GEAR_FILE) as PackedScene).instantiate()
-		_gear.add_child(model)
-		player = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	else:
-		model = _standin_gear()
-		_gear.add_child(model)
+	var model := _gear_model()
+	_gear.add_child(model)
 	var box := _bounds(model)
 	_gear_height = box.size.y
 	model.position = Vector3(-box.get_center().x, -box.position.y, -box.get_center().z)
-	if player != null:
-		_gear_spin.read(player.get_node(player.root_node), player.get_animation(player.get_animation_list()[0]))
-		player.queue_free()   # the clip does not loop; the parts are turned directly
 	_gear.visible = false
 	_carry = Carry.new()
 	_carry.name = "Carry"
@@ -1817,12 +1740,12 @@ func _build_gear() -> void:
 	_demo.name = "DemoHand"
 	add_child(_demo)
 	_configure_interaction()
-	print("ENTRY gear: ", snappedf(box.size.x, 0.001), " m wide, ", snappedf(_gear_height, 0.001), " m high at full size, ", "real" if player != null else "stand-in")
+	print("ENTRY gear: ", snappedf(box.size.x, 0.001), " m wide, ", snappedf(_gear_height, 0.001), " m high at full size")
 
 
 ## A planetary gear from primitives: a base, a ring, three planets on a carrier and a sun gear
-## on a shaft. About 17.5 cm wide, 8 cm tall, like the real one. Registers its turning parts.
-func _standin_gear() -> Node3D:
+## on a shaft. About 17.5 cm wide, 8 cm tall. Registers its turning parts.
+func _gear_model() -> Node3D:
 	var root := Node3D.new()
 	var brass := _lit(Color(0.72, 0.55, 0.25), 0.4)
 	var steel := _lit(Color(0.62, 0.65, 0.68), 0.6)
@@ -1988,7 +1911,7 @@ func _mechanism_spot() -> Vector3:
 
 
 ## The cauldron and the panel (with the gear in it) at their spots for the revealed room, where
-## Wei's bench will be clear of them (EntryLayout.MAKE_WAY): gliding there over [param seconds], or
+## the bench will be clear of them: gliding there over [param seconds], or
 ## at once (0). Onion, if waiting beside the cauldron, goes along. The ripple starts from the socket
 ## where it ends up. Back to the opening's spots with [param back].
 func _make_way(seconds := 1.2, back := false) -> void:
@@ -2276,7 +2199,7 @@ func _ripple() -> void:
 				point.shown = true
 				_glint(point.position, point.normal)
 				_glint_sound(point.position)
-		if not _puffed and not _cauldron_gone and _box.visible:
+		if not _puffed and _box.visible:
 			var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
 			if to_pot <= table_radius:   # the band reaches the cauldron: it answers (Scene 6)
 				_puffed = true
@@ -2291,29 +2214,6 @@ func _ripple() -> void:
 	await _wait(RIPPLE_SECONDS)
 	HubGlow.afterglow(self, _socket_at).add_to_group(&"entry_transient")   # glow A: the gear's afterglow
 	await _wait(2.0)
-
-
-## One step of a ring: its radius grows, it fades; the first ring shows what it passes.
-func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: float, alpha: float, shows: bool) -> void:
-	var radius := maxf(0.02, k * reach)
-	ring.scale = Vector3(radius, 0.02, radius)
-	light.albedo_color.a = alpha * (1.0 - k)
-	if not shows:
-		return
-	for point in _surface_points:
-		if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= radius:
-			point.shown = true
-			_glint(point.position, point.normal)
-	for detail in _details:
-		if is_instance_valid(detail) and not detail.get_meta(&"shown", false) and detail.global_position.distance_to(_ripple_origin) <= radius:
-			detail.set_meta(&"shown", true)
-			detail.visible = true
-			var arrival := _runner.create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			arrival.tween_property(detail, "scale", detail.get_meta(&"size", Vector3.ONE), 1.2)
-			if detail.has_meta(&"rise"):   # a thing: it settles the last few cm onto the bench, softly
-				var home := detail.global_position
-				detail.global_position = home + Vector3.UP * float(detail.get_meta(&"rise"))
-				arrival.tween_property(detail, "global_position", home, 1.2)
 
 
 ## PLACEHOLDER for a depth ripple (later: drawn on the depth image itself, every pixel).
@@ -2401,17 +2301,6 @@ func _detail(detail: Node3D, where: Vector3) -> void:
 	detail.scale = Vector3.ONE * 0.001
 	detail.visible = false
 	_details.append(detail)
-
-
-func _shape(mesh: PrimitiveMesh, size: Vector3, material: Material) -> MeshInstance3D:
-	mesh.material = material
-	var shape := MeshInstance3D.new()
-	shape.mesh = mesh
-	if mesh is QuadMesh:
-		(mesh as QuadMesh).size = Vector2(size.x, size.y)
-	else:
-		shape.scale = size / _unit(mesh)
-	return shape
 
 
 ## The size of a primitive mesh at its defaults, metres.

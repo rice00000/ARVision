@@ -232,15 +232,6 @@ static func analyse(image: Image, box: Rect2i) -> Dictionary:
 	return result
 
 
-## A mask as a picture (white = object), [param width] wide, for a panel or a saved file.
-static func to_image(m: PackedByteArray, width: int, height: int) -> Image:
-	var bytes := PackedByteArray()
-	bytes.resize(m.size())
-	for i in m.size():
-		bytes[i] = 255 * m[i]
-	return Image.create_from_data(width, height, false, Image.FORMAT_L8, bytes)
-
-
 # --- v2 (Nov 15): live tracking by the cup's own colours ------------------------------
 # Brightness alone (above) fails on a real table: anything else in the crop joins the
 # "cup". Instead, at capture we learn which colours belong to THIS cup (from SAM's exact
@@ -394,28 +385,6 @@ static func _shape_result(m: PackedByteArray, w: int, h: int) -> Dictionary:
 	result.shape = normalise(blob.mask, w, blob.box)
 	result.ok = true
 	return result
-
-
-## 3 × 3 average (each pixel becomes the mean of itself and its neighbours).
-static func _blur3(values: PackedFloat32Array, w: int, h: int) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(values.size())
-	for y in h:
-		for x in w:
-			var sum := 0.0
-			var n := 0
-			for dy in range(-1, 2):
-				var yy := y + dy
-				if yy < 0 or yy >= h:
-					continue
-				for dx in range(-1, 2):
-					var xx := x + dx
-					if xx < 0 or xx >= w:
-						continue
-					sum += values[yy * w + xx]
-					n += 1
-			out[y * w + x] = sum / n
-	return out
 
 
 ## The contour of a mask: object pixels with a background neighbour (left, right, up or

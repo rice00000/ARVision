@@ -89,15 +89,14 @@ func test_a_saved_frame_opens_with_the_same_pose_and_rays() -> void:
 	image.fill(Color(0.4, 0.5, 0.6))
 	var pose := Transform3D(Basis(Vector3.UP, 0.7) * Basis(Vector3.RIGHT, -0.3), Vector3(0.2, 1.1, -0.4))
 	var frame := CameraFrame.new(image, pose, 64.0)
-	DirAccess.make_dir_recursive_absolute("user://test_frames")
-	frame.save("user://test_frames/0000")
-	var opened := CameraFrame.open("user://test_frames/0000")
+	var path := Profile.path("test_frames/0000")
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	frame.save(path)
+	var opened := CameraFrame.open(path)
 	expect(opened.pose.is_equal_approx(pose), "same pose")
 	expect(is_equal_approx(opened.fov_y, 64.0), "same field of view")
 	expect(opened.image.get_size() == Vector2i(320, 240), "same size")
 	expect(opened.ray(0.3, 0.8).is_equal_approx(frame.ray(0.3, 0.8)), "same rays")
-	DirAccess.remove_absolute("user://test_frames/0000.jpg")
-	DirAccess.remove_absolute("user://test_frames/0000.json")
 
 # -- View ---------------------------------------------------------------------
 

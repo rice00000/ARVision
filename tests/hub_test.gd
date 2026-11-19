@@ -35,7 +35,7 @@ func _open(hub: WorkshopController) -> bool:
 	if not await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning and not app.get_tree().paused, 30.0):
 		return false
 	if not hub.ring.opened:
-		Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+		Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	return await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0)
 
 
@@ -57,7 +57,7 @@ func _finish_rounds() -> void:
 		await frames(2)
 
 
-func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_alone() -> void:
+func test_the_welcome_opens_the_menu_with_only_the_shelf_unlocked() -> void:
 	var said := record(Events.said)
 	var hub := await _to_hub()
 	expect(hub != null, "the hub runs in the first visit")
@@ -68,16 +68,15 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect_eq(hub.ring.impressions[0].kind, &"shelf", "the shelf")
 	expect(not hub.ring.impressions[0].sealed, "the shelf is open")
 	expect(hub.ring.impressions[1].kind == &"real_life" and hub.ring.impressions[1].sealed, "Real Life waits in a closed bubble (there's more)")
-	expect(hub.ring.impressions.all(func(i: Impression) -> bool: return i.bud == null), "no buds in the menu (Megan, Nov 18)")
 	expect(await until(func() -> bool: return hub.state == &"hub", 10.0), "the hub waits")
 	# Megan, Nov 18: on "Well, this one's ready for us!" the menu opens by itself, Find Objects waiting in front.
 	expect(await until(func() -> bool: return hub.ring.opened and hub.ring.visible and not hub.ring.turning, 10.0), "the menu opened by itself with the line")
 	expect(App.session.trial == null, "nothing plays until the child chooses")
 	var cauldron := (App.main.get_node(^"Workshop") as Workshop).cauldron()
 	expect(cauldron.visible, "the cauldron stays")
-	expect(hub.menu_sign.is_visible_in_tree() and hub.menu_sign.get_parent() == cauldron, "the ☰ is engraved on the cauldron itself")
+	expect(hub.cauldron_menu.engraving.is_visible_in_tree() and hub.cauldron_menu.engraving.get_parent() == cauldron, "the ☰ is engraved on the cauldron itself")
 	var demo := hub.find_children("*", "DemoHand", true, false)
-	expect(await until(func() -> bool: return not hub.cauldron_lit(), 3.0), "the cauldron's glow goes while the menu is open")
+	expect(await until(func() -> bool: return not hub.cauldron_menu.is_lit(), 3.0), "the cauldron's glow goes while the menu is open")
 	var eye := App.head().global_position
 	var shelf := hub.ring.impressions[0]
 	expect(shelf.global_position.distance_to(eye) < 0.62, "the shelf bubble is within easy ray-and-pinch reach (%.2f m; bubbles are pinched, not touched)" % shelf.global_position.distance_to(eye))
@@ -92,7 +91,7 @@ func test_after_the_first_shelf_real_life_opens_with_its_line_and_the_door_waits
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running, 20.0), "the shelf plays")
-	expect(hub.menu_sign.is_visible_in_tree(), "the ☰ engraved on the cauldron stays during the game")
+	expect(hub.cauldron_menu.engraving.is_visible_in_tree(), "the ☰ engraved on the cauldron stays during the game")
 	expect(hub.stop_bubble == null, "no ✕ until the child taps the cauldron")
 	expect(not hub.ring.visible, "the menu drew into the cauldron for the game")
 	expect(not hub.carry.enabled, "the gear can't be lifted during a game")
@@ -133,10 +132,10 @@ func test_a_cauldron_tap_in_a_game_pauses_it_and_its_x_ends_it_with_a_pinch_neve
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
-	Events.touched.emit(&"right", hub.cauldron_target)   # a hand passing over the cauldron
+	Events.touched.emit(&"right", hub.cauldron_menu.target)   # a hand passing over the cauldron
 	await wait(0.5)
 	expect(hub.stop_bubble == null and not app.get_tree().paused, "a touch or hover over the cauldron never pauses a game")
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)   # a pinch on the cauldron
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)   # a pinch on the cauldron
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "one ✕ bubble rises")
 	expect(app.get_tree().paused, "the game pauses")
 	await wait(0.7)
@@ -155,15 +154,15 @@ func test_the_paused_game_carries_on_after_six_seconds_or_a_second_tap() -> void
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the shelf is chosen")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 20.0), "the shelf plays")
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused")
 	await wait(WorkshopController.STOP_WAIT + 1.0)
 	expect(hub.stop_bubble == null and not app.get_tree().paused, "after ~6 s the bubble sinks and the game goes on")
 	expect(App.session.running and hub.state == &"game", "the same game, still running")
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused again")
 	await wait(0.3)
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.stop_bubble == null and not app.get_tree().paused, 3.0), "a second tap: it carries on")
 	expect(App.session.running, "still running")
 
@@ -204,7 +203,7 @@ func test_after_the_goodbye_a_cauldron_tap_restarts_with_the_gear_to_set_back() 
 	Engine.time_scale = 1.0
 	var workshop := App.main.get_node(^"Workshop") as Workshop
 	var lines := said.size()
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)   # a tap on the cauldron
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)   # a tap on the cauldron
 	expect(await until(func() -> bool: return hub.state == &"restarting", 5.0), "it starts again")
 	expect(reported.any(func(r: Array) -> bool: return r[0] == WorkshopController.RESTARTED), "logged")
 	expect(await until(func() -> bool: return hub.carry.enabled and workshop.gear_node().visible, 10.0), "the gear popped out, ready to pick up")
@@ -349,7 +348,7 @@ func test_the_house_says_its_name_and_the_stones_and_labels_wait_for_quiet() -> 
 func test_a_touch_on_a_bubble_never_chooses_it() -> void:
 	var hub := await _to_hub()
 	await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning and not app.get_tree().paused, 30.0)
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	expect(await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0), "the menu is open")
 	var shelf := hub.ring.impressions[0]
 	Events.touched.emit(&"right", shelf.target)

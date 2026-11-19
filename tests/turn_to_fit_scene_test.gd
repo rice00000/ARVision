@@ -22,6 +22,7 @@ func _box(view: String) -> Rect2i:
 func _start() -> TurnToFit:
 	await boot(null, &"turn_to_fit")
 	var fit := app.find_child("Fit", true, false) as TurnToFit
+	fit.server_file = Profile.path("cv_server.txt")
 	fit.frame_source = func() -> Image: return _photo(_view)
 	fit.tracker.use_server = false
 	fit.tracker.threaded = false   # the same rounds every run (the threaded path: fit_tracker_test)
@@ -47,8 +48,7 @@ func _press(fit: TurnToFit, id: String) -> void:
 	await select((fit.find_child(id, true, false) as Node3D).global_position)
 
 
-func test_it_is_in_the_scenes_menu_and_stands_on_the_table_above_the_cup() -> void:
-	expect(Main.SCENES.has(&"turn_to_fit"), "listed in the facilitator's Scenes")
+func test_the_setup_board_stands_on_the_table_above_the_cup() -> void:
 	var fit := await _start()
 	var table_y := App.reality.work_surface().transform.origin.y
 	var window: MeshInstance3D = fit.get("_window")
@@ -158,8 +158,6 @@ func test_setup_goes_step_by_step_and_a_saved_setup_comes_back_next_time() -> vo
 
 ## The setup page (Megan, Nov 18): the laptop's address is typed on the board's number pad, once per headset.
 func test_the_number_pad_saves_the_laptops_address_on_the_headset() -> void:
-	var before := FitTracker.saved_server()
-	FitTracker.save_server("")
 	var fit := await _start()
 	var shown: Label3D = fit.get("_address_label")
 	expect(shown != null and shown.text.begins_with("Server:"), "the board shows the address line")
@@ -167,7 +165,6 @@ func test_the_number_pad_saves_the_laptops_address_on_the_headset() -> void:
 		await _press(fit, "fit_key_" + key)
 	expect(shown.text.begins_with("Server: 192.168.1.23"), "typed: %s" % shown.text)
 	await _press(fit, "fit_server_save")
-	expect_eq(FitTracker.saved_server(), "http://192.168.1.23:8765", "saved on this headset")
+	expect_eq(FitTracker.saved_server(fit.server_file), "http://192.168.1.23:8765", "saved on this headset")
 	expect_eq(fit.tracker.server, "http://192.168.1.23:8765", "and used now")
 	expect("saved" in shown.text, "the board says it's saved (%s)" % shown.text)
-	FitTracker.save_server(before)

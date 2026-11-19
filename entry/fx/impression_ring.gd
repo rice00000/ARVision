@@ -16,7 +16,6 @@ extends Node3D
 ##   bubble with a brass porthole rim ([method set_door]).
 ## * **Chosen:** the bubble pops into droplets with a pop sound; the game's name appears over it in big retro
 ##   letters with a chime ([ChosenTitle]).
-## * **Buds** under a bubble show the game's next level as a silhouette ([method Impression.set_bud]).
 ## * **Sound:** [method rise] and [method sink] play the brew's own (Sounds `brew_rise`, `brew_sink`), the sink's
 ##   gulp timed to the bubbles meeting the brew whatever the duration.
 ## * **Rest:** after [constant REST_AFTER] s with no hand near, the bubbles shrink to [constant REST_SCALE] in

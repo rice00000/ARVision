@@ -3,8 +3,6 @@ extends TestCase
 ## reach reused with one press when the room scan still finds that table; "Skip setup" in play
 ## too; "Redo setup" in the staff tools.
 
-const MEMORY := "user://test_last_setup.cfg"
-
 var entry: Entry
 
 
@@ -31,8 +29,9 @@ func _press(id: StringName) -> bool:
 	return true
 
 
-func _remember(path: String) -> void:
-	SetupMemory.path = path
+func _remember() -> void:
+	DirAccess.make_dir_recursive_absolute(Profile.path())
+	SetupMemory.path = Profile.path("last_setup.cfg")
 	SetupMemory.forget()
 
 
@@ -76,7 +75,7 @@ func test_the_same_table_means_same_place_height_and_size_either_way_round() -> 
 
 
 func test_a_full_setup_keeps_the_table_and_reach_and_the_next_launch_offers_them() -> void:
-	_remember(MEMORY)
+	_remember()
 	await _boot_entry()
 	await _four_steps()
 	var kept := SetupMemory.last()
@@ -96,7 +95,7 @@ func test_a_full_setup_keeps_the_table_and_reach_and_the_next_launch_offers_them
 
 
 func test_the_kept_reach_sets_the_layout() -> void:
-	_remember(MEMORY)
+	_remember()
 	await boot(null, &"intro")
 	SetupMemory.remember(_scanned_table(), 0.45)
 	await shutdown()
@@ -110,7 +109,7 @@ func test_the_kept_reach_sets_the_layout() -> void:
 
 
 func test_when_the_scan_no_longer_finds_that_table_setup_runs_as_usual() -> void:
-	_remember(MEMORY)
+	_remember()
 	await boot(null, &"intro")
 	var table := _scanned_table()
 	var moved := Surface.new(&"table", table.transform.translated(Vector3(0.6, 0.0, 0.0)), table.size)
@@ -123,7 +122,7 @@ func test_when_the_scan_no_longer_finds_that_table_setup_runs_as_usual() -> void
 
 
 func test_set_up_again_runs_the_four_steps() -> void:
-	_remember(MEMORY)
+	_remember()
 	await boot(null, &"intro")
 	SetupMemory.remember(_scanned_table(), 0.0)
 	await shutdown()
@@ -148,7 +147,7 @@ func test_play_mode_has_skip_setup_and_it_starts_the_opening() -> void:
 
 
 func test_redo_setup_in_the_staff_tools_runs_every_step_without_the_offer() -> void:
-	_remember(MEMORY)
+	_remember()
 	await boot(null, &"intro")
 	SetupMemory.remember(_scanned_table(), 0.0)
 	await shutdown()

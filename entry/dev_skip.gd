@@ -73,7 +73,7 @@ func skip() -> void:
 			_say("Turn to fit: the go finished")
 			return
 		if hub.state == &"hub" and not hub.ring.opened:
-			Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+			Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 			_say("menu opened")
 			return
 		if hub.state == &"hub" and not hub.ring.turning:   # Megan, Nov 18: the next game (its recommended level)

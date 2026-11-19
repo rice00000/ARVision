@@ -41,7 +41,7 @@ func _choose_game(kind: StringName, timeout := 60.0) -> bool:
 	var hub := app.find_child("WorkshopController", true, false) as WorkshopController
 	await until(func() -> bool: return not app.get_tree().paused, 10.0)
 	if not hub.ring.opened:   # the cauldron is the menu: one tap opens it
-		Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+		Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 		if not await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0):
 			return false
 	Events.selected.emit(&"right", found.target, Vector3.ZERO, Vector3.FORWARD)
@@ -61,7 +61,7 @@ func _until_said(said: Array, text: String, timeout := 30.0) -> bool:
 
 
 func _target(id: StringName) -> Target:
-	return entry.find_child(String(id), true, false) as Target
+	return entry.find_child(String(id), true, false) as Target if is_instance_valid(entry) else null
 
 
 ## Waits for a button and presses it (points and pinches), then waits out the gap in which
@@ -534,7 +534,7 @@ func test_a_game_jump_keeps_every_bubble() -> void:
 		return found != null and found.state == &"game", 30.0), "the shelf starts")
 	var hub := app.find_child("WorkshopController", true, false) as WorkshopController
 	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)
-	expect_eq(kinds, [&"shelf", &"dots", &"butterflies", &"turn_to_fit"], "every game's bubble")
+	expect_eq(kinds, [&"shelf", &"real_life", &"dots", &"butterflies", &"odd_color", &"turn_to_fit"], "every game's bubble")
 
 
 ## Megan, Nov 18: Restart in the hub rebuilds the room: a fresh hub with the cauldron, Onion and the gear.
@@ -544,14 +544,16 @@ func test_restart_in_the_hub_keeps_the_workshop() -> void:
 	Entry.go_to(&"hub")
 	expect(await until(func() -> bool: return App.main.current_scene == &"first_visit" and not App.main.switching, 60.0), "the hub")
 	await until(func() -> bool: return App.main.get_node_or_null(^"Workshop") != null, 10.0)
+	var previous_workshop := App.main.get_node(^"Workshop").get_instance_id()
 	await open_intro_tools()
 	await press_facilitator("fac_restart")
 	await frames(2)
 	await press_facilitator("fac_confirm_tool")
 	expect(await until(func() -> bool:
 		var hub := app.find_child("WorkshopController", true, false) as WorkshopController
+		var rebuilt := App.main.get_node_or_null(^"Workshop")
 		return App.main.current_scene == &"first_visit" and hub != null and hub.state == &"hub" \
-				and App.main.get_node_or_null(^"Workshop") != null, 60.0), "a fresh hub, through the opening's room")
+				and rebuilt != null and rebuilt.get_instance_id() != previous_workshop, 60.0), "a fresh hub, through the opening's room")
 	var workshop := App.main.get_node(^"Workshop") as Workshop
 	expect(is_instance_valid(workshop.onion) and workshop.onion.is_visible_in_tree(), "Onion is there")
 	expect(is_instance_valid(workshop.get(&"_cauldron")), "and the cauldron")
@@ -599,6 +601,7 @@ func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void
 	expect(not _said_line(said, "Well done, alchemist!"), "no second 'well done' from the World")
 	expect(not _said_line(said, "You earned 3 magic stones!"), "Onion owns the tutorial closing")
 	expect(not Tidy.onion_voice, "Wei's lines are back for his own route afterwards")
+	Profile.set_level(level.staircase(), TaskProgress.READY_AT)
 	var next_level := task.level_by_id(&"size")   # Find Objects' order (Megan, Nov 18): Shadow → Size → Clutter → Color → Similar
 	if not await _choose_game(&"shelf"):   # back at the hub: the shelf again plays the next level
 		expect(false, "the child can choose the shelf again in the hub")

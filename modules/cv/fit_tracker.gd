@@ -25,9 +25,6 @@ const DETECT_EVERY := 0.5
 const BOX_TIMEOUT := 1.5
 ## The panel picture: the 64 × 48 shape drawn this many times bigger.
 const PICTURE_SCALE := 5
-## The live shadow's picture: drawn this many times bigger, from a smoothed (bilinear) mask, so its edge is
-## soft instead of 5 mm steps (Megan, Nov 18, beat 1).
-const SMOOTH_SCALE := 6
 ## Where the address of the CV server is kept on this device (Staff tools → Turn to fit setup).
 const SERVER_FILE := "user://cv_server.txt"
 
@@ -152,15 +149,15 @@ func _exit_tree() -> void:
 
 
 ## The CV server's address saved on this device ("" = none).
-static func saved_server() -> String:
-	if not FileAccess.file_exists(SERVER_FILE):
+static func saved_server(path := SERVER_FILE) -> String:
+	if not FileAccess.file_exists(path):
 		return ""
-	return FileAccess.get_file_as_string(SERVER_FILE).strip_edges()
+	return FileAccess.get_file_as_string(path).strip_edges()
 
 
 ## Saves the CV server's address on this device (Staff tools). "" forgets it.
-static func save_server(address: String) -> void:
-	var file := FileAccess.open(SERVER_FILE, FileAccess.WRITE)
+static func save_server(address: String, path := SERVER_FILE) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file:
 		file.store_string(address.strip_edges())
 		file.close()

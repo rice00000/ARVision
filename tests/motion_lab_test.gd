@@ -44,7 +44,7 @@ const SYNTHETIC := "SYNTHETIC-FIXTURE-not-participant-data"
 
 func _flow(seed := 7) -> RefCounted:
 	var flow := TrialBlock.new()
-	flow.save_dir = "user://motion_lab_test_records"
+	flow.save_dir = Profile.path("motion_lab_test_records")
 	flow.begin(BlockConfig.preview(0.7), BlockConfig.timing(), 0, seed, {test = true}, SYNTHETIC)
 	return flow
 
@@ -349,7 +349,7 @@ func test_setup_changes_only_reach_a_new_block() -> void:
 
 func test_requested_and_realized_coherence_are_both_recorded() -> void:
 	var flow := TrialBlock.new()
-	flow.save_dir = "user://motion_lab_test_records"
+	flow.save_dir = Profile.path("motion_lab_test_records")
 	flow.begin(BlockConfig.reference_circle(0.7), BlockConfig.timing(), 0, 21, {}, SYNTHETIC)
 	flow.start_block(0)
 	expect_eq(flow.attempt.signal_dots, 11, "round(0.7 x 15) = 11")

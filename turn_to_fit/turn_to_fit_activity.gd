@@ -8,8 +8,7 @@ extends Summonable
 ##   cup isn't in view when the game starts, the game asks for it.
 ## * summon(): one go (TurnToFitGame) at the child's table spot (62 cm ahead; the hub's workspace, Wei's bench,
 ##   isn't used). finished: &"done", or &"left" after [method leave] (the exit token).
-## * pause()/resume(): the game node pauses with the world by itself (it's PAUSABLE under the always-running
-##   controller); nothing else to do.
+## * The game node pauses with the world.
 
 const TASK := preload("res://content/tasks/turn_to_fit.tres")
 ## How often the CV server is asked "are you there?" (GET /health), and how long an answer may take.

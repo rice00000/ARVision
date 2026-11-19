@@ -320,10 +320,3 @@ func _motion_condition() -> TrialCondition:
 	return block.trial.condition(block.difficulty, 0, block.probe, block.pins)
 
 
-## Chat C's motion layout on the opening's zone map, or null (no map: the plain placement is used).
-func _motion_layout() -> EntryMotionLayout:
-	if _onion == null or _onion.layout == null:
-		return null
-	return EntryMotionLayout.new(_onion.layout, _motion_condition())
-
-

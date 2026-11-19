@@ -258,7 +258,6 @@ const MARK_STYLE := 1
 ## Seconds: fade in, grow (with a little overshoot), stay, fade out. Brief, no flashing.
 const MARK_IN := 0.15
 const MARK_GROW := 0.22
-const MARK_STAY := 0.9
 const MARK_OUT := 0.35
 
 
@@ -296,11 +295,6 @@ var real_table := true
 var reach := 0.0
 
 # --- Results (after [method plan]) ---------------------------------------------
-
-## Off (Megan, round 5): the panel and the gear NEVER move at the reveal. The layout finds a spot for the
-## panel (and the cauldron, which is gone after the ripple) that is clear of the bench, the shelf and the
-## things from the start. On: the old way, they glide to a clear spot at the reveal (Entry._make_way).
-const MAKE_WAY := false   # legacy name: the default is now chosen by plan() (see [member panel_fixed])
 
 var push := SHELF_PUSH
 var cauldron_distance := CAULDRON_DISTANCE
@@ -461,9 +455,6 @@ var panel_fixed := true
 ## While planning: let the panel glide aside at the reveal (false: it must be clear of the bench from the start).
 var make_way := false
 var _mech_score := 0.0
-## True when the socket's spot lies under Wei's bench, shelf or things: it then fades under the bench board during
-## the shelf game (Workshop.hide_socket). The planner avoids that when the table allows (Megan, Nov 18).
-var socket_under_bench := false
 
 
 ## The shelf may turn this many degrees to the right of straight ahead (Wei's table point moves there), and
@@ -629,29 +620,6 @@ func _cauldron_spot(out := cauldron_distance, bearing_deg := -CAULDRON_ANGLE) ->
 	return spot
 
 
-## The shelf's angle: Wei's things and shelf in view (his bench is wide and starts close to the
-## eyes, so it can only turn a little), clear of the cauldron if it can, nearest straight ahead.
-## Only with a real table (the pretend one keeps it straight ahead).
-func _shelf_angle() -> float:
-	if not real_table:
-		return 0.0
-	var pot := _circle(&"probe", cauldron, CAULDRON_WIDTH * 0.5, 0.0)
-	var best := 0.0
-	var best_score := -INF
-	for angle in range(-10, 35, 5):
-		bench = bench_frame(angle)
-		var view := 0.0
-		for z in [_things_zone(), _shelf_zone()]:
-			var box := in_view(z)
-			view += maxf(maxf(-VIEW_WIDE * 0.5 - box.position.x, box.end.x - VIEW_WIDE * 0.5), 0.0)
-		var clash := maxf(-gap(_bench_zone(), pot), 0.0) + maxf(-gap(_things_zone(), pot), 0.0)
-		var score := -view * 2.0 - (2.0 if view > 0.0 else 0.0) - clash * 50.0 - absf(angle) * 0.02   # the cauldron stays: never in the bench's way
-		if score > best_score:
-			best_score = score
-			best = angle
-	return best
-
-
 func _bench_zone(phases := SHELF) -> Zone:   # no shelf at the reveal (Megan, Nov 17: Scene 6)
 	var middle := bench * Vector3(0, 0, -(BENCH_NEAR + BENCH_FAR) * 0.5)
 	var top := eye.y - bench_below
@@ -708,11 +676,6 @@ func _place_mechanism() -> void:
 		mechanism = ctx.best_at
 	_mech_score = ctx.best_score
 	mechanism.y = cauldron.y
-	var placed := _rect(&"plate", mechanism, _panel_half(), _facing(mechanism), 0.0)
-	socket_under_bench = false
-	for z: Zone in ctx.bench_zones:
-		if gap(placed, z) < LOOKED_GAP:
-			socket_under_bench = true
 
 
 ## Scores a panel at [param angle] degrees, [param distance] m out (higher is better) and keeps it in [param ctx]
@@ -1410,34 +1373,6 @@ func out_of_reach() -> Array[Dictionary]:
 		if nearest > reach_used() + 0.02 + (socket_stretch if name == &"panel" else 0.0):
 			found.append({name = name, how = "%d cm out, reach %d cm" % [roundi(nearest * 100.0), roundi(reach_used() * 100.0)],
 					metres = nearest - reach_used() - 0.02})
-	return found
-
-
-## The subtitle as Wei's Voice puts it ([param above_gaze] degrees over the gaze, at most
-## [param above_horizon] up, [param distance] m out, about 54 x 6 cm), looking at [param at].
-func subtitle_zone(at: Vector3, above_gaze := 25.0, above_horizon := 20.0, distance := 0.75) -> Zone:
-	var d := at - eye
-	var flat := Vector3(d.x, 0.0, d.z).normalized()
-	var pitch := rad_to_deg(atan2(d.y, Vector2(d.x, d.z).length()))
-	var up := deg_to_rad(clampf(pitch + above_gaze, -3.0, above_horizon))   # Voice.min_elevation (polish)
-	var middle := eye + (flat * cos(up) + Vector3.UP * sin(up)) * distance
-	var zone := _rect(&"subtitle", Vector3(middle.x, middle.y - 0.03, middle.z), Vector2(0.27, 0.01), atan2(-flat.x, -flat.z), 0.06, SHELF, "Onion's subtitles")
-	zone.kind = Kind.PANEL
-	return zone
-
-
-## What the subtitle covers in view while the child looks at each thing of the shelf scene:
-## [{looking_at, covers, amount (degrees)}].
-func subtitle_covers(above_gaze := 25.0) -> Array[Dictionary]:
-	var found: Array[Dictionary] = []
-	for looking: StringName in [&"things", &"shelf", &"panel"]:
-		var target := zone(looking)
-		var at := target.centre + Vector3.UP * minf(target.height, 0.1) * 0.5
-		var sub := subtitle_zone(at, above_gaze)
-		for name: StringName in [&"shelf", &"things", &"panel", &"cauldron", &"onion_rest"]:
-			var amount := _view_overlap(sub, zone(name))
-			if amount > 0.5:
-				found.append({looking_at = looking, covers = name, amount = amount})
 	return found
 
 

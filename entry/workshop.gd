@@ -265,11 +265,6 @@ func slide_cauldron(offset: Vector3, seconds := 0.6) -> Tween:
 	return tween
 
 
-## True when the socket lies under Wei's bench board (the shelf game hides it there). Without a layout, true.
-func socket_covered() -> bool:
-	return layout == null or layout.socket_under_bench
-
-
 ## Where the cauldron's mouth is.
 func mouth() -> Vector3:
 	return _mouth

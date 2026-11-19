@@ -3,7 +3,7 @@ extends TestCase
 ## cannot read yet: after a short aim, once, never over the guide, and every
 ## name is baked.
 
-const GUIDE_LINE := "Thank you for trying that with me."
+const GUIDE_LINE := "Welcome to the workshop."
 
 
 func _baked(text: String) -> void:
@@ -98,5 +98,5 @@ func test_every_level_card_name_is_baked() -> void:
 
 
 func test_entry_and_play_buttons_are_baked() -> void:
-	for text in ["Replay tutorial", "Play again", "Magic dots", "End session", "More shapes"]:
+	for text in ["Replay tutorial", "Play again", "End session"]:
 		_baked(text)

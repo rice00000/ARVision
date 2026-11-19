@@ -89,10 +89,3 @@ func take_level() -> TaskLevel:
 	level = null
 	played_level = next
 	return next
-
-
-func pause() -> void:
-	pass
-
-func resume() -> void:
-	pass

@@ -25,12 +25,14 @@ class ScriptErrors:
 
 
 func _ready() -> void:
-	if not String(Profile.id).begins_with("test"):
+	var test_profile := Profile.id
+	var args := OS.get_cmdline_user_args()
+	if not String(test_profile).begins_with("test") or not args.has("--profile=" + String(test_profile)):
 		push_error("Run the tests with -- --profile=test: they wipe the profile they run on.")
 		get_tree().quit(2)
 		return
 	var only := ""
-	for arg in OS.get_cmdline_user_args():
+	for arg in args:
 		if arg.begins_with("--only="):
 			only = arg.trim_prefix("--only=")
 	var passed := 0
@@ -45,7 +47,7 @@ func _ready() -> void:
 		for method in script.get_script_method_list():
 			if not method.name.begins_with("test_"):
 				continue
-			Profile.wipe()
+			_reset_saves(test_profile)
 			var case: TestCase = script.new()
 			add_child(case)
 			print("%s :: %s" % [path.get_file(), method.name])
@@ -59,7 +61,12 @@ func _ready() -> void:
 			else:
 				failed.append("%s :: %s" % [path.get_file(), method.name])
 			case.queue_free()
-	Profile.wipe()
+	_reset_saves(test_profile)
+	DirAccess.remove_absolute(_test_index(test_profile))
+	if passed == 0 and failed.is_empty():
+		push_error("No tests matched: %s" % only)
+		get_tree().quit(2)
+		return
 	# Megan, Nov 18: every line the game says must be baked. A line said in the tests with no clip fails the run
 	# (lines a test makes up itself, written in a test script, don't count).
 	var missing := _unbaked_game_lines()
@@ -74,8 +81,25 @@ func _ready() -> void:
 	get_tree().quit(failed.size())
 
 
+func _test_index(profile: StringName) -> String:
+	return Profile.ROOT.path_join("%s.cfg" % profile)
+
+
+## A case may switch saves. The next case starts on the pinned profile, with a fresh save list.
+func _reset_saves(profile: StringName) -> void:
+	for save in Profile.saves():
+		if String(save).begins_with(String(profile) + "_s"):
+			Profile.id = save
+			Profile.wipe()
+	Profile.id = profile
+	DirAccess.remove_absolute(_test_index(profile))
+	Profile.wipe()
+
+
 ## The lines said with no baked clip, less those a test script wrote itself.
 func _unbaked_game_lines() -> PackedStringArray:
+	if BakedSpeech.unbaked.is_empty():
+		return []
 	var tests := ""
 	for path in _scripts("res://tests"):
 		tests += FileAccess.get_file_as_string(path)

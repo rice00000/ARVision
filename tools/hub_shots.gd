@@ -109,7 +109,7 @@ func _ready() -> void:
 
 
 func _open(hub: WorkshopController) -> void:
-	Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+	Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 
 
 func _press(hub: WorkshopController, kind: StringName) -> void:

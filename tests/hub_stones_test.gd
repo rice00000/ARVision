@@ -43,7 +43,7 @@ func _open(hub: WorkshopController) -> bool:
 	if not await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning and not app.get_tree().paused, 30.0):
 		return false
 	if not hub.ring.opened:
-		Events.selected.emit(&"right", hub.cauldron_target, Vector3.ZERO, Vector3.FORWARD)
+		Events.selected.emit(&"right", hub.cauldron_menu.target, Vector3.ZERO, Vector3.FORWARD)
 	return await until(func() -> bool: return hub.ring.opened and not hub.ring.turning, 10.0)
 
 
@@ -93,7 +93,7 @@ func test_leaving_a_game_by_the_x_earns_one_stone_and_never_marks_it_done() -> v
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 30.0), "the shelf plays")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused: the ✕ rises")
 	expect(hub.eye_bubble != null, "with the eye beside it during the shelf (eye · ✕)")
 	await wait(0.7)
@@ -108,12 +108,12 @@ func test_the_dots_pause_bubble_has_no_eye() -> void:
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"dots").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "paused: the ✕ rises")
 	expect(hub.eye_bubble == null, "the ✕ alone: the dots' dim must stay the same every round")
 	expect(is_equal_approx(App.reality.view.dim, MotionVisit.DIM.dim), "the room stays dimmed")
 	await wait(0.6)
-	_pinch(hub.cauldron_target)   # carry on (never leave the world paused)
+	_pinch(hub.cauldron_menu.target)   # carry on (never leave the world paused)
 	expect(await until(func() -> bool: return not app.get_tree().paused, 5.0), "a second tap: it carries on")
 
 
@@ -144,7 +144,7 @@ func test_with_levels_done_a_press_opens_the_games_own_row_and_nothing_starts_by
 	expect(hub.row.impressions[1].scale.x >= big * 0.6, "the others at least 60 %")
 	await wait(2.0)
 	expect(hub.state == &"hub" and App.session.trial == null, "nothing starts by itself")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.row == null and hub.ring.opened, 10.0), "a tap on the cauldron: back to the menu")
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.row != null and hub.row.opened, 10.0), "the row again")
@@ -199,7 +199,7 @@ func test_the_eye_shows_the_looks_and_a_pinch_changes_the_real_room_and_is_saved
 	expect(edges.is_picked() and not hub.row.impressions[0].is_picked(), "the ring moves to it")
 	expect(hub.row != null, "the looks stay up to try another")
 	expect(reported.any(func(r: Array) -> bool: return r[0] == &"view_chosen" and r[1].get("look", "") == "edges"), "view_chosen is logged")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.row == null and hub.ring.opened, 10.0), "a tap on the cauldron: the menu comes back")
 	expect_eq(App.reality.view.title, "Edges", "the last look stays")
 	expect_eq(App.session.base_view.title, "Edges", "it is the base view from now on")
@@ -229,7 +229,7 @@ func test_the_shelf_pause_eye_opens_the_looks_and_the_game_carries_on_after() ->
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.trial != null, 30.0), "the shelf plays")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.eye_bubble != null, 5.0), "eye · ✕")
 	await wait(0.7)
 	_pinch(hub.eye_bubble.target)
@@ -238,7 +238,7 @@ func test_the_shelf_pause_eye_opens_the_looks_and_the_game_carries_on_after() ->
 	_pinch(hub.row.impressions[1].target)
 	await frames(3)
 	expect_eq(App.reality.view.title, "High contrast", "the real room changes")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.row == null and not app.get_tree().paused, 10.0), "a tap: the looks sink and the game carries on")
 	expect(hub.state == &"game" and App.session.running, "the same game")
 
@@ -285,7 +285,7 @@ func test_a_real_pinch_at_the_cauldron_pauses_the_dots_and_the_x_ends_them() -> 
 	_pinch(_piece(hub, &"dots").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
 	expect(not App.rig.pointer(&"right").ray_on(), "the dots run with the ray off")
-	await _real_pinch_at(hub.cauldron_target)
+	await _real_pinch_at(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a real pinch at the cauldron: paused, the ✕ rises")
 	await wait(0.8)
 	await _real_pinch_at(hub.stop_bubble.target)
@@ -324,7 +324,7 @@ func test_a_real_pinch_at_the_cauldron_pauses_the_shelf() -> void:
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the shelf plays")
 	await wait(1.0)
-	await _real_pinch_at(hub.cauldron_target)
+	await _real_pinch_at(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a real pinch at the cauldron: paused, the ✕ rises")
 	await wait(0.8)
 	await _real_pinch_at(hub.stop_bubble.target)
@@ -338,7 +338,7 @@ func test_spotlight_is_offered_in_a_game_and_the_hub_shows_normal() -> void:
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 30.0), "the shelf plays")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.eye_bubble != null, 5.0), "paused: eye · ✕")
 	await wait(0.7)
 	_pinch(hub.eye_bubble.target)
@@ -350,7 +350,7 @@ func test_spotlight_is_offered_in_a_game_and_the_hub_shows_normal() -> void:
 	await frames(3)
 	expect_eq(App.reality.view.title, "Spotlight", "the game shows it")
 	expect_eq(hub.memory.look, &"spotlight", "and it's the child's look")
-	_pinch(hub.cauldron_target)   # leave the looks: the game carries on
+	_pinch(hub.cauldron_menu.target)   # leave the looks: the game carries on
 	expect(await until(func() -> bool: return hub.row == null and not app.get_tree().paused, 10.0), "the game carries on")
 	await _finish_rounds()
 	expect(await until(func() -> bool: return hub.state == &"hub", 40.0), "back at the hub")
@@ -396,7 +396,7 @@ func test_levels_megan_has_not_drawn_show_their_own_drawing_in_the_games_frame()
 	expect_eq(titles, ["Ready to Study", "Bookshelf Match"], "the finished level and the next one")
 	expect(hub.row.impressions.all(func(p: Impression) -> bool: return p.find_child("drawn_real_life", true, false) != null),
 			"each wears its level's drawing")
-	_pinch(hub.cauldron_target)
+	_pinch(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.row == null and hub.ring.opened, 10.0), "back to the menu")
 
 
@@ -429,10 +429,10 @@ func test_picking_up_a_desk_thing_never_pauses_and_a_pinch_inside_the_x_presses_
 	_pinch(_piece(hub, &"real_life").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.trial != null and App.session.trial.is_running(), 30.0), "Ready to Study plays")
 	var reported := record(Events.reported)
-	var things: Array = App.session.trial.get(&"_things")
-	var thing := things[0] as Node3D
-	var at := thing.global_position
-	App.sim_input.set_hand(&"right", Transform3D(Basis.looking_at(hub.cauldron_target.global_position - at), at))
+	var keys: Dictionary = App.session.trial.get(&"_keys")
+	var at := (keys.find_key("notebook") as Target).global_position
+	var toward := (hub.cauldron_menu.target.global_position - at).normalized()
+	input.point(&"right", at - toward * App.rig.pointer(&"right").tip_reach, at)
 	await frames(3)
 	App.sim_input.press(&"right", &"trigger_click", true)
 	await frames(3)
@@ -441,7 +441,7 @@ func test_picking_up_a_desk_thing_never_pauses_and_a_pinch_inside_the_x_presses_
 	expect(hub.stop_bubble == null and not app.get_tree().paused, "and the game never paused")
 	App.sim_input.press(&"right", &"trigger_click", false)
 	await wait(1.0)
-	await _real_pinch_at(hub.cauldron_target)
+	await _real_pinch_at(hub.cauldron_menu.target)
 	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a pinch aimed at the cauldron still pauses")
 	await wait(0.8)
 	var x := hub.stop_bubble.target.global_position

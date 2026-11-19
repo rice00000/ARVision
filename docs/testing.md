@@ -1,13 +1,13 @@
 # Testing
 
-Run `python tools/test.py` before submitting. It checks baked speech, GDScript tests and Python scenarios headlessly on test profiles.
+Run `python tools/test.py` before submitting. It runs the speech, GDScript and Python suites in parallel on test profiles.
 
 - **GDScript unit tests** `tests/*_test.gd` (`TestCase`): one piece at a time on the real app.
 - **Scenarios** `tests/sim/test_*.py` (`unittest`): whole sessions on the real `main.tscn`, played by a simulated child.
 
 For visual changes, run `python tools/sim/walkthrough.py`. It runs `tests/rendered/` with fake CV and captures Find it, real objects and Global motion. Review `build/walkthrough/review.html`.
 
-- One GDScript suite `godot --headless --xr-mode off --fixed-fps 60 --path . res://tests/run.tscn -- --profile=test --only=smoke`.
+- During a focused edit, select suites by name. `python tools/test.py --only hub --only adaptive` runs only those matches. Use `--jobs 2` on a smaller machine.
 - Extra view screenshots `godot --xr-mode off --path . res://tools/capture.tscn -- --profile=test_capture` → `build/captures/`.
 
 ## The simulated child

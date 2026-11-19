@@ -39,9 +39,10 @@ func test_every_pick_is_a_csv_row_with_its_time_and_the_running_accuracy() -> vo
 	while file.get_position() < file.get_length():
 		cells.append(file.get_csv_line())
 	expect_eq(cells.size(), 3, "a row per pick")
+	var save := String(Profile.id)
 	expect_eq(cells.map(func(row: PackedStringArray) -> Array: return [row[1], row[2], row[3], row[6], row[8]]),
-		[["test", "Find the toys, level 1", "1", "0", "0"], ["test", "Find the toys, level 1", "1", "1", "50"],
-		["test", "Find the toys, level 1", "2", "1", "67"]], "save, game, round, correct, accuracy")
+		[[save, "Find the toys, level 1", "1", "0", "0"], [save, "Find the toys, level 1", "1", "1", "50"],
+		[save, "Find the toys, level 1", "2", "1", "67"]], "save, game, round, correct, accuracy")
 	expect(cells[0][5] != cells[0][4] and cells[1][5] == cells[1][4], "picked against target")
 	expect(float(cells[0][7]) >= 0.5 and float(cells[1][7]) >= float(cells[0][7]), "seconds since the round began")
 

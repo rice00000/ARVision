@@ -114,7 +114,7 @@ func test_dress_swaps_the_piece_and_leaves_levels_without_a_picture_alone() -> v
 	var piece := Impression.make(&"shelf")
 	app.add_child(piece)
 	var before := _signature(piece)
-	expect(not LevelPiece.dress(piece, SHELF.level_by_id(&"odd_color_1")), "Odd Color has no picture yet")
+	expect(not LevelPiece.dress(piece, TaskLevel.new()), "a level with no picture keeps its piece")
 	expect_eq(_signature(piece), before, "the piece stays the shelf")
 	expect(LevelPiece.dress(piece, SHELF.level_by_id(&"size")), "Size Match dresses the piece")
 	await frames(1)

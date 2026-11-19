@@ -54,6 +54,7 @@ const SAVE_VERSION := 1
 ## Tests: () -> Image, instead of a camera.
 var frame_source := Callable()
 var tracker := FitTracker.new()
+var server_file := FitTracker.SERVER_FILE
 var matcher := FitMatcher.new()
 var game := FitGame.new(matcher)
 ## target name → normalised shape
@@ -234,7 +235,7 @@ func _save_address() -> void:
 		_say_note("An address has four numbers with dots, e.g. 192.168.1.23 (the server prints it).")
 		return
 	var url := "http://%s:8765" % _address
-	FitTracker.save_server(url)
+	FitTracker.save_server(url, server_file)
 	tracker.server = url
 	tracker.server_ok = true
 	_say_note("Server address saved on this headset: %s" % _address)
@@ -244,7 +245,7 @@ func _save_address() -> void:
 
 func _show_address() -> void:
 	if _address_label:
-		var saved := address_of(FitTracker.saved_server())
+		var saved := address_of(FitTracker.saved_server(server_file))
 		_address_label.text = "Server: %s%s" % [_address if _address != "" else "…", "  ✓ saved" if saved != "" and saved == _address else ""]
 
 
@@ -531,7 +532,7 @@ func _build() -> void:
 	_info = _label("", 18, Vector3(0, 0.165, 0), board)
 	# The number pad for the laptop's address (a headset can't be given it at launch), left of the buttons and low
 	# (clear of the menu tile and the gem).
-	_address = address_of(FitTracker.saved_server())
+	_address = address_of(FitTracker.saved_server(server_file))
 	_address_label = _label("", 26, Vector3(-0.235, 0.0, 0), board)
 	var keys := ["1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "0", "back"]
 	for i in keys.size():

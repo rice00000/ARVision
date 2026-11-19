@@ -1,22 +1,12 @@
 class_name HubGlow
 extends Node3D
-## The workshop's quiet magic between tasks (Effects chat, Nov 17; Megan: "C + a short A"):
-## * A, [method afterglow]: a soft warm pool round the seated gear as the reveal ends, breathing very
-##   slowly (one breath in 4 s), gone by itself after a few seconds;
-## * C, [method offer]: each impression on a still pool of light while it waits; the pool brightens as a
-##   hand comes near ([method near]). It doubles as the "you can touch this" cue.
-## (Nov 17: in the hub the choices float in an [ImpressionRing], which lights its own front one;
-## [method offer] stays for choices standing on the table.)
-## Rule: nothing of it is lit while a task runs. The Hub calls [code]await HubGlow.quiet_all()[/code]
-## before every activity starts; tests check that it leaves nothing lit.
+## A soft pool of light around the gear after the reveal. The hub fades it and the menu halos before a game.
 
 const TINT := Color(1.0, 0.86, 0.55)
 const BREATH_SECONDS := 4.0
 ## Every glow alive now (for [method quiet_all]).
 static var _alive: Array[HubGlow] = []
 
-var _impressions: Array[Impression] = []
-var _pool: MeshInstance3D
 var _pool_light: StandardMaterial3D
 var _quieting := false
 
@@ -27,9 +17,6 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	_alive.erase(self)
-	for impression in _impressions:
-		if is_instance_valid(impression):
-			impression.set_waiting(0.0)
 
 
 ## Fades every glow out and frees it. Await it before a task starts.
@@ -51,7 +38,7 @@ static func any_lit() -> bool:
 			or ImpressionRing.alive.any(func(ring: ImpressionRing) -> bool: return ring.is_lit())
 
 
-## Glow A: a breathing pool round [param socket] for [param seconds], then it fades and frees itself.
+## A breathing pool round [param socket] for [param seconds], then it fades and frees itself.
 static func afterglow(parent: Node, socket: Vector3, seconds := 3.0) -> HubGlow:
 	var glow := HubGlow.new()
 	glow.name = "hub_glow_afterglow"
@@ -63,48 +50,18 @@ static func afterglow(parent: Node, socket: Vector3, seconds := 3.0) -> HubGlow:
 	return glow
 
 
-## Glow C: [param impressions] wait on their pools of light (fading in over [param seconds]).
-static func offer(parent: Node, impressions: Array[Impression], seconds := 0.6) -> HubGlow:
-	var glow := HubGlow.new()
-	glow.name = "hub_glow_offer"
-	parent.add_child(glow)
-	glow._impressions = impressions
-	glow.create_tween().tween_method(func(f: float) -> void:
-		for impression in glow._impressions:
-			if is_instance_valid(impression):
-				impression.set_waiting(f), 0.0, 1.0, seconds)
-	return glow
-
-
-## A hand is [param amount] near [param impression] (0 far .. 1 touching): its pool brightens.
-func near(impression: Impression, amount: float) -> void:
-	if not _quieting and impression in _impressions:
-		impression.set_near(amount)
-
-
 ## Fades this glow out over [param seconds] and frees it.
 func quiet(seconds := 0.8) -> void:
 	if _quieting:
 		return
 	_quieting = true
-	for impression in _impressions:
-		if is_instance_valid(impression):
-			impression.set_near(0.0)
-	var start := _pool_light.albedo_color.a if _pool_light else 0.0
 	var tween := create_tween()
-	tween.tween_method(func(f: float) -> void:
-		if _pool_light:
-			_pool_light.albedo_color.a = start * f
-		for impression in _impressions:
-			if is_instance_valid(impression):
-				impression.set_waiting(f), 1.0, 0.0, seconds)
+	tween.tween_property(_pool_light, "albedo_color:a", 0.0, seconds)
 	tween.tween_callback(queue_free)
 
 
 func is_lit() -> bool:
-	if _pool_light and _pool_light.albedo_color.a > 0.003:
-		return true
-	return _impressions.any(func(i: Impression) -> bool: return is_instance_valid(i) and i._waiting > 0.0)
+	return _pool_light.albedo_color.a > 0.003
 
 
 func _breathe(t: float) -> void:
@@ -115,7 +72,7 @@ func _breathe(t: float) -> void:
 
 
 func _make_pool(at: Vector3, size: float) -> void:
-	_pool = MeshInstance3D.new()
+	var pool := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE * size
 	quad.orientation = PlaneMesh.FACE_Y
@@ -125,7 +82,7 @@ func _make_pool(at: Vector3, size: float) -> void:
 	_pool_light.albedo_texture = Onion.soft_dot()
 	_pool_light.albedo_color = Color(TINT, 0.0)
 	quad.material = _pool_light
-	_pool.mesh = quad
-	_pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_pool)
-	_pool.global_position = at + Vector3.UP * 0.004
+	pool.mesh = quad
+	pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pool)
+	pool.global_position = at + Vector3.UP * 0.004

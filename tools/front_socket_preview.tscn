@@ -1,4 +1,0 @@
-[gd_scene format=3]
-[ext_resource type="Script" path="res://tools/front_socket_preview.gd" id="1"]
-[node name="Shots" type="Node"]
-script = ExtResource("1")

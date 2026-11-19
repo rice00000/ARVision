@@ -23,7 +23,6 @@ var _tried := 0
 var _since_start := 0.0
 var _since_check := CHECK_EVERY
 var _checking := false
-var _up := false
 var _ours := false
 
 
@@ -76,10 +75,8 @@ func _on_probe(result: int, code: int, _headers: PackedStringArray, _body: Packe
 	_checking = false
 	var answered := result == HTTPRequest.RESULT_SUCCESS and code == 200
 	if answered:
-		_up = true
 		_status.text = "CV server: on" if _ours else "CV server: on (yours)"
 		return
-	_up = false
 	if _pid > 0:
 		if _since_start > START_PATIENCE:   # running but never answering: give up on this one
 			_stop()
