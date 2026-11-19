@@ -576,6 +576,17 @@ func test_scenes_go_to_the_workshops_places() -> void:
 		return hub != null and hub.current != null and hub.current.id() == &"butterflies", 60.0), "Butterflies starts in the workshop")
 
 
+func test_turn_to_fit_without_cards_opens_cup_setup() -> void:
+	await _boot_entry()
+	await _to_setup_panel()
+	input.menu()
+	await frames(2)
+	await press_facilitator("fac_scenes")
+	await press_facilitator("fac_scene_turn_to_fit")
+	expect(await until(func() -> bool:
+		return app.find_child("SetupBoard", true, false) != null, 10.0), "Turn to fit opens cup setup on a fresh save")
+
+
 func test_the_first_visit_ends_with_onions_closing_and_nothing_of_weis() -> void:
 	await _boot_entry()
 	await _to_setup_panel()

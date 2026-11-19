@@ -56,6 +56,7 @@ const EDGE_COLOUR := Color(1, 0.9, 0.2, 1)
 const SPOKEN := {
 	fac_prev = "Previous page", fac_next = "Next page", fac_new_save = "New save",
 	fac_add_stones = "Add ten magic stones", fac_space = "Space",
+	fac_fit_setup = "Turn to fit",
 	fac_v_filter_down = "Previous filter", fac_v_filter_up = "Next filter",
 	fac_v_contrast_down = "Less contrast", fac_v_contrast_up = "More contrast",
 	fac_v_brightness_down = "Darker", fac_v_brightness_up = "Brighter",
@@ -184,9 +185,13 @@ func _activate() -> void:
 		_open_save(StringName(String(target.id).trim_prefix("fac_slot_")))
 		return
 	if String(target.id).begins_with("fac_scene_"):
+		var place := StringName(String(target.id).trim_prefix("fac_scene_"))
 		_view_index = 0
 		_close()
-		Entry.go_to(StringName(String(target.id).trim_prefix("fac_scene_")))   # Megan, Nov 18: always through the workshop
+		if place == &"turn_to_fit" and not TurnToFitGame.has_setup():
+			App.main.change_scene(&"turn_to_fit")
+		else:
+			Entry.go_to(place)
 		return
 	if String(target.id).begins_with("fac_res_"):
 		_results.press(target.id)
@@ -201,6 +206,9 @@ func _activate() -> void:
 		Events.intro_jump_requested.emit(StringName(String(target.id).trim_prefix("fac_jump_")))
 		return
 	match target.id:
+		&"fac_fit_setup":
+			_close()
+			App.main.change_scene(&"turn_to_fit")
 		&"fac_mode":
 			PlayMode.toggle("staff tools")
 			_refresh_tools()
@@ -611,9 +619,11 @@ func _build() -> void:
 		_button("fac_scene_" + String(places[i]), Entry.PLACES[places[i]], Vector2(0.18, 0.055),
 			Vector2(-0.095 + 0.19 * (i % 2), 0.032 - floori(i / 2.0) * 0.063), scenes)
 	var row := ceili(places.size() / 2.0)
+	var bottom := 0.032 - row * 0.063 - 0.012
+	_button("fac_fit_setup", "Cup setup", Vector2(0.13, 0.055), Vector2(-0.125, bottom), scenes)
 	# Megan, Nov 18: start over as a brand-new child, from the hello. A new save, so the current child's progress is
 	# kept (it is still under Saves); never a wipe.
-	_button("fac_fresh_start", "Restart: new player save", Vector2(0.38, 0.055), Vector2(0.0, 0.032 - row * 0.063 - 0.012), scenes)
+	_button("fac_fresh_start", "Restart: new player save", Vector2(0.24, 0.055), Vector2(0.07, bottom), scenes)
 
 	var training := _page(&"Training")
 	_text(_status, Vector2(0.0, 0.1), training)

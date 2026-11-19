@@ -3,7 +3,7 @@ extends Summonable
 ## Turn to fit in the workshop hub (Megan, Nov 18; `claude/SCENE_REVIEW_DECISIONS.md` → "Turn to fit"):
 ## the cup's bubble in the cauldron's menu. Replaces the hub's stand-in `TurnToFitSlot` (never available).
 ##
-## * Offered (is_available) once this player has a saved cup setup (Staff tools → Scenes → "Turn to fit (real cup)", the setup page) AND the
+## * Offered (is_available) once this player has a saved cup setup (Staff tools → Scenes → "Cup setup") AND the
 ##   CV server answers. Not tied to "cup seen" (it flickers whenever the cup leaves the camera's view): if the
 ##   cup isn't in view when the game starts, the game asks for it.
 ## * summon(): one go (TurnToFitGame) at the child's table spot (62 cm ahead; the hub's workspace, Wei's bench,

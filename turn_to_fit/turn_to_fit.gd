@@ -23,7 +23,7 @@ extends Node3D
 ## On a headset, type the laptop's address on the board's number pad (the server prints it) and press
 ## "Save address": it's kept on the headset (FitTracker.save_server) and the hub's Turn to fit uses it too.
 ##
-## Since Nov 18 this scene is the grown-up's **setup page** (Staff tools → Scenes → "Turn to fit (real cup)"),
+## This scene is the grown-up's **setup page** (Staff tools → Scenes → "Cup setup"),
 ## used before the child's session. The child plays Turn to fit in the workshop hub (TurnToFitActivity /
 ## TurnToFitGame), which never shows this board.
 
