@@ -79,6 +79,8 @@ func _ready() -> void:
 	_skip_button.position = Vector3(SIZE.x * 0.5 - SKIP_SIZE.x * 0.5, shortcut_y, 0.012)
 	add_child(_skip_button)
 	_skip_button.setup("Skip", &"entry_skip_setup", Color("#3c668c"), SKIP_SIZE, 0.014, 44)
+	_quiet(_mode_button)
+	_quiet(_skip_button)
 	visibility_changed.connect(_update_shortcuts)
 	visible = false
 
@@ -139,6 +141,7 @@ func show_step(number: int, total: int, title: String, words: String, checks: Ar
 		button.position = Vector3(x, -0.118, 0.012)
 		add_child(button)
 		button.setup(str(def[0]), def[1], def[2], Vector2(wide, 0.06), 0.012)
+		_quiet(button)
 		buttons.append(button)
 	_shown = true
 	visible = not get_tree().paused
@@ -197,6 +200,7 @@ func check_state(index: int) -> StringName:
 ## Updates the adult's mode toggle. The Skip button stays in place across steps and modes.
 func show_mode(mode_name: String, dev: bool) -> void:
 	_mode_button.set_text("Mode: " + mode_name)
+	_quiet(_mode_button)
 	_mode_button.set_colour(Color(0.55, 0.42, 0.2) if dev else GREY)
 
 
@@ -255,3 +259,8 @@ func _flat(colour: Color) -> StandardMaterial3D:
 	if colour.a < 1.0:
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return material
+
+
+## Setup is for the grown-up and stays quiet until Start: its buttons do not say their names.
+static func _quiet(button: EntryButton) -> void:
+	button.target.speech = ""

@@ -19,14 +19,31 @@ func _button(id: String) -> Target:
 	return App.world.menu.find_child(id, false, false) as Target
 
 
-func test_the_current_level_is_the_first_not_done() -> void:
+func test_the_current_level_follows_the_child() -> void:
 	await boot()
 	var world := App.world
 	expect_eq([world.current(TIDY).id, world.current(WALL).id], [&"shadow", &"steady_flow"], "level 1 of each")
 	await world._complete(TIDY, TIDY.levels[0])
-	expect_eq([world.current(TIDY).id, world.current(WALL).id], [&"similar_shadows", &"steady_flow"], "the shelf moves on, the wall does not")
+	expect_eq(world.current(TIDY).id, &"shadow", "finished, but low in its range: practise it more")
+	Profile.set_level(TIDY.levels[0].staircase(), World.READY_AT)
+	expect_eq([world.current(TIDY).id, world.current(WALL).id], [&"similar_shadows", &"steady_flow"], "climbed: the shelf moves on, the wall does not")
 	await world._complete(TIDY, TIDY.levels[2])
+	Profile.set_level(TIDY.levels[2].staircase(), 1.0)
 	expect_eq(world.current(TIDY).id, &"similar_shadows", "a skipped level stays current")
+	Vision.set_adaptive(false)
+	await world._complete(TIDY, TIDY.levels[1])
+	expect_eq(world.current(TIDY).id, &"bookshelf", "on fixed levels, finishing is enough")
+
+
+func test_every_menu_level_adapts_on_its_own_staircase() -> void:
+	var staircases := {}
+	for task in [TIDY, WALL, preload("res://content/tasks/catch_butterflies.tres")]:
+		for level: TaskLevel in task.levels:
+			if level.plan.is_endless():
+				continue
+			expect(not level.staircase().is_empty(), "%s adapts" % level.title)
+			expect(not staircases.has(level.staircase()), "%s has its own staircase" % level.title)
+			staircases[level.staircase()] = true
 
 
 func test_the_room_stays_in_normal_colour_before_and_after_tasks() -> void:
@@ -232,3 +249,22 @@ func test_motion_is_only_in_its_own_scene_and_needs_no_shelf_progress() -> void:
 	await select(_button("task_break_wall_steady_flow").global_position)
 	expect(await until(func() -> bool: return App.session.running, 10.0), "the wall plays")
 	expect_eq(App.session.plan, WALL.levels[0].plan, "level 1's plan")
+
+
+func test_every_level_card_shows_its_picture() -> void:
+	for file in DirAccess.get_files_at("res://content/tasks"):
+		var task: Task = load("res://content/tasks/" + file.trim_suffix(".remap"))
+		for level in task.levels:
+			expect(level.picture != null, "%s has a picture, for children who cannot read yet" % level.title)
+	await boot()
+	await _turn_from_table(90.0)
+	App.world.run()
+	await _turn_from_table(10.0)
+	expect(await until(func() -> bool: return App.world.menu != null and App.world.menu.get("_open"), 15.0), "the menu unfolds")
+	var buttons: Dictionary = App.world.menu.get("_buttons")
+	expect_eq(buttons.size(), TIDY.levels.size(), "a card per level")
+	for button: Target in buttons:
+		var level: TaskLevel = buttons[button][1]
+		var picture := button.find_child("Picture", true, false) as MeshInstance3D
+		expect(picture != null and (picture.material_override as StandardMaterial3D).albedo_texture == level.picture,
+			"%s shows its own picture" % level.title)

@@ -1,7 +1,14 @@
 [gd_resource type="Resource" script_class="TrialDef" format=3]
 
 [ext_resource type="Script" path="res://trials/trial_def.gd" id="1"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="3"]
 [ext_resource type="PackedScene" path="res://trials/sandwich/sandwich.tscn" id="2"]
+
+[sub_resource type="Resource" id="fillings"]
+script = ExtResource("3")
+name = &"fillings"
+easy = 3.0
+fixed = nan
 
 [resource]
 script = ExtResource("1")
@@ -11,3 +18,5 @@ skill = &"sandwich_spatial_order"
 hint_after = 22.0
 max_hint = 1
 time_limit = 0.0
+axes = Array[ExtResource("3")]([SubResource("fillings")])
+notes = "Fillings: layers between the two slices of toast (1 to 3). Menu levels drive it (Block.drive)."

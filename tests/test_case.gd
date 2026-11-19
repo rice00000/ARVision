@@ -24,11 +24,15 @@ func expect_eq(actual: Variant, expected: Variant, what: String) -> void:
 
 ## Starts a scene without autoplay: call App.session.run(), App.world.run()
 ## or the Intro's Entry.run(). A plan overrides the scene's adventure.
-func boot(plan: SessionPlan = null, scene := &"find_object") -> void:
+## Check-ins are unplugged unless [param check_ins]: a fresh save would otherwise
+## start every place with its baseline check-in.
+func boot(plan: SessionPlan = null, scene := &"find_object", check_ins := false) -> void:
 	app = load("res://main.tscn").instantiate()
 	app.autostart = false
 	app.initial_scene = String(scene)
 	app.plan = plan
+	if not check_ins:
+		app.get_node(^"Modules/CheckIns").free() # what deleting the node from main.tscn does
 	add_child(app)
 	input = App.sim_input
 	await frames(2)

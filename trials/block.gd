@@ -12,6 +12,15 @@ extends Resource
 @export_range(-1.0, 1.0) var difficulty := -1.0
 ## Axes fixed for this block, by name (e.g. &"direction": 1.0), over the TrialDef's values.
 @export var pins: Dictionary[StringName, float] = {}
+## An adaptive level: these axes follow the child's level for this block, from
+## the first value (level 0, easiest) to the second (level 1, hardest), e.g.
+## &"clutter": Vector2(2, 12). The block then has its own staircase per child
+## ([member staircase]) and [member difficulty] is where a new child starts.
+## Empty = the trial's own driven axis at [member difficulty], fixed.
+@export var drive: Dictionary[StringName, Vector2] = {}
+## The staircase this block moves; empty = its trial's skill. Give each adaptive
+## level its own, so each keeps its purpose: &"visual_matching.shadow".
+@export var staircase: StringName = &""
 ## How the real world is shown. Empty = normal.
 @export var view: View
 ## Replay tutorial for training, read before the first round in a probe.

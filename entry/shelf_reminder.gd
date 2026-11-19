@@ -14,6 +14,8 @@ extends Node
 ## It is skipped (or stops) when: any thing is already carried, a `taken` or `put` has been reported (the
 ## child has shown they can), Wei's hint has begun, or the round is not running.
 
+## Rounds of the first visit's shelf level, however long the level is in the menu.
+const TUTORIAL_ROUNDS := 2
 ## Seconds of waiting, after Onion's last line, before the hand shows. 0 = never.
 const DELAY := 12.0
 ## How long Wei's first hint is held back in the first visit (his default is 10 s).
@@ -43,6 +45,7 @@ func prepare(plan: SessionPlan) -> SessionPlan:
 	var blocks: Array[Block] = []
 	for block in plan.blocks:
 		var changed := block.duplicate() as Block
+		changed.rounds = mini(block.rounds, TUTORIAL_ROUNDS) # a first visit stays short
 		changed.trial = block.trial.duplicate() as TrialDef
 		_defs.append(changed.trial)
 		_normal.append(changed.trial.hint_after)

@@ -65,9 +65,11 @@ class Adventure(SimCase):
         Child(sim, seed=3).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=10))
         ends = self.round_ends(sim)
-        self.assertEqual(len(ends), 2)
+        self.assertEqual(len(ends), 5, "five rounds: room to adapt")
         self.assertTrue(all(e["data"]["view"]["title"] == "Normal" for e in ends), "played in normal colour")
-        self.assertTrue(all(e["data"]["level"] == 0.0 and e["data"]["values"]["things"] == 3 for e in ends), "level 1: three things")
+        self.assertEqual((ends[0]["data"]["level"], ends[0]["data"]["values"]["things"]), (0.0, 3), "a new child starts with three things")
+        self.assertTrue(all(3 <= e["data"]["values"]["things"] <= 5 for e in ends), "Shadow Match stays within three to five")
+        climbed = [e["data"]["after"] for e in sim.events("reported", "level") if e["data"]["skill"] == "visual_matching.shadow"][-1]
         with open(Path(sim.observe()["profile_dir"]) / "picks.csv", encoding="utf-8") as file:
             picks = list(csv.DictReader(file))
         self.assertEqual({row["game"] for row in picks}, {"Tidy the shelf, level 1"}, "every put in the CSV")
@@ -81,8 +83,9 @@ class Adventure(SimCase):
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the shelf keeps normal colour")
         self.assertFalse(world["guide"]["visible"], "motion lives in another scene")
         self.assertEqual(world["menu"]["buttons"][0]["reward"], 2, "the completed card shows the replay reward")
-        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [False, True] + [False] * 4,
-                         "level 2 lights up")
+        ready = climbed >= 0.7
+        self.assertEqual([b["current"] for b in world["menu"]["buttons"]], [not ready, ready] + [False] * 4,
+                         "level 2 lights up once level 1 is climbed, else level 1 again")
 
         actor.look_at(tuple(sim.observe()["work_surface"]["position"]))  # back at the menu, not the last toy
         self.switch_scene(sim, actor, "global_motion")
@@ -94,7 +97,7 @@ class Adventure(SimCase):
         Child(sim, seed=4).play()
         self.assertTrue(sim.run_until(("reported", "task_done"), timeout=15))
         ends = [e for e in self.round_ends(sim) if e["skill"] != "visual_matching"]
-        self.assertEqual(len(ends), 3, "three wall rounds")
+        self.assertEqual(len(ends), 8, "eight wall rounds")
         self.assertTrue(all(e["data"]["view"]["title"] == "Normal" for e in ends))
         world = self.menu_at(sim, "Spell wall")
         self.assertEqual(sim.observe()["view"]["title"], "Normal", "completing the wall keeps normal colour")

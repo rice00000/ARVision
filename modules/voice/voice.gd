@@ -23,6 +23,8 @@ extends Module
 signal line_finished(text: String, completed: bool)
 
 var _label := Label3D.new()
+## A dark plate behind the words, so they read on pale walls and bright passthrough.
+var _backing := MeshInstance3D.new()
 var _player := AudioStreamPlayer.new()
 var _hide_at := 0.0
 var _speaking := ""
@@ -46,6 +48,17 @@ func _ready() -> void:
 	_label.width = 900.0
 	_label.visible = false
 	App.rig.add_child(_label)
+	var plate := StandardMaterial3D.new()
+	plate.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	plate.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	plate.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	plate.no_depth_test = true
+	plate.render_priority = 8
+	plate.albedo_color = Color(0.05, 0.06, 0.08, 0.72)
+	_backing.mesh = QuadMesh.new()
+	_backing.material_override = plate
+	_backing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_label.add_child(_backing)
 	_player.bus = &"Voice"
 	add_child(_player)
 	Events.said.connect(_say)
@@ -95,6 +108,15 @@ func _place() -> void:
 	var pitch := rad_to_deg(asin(gaze.y))
 	var elevation := deg_to_rad(minf(above_horizon, pitch + above_gaze))
 	_label.global_position = eye.origin + (ahead * cos(elevation) + Vector3.UP * sin(elevation)) * distance
+	_fit_backing()
+
+
+## The plate just around the words (centred, as the label centres them).
+func _fit_backing() -> void:
+	var font := _label.font if _label.font else ThemeDB.fallback_font
+	var words := font.get_multiline_string_size(_label.text, HORIZONTAL_ALIGNMENT_CENTER, _label.width, _label.font_size,
+		-1, TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE)
+	(_backing.mesh as QuadMesh).size = words * _label.pixel_size + Vector2(0.04, 0.02)
 
 
 func _say(text: String) -> void:

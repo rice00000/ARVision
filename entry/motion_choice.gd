@@ -65,6 +65,7 @@ func _build() -> void:
 	_target = UITarget.new()
 	_target.collision_layer = 0
 	_target.id = ID
+	_target.speech = "Magic dots"
 	_target.name = String(ID)
 	var shape := CollisionShape3D.new()
 	var hit := BoxShape3D.new()

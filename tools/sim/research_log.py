@@ -65,11 +65,17 @@ def problems(lines, step=0.1):
                 continue
             if last_end["data"]["probe"]:
                 found.append(f"line {number}: a probe round moved the level")
-            if level["skill"] != last_end["skill"] or level["first_try"] != last_end["data"]["first_try"]:
+            # a level's own staircase is named after its trial's skill: "visual_matching.shadow"
+            own = level["skill"] == last_end["skill"] or level["skill"].startswith(last_end["skill"] + ".")
+            if not own or level["first_try"] != last_end["data"]["first_try"]:
                 found.append(f"line {number}: level report disagrees with its round's first_try")
             change = level.get("step", step)
             expected = [max(0.0, level["before"] - change)] if not level["first_try"] \
                 else [level["before"], min(1.0, level["before"] + change)]
+            if level.get("fast"):  # an adaptive level's quick start: twice the step up until the first miss
+                expected.append(min(1.0, level["before"] + 2 * change))
+            if level.get("outcome") == "neutral":  # solved first time with help that came by itself: no move
+                expected = [level["before"]]
             if not any(abs(level["after"] - value) < 1e-6 for value in expected):
                 found.append(f"line {number}: level {level['before']} -> {level['after']} is not a 2-up / 1-down step")
     return found

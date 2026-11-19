@@ -9,7 +9,7 @@
   - A share of the swarm (coherence, 0.9 to 0.2) flies round with the flow; the rest fly every way, and half the noise trades places each second.
   - A swing against the flow wins when it ends with at least one catch. It scoops each butterfly it meets. With the flow counts as a try once the net stops. Turning straight into the right way forgives the wind-up (`catch_windup`).
   - The flow is drawn again as soon as the round is scored. The net can keep catching through the closing animation.
-- **Levels:** Butterfly Circle (8, one way), Both Ways (12, two circles flying opposite ways), Butterfly Swarm and Busy Swarm (3 rounds at difficulty 0 and 0.4).
+- **Levels:** Butterfly Circle (8, one way), Both Ways (12, two circles flying opposite ways), Butterfly Swarm and Busy Swarm (6 rounds). Each adapts within its own range ([adaptive levels](adaptive-levels.md)); catch-all levels also adapt inside a round: each catch 10% faster, each wrong swing 15% slower.
 - **Help:** catch-all levels slow to half speed (on a raised hand, or after 25 s). In the swarm, a raised hand makes every butterfly follow the flow.
 - **Logged:** `catch_attempt` per catch or wrong bump in catch-all, per scored swing in the swarm. Also `net_taken` and the condition (spins or flow, signal count).
 - **Rendering:** one MultiMesh draw call, wings beat in `butterfly.gdshader`.

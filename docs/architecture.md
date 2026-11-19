@@ -27,10 +27,12 @@ Session ─ waits for App.reality.settled (the table is known, or the search gav
    ─▶ Events.trial_ended ─▶ Log line, Profile.adapt (2-up / 1-down)
 ```
 
+- **Vision:** the child's profile (`Vision`, [vision profile](vision-profile.md)): their filter is `Session.base_view`, size axes and help/time limits scale by it, and menu levels take its offset or, adaptive, the staircase.
 - **Level:** one 0–1 number per skill (`Profile`). `TrialAxis` maps it to real values; keep one driven axis per trial. `Block.pins` fixes other axes per block.
-- **Staircase:** a round counts as right only when solved on the first try without help (`first_try` in the log); retries and help still end in success for the child.
+- **Staircase:** a round counts as right only when solved on the first try without help (`first_try` in the log); retries and help still end in success for the child. Menu levels are [adaptive levels](adaptive-levels.md): each on its own staircase and range (`Block.drive`), a quick start, and help that came by itself does not count against a slow child.
 - **Probe blocks** are unaided and do not move the level: no-help check-ins.
-- **Help** escalates by itself (`hint_after`, later each round) or when the child raises a hand; every hint is logged.
+- **Help** escalates by itself (`hint_after`, later each round) or when the child raises a hand; every hint is logged. Where help only comes when asked (`hint_after` 0), a child with no try after 8 s hears once how to ask (`Trial.REMINDER`, logged `help_reminded`).
+- **Rounds:** `RoundDots` shows a block's rounds; "Last one!" plays in the pause before the last (not in no-pause levels). `Session.stop()` (player menu → Stop this game) ends the whole play unfinished.
 - **Log:** `user://profiles/<id>/logs/*.jsonl`, every round with its full condition and view.
 - **Save:** `user://profiles/<id>/save.json` (staircase levels, the adventure's progress), written through a temporary file. `user://profiles.cfg` lists the saves and the one in use (`Profile`, as in XRVision). Opening another save writes everything, then `Main.restart` frees the Session, World and stage and builds them fresh on the new files; room, rig and modules stay.
 
@@ -48,6 +50,7 @@ Children of `Main/Modules`; delete a node to unplug it. A trial that needs one l
 - **Music:** the piano loop under everything; it dips under the voice.
 - **Detector:** CV. Sim backend reads `RealObject`s with line of sight; headset backend runs YOLO on the Quest (`addons/yolo` Android plugin, `modules/cv/yolo11n.onnx`); remote backend posts frames to `tools/cv_server.py` (same model on a PC). Labels are COCO names in all.
 - **Magic:** gold sparkles on a right pick and a brief transparent trophy animation on a level win.
+- **CheckIns:** no-help check-ins before a place's menu when due, saved with the child; the facilitator's Progress page and `tools/progress.py` show them. [Check-ins](check-ins.md).
 - **Picks:** one CSV row per pick (`Trial.pick()` → `Events.picked`), in `<save>/picks.csv`.
 - **Home, Inventory, Rooms, Decor and Pets** handle the player menu, purchases, rewards, room selection, furniture layouts and pets. [Details](home.md).
 - **Facilitator** takes input from the player menu and keeps play paused. Tools holds Intro jumps and zones, restart and exit.

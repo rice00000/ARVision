@@ -28,6 +28,8 @@ const TRAY_SPOTS := {
 }
 
 var _cubbies: Dictionary[String, AABB] = {}
+## This round's things (axis objects, 3 to 5); the other cubbies stay empty.
+var _chosen: Array = []
 
 
 func _setup(round_condition: TrialCondition) -> void:
@@ -45,8 +47,12 @@ func _setup(round_condition: TrialCondition) -> void:
 	var mirror_tray := randf() < 0.5
 	round_condition.set_value(&"shelf_mirrored", mirror_shelf)
 	round_condition.set_value(&"tray_mirrored", mirror_tray)
+	_chosen = TRAY_SPOTS.keys()
+	_chosen.shuffle()
+	_chosen = _chosen.slice(0, clampi(roundi(round_condition.value(&"objects", 5.0)), 3, 5))
+	round_condition.set_value(&"chosen", ",".join(_chosen))
 	_build_shelf(mirror_shelf, (-toward.y - below) / scale_to_reach)
-	for key: String in TRAY_SPOTS:
+	for key: String in _chosen:
 		var factor: float = SCALES.get(key, 1.0)
 		var home: Vector3 = TRAY_SPOTS[key] + Vector3.UP * Props.size_of(key).y * factor * 0.5
 		if mirror_tray:
@@ -98,7 +104,8 @@ func _build_shelf(mirrored: bool, foot_height: float) -> void:
 			var key: String = keys[column]
 			_cubbies[key] = AABB(Vector3(left + BOARD * 0.5, floor_y - 0.005, BACK),
 				Vector3(pitch - BOARD, clear_height + 0.005, FRONT - BACK + MOUTH))
-			_add_glass_model(key, left + pitch * 0.5, floor_y, glass)
+			if key in _chosen:
+				_add_glass_model(key, left + pitch * 0.5, floor_y, glass)
 
 
 func _add_glass_model(key: String, x: float, floor_y: float, glass: ShaderMaterial) -> void:
@@ -122,7 +129,7 @@ func _add_glass_model(key: String, x: float, floor_y: float, glass: ShaderMateri
 
 func _slot_at(point: Vector3) -> String:
 	for key: String in _cubbies:
-		if _guides[key].visible and _cubbies[key].has_point(point):
+		if _guides.has(key) and _guides[key].visible and _cubbies[key].has_point(point):
 			return key
 	return ""
 

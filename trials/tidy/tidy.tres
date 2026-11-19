@@ -17,6 +17,8 @@ script = ExtResource("2_axis")
 name = &"size"
 easy = 0.06
 fixed = nan
+scaled_by = &"size"
+scaled_max = 0.075
 
 [sub_resource type="Resource" id="match"]
 script = ExtResource("2_axis")
@@ -33,6 +35,11 @@ script = ExtResource("2_axis")
 name = &"clutter"
 fixed = nan
 
+[sub_resource type="Resource" id="novel"]
+script = ExtResource("2_axis")
+name = &"novel"
+fixed = nan
+
 [sub_resource type="Resource" id="colour_step"]
 script = ExtResource("2_axis")
 name = &"colour_step"
@@ -43,7 +50,7 @@ script = ExtResource("1_def")
 title = "Tidy up"
 scene = ExtResource("3_scene")
 skill = &"visual_matching"
-axes = Array[ExtResource("2_axis")]([SubResource("things"), SubResource("size"), SubResource("match"), SubResource("outline"), SubResource("clutter"), SubResource("colour_step")])
+axes = Array[ExtResource("2_axis")]([SubResource("things"), SubResource("size"), SubResource("match"), SubResource("outline"), SubResource("clutter"), SubResource("colour_step"), SubResource("novel")])
 notes = "Things drives matching difficulty. Match: 0 shape, 1 size, 2 colour, 3 odd colour. Odd colour pins colour_step (0 to 2) and logs picks on pinch instead of placement."
 hint_after = 10.0
 time_limit = 120.0

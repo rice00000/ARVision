@@ -11,9 +11,13 @@ const BELOW_EYES := 0.12
 const TILT := 30.0
 const COLUMNS := 2
 const VISIBLE_ROWS := 3
-const CARD := Vector2(0.285, 0.066)
+const CARD := Vector2(0.285, 0.1)
+## The level's picture (TaskLevel.picture), a square at the card's left: big enough
+## to choose by, for children who cannot read the title yet.
+const PICTURE := 0.084
+const PICTURE_INSET := 0.008
 const COLUMN_PITCH := 0.315
-const ROW_PITCH := 0.088
+const ROW_PITCH := 0.122
 const HEADER_ROW := 0.088
 const PANEL_PADDING := Vector2(0.03, 0.015)
 const MENU_SCALE := 0.70
@@ -29,6 +33,7 @@ const GLOW_COLOR := Color("#f4e3bc")
 const TEXT_COLOR := Color("#f7f4ed")
 const INK_COLOR := Color("#242b32")
 const GOLD_COLOR := Color("#f3d28a")
+const RAIL_DARK := Color("#22303b")
 const BREATH := 0.035
 const LIFT := 0.012
 
@@ -255,7 +260,9 @@ func _build_scroll(x: float) -> void:
 	var up := _rows_top - ROW_PITCH * 0.5
 	var down := _rows_top - ROW_PITCH * (VISIBLE_ROWS - 0.5)
 	_scroll_up = _scroll_button(&"level_scroll_up", "▲", SCROLL_ARROW, Vector3(x, up, 0.0))
+	_scroll_up.speech = "Scroll up"
 	_scroll_down = _scroll_button(&"level_scroll_down", "▼", SCROLL_ARROW, Vector3(x, down, 0.0))
+	_scroll_down.speech = "Scroll down"
 	var track_height := up - down - SCROLL_ARROW.y - 0.022
 	var track := MeshInstance3D.new()
 	var rail := QuadMesh.new()
@@ -286,6 +293,7 @@ func _button(task: Task, level: TaskLevel, next: bool) -> Target:
 	var progress := App.main.progress
 	var done := progress.is_done(task, level)
 	var button := _target(StringName("task_%s_%s" % [task.id, level.id]), CARD)
+	button.speech = level.title
 	_buttons[button] = [task, level]
 	var look := Node3D.new()
 	look.name = "Look"
@@ -304,6 +312,13 @@ func _button(task: Task, level: TaskLevel, next: bool) -> Target:
 	label.name = "Title"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	label.position = Vector3(-CARD.x * 0.5 + 0.012, 0, 0.008)
+	if level.picture:
+		var picture := _picture(level.picture)
+		picture.position = Vector3(-CARD.x * 0.5 + PICTURE_INSET + PICTURE * 0.5, 0, 0.007)
+		look.add_child(picture)
+		label.position.x += PICTURE + PICTURE_INSET
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.width = (CARD.x - PICTURE - PICTURE_INSET - 0.06) / label.pixel_size # clear of the reward
 	look.add_child(label)
 	var stones := progress.reward(task, level)
 	var reward := _label("∞" if endless else ("◆ %d" % stones if stones > 0 else ""), 36)
@@ -316,6 +331,8 @@ func _button(task: Task, level: TaskLevel, next: bool) -> Target:
 		for text in [label, reward]:
 			text.modulate = INK_COLOR
 			text.outline_size = 0
+	if level.played() and level.climbed() >= 0.0:
+		_climb_bar(look, level.climbed())
 	if done:
 		var medal := MeshInstance3D.new()
 		medal.mesh = SphereMesh.new()
@@ -325,6 +342,37 @@ func _button(task: Task, level: TaskLevel, next: bool) -> Target:
 		medal.position = Vector3(CARD.x * 0.5 - 0.012, CARD.y * 0.5 - 0.012, 0.012)
 		look.add_child(medal)
 	return button
+
+
+## A thin bar along the card's foot: how far up this level's range the child has
+## climbed (gold), so staff and children see where they are.
+static func _climb_bar(look: Node3D, climbed: float) -> void:
+	var left := -CARD.x * 0.5 + PICTURE_INSET + PICTURE + 0.01 # beside the picture, under the title
+	var width := CARD.x * 0.5 - 0.012 - left
+	var at := Vector3(left + width * 0.5, -CARD.y * 0.5 + 0.009, 0.0085)
+	for part in [[width, RAIL_DARK, 3], [width * maxf(climbed, 0.04), GOLD_COLOR, 4]]:
+		var bar := MeshInstance3D.new()
+		bar.name = "Climb" if part[1] == GOLD_COLOR else "ClimbRail"
+		var quad := QuadMesh.new()
+		quad.size = Vector2(part[0], 0.006)
+		bar.mesh = quad
+		bar.material_override = _flat(part[1], part[2])
+		bar.position = at + Vector3((part[0] - width) * 0.5, 0.0, 0.0)
+		look.add_child(bar)
+
+
+static func _picture(texture: Texture2D) -> MeshInstance3D:
+	var picture := MeshInstance3D.new()
+	picture.name = "Picture"
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * PICTURE
+	picture.mesh = quad
+	var material := _flat(Color.WHITE, 3)
+	material.albedo_texture = texture
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR # the tile's rounded corners
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	picture.material_override = material
+	return picture
 
 
 static func _target(id: StringName, size: Vector2) -> UITarget:

@@ -9,12 +9,27 @@
 [ext_resource type="Resource" path="res://trials/desk/desk.tres" id="7_desk"]
 [ext_resource type="Resource" path="res://trials/sandwich/sandwich.tres" id="8_sandwich"]
 [ext_resource type="Resource" path="res://trials/bookshelf/bookshelf.tres" id="9_bookshelf"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/shadow.svg" id="pic_shadow"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/similar_shadows.svg" id="pic_similar_shadows"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/study.svg" id="pic_outline"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/bookshelf.svg" id="pic_bookshelf"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/sandwich.svg" id="pic_sandwich"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/size.svg" id="pic_size"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/color.svg" id="pic_color"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/clutter.svg" id="pic_clutter"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/odd_color_1.svg" id="pic_odd_color_1"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/odd_color_2.svg" id="pic_odd_color_2"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/odd_color_adaptive.svg" id="pic_odd_color_adaptive"]
 
 [sub_resource type="Resource" id="tidy_1"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
+rounds = 5
 difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"things": Vector2(3.0, 5.0)
+})
+staircase = &"visual_matching.shadow"
 ray = false
 pause_between = 1.0
 
@@ -30,13 +45,18 @@ script = ExtResource("5_level")
 id = &"shadow"
 project = &"shadow"
 title = "Shadow Match"
+picture = ExtResource("pic_shadow")
 plan = SubResource("level_1")
 
 [sub_resource type="Resource" id="tidy_2"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 1.0
+rounds = 5
+difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"things": Vector2(5.0, 6.0)
+})
+staircase = &"visual_matching.similar_shadows"
 ray = false
 pause_between = 1.0
 
@@ -52,13 +72,18 @@ script = ExtResource("5_level")
 id = &"similar_shadows"
 project = &"shadow"
 title = "Similar Shadows"
+picture = ExtResource("pic_similar_shadows")
 plan = SubResource("level_2")
 
 [sub_resource type="Resource" id="tidy_3"]
 script = ExtResource("3_block")
 trial = ExtResource("7_desk")
-rounds = 1
+rounds = 2
 difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"props": Vector2(3.0, 5.0)
+})
+staircase = &"desk_outline_matching.outline"
 ray = false
 pause_between = 1.0
 
@@ -74,13 +99,18 @@ script = ExtResource("5_level")
 id = &"outline"
 project = &"outline"
 title = "Ready to Study"
+picture = ExtResource("pic_outline")
 plan = SubResource("level_3")
 
 [sub_resource type="Resource" id="bookshelf_block"]
 script = ExtResource("3_block")
 trial = ExtResource("9_bookshelf")
-rounds = 1
+rounds = 3
 difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"objects": Vector2(3.0, 5.0)
+})
+staircase = &"bookshelf_shape_matching.bookshelf"
 ray = false
 pause_between = 1.5
 
@@ -96,13 +126,18 @@ script = ExtResource("5_level")
 id = &"bookshelf"
 project = &"bookshelf"
 title = "Bookshelf Match"
+picture = ExtResource("pic_bookshelf")
 plan = SubResource("bookshelf_plan")
 
 [sub_resource type="Resource" id="sandwich_block"]
 script = ExtResource("3_block")
 trial = ExtResource("8_sandwich")
-rounds = 1
+rounds = 2
 difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"fillings": Vector2(1.0, 3.0)
+})
+staircase = &"sandwich_spatial_order.sandwich"
 ray = false
 
 [sub_resource type="Resource" id="sandwich_plan"]
@@ -117,16 +152,21 @@ script = ExtResource("5_level")
 id = &"sandwich"
 project = &"sandwich"
 title = "Make a Sandwich"
+picture = ExtResource("pic_sandwich")
 plan = SubResource("sandwich_plan")
 
 [sub_resource type="Resource" id="tidy_4"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.34
+rounds = 5
+difficulty = 0.0
 pins = Dictionary[StringName, float]({
 &"match": 1.0
 })
+drive = Dictionary[StringName, Vector2]({
+&"things": Vector2(3.0, 5.0)
+})
+staircase = &"visual_matching.size"
 ray = false
 pause_between = 1.0
 
@@ -142,16 +182,21 @@ script = ExtResource("5_level")
 id = &"size"
 project = &"size"
 title = "Size Match"
+picture = ExtResource("pic_size")
 plan = SubResource("level_4")
 
 [sub_resource type="Resource" id="tidy_5"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.67
+rounds = 5
+difficulty = 0.0
 pins = Dictionary[StringName, float]({
 &"match": 2.0
 })
+drive = Dictionary[StringName, Vector2]({
+&"things": Vector2(3.0, 6.0)
+})
+staircase = &"visual_matching.color"
 ray = false
 pause_between = 1.0
 
@@ -167,16 +212,21 @@ script = ExtResource("5_level")
 id = &"color"
 project = &"color"
 title = "Color Match"
+picture = ExtResource("pic_color")
 plan = SubResource("level_5")
 
 [sub_resource type="Resource" id="tidy_6"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
-difficulty = 0.34
+rounds = 5
+difficulty = 0.0
 pins = Dictionary[StringName, float]({
-&"clutter": 8.0
+&"things": 4.0
 })
+drive = Dictionary[StringName, Vector2]({
+&"clutter": Vector2(2.0, 12.0)
+})
+staircase = &"visual_matching.clutter"
 ray = false
 pause_between = 1.0
 
@@ -192,17 +242,21 @@ script = ExtResource("5_level")
 id = &"clutter"
 project = &"clutter"
 title = "Clutter Search"
+picture = ExtResource("pic_clutter")
 plan = SubResource("level_6")
 
 [sub_resource type="Resource" id="odd_colour_easy"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
+rounds = 6
 difficulty = 0.0
 pins = Dictionary[StringName, float]({
-&"colour_step": 0.0,
 &"match": 3.0
 })
+drive = Dictionary[StringName, Vector2]({
+&"colour_step": Vector2(0.0, 1.0)
+})
+staircase = &"colour_discrimination.odd_color_1"
 ray = false
 pause_between = 1.0
 
@@ -218,17 +272,21 @@ script = ExtResource("5_level")
 id = &"odd_color_1"
 project = &"odd_color"
 title = "Odd Color"
+picture = ExtResource("pic_odd_color_1")
 plan = SubResource("odd_colour_plan_1")
 
 [sub_resource type="Resource" id="odd_colour_medium"]
 script = ExtResource("3_block")
 trial = ExtResource("4_tidy")
-rounds = 2
+rounds = 6
 difficulty = 0.0
 pins = Dictionary[StringName, float]({
-&"colour_step": 1.0,
 &"match": 3.0
 })
+drive = Dictionary[StringName, Vector2]({
+&"colour_step": Vector2(1.0, 2.0)
+})
+staircase = &"colour_discrimination.odd_color_2"
 ray = false
 pause_between = 1.0
 
@@ -244,6 +302,7 @@ script = ExtResource("5_level")
 id = &"odd_color_2"
 project = &"odd_color"
 title = "Odd Color"
+picture = ExtResource("pic_odd_color_2")
 plan = SubResource("odd_colour_plan_2")
 
 [sub_resource type="Resource" id="odd_colour_adaptive_block"]
@@ -265,6 +324,7 @@ script = ExtResource("5_level")
 id = &"odd_color_adaptive"
 project = &"odd_color"
 title = "Odd Color Adaptive"
+picture = ExtResource("pic_odd_color_adaptive")
 first_reward = 0
 repeat_reward = 0
 plan = SubResource("odd_colour_adaptive_plan")

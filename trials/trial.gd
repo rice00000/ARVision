@@ -15,7 +15,8 @@ extends Node3D
 ## [code]_notification(NOTIFICATION_PAUSED)[/code].
 ##
 ## Help: [member TrialDef.hint_after] seconds without progress raise the hint
-## level by one (later each round, so help fades); a raised hand asks for the next level
+## level by one (later each round, so help fades; times [member Vision.help_scale]);
+## a raised hand asks for the next level
 ## at once; probe rounds get none. What each level shows is up to [method _hint].
 
 ## The round is over. [param scored] is false for an abandoned round, which
@@ -23,6 +24,10 @@ extends Node3D
 signal ended(success: bool, scored: bool)
 
 const GROUP := &"trial"
+## Seconds without any try before a child in a game whose help comes only when
+## asked (TrialDef.hint_after 0) is reminded, once a block, how to ask.
+const REMIND_AFTER := 8.0
+const REMINDER := "Stuck? Raise your hand up high, and I'll help."
 
 ## Set by the Session before the scene enters the tree.
 var def: TrialDef
@@ -35,6 +40,9 @@ var condition: TrialCondition
 var tries := 0
 ## Highest hint level reached this round. 0 = solved unaided.
 var hint_level := 0
+## The child asked for help this round (raised a hand), rather than help coming
+## by itself after a wait: only asked help counts against the staircase.
+var help_asked := false
 
 var _running := false
 ## Seconds of play this round; paused time does not count.
@@ -44,6 +52,7 @@ var _hint_at := 0.0
 var _instruction := ""
 var _tutorial_button: EntryButton
 var _tutorial_active := false
+var _reminded := false
 
 
 func _ready() -> void:
@@ -73,6 +82,7 @@ func _ready() -> void:
 	Events.help_requested.connect(func() -> void:
 		if _live():
 			Events.report(&"help_asked", {trial = condition.trial})
+			help_asked = true
 			escalate())
 
 
@@ -81,6 +91,7 @@ func begin(round_condition: TrialCondition) -> void:
 	condition = round_condition
 	tries = 0
 	hint_level = 0
+	help_asked = false
 	_elapsed = 0.0
 	_running = true
 	_instruction = ""
@@ -107,7 +118,7 @@ func finish(success: bool, extra: Dictionary = {}) -> void:
 	_running = false
 	_hide_tutorial()
 	var data := condition.to_log()
-	data.merge({seconds = snappedf(_elapsed, 0.001), tries = tries, hint = hint_level,
+	data.merge({seconds = snappedf(_elapsed, 0.001), tries = tries, hint = hint_level, help_asked = help_asked,
 		first_try = success and tries == 0 and hint_level == 0}, true)
 	data.merge(extra, true)
 	_teardown()
@@ -248,10 +259,15 @@ func _process(delta: float) -> void:
 	if not _running or _tutorial_active:
 		return
 	_elapsed += delta
+	if not _reminded and not condition.probe and def.hint_after <= 0.0 and def.max_hint > 0 \
+			and _elapsed >= REMIND_AFTER and tries == 0 and hint_level == 0:
+		_reminded = true # once a block: a reminder, not nagging
+		Events.report(&"help_reminded", {trial = condition.trial})
+		say(REMINDER)
 	if _hint_at > 0.0 and _elapsed >= _hint_at:
 		_hint_at = 0.0
 		escalate()
-	if def.time_limit > 0.0 and _elapsed >= def.time_limit:
+	if def.time_limit > 0.0 and _elapsed >= def.time_limit * Vision.time_scale:
 		finish(false, {timed_out = true})
 
 
@@ -269,4 +285,4 @@ func _arm_hint() -> void:
 	if condition.probe or hint_level >= def.max_hint or def.hint_after <= 0.0:
 		_hint_at = 0.0
 		return
-	_hint_at = _elapsed + def.hint_after + def.hint_fade * condition.round_index
+	_hint_at = _elapsed + (def.hint_after + def.hint_fade * condition.round_index) * Vision.help_scale

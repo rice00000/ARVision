@@ -11,3 +11,6 @@ extends Resource
 ## Said when the child faces the place and its menu unfolds.
 @export var arrive := ""
 @export var tasks: Array[Task] = []
+## A few no-help rounds on new things, played before the menu when due
+## (see CheckIns). Null = this place never checks in.
+@export var check_in: SessionPlan

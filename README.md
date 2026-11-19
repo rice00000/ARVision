@@ -11,11 +11,11 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 - **Meta XR Simulator:** runs as XR; without passthrough it uses the simulated room.
 - Options after `--`: `--profile=<id>` (this save for this run only; tests), `--plan=res://content/sessions/<plan>.tres`, `--sim` (simulated room even with passthrough).
 
-**Menu → Staff tools** opens **Tools** for the room intro, restart and exit. Intro jumps appear only in Intro, and Zones only after its layout exists. **Training** and **Saves** share the panel. Training shows difficulty and skip controls only during a block. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps progress and leaves interrupted rounds unscored.
+**Menu → Staff tools** opens **Tools** for the room intro, restart and exit. Intro jumps appear only in Intro, and Zones only after its layout exists. **Training**, **Vision**, **Progress** and **Saves** share the panel. **Vision** sets this child's filter, object size, help timing, time limits and difficulty, saved with the child ([vision profile](docs/vision-profile.md)). Training shows difficulty and skip controls only during a block. The left-palm menu pinch on Quest and **M** on PC also open it. Switching or restarting keeps progress and leaves interrupted rounds unscored.
 
 **Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. For butterflies, pinch the net on the table, then swing it to meet them. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 
-Point and pinch **Menu** on the upper right. **Close** (×) resumes the same round. **Games** offers Find the object and Global motion. **My room** opens the room to arrange it; its **Shop** sells furniture, pets and rooms. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
+Point and pinch **Menu** on the upper right. **Close** (×) resumes the same round; **Stop this game** (any level) goes back to the levels. Dots at the upper right show a level's rounds (gold done, ringed now); the guide says "Last one!" before the last. In games where help only comes when asked, a child who has not tried for 8 s is told once to raise a hand. **Games** offers Find the object and Global motion. **My room** opens the room to arrange it; its **Shop** sells furniture, pets and rooms. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
 
 Run a fixed session with `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
 
@@ -47,13 +47,16 @@ See [architecture](docs/architecture.md), [anticipated experiments](docs/experim
 
 - **Trial:** `trials/<kind>/` with a scene whose root extends `Trial` and a `TrialDef` `.tres`; add a `Block` to a session plan.
 - **View preset:** a `View` `.tres` in `content/views/`.
+- **Vision preset:** a `VisionPreset` `.tres` in `content/vision/`, listed on the Facilitator node in `main.tscn`.
 - **Session:** a `SessionPlan` `.tres` in `content/sessions/`.
-- **Task:** a `Task` `.tres` in `content/tasks/`. Each level has a plan, short title, project and two rewards. [Level configuration](docs/world.md).
+- **Adaptive level:** a block's `drive` (axis → easiest, hardest) and `staircase`; see [adaptive levels](docs/adaptive-levels.md).
+- **Task:** a `Task` `.tres` in `content/tasks/`. Each level has a plan, short title, picture (`tools/card_pictures.py`), project and two rewards. [Level configuration](docs/world.md).
 - **Saved state:** `save_state()` / `load_state()` on a node ([Save](core/save.gd), as in XRVision).
 - **Guide speech:** write the line in `say(...)`; the editor bakes the audio. See [baked speech](docs/baked-speech.md).
 - **Sound effect:** add a recipe to `tools/sound/design.py`, the cue to `modules/sound/sound.gd`, then `Events.play(&"cue", at)`. [Mix](modules/sound/README.md).
 - **Module:** a node under `Main/Modules` extending `Module`, talking through `Events`. Delete the node to unplug it.
 - **Simulated room:** a scene in `reality/rooms/` with `SimSurface` markers and `RealObject`s.
 - **Quest code without a headset:** `python tools/xrsim.py test` (Meta XR Simulator rooms); camera frames: `python tools/frames.py pull` / `check` (see docs/testing.md).
+- **Progress report:** `python3 tools/progress.py pull` (Quest) or `local` → `build/progress/index.html`: each child's check-ins, levels and practice over time. Check-ins (no help, new things) run before a place's menu: first visit, then weekly ([check-ins](docs/check-ins.md)).
 - **Pick data:** every pick is a row in `<save>/picks.csv` (time, save, game, round, target, picked, correct, seconds, accuracy; see [Picks](modules/picks/picks.gd)). One file for all saves: `python tools/picks.py pull` (Quest) or `local` → `build/picks.csv`.
 - **CV on a Quest:** YOLO11n runs on the headset (`addons/yolo`, ONNX Runtime; about 0.3 s a look), no PC needed. The committed `addons/yolo/yolo.aar` is built from `addons/yolo/android/`; after changing the Kotlin, rebuild it with `./gradlew assembleRelease` there (JDK 17, `ANDROID_HOME`). Another model: export it with `yolo export model=<pt> format=onnx imgsz=640` to `modules/cv/yolo11n.onnx`.

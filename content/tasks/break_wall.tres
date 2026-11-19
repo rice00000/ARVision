@@ -5,12 +5,18 @@
 [ext_resource type="Script" uid="uid://b0nl06crubwd" path="res://trials/block.gd" id="3_block"]
 [ext_resource type="Resource" uid="uid://d3v1c8xgcattc" path="res://trials/motion/motion_demo.tres" id="4_motion"]
 [ext_resource type="Script" uid="uid://r0plwybnwais" path="res://world/task_level.gd" id="5_level"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/steady_flow.svg" id="pic_steady_flow"]
+[ext_resource type="Texture2D" path="res://content/tasks/pictures/mixed_flow.svg" id="pic_mixed_flow"]
 
 [sub_resource type="Resource" id="wall_1"]
 script = ExtResource("3_block")
 trial = ExtResource("4_motion")
-rounds = 3
+rounds = 8
 difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"coherence": Vector2(0.9, 0.5)
+})
+staircase = &"global_motion.steady_flow"
 intro = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
 ray = false
 pause_between = 3.0
@@ -27,13 +33,18 @@ script = ExtResource("5_level")
 id = &"steady_flow"
 project = &"flow"
 title = "Steady Flow"
+picture = ExtResource("pic_steady_flow")
 plan = SubResource("level_1")
 
 [sub_resource type="Resource" id="wall_2"]
 script = ExtResource("3_block")
 trial = ExtResource("4_motion")
-rounds = 3
-difficulty = 0.4
+rounds = 8
+difficulty = 0.0
+drive = Dictionary[StringName, Vector2]({
+&"coherence": Vector2(0.6, 0.15)
+})
+staircase = &"global_motion.mixed_flow"
 intro = "Magic dots! Sweep your hand the way they flow, then hold still. Get it right and the spell wall cracks!"
 ray = false
 pause_between = 3.0
@@ -50,6 +61,7 @@ script = ExtResource("5_level")
 id = &"mixed_flow"
 project = &"flow"
 title = "Mixed Flow"
+picture = ExtResource("pic_mixed_flow")
 plan = SubResource("level_2")
 
 [resource]

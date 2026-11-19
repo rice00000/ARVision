@@ -13,7 +13,7 @@ What the team is likely to try (design doc, team sketch) and what the framework 
 | **Passthrough filter A/B:** same trial under normal vs high contrast / greyscale / B&W / edges | visual function, contrast | `Block.view`, `content/views/` | ready |
 | **Less information:** dim the room, spotlight the work area | attention, clutter | `View.dim`, `focus_radius`, `Trial.focus_point()` | ready |
 | **Help that fades:** motion, glow, voice; logged per round | all | `Trial._hint`, `TrialDef.hint_after / hint_fade` | ready |
-| **Pre / post check-in** on new objects, no help | outcome measure | `Block.probe` | ready |
+| **Pre / post check-in** on new objects, no help | outcome measure | `Block.probe`, `CheckIns`, `Place.check_in` ([check-ins](check-ins.md)) | in play: baseline, then weekly |
 | **Contrast sensitivity:** patches on the real wall at falling contrast | visual function | new trial, `surfaces(&"wall")`, driven contrast axis | add a trial |
 | **Reach and touch:** targets at varying depth | vision for action | new trial, `Events.touched`, `Pointer.tip()` | add a trial |
 | **Which is nearer:** two objects in depth | getting around | new trial, `in_front()` | add a trial |
