@@ -17,6 +17,8 @@ script = ExtResource("2_axis")
 name = &"size"
 easy = 0.07
 fixed = nan
+scaled_by = &"size"
+scaled_max = 0.14
 
 [sub_resource type="Resource" id="spacing"]
 script = ExtResource("2_axis")

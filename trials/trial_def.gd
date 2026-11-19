@@ -36,8 +36,11 @@ var id: StringName:
 		return StringName(resource_path.get_file().get_basename())
 
 
-## The settings for one round at [param level]. [param pins] fixes axes by name.
-func condition(level: float, round_index: int, probe: bool, pins: Dictionary = {}) -> TrialCondition:
+## The settings for one round at [param level]. [param pins] fixes axes by name;
+## [param drive] (Block.drive) makes the named axes follow the level from their
+## easiest to their hardest value instead of this trial's own driven axis;
+## axes tagged [member TrialAxis.scaled_by] grow with the child's Vision.
+func condition(level: float, round_index: int, probe: bool, pins: Dictionary = {}, drive: Dictionary = {}) -> TrialCondition:
 	var round_condition := TrialCondition.new()
 	round_condition.trial = id
 	round_condition.skill = skill
@@ -45,5 +48,12 @@ func condition(level: float, round_index: int, probe: bool, pins: Dictionary = {
 	round_condition.round_index = round_index
 	round_condition.probe = probe
 	for axis in axes:
-		round_condition.set_value(axis.name, pins.get(axis.name, axis.resolve(level)))
+		var scale := Vision.scale(axis.scaled_by)
+		if pins.has(axis.name):
+			round_condition.set_value(axis.name, pins[axis.name])
+		elif drive.has(axis.name):
+			var span: Vector2 = drive[axis.name]
+			round_condition.set_value(axis.name, axis.grown(lerpf(span.x, span.y, clampf(level, 0.0, 1.0)), scale))
+		else: # a driven level moves only its own axes
+			round_condition.set_value(axis.name, axis.scaled(0.0 if axis.driven and not drive.is_empty() else level, scale))
 	return round_condition

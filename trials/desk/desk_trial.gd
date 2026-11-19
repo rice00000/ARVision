@@ -38,7 +38,11 @@ func _setup(round_condition: TrialCondition) -> void:
 	Visuals.build_table(_board)
 
 	# Mirror the packed tray between rounds; the narrow pieces never hide beneath a bigger prop.
-	var order := Props.MODELS.keys()
+	# Fewer props are easier; the notebook and pencil always come, for the ending.
+	var extras := ["mug", "headphones", "plant"]
+	extras.shuffle()
+	var count := clampi(roundi(round_condition.value(&"props", 5.0)), 3, 5)
+	var order: Array = ["notebook", "pencil"] + extras.slice(0, count - 2)
 	order.shuffle()
 	var mirror := randf() < 0.5
 	round_condition.set_value(&"tray_order", ",".join(order))
@@ -49,7 +53,7 @@ func _setup(round_condition: TrialCondition) -> void:
 			home.x = -0.39 - home.x
 		# Small turns make the tray look casually scattered; matching never checks precision of rotation.
 		_add_thing(key, Transform3D(Basis(Vector3.UP, randf_range(-0.08, 0.08)), home))
-	for key: String in SPOTS:
+	for key: String in order:
 		var line := Visuals.outline(key)
 		line.position = SPOTS[key]
 		_board.add_child(line)
@@ -66,7 +70,7 @@ func _slot_at(point: Vector3) -> String:
 	var closest := ""
 	var distance := INF
 	for key: String in SPOTS:
-		if not _guides[key].visible:
+		if not _guides.has(key) or not _guides[key].visible:
 			continue
 		var delta: Vector3 = point - SPOTS[key]
 		var size := Props.size_of(key)

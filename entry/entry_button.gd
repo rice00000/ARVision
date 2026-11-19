@@ -44,6 +44,7 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 	_words.position = Vector3(0, 0, 0.007)
 	_face.add_child(_words)
 	target = UITarget.new()
+	target.speech = text
 	target.id = id
 	target.name = String(id)
 	var shape := CollisionShape3D.new()
@@ -58,6 +59,7 @@ func setup(text: String, button_id: StringName, colour: Color, size: Vector2, re
 ## Changes the words on the plate.
 func set_text(text: String) -> void:
 	_words.text = text
+	target.speech = text
 
 
 func text() -> String:

@@ -1,7 +1,14 @@
 [gd_resource type="Resource" script_class="TrialDef" format=3]
 
 [ext_resource type="Script" path="res://trials/trial_def.gd" id="1"]
+[ext_resource type="Script" path="res://trials/trial_axis.gd" id="3"]
 [ext_resource type="PackedScene" path="res://trials/desk/desk.tscn" id="2"]
+
+[sub_resource type="Resource" id="props"]
+script = ExtResource("3")
+name = &"props"
+easy = 5.0
+fixed = nan
 
 [resource]
 script = ExtResource("1")
@@ -11,3 +18,5 @@ skill = &"desk_outline_matching"
 hint_after = 18.0
 max_hint = 1
 time_limit = 0.0
+axes = Array[ExtResource("3")]([SubResource("props")])
+notes = "Props: how many things to put on their outlines (3 to 5); the notebook and pencil always, for the ending. Menu levels drive it (Block.drive)."

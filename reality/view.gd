@@ -37,3 +37,12 @@ func is_graded() -> bool:
 func to_log() -> Dictionary:
 	return {title = title, brightness = brightness, contrast = contrast, saturation = saturation,
 		black_and_white = black_and_white, edges = edges, dim = dim, focus_radius = focus_radius}
+
+
+## The view [method to_log] wrote; missing fields stay neutral.
+static func from_log(data: Dictionary) -> View:
+	var made := View.new()
+	for field: String in data:
+		if field in made:
+			made.set(field, data[field])
+	return made

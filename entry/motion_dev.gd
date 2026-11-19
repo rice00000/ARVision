@@ -57,6 +57,7 @@ func _button(text: String, at: Vector3, id: StringName, wide: float) -> void:
 	var button := EntryButton.new()
 	add_child(button)
 	button.setup(text, id, Color(0.35, 0.4, 0.55), Vector2(wide, 0.05), 0.005)
+	button.target.speech = "" # developer numbers
 	button.global_position = at
 	var head := App.head().global_position
 	button.look_at(Vector3(head.x, at.y, head.z), Vector3.UP)

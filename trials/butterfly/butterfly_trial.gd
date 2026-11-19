@@ -7,6 +7,12 @@ extends Trial
 ## swarm swing counts when the net stops, or is forgiven if it was a wind-up.
 
 ## Below this hoop speed (m/s) the net is not swinging.
+## Catch them all adapts inside the round: each catch speeds the flock up by
+## [constant SPEED_UP], each wrong bump slows it by [constant SPEED_DOWN], between
+## these speeds (m/s). The round starts at the level's speed.
+const SPEED_UP := 1.1
+const SPEED_DOWN := 0.85
+const SPEED_RANGE := Vector2(0.08, 0.45)
 const SWING := 0.3
 ## A swing counts as over once the hoop has been slower than [constant SWING] this long.
 const SWING_STOP := 0.3
@@ -246,15 +252,18 @@ func _score_circle_contact(i: int, at: Vector3, against: float, caught: bool) ->
 	if not caught and (against < 180.0 - _tolerance or seconds() < _quiet_until):
 		return
 	var result := _attempt(against)
-	result.merge({caught = caught, species = _swarm.species_of(i), seconds = snappedf(seconds(), 0.01)})
+	result.merge({caught = caught, species = _swarm.species_of(i), seconds = snappedf(seconds(), 0.01),
+		speed = snappedf(_swarm.speed, 0.001)})
 	_log_attempt(result)
+	_swarm.speed = clampf(_swarm.speed * (SPEED_UP if caught else SPEED_DOWN), SPEED_RANGE.x, SPEED_RANGE.y)
 	if caught:
 		judge(&"good", at)
 		var left := _swarm.flying_count()
 		if left == 0:
 			say("You caught them all! Let them fly free.")
 			var wrong := _attempts.filter(func(a: Dictionary) -> bool: return not a.caught).size()
-			finish(true, {attempts = _attempts.duplicate(), caught = _attempts.size() - wrong, wrong = wrong})
+			finish(true, {attempts = _attempts.duplicate(), caught = _attempts.size() - wrong, wrong = wrong,
+				end_speed = snappedf(_swarm.speed, 0.001)})
 		elif left == 1:
 			say("Just one more!")
 		return

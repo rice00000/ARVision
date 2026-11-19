@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="VisionPreset" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/vision_preset.gd" id="1_preset"]
+[ext_resource type="Script" path="res://reality/view.gd" id="2_view"]
+
+[sub_resource type="Resource" id="view"]
+script = ExtResource("2_view")
+dim = 0.7
+focus_radius = 0.35
+
+[resource]
+script = ExtResource("1_preset")
+label = "Focus"
+view = SubResource("view")
+size_scale = 1.0
+help_scale = 0.75
+time_scale = 1.0

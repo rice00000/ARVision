@@ -16,9 +16,24 @@ extends Resource
 @export var driven := false
 ## Value while not driven. NAN = [member easy].
 @export var fixed := NAN
+## Grows with the child's vision profile: &"size" = times [member Vision.size_scale].
+## Pinned values are taken as they are.
+@export var scaled_by: StringName = &""
+## Highest value scaling may reach (the thing must still fit its place); INF = none.
+@export var scaled_max := INF
 
 
 func resolve(level: float) -> float:
 	if not driven:
 		return easy if is_nan(fixed) else fixed
 	return lerpf(easy, hard, clampf(level, 0.0, 1.0))
+
+
+## [method resolve] grown by [param scale], up to [member scaled_max].
+func scaled(level: float, scale: float) -> float:
+	return grown(resolve(level), scale)
+
+
+## [param value] grown by [param scale], up to [member scaled_max].
+func grown(value: float, scale: float) -> float:
+	return minf(value * scale, maxf(value, scaled_max))

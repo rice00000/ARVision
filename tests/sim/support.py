@@ -20,6 +20,8 @@ class SimCase(unittest.TestCase):
         """Boots the app with the child (`body`) already seated, eyes at its height."""
         profile = profile or "test_sim_" + self.id().split(".")[-1].removeprefix("test_")[:40]
         options.setdefault("eye", load()[0][body].eye_height)
+        if not options.pop("check_ins", False):  # a fresh save would start each place with its baseline check-in
+            options["unplug"] = list(dict.fromkeys([*options.get("unplug", ()), "CheckIns"]))
         sim = Sim(plan_spec, profile=profile, **options)
         sim.start()
         self.addCleanup(sim.close)

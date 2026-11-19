@@ -46,7 +46,8 @@ func _setup(round_condition: TrialCondition) -> void:
 		head + forward * setback + Vector3.DOWN * below)
 	Visuals.counter(_counter, WELL_POSITIONS, PLATE)
 	_recipe = ["lettuce", "tomato", "cheese"]
-	_recipe.shuffle()
+	_recipe.shuffle() # fewer fillings are easier
+	_recipe = _recipe.slice(0, clampi(roundi(round_condition.value(&"fillings", 3.0)), 1, 3))
 	_recipe.append("bread")
 	var tray := _recipe.duplicate()
 	tray.shuffle()

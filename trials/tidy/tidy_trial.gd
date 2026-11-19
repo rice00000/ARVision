@@ -39,6 +39,9 @@ const ODD_BLUE := Color("#4c9cd9")
 const ODD_COLOURS: Array[Color] = [Color("#cb8740"), Color("#12a3c8"), Color("#429ed6")]
 
 const SHAPES: Array[StringName] = [&"ball", &"block", &"cone", &"ring", &"gem"]
+## Check-in things (axis [code]novel[/code]): shapes the child never trains on, so a
+## check-in shows seeing, not remembering. Five, so no look-alikes.
+const NOVEL_SHAPES: Array[StringName] = [&"pyramid", &"prism", &"capsule", &"disc", &"bar"]
 const LOOK_ALIKES: Array[StringName] = [&"egg", &"drum"]
 const COLOURS: Array[Color] = [Color(0.95, 0.3, 0.25), Color(0.25, 0.55, 0.95), Color(0.98, 0.8, 0.2),
 	Color(0.35, 0.8, 0.4), Color(0.75, 0.4, 0.9), Color(0.95, 0.55, 0.2)]
@@ -112,6 +115,7 @@ var _shelf: Node3D
 ## Metres the bench top lies below [member _frame].
 var _below := 0.0
 var _match := SHAPE
+var _novel := false
 var _outline := false
 ## Per cubby (COLUMNS x ROWS, bottom row first): the middle of its floor in the
 ## bench's frame, its card's material, what its sticker shows ("" = no sticker),
@@ -160,6 +164,7 @@ func _setup(round_condition: TrialCondition) -> void:
 	var arrive := things_arrive
 	things_arrive = true
 	_match = int(round_condition.value(&"match", SHAPE))
+	_novel = round_condition.value(&"novel", 0.0) > 0.5
 	if _shelf == null:
 		_build_shelf()
 	_outline = round_condition.value(&"outline", 0.0) > 0.5
@@ -274,7 +279,8 @@ func _add_junk(at: Vector3) -> void:
 ## What fell this round: {key, shape, size, colour}, at most one per sticker the shelf can show.
 func _looks(count: int, size: float) -> Array[Dictionary]:
 	var looks: Array[Dictionary] = []
-	var shape: StringName = SHAPES[_rng.randi_range(0, SHAPES.size() - 1)]
+	var pool := NOVEL_SHAPES if _novel else SHAPES
+	var shape: StringName = pool[_rng.randi_range(0, pool.size() - 1)]
 	var colours := range(COLOURS.size())
 	colours.shuffle()
 	match _match:
@@ -289,9 +295,11 @@ func _looks(count: int, size: float) -> Array[Dictionary]:
 			for i in count:
 				looks.append({key = "%s_%s" % [shape, COLOUR_NAMES[colours[i]]], shape = shape, size = size, colour = COLOURS[colours[i]]})
 		_:
-			var shapes := SHAPES.duplicate()
+			var shapes := pool.duplicate()
 			shapes.shuffle()
-			if count > SHAPES.size(): # the look-alikes and what they look like, then any others
+			if _novel:
+				count = mini(count, pool.size())
+			elif count > SHAPES.size(): # the look-alikes and what they look like, then any others
 				shapes.assign([&"ball", &"block"] + LOOK_ALIKES + shapes.filter(func(other: StringName) -> bool:
 					return not other in [&"ball", &"block"]))
 			for i in mini(count, COLUMNS * ROWS):
@@ -309,7 +317,7 @@ func _odd_colour_looks(size: float) -> Array[Dictionary]:
 		other = Color.from_ok_hsl(hue - gap, 0.8, 0.65)
 		condition.set_value(&"colour_gap", gap)
 	else:
-		other = ODD_COLOURS[int(condition.value(&"colour_step"))]
+		other = ODD_COLOURS[roundi(condition.value(&"colour_step"))]
 	var blue_is_odd := _rng.randf() < 0.5
 	var odd := blue if blue_is_odd else other
 	var pair := other if blue_is_odd else blue

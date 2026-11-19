@@ -31,6 +31,9 @@ var save_key := "levels"
 var _pin: StringName = &""
 var _levels: Dictionary[StringName, float] = {}
 var _streaks: Dictionary[StringName, int] = {}
+## Staircases past their first miss. Before it, each right round steps up twice
+## as far, so a child reaches their level in a few rounds.
+var _settled: Dictionary[StringName, bool] = {}
 
 
 func _ready() -> void:
@@ -49,12 +52,15 @@ func _ready() -> void:
 
 
 func save_state() -> Dictionary:
-	return {levels = _levels, streaks = _streaks}
+	return {levels = _levels, streaks = _streaks, settled = _settled.keys()}
 
 
 func load_state(data: Dictionary) -> void:
 	_levels.assign(data.get("levels", {}))
 	_streaks.assign(data.get("streaks", {}))
+	_settled.clear()
+	for skill: Variant in data.get("settled", []):
+		_settled[StringName(skill)] = true
 
 
 ## Absolute path of [param file] inside this save's folder.
@@ -124,15 +130,38 @@ func switch(save: StringName) -> void:
 		Save.reload())
 
 
-func level(skill: StringName) -> float:
-	return _levels.get(skill, START_LEVEL)
+## Every skill whose staircase has moved or been set.
+func skills() -> Array[StringName]:
+	return _levels.keys()
+
+
+## [param start] while [param skill] has never moved.
+func level(skill: StringName, start := START_LEVEL) -> float:
+	return _levels.get(skill, start)
+
+
+## Puts [param skill] at [param value]: the facilitator's Vision page.
+func set_level(skill: StringName, value: float, start := START_LEVEL) -> void:
+	var before := level(skill, start)
+	_levels[skill] = clampf(value, 0.0, 1.0)
+	_streaks.erase(skill)
+	_settled[skill] = true # staff placed it: no quick start past it
+	Events.report(&"level_set", {skill = skill, before = before, after = _levels[skill]})
+	Save.request()
 
 
 ## Moves [param skill] after a scored round: [param up_after] successes in a row
 ## make it harder by [param step], one failure makes it easier. 2-up / 1-down
-## settles near 71% correct. Returns the new level.
-func adapt(skill: StringName, success: bool, up_after: int, step: float) -> float:
-	var next := level(skill)
+## settles near 71% correct. With [param fast], until the first failure every
+## success steps up by twice [param step] (a quick start). Returns the new level.
+func adapt(skill: StringName, success: bool, up_after: int, step: float, start := START_LEVEL, fast := false) -> float:
+	var next := level(skill, start)
+	if fast and not _settled.has(skill):
+		if success:
+			_levels[skill] = clampf(next + step * 2.0, 0.0, 1.0)
+			Save.request()
+			return _levels[skill]
+		_settled[skill] = true
 	if success:
 		_streaks[skill] = _streaks.get(skill, 0) + 1
 		if _streaks[skill] >= up_after:

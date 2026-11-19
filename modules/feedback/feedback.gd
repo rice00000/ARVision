@@ -12,6 +12,7 @@ const SOUNDS := {
 }
 const WIN := preload("sounds/win.ogg")
 const COLOURS := {bad = Color(0.95, 0.35, 0.3), hint = Color(1.0, 0.85, 0.3)}
+const OUTLINE := Color(0.08, 0.09, 0.12, 0.85)
 
 var _take: Dictionary[StringName, int] = {}
 
@@ -60,32 +61,46 @@ func _mark(kind: StringName, at: Vector3) -> void:
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.no_depth_test = true
 	material.albedo_color = COLOURS[kind]
+	# A dark edge keeps the mark clear on any background: pale walls, bright passthrough.
+	var edge := material.duplicate() as StandardMaterial3D
+	edge.albedo_color = OUTLINE
+	edge.render_priority = -1
 	var mark := Node3D.new()
 	if kind == &"bad":
 		for angle in [PI / 4.0, -PI / 4.0]:
 			var bar := BoxMesh.new()
 			bar.size = Vector3(0.12, 0.022, 0.01)
 			_add_mesh(mark, bar, material, Vector3(0.0, 0.0, angle))
+			var behind := BoxMesh.new()
+			behind.size = Vector3(0.136, 0.038, 0.01)
+			_add_mesh(mark, behind, edge, Vector3(0.0, 0.0, angle)).position.z = -0.004
 	else:
 		var dot := SphereMesh.new()
 		dot.radius = 0.02
 		dot.height = 0.04
 		_add_mesh(mark, dot, material, Vector3.ZERO)
+		var behind := SphereMesh.new()
+		behind.radius = 0.027
+		behind.height = 0.054
+		_add_mesh(mark, behind, edge, Vector3.ZERO).position.z = -0.004
 	add_child(mark)
 	mark.global_position = at + Vector3.UP * 0.1
 	mark.look_at(App.head().global_position)
-	mark.scale = Vector3.ONE * 0.3
+	var grown := Vector3.ONE * Vision.size_scale # bigger for a child who needs bigger things
+	mark.scale = grown * 0.3
 	var tween := mark.create_tween()
-	tween.tween_property(mark, ^"scale", Vector3.ONE, 0.15)
-	tween.tween_property(material, ^"albedo_color:a", 0.0, 0.6).set_delay(0.4)
+	tween.tween_property(mark, ^"scale", grown, 0.15)
+	tween.tween_property(material, ^"albedo_color:a", 0.0, 0.6).set_delay(0.9)
+	tween.parallel().tween_property(edge, ^"albedo_color:a", 0.0, 0.6).set_delay(0.9)
 	tween.tween_callback(mark.queue_free)
 
 
-func _add_mesh(parent: Node3D, mesh: Mesh, material: Material, rotation: Vector3) -> void:
+func _add_mesh(parent: Node3D, mesh: Mesh, material: Material, rotation: Vector3) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
 	instance.material_override = material
 	instance.rotation = rotation
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(instance)
+	return instance
 

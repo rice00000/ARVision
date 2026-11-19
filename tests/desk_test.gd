@@ -44,7 +44,8 @@ func test_outline_level_uses_the_desk_and_keeps_saved_identity() -> void:
 	var level := TASK.level_by_id(&"outline")
 	expect_eq(level.title, "Ready to Study", "desk appears in the existing outline card")
 	expect_eq(level.plan.blocks[0].trial, DESK, "the old shelf-outline path is replaced")
-	expect_eq(level.plan.blocks[0].rounds, 1, "one complete desk")
+	expect_eq(level.plan.blocks[0].rounds, 2, "two desks: room for the level to adapt")
+	expect_eq(level.plan.blocks[0].drive, {&"props": Vector2(3.0, 5.0)}, "three to five props")
 	expect(not level.plan.blocks[0].ray, "reach and pinch")
 
 

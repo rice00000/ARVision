@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="SessionPlan" format=3]
+
+[ext_resource type="Script" path="res://trials/session_plan.gd" id="1_plan"]
+[ext_resource type="Script" path="res://trials/block.gd" id="2_block"]
+[ext_resource type="Resource" path="res://trials/tidy/tidy.tres" id="3_tidy"]
+[ext_resource type="Resource" path="res://trials/tidy/odd_color_adaptive.tres" id="4_colour"]
+
+[sub_resource type="Resource" id="shapes_3"]
+script = ExtResource("2_block")
+trial = ExtResource("3_tidy")
+rounds = 1
+probe = true
+difficulty = 0.0
+pins = Dictionary[StringName, float]({
+&"novel": 1.0,
+&"match": 0.0
+})
+intro = "New shapes! Put each one on its shadow."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="shapes_4"]
+script = ExtResource("2_block")
+trial = ExtResource("3_tidy")
+rounds = 1
+probe = true
+difficulty = 0.34
+pins = Dictionary[StringName, float]({
+&"novel": 1.0,
+&"match": 0.0
+})
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="shapes_5"]
+script = ExtResource("2_block")
+trial = ExtResource("3_tidy")
+rounds = 1
+probe = true
+difficulty = 0.67
+pins = Dictionary[StringName, float]({
+&"novel": 1.0,
+&"match": 0.0
+})
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="colour_easy"]
+script = ExtResource("2_block")
+trial = ExtResource("4_colour")
+rounds = 2
+probe = true
+difficulty = 0.3
+intro = "Now find the block with the different colour."
+ray = false
+pause_between = 1.0
+
+[sub_resource type="Resource" id="colour_hard"]
+script = ExtResource("2_block")
+trial = ExtResource("4_colour")
+rounds = 2
+probe = true
+difficulty = 0.6
+ray = false
+pause_between = 1.0
+
+[resource]
+script = ExtResource("1_plan")
+title = "Table check-in"
+greeting = "Check-in time! Let's see what your eyes can do today. No help this time. Just try your best."
+farewell = "Thank you! That helps us see how your eyes are growing."
+blocks = Array[ExtResource("2_block")]([SubResource("shapes_3"), SubResource("shapes_4"), SubResource("shapes_5"), SubResource("colour_easy"), SubResource("colour_hard")])

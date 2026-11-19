@@ -10,6 +10,7 @@ const RADIUS := 0.08
 
 func _init() -> void:
 	id = &"play_again"
+	speech = "Play again"
 	var shape := CollisionShape3D.new()
 	shape.shape = SphereShape3D.new()
 	(shape.shape as SphereShape3D).radius = RADIUS

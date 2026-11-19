@@ -14,6 +14,12 @@
 [ext_resource type="Resource" path="res://content/views/edges.tres" id="14_edges"]
 [ext_resource type="Resource" path="res://content/views/dim.tres" id="15_dim"]
 [ext_resource type="Resource" path="res://content/views/spotlight.tres" id="16_spotlight"]
+[ext_resource type="Script" path="res://core/vision_preset.gd" id="90_vpreset"]
+[ext_resource type="Script" path="res://modules/check_ins/check_ins.gd" id="95_check_ins"]
+[ext_resource type="Resource" path="res://content/vision/normal.tres" id="91_vnormal"]
+[ext_resource type="Resource" path="res://content/vision/low_acuity.tres" id="92_vacuity"]
+[ext_resource type="Resource" path="res://content/vision/light_sensitive.tres" id="93_vlight"]
+[ext_resource type="Resource" path="res://content/vision/focus.tres" id="94_vfocus"]
 [ext_resource type="Script" uid="uid://cygbefcbaweqm" path="res://reality/view.gd" id="17_view"]
 [ext_resource type="Script" uid="uid://66r4eye1fq4a" path="res://modules/magic/magic.gd" id="19_magic"]
 [ext_resource type="Script" uid="uid://b538l2ldo1b52" path="res://modules/picks/picks.gd" id="20_picks"]
@@ -63,9 +69,13 @@ script = ExtResource("6_detector")
 [node name="Facilitator" type="Node" parent="Modules" unique_id=679936984]
 script = ExtResource("7_facilitator")
 views = Array[ExtResource("17_view")]([ExtResource("10_normal"), ExtResource("11_contrast"), ExtResource("12_grey"), ExtResource("13_bw"), ExtResource("14_edges"), ExtResource("15_dim"), ExtResource("16_spotlight")])
+vision_presets = Array[ExtResource("90_vpreset")]([ExtResource("91_vnormal"), ExtResource("92_vacuity"), ExtResource("93_vlight"), ExtResource("94_vfocus")])
 
 [node name="Magic" type="Node" parent="Modules" unique_id=644224595]
 script = ExtResource("19_magic")
+
+[node name="CheckIns" type="Node" parent="Modules"]
+script = ExtResource("95_check_ins")
 
 [node name="Picks" type="Node" parent="Modules" unique_id=420457793]
 script = ExtResource("20_picks")

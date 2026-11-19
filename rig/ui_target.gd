@@ -3,11 +3,22 @@ extends Target
 ## UI is aimed at and pinched. Its outline is shared by every menu and panel.
 
 const GROUP := &"ui_targets"
+## Seconds of aiming before [member speech] is said.
+const SPEAK_AFTER := 0.6
 signal hover_changed(on: bool)
 
 ## Persistent side entries show a ray only when aimed at, not throughout play.
 var show_ray := true
 var hovered := false
+## Said once the button has been aimed at for [constant SPEAK_AFTER] s, for
+## children who cannot read yet: usually its name. Empty = silent. Bake it
+## (content/voice/speech.tts lines), as every spoken line.
+var speech := ""
+
+## Every name said on hover: one may cut off another, never the guide.
+static var _names: Dictionary[String, bool] = {}
+## Seconds aimed at, counting to [constant SPEAK_AFTER]; negative once said or not aimed.
+var _aimed := -1.0
 var _hands: Dictionary[StringName, bool] = {}
 var _outline: Node3D
 var _flash := 0.0
@@ -55,6 +66,7 @@ func focus(hand: StringName, on: bool) -> void:
 	if hot != hovered:
 		hovered = hot
 		hover_changed.emit(hot)
+		_aimed = 0.0 if hot else -1.0
 		if hot: Events.play(&"ui_hover", global_position)
 
 
@@ -64,6 +76,21 @@ func confirm() -> void:
 
 
 func _process(delta: float) -> void:
+	if _aimed >= 0.0:
+		_aimed += delta
+		if _aimed >= SPEAK_AFTER:
+			_aimed = -1.0
+			_speak()
 	_flash = maxf(0.0, _flash - delta)
 	_outline.visible = collision_layer != 0 and (hovered or _flash > 0.0)
 	_outline.scale = Vector3.ONE * (1.08 if _flash > 0.0 else 1.0)
+
+
+func _speak() -> void:
+	if speech.is_empty() or collision_layer == 0:
+		return
+	var voice := App.module(&"Voice")
+	if voice != null and not voice.speaking().is_empty() and not _names.has(voice.speaking()):
+		return # the guide is talking
+	_names[speech] = true
+	Events.say(speech)

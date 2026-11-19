@@ -22,6 +22,7 @@ run/main_scene.cvlab="res://tools/cv_lab/cv_lab.tscn"
 
 Events="*res://core/events.gd"
 Profile="*res://core/profile.gd"
+Vision="*res://core/vision.gd"
 Log="*res://core/log.gd"
 Save="*res://core/save.gd"
 App="*res://core/app.gd"

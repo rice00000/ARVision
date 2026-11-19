@@ -204,7 +204,9 @@ class Panel(SimCase):
         self.assertEqual(observation["profile"], "test_sim_saves")
         self.assertEqual((observation["world"]["done"], observation["view"]["title"]),
                          ({"tidy_shelf": ["shadow"]}, "Normal"), "where it was left")
-        self.assertEqual([b["id"] for b in self.menu(sim)["buttons"] if b["current"]], ["task_tidy_shelf_similar_shadows"])
+        climbed = [e["data"]["after"] for e in sim.events("reported", "level") if e["data"]["skill"] == "visual_matching.shadow"]
+        lit = "similar_shadows" if climbed and climbed[-1] >= 0.7 else "shadow"  # the menu follows the child
+        self.assertEqual([b["id"] for b in self.menu(sim)["buttons"] if b["current"]], [f"task_tidy_shelf_{lit}"])
 
         self.facilitator.open()
         self.facilitator.press("fac_saves")

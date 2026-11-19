@@ -12,6 +12,7 @@ void fragment() {
 	vec3 reflection = reflect(-view, normal);
 	float sheen = smoothstep(0.80, 0.98, dot(reflection, normalize(vec3(-0.38, 0.61, 0.72))));
 	float highlight = max(edge, sheen * 0.64);
-	ALBEDO = vec3(mix(0.43, 0.96, highlight));
-	ALPHA = mix(0.25, 0.66, highlight);
+	// Bright and fairly solid, a little blue: clear against the dark cubby backs for low vision.
+	ALBEDO = mix(vec3(0.70, 0.82, 0.95), vec3(1.0), highlight);
+	ALPHA = mix(0.48, 0.88, highlight);
 }

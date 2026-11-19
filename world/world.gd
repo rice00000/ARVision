@@ -11,6 +11,9 @@ extends Node
 
 ## Degrees within which the head faces a place (left-right only).
 const FACING := 25.0
+## How far up an adaptive level's range (0 to 1) the child climbs before the
+## menu lights up the next level instead.
+const READY_AT := 0.7
 ## Seconds the child keeps facing a place before its menu unfolds.
 const FACING_SECONDS := 0.5
 ## How far behind the child a place "behind" is, metres.
@@ -52,6 +55,7 @@ func run() -> void:
 		Events.say(first.turn_to)
 		_enter((await _watch())[0])
 	while true:
+		await _check_in()
 		var picked: Array = await _choose()
 		if picked.size() == 1:
 			_enter(picked[0])
@@ -67,11 +71,21 @@ func run() -> void:
 			Events.report(&"task_unfinished", {task = task.id, level = task.levels.find(level) + 1, level_id = level.id})
 
 
-## The first unfinished level of [param task], or null when all are done.
-## Every level is open; this is just the one the menu lights up.
+## A check-in at [member place] before its menu, when one is due (CheckIns).
+func _check_in() -> void:
+	var check_ins := App.module(&"CheckIns") as CheckIns
+	if check_ins and place and check_ins.due(place):
+		await check_ins.run(place)
+
+
+## The level the menu lights up for [param task], or null: the first not yet
+## finished, or finished but not yet climbed to [constant READY_AT] of its
+## range (an adaptive level), so the menu follows the child. Every level stays open.
 func current(task: Task) -> TaskLevel:
 	for level in task.levels:
-		if not level.plan.is_endless() and not App.main.progress.is_done(task, level):
+		if level.plan.is_endless():
+			continue
+		if not App.main.progress.is_done(task, level) or (level.climbed() >= 0.0 and level.climbed() < READY_AT):
 			return level
 	return null
 
