@@ -553,6 +553,7 @@ func _place() -> void:
 	# "Found its place" (Megan's scene review, Nov 17): one soft ring and the click, the same signal as a
 	# shape fitting its cubby and the gear going home. The only feedback here (Carry's hint is off).
 	_sounds.play(&"seat", _socket_at)   # the click, once (PlaceSignal's own click is this same sound)
+	_sounds.play(&"power_up", _socket_at)   # and the mechanism winds up: it runs
 	PlaceSignal.play(self, _socket_at, Vector3.UP, 0.08, false).add_to_group(&"entry_transient")
 	_orb.actions.lean_to(_runner, 0.0, 0.4)
 	_orb.actions.lift(_runner, 0.02, 0.6)   # lifts slightly
@@ -2274,6 +2275,7 @@ func _ripple() -> void:
 			if not point.get(&"shown", false) and (point.position as Vector3).distance_to(_ripple_origin) <= room_radius:
 				point.shown = true
 				_glint(point.position, point.normal)
+				_glint_sound(point.position)
 		if not _puffed and not _cauldron_gone and _box.visible:
 			var to_pot := Vector2(_box.global_position.x - _ripple_origin.x, _box.global_position.z - _ripple_origin.z).length()
 			if to_pot <= table_radius:   # the band reaches the cauldron: it answers (Scene 6)
@@ -2319,6 +2321,7 @@ func _spread(k: float, ring: MeshInstance3D, light: StandardMaterial3D, reach: f
 ## real surfaces they hit. Depth only covers what is in view, about 90 degrees ahead.
 const GLINT_ROWS := 7
 const GLINT_COLUMNS := 15
+const GLINT_GAP := 0.09
 func _sample_room() -> void:
 	_surface_points.append_array(_scan_room())
 	print("ENTRY ripple: ", _surface_points.size(), " real surface points of ", GLINT_ROWS * GLINT_COLUMNS, " rays")
@@ -2342,6 +2345,21 @@ func _scan_room() -> Array[Dictionary]:
 
 
 ## A faint, soft disc of light lying on a real surface, fading out.
+var _glints_heard := 0
+var _glint_heard_at := -INF
+
+
+## A glint's tiny bell from where it lights: up the pentatonic as the light spreads, then round the top; at
+## most one every [constant GLINT_GAP] s, so the room twinkles and never chatters.
+func _glint_sound(at: Vector3) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _glint_heard_at < GLINT_GAP:
+		return
+	_glint_heard_at = now
+	_sounds.play(&"glint", at, Sounds.step(mini(_glints_heard - 5, 4) if _glints_heard < 10 else randi_range(0, 4)))
+	_glints_heard += 1
+
+
 func _glint(at: Vector3, normal: Vector3) -> void:
 	var disc := MeshInstance3D.new()
 	var quad := QuadMesh.new()

@@ -17,6 +17,10 @@ func id() -> StringName:
 
 
 ## Find Objects plays only the shelf (Megan, Nov 18): Wei's five shelf levels by difficulty.
+func place() -> Place:
+	return preload("res://content/places/table.tres")
+
+
 func task() -> Task:
 	return FirstVisit.SHELF_TASK
 

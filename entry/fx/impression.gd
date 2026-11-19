@@ -13,7 +13,7 @@ extends Node3D
 var kind := &""
 ## Its own name, when it isn't its kind's (a level in a game's row: "Size Match"); see [method label].
 var title := ""
-## A level bubble's level (the game's own row), or null.
+## The single level this bubble represents, if any.
 var level: TaskLevel
 ## A look bubble's look (&"normal", &"high_contrast", &"edges", &"black_white"), or &"".
 var look := &""
@@ -43,6 +43,7 @@ var bubble: Node3D
 var bud: Node3D
 var _shell_light: StandardMaterial3D
 var _frost_light: StandardMaterial3D
+var _difficulty_bar: MeshInstance3D
 ## The hover cue (Megan, Nov 18 5:29, option B): a warm glow round the outside of the bubble, its rim turning gold,
 ## and the bubble swelling a little ([member swell], applied by the ring). The old halo sat behind the frost, unseen.
 const HOVER_GOLD := Color(0.79, 0.54, 0.12)          # the rim at full hover (#C98A1E)
@@ -103,6 +104,14 @@ static func make(of_kind: StringName) -> Impression:
 	impression.target = Target.sphere(StringName("impression_%s" % of_kind), 0.1)
 	impression.target.position.y = 0.075
 	impression.add_child(impression.target)
+	return impression
+
+
+## A game's impression drawn from a level's card ([param picture], LevelPiece.drawn): the games made from Wei's
+## tasks (TaskActivity) that have no piece of their own.
+static func make_drawn(of_kind: StringName, picture: Texture2D) -> Impression:
+	var impression := make(of_kind)
+	impression._body.add_child(LevelPiece.drawn(picture, of_kind))
 	return impression
 
 
@@ -195,7 +204,7 @@ func unseal(seconds := 0.8) -> void:
 	if _lock != null and _lock.visible:
 		# The unlock, made explicit (Megan, Nov 18): the shackle clicks open, the lock drops away and fades;
 		# then the frost clears and the piece grows to full size with its sparkle (below).
-		_sounds.play(&"locked_bonk", global_position, 1.6)   # the click
+		_sounds.play(&"lock_click", global_position)   # the shackle springs open
 		var click := create_tween()
 		click.tween_property(_shackle, "position:y", _shackle.position.y + 0.012, 0.25).set_trans(Tween.TRANS_SINE)
 		click.parallel().tween_property(_shackle, "rotation:y", 0.9, 0.25)
@@ -244,12 +253,14 @@ func _update_halo() -> void:
 
 const BUBBLE_RADIUS := 0.125        # round the piece's middle (pieces 12-16 cm wide, up to 8 cm deep: they fit inside from any side; Megan, Nov 18: the shelf poked out at 0.11)
 const MIDDLE := Vector3(0.0, 0.075, 0.0)
+const DIFFICULTY_ARC := preload("res://entry/fx/bubble_difficulty.gdshader")
 const FROST := Color(0.96, 0.97, 0.96)
 const RIM := Color(0.36, 0.36, 0.35)
 const BRASS := Color(0.74, 0.56, 0.24)   # the house's porthole rim: a place, not a game
 const POP_DROPS := 7
 ## What the chosen bubble's title says (and the sound label).
 const TITLES := {&"shelf": "Find Objects", &"dots": "The Dots", &"turn_to_fit": "Turn to Fit", &"house": "Virtual Workshop", &"butterflies": "Butterflies",
+		&"real_life": "Real Life", &"odd_color": "Odd Color",
 		&"stop": "Stop", &"finish": "Finish", &"help": "Help", &"eye": "Looks"}
 ## The looks the eye offers (design chat, Nov 18, DESIGN_STONES_AND_LEVELS §6): their names, said and shown.
 const LOOK_TITLES := {&"normal": "Normal", &"high_contrast": "High contrast", &"edges": "Edges", &"black_white": "Black and white",
@@ -321,6 +332,41 @@ func add_bubble() -> void:
 	bubble.add_child(shine)
 	(target.get_child(0) as CollisionShape3D).shape.set(&"radius", BUBBLE_RADIUS)   # the whole bubble answers
 	_halo.position = MIDDLE + Vector3(0.0, 0.0, -0.05)
+	if level != null and not level.staircase().is_empty():
+		_refresh_difficulty_bar()
+		Events.reported.connect(_on_difficulty_changed)
+
+
+func _on_difficulty_changed(what: StringName, _data: Dictionary) -> void:
+	match what:
+		&"level", &"level_set", &"vision_changed":
+			_refresh_difficulty_bar()
+
+
+## A gold arc under the picture shows the child's current position on this level's staircase.
+func _refresh_difficulty_bar() -> void:
+	var climbed := level.climbed()
+	if climbed < 0.0 or not level.played():
+		if _difficulty_bar != null:
+			_difficulty_bar.hide()
+		return
+	if _difficulty_bar == null:
+		_difficulty_bar = MeshInstance3D.new()
+		_difficulty_bar.name = "DifficultyBar"
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * BUBBLE_RADIUS * 2.0
+		_difficulty_bar.mesh = quad
+		var paint := ShaderMaterial.new()
+		paint.shader = DIFFICULTY_ARC
+		paint.set_shader_parameter(&"track_colour", INK)
+		paint.set_shader_parameter(&"fill_colour", HOVER_BRASS)
+		_difficulty_bar.material_override = paint
+		_difficulty_bar.position.z = 0.025
+		_difficulty_bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bubble.add_child(_difficulty_bar)
+	var paint := _difficulty_bar.material_override as ShaderMaterial
+	paint.set_shader_parameter(&"progress", climbed)
+	_difficulty_bar.show()
 
 
 ## The hover glow: a soft warm ring just outside the bubble's rim, fading out over ~6 cm (at scale 1).

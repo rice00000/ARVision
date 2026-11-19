@@ -15,6 +15,8 @@ extends Resource
 
 ## The staircase of this level's adaptive block (Block.drive), or &"" when it plays fixed.
 func staircase() -> StringName:
+	if plan == null: # Turn to Fit runs its own activity.
+		return &""
 	for block in plan.blocks:
 		if not block.drive.is_empty():
 			return block.staircase if not block.staircase.is_empty() else block.trial.skill

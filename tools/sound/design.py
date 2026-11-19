@@ -58,6 +58,13 @@ SRC = {
     'thumb': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Data,Beep,Notifier,Thumb Pluck.wav',
     'glassy': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Data,Beep,Glassy Pluck,High 2.wav',
     'soft54': UP + 'Accusonus SFX Cellar/Whoosh/SFX Cellar - Whoosh 54.wav',
+    'burst1': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Comedy,Blip,Bubble Burst,Small 1.wav',
+    'burst2': UP + 'aXLsound/Big Room Sound/User Interface Sounds 用户界面音效/Comedy,Blip,Bubble Burst,Small 2.wav',
+    'lock_up': UP + 'Cinetools/ST069 Treasure Chest（宝箱）/TCH_Chest_LockUp_4_ST.wav',
+    'lock_open': UP + 'Cinetools/ST069 Treasure Chest（宝箱）/TCH_Chest_Lock_Open_3_ST.wav',
+    'strings_c': UP + 'CB_Sounddesign/Dreamcatcher（悠扬梦幻氛围）/04_Pads/Deep_Strings_Pad_2.wav',
+    'enchant_c': UP + 'CB_Sounddesign/Dreamcatcher（悠扬梦幻氛围）/03_Melodic Drones/Enchanting_Bells_10.wav',
+    'door_knock': UP + 'Carma Studio/CAFOFO/Doors（门）/Door Knock 1_1.wav',
 }
 
 
@@ -245,16 +252,14 @@ def handling():
 
 
 def butterflies():
-    """Net swing swish, a catch (a soft cloth flump with two quick wing beats), and released butterflies."""
+    """Net swing swish, a catch (the net's mesh brushing softly), and released butterflies."""
     for i, k in enumerate(['swish51', 'swish78', 'swish86']):
         y = hp(src(k), 350)
         y = mix((y, 0, 0), (hp(speed(src('blanket'), 3), 600), 0.0, -12))
         cue(fade(trim(y, -45), 0.01, 0.15), f'swish_{i + 1}', -27.0)
-    flaps = src('wings_by')
-    for i, s in enumerate([2.80, 3.30]):
-        beats = speed(hp(cut(flaps, s, s + 0.35), 400), 9)    # small wings, fast
-        y = mix((hp(speed(src('blanket'), 4), 200), 0, 0), (beats, 0.04, -6), (hp(src('pop6'), 400), 0.02, -14))
-        cue(fade(y, 0.003, 0.12), f'catch_{i + 1}', -25.0)
+    for i, s in enumerate([0.1, 0.35]):     # a catch: just the soft brush of the net's mesh
+        y = lp(hp(speed(src('blanket', s, s + 0.3), 5), 900), 5000)
+        cue(fade(y, 0.01, 0.15), f'catch_{i + 1}', -36.0)
     away = speed(hp(src('wings_away', 4.6, 6.9), 500), 10)
     cue(fade(away, 0.15, 0.6), 'flutter_away', -31.0)
 
@@ -330,18 +335,150 @@ def opening():
            channels=1)
     y = mix((src('gears_tick'), 0, 0), (cut(src('place3'), 0.04, 0.4), 0.0, -3))
     export(level(fade(eq(y, low=(200, 2)), 0.002, 0.15), -23.0), out('entry/assets/audio/gear_land.ogg'), channels=1)
-    swell = fade(hp(src('air2', 0.4, 1.9), 200), 1.0, 0.1)
-    harp = fade(speed(src('harp_e', 0.0, 3.2), -4), 0.05, 1.4)
-    chord = fade(src('guitar_c', 0.0, 3.0), 0.02, 1.8)
-    bells = hp(fade(src('windbells', 0.2, 3.0), 0.1, 1.6), 3000)
-    y = mix((swell, 0, -4), (harp, 1.2, -6), (chord, 1.5, -12), (bells, 1.5, -15),
-            (lp(marimba('C3', 2.4), 700), 1.5, -14))
-    y = verb(y, 0.6, 0.22, ring=0.8)
-    export(level(length(y, 4.2, 1.6), -20.0), out('entry/assets/audio/reveal.ogg'), channels=1)
+    export(level(reveal(), -18.0), out('entry/assets/audio/reveal.ogg'), channels=1)
+    export(level(power_up(), -20.0), out('entry/assets/audio/power_up.ogg'), channels=1)
+    y = mix((celesta('C6', 0.9, seed=40), 0, 0), (glass('C7', 0.6, seed=41), 0.0, -14), (sparkle(0.35, seed=42), 0.01, -20))
+    export(level(length(verb(y, 0.5, 0.2, ring=0.5), 1.0, 0.6), -31.0), out('entry/assets/audio/glint.ogg'), channels=1)
+
+
+# The reveal's front of light: 5 s out from the socket on a sine ease (fast, then ever slower), then a 2 s
+# afterglow round the gear (Entry.RIPPLE_SECONDS, HubGlow).
+FRONT = 5.0
+
+
+def reveal():
+    """The light leaves the socket: a deep bloom, a harp sweeping up with it, strings and enchanted bells
+    swelling into C major while it travels, glitter that thins as the front slows, wind bells as it settles."""
+    bloom = mix((lp(marimba('C2', 3.0, seed=7), 380), 0, 0), (lp(marimba('G2', 2.6, seed=8), 600), 0.02, -6),
+                (lp(speed(cut(src('place6'), 0.1, 0.37), -10), 300), 0.0, -8))
+    harp = fade(speed(src('harp_e', 0.0, 3.2), -4), 0.02, 1.6)
+    strings = fade(src('strings_c', 3.0, 10.0), 1.4, 3.0)
+    enchant = hp(fade(src('enchant_c', 4.0, 11.0), 1.8, 3.0), 1200)
+    chord = fade(src('guitar_c', 0.0, 4.0), 0.02, 2.2)
+    air = fade(hp(src('air2', 0.4, 2.4), 200), 0.05, 1.2)
+    rng = np.random.default_rng(5)
+    glitter = []
+    for k in range(14):                   # as many specks as the front covers: dense first, sparse later
+        t = FRONT * (2 / np.pi) * np.arcsin(k / 14)
+        glitter.append((pan(sparkle(0.35, seed=50 + k), rng.uniform(-0.6, 0.6)), t, -14 - 6 * k / 14))
+    bells = hp(fade(src('windbells', 0.2, 3.0), 0.1, 1.8), 3000)
+    lift = mix(*[(celesta(n, 1.6, seed=60 + k), 0.12 * k, -2) for k, n in enumerate(['C5', 'E5', 'G5', 'C6'])])
+    y = mix((bloom, 0, -2), (air, 0, -10), (harp, 0.05, -4), (lift, 0.1, -9), (chord, 0.4, -9), (strings, 0.2, 0),
+            (enchant, 0.6, -7), (lp(marimba('C3', 3.0, seed=9), 700), 0.4, -12), *glitter, (bells, FRONT - 0.3, -14))
+    y = eq(y, low=(120, 1), peaks=((300, -2.0, 0.8),))
+    y = verb(y, 0.75, 0.24, damp=0.45, ring=1.5)
+    return length(y, FRONT + 3.0, 2.6)
+
+
+def power_up():
+    """The gear seated (after Seat's click): the mechanism engages with a weighty clunk, its little gear
+    train ratchets faster and faster, and a warm hum swells up into a bright C-major arrival: it runs."""
+    clunk = mix((lp(speed(cut(src('place6'), 0.1, 0.37), -7), 900), 0, 0), (hp(src('gears_click'), 300), 0.0, -6))
+    gear = src('plastic_gear')
+    hits = [0.021, 0.128, 0.203, 0.597, 0.789, 0.896]
+    rng = np.random.default_rng(11)
+    clicks, t, gap = [], 0.0, 0.12
+    for k in range(16):                    # winding up: each click sooner and a touch higher
+        s = hits[rng.integers(len(hits))]
+        grain = fade(cut(gear, s, s + 0.08), 0.0, 0.05)
+        clicks.append((speed(grain, -2 + k * 0.25), t, -10 + 6 * min(k, 8) / 8 - max(0, k - 10) * 1.5))
+        t += gap
+        gap = max(0.035, gap * 0.85)
+    hum = fade(mix((glass('C3', 1.6), 0, 0), (glass('G3', 1.6, 1), 0, -4), (glass('C4', 1.4, 2), 0, -8)), 0.6, 0.6)
+    rise = mix(*[(celesta(n, 1.2, seed=70 + k), 0.07 * k, -k * 0.5) for k, n in enumerate(['C5', 'E5', 'G5', 'C6'])])
+    y = mix((clunk, 0.12, 0), (mix(*clicks), 0.2, -4), (hum, 0.25, -10), (rise, 0.85, -6),
+            (sparkle(0.5, seed=12), 0.95, -16))
+    y = verb(y, 0.4, 0.15, ring=0.6)
+    return length(y, 2.0, 0.7)
+
+
+# ---- the hub over the cauldron (entry/assets/audio, played by entry/sounds.gd) ---------------------------
+
+# Seconds into brew_sink at which the bubbles meet the brew (Sounds.BREW_LAND).
+BREW_LAND = 0.42
+
+
+def hub_out(y, name, target):
+    export(level(y, target), out(f'entry/assets/audio/{name}.ogg'), channels=1)
+
+
+def signature(notes, under=None, gap=0.07, under_db=-8.0):
+    """A bubble's own little motif: [notes] as thumb plucks with their glass octave, [under] (a foley hit) at
+    the start, a short room."""
+    y = plucks(notes, gap)
+    if under is not None:
+        y = mix((y, 0, 0), (under, 0.0, under_db))
+    return length(verb(y, 0.3, 0.12, ring=0.35), 0.55, 0.3)
+
+
+def hub():
+    """The bubble menu: hover, the chosen bubble's pop and name, locked and unlocked bubbles, menus, stones,
+    and a short motif for every game and button bubble (each its own, Effects chat Nov 17)."""
+    tink = mix((hp(glassy('E6'), 1200), 0, 0), (hp(thumb('E5'), 600), 0.0, -14))     # pitched per bubble along the arc
+    hub_out(length(tink, 0.25, 0.18), 'hover_tink', -34.0)
+    y = mix((hp(src('burst1'), 300), 0, 0), (hp(src('pop14'), 500), 0.0, -10), (glass('C7', 0.4), 0.01, -18),
+            (sparkle(0.3, seed=31), 0.02, -22))
+    hub_out(length(trim(y, -50), 0.45, 0.3), 'bubble_pop', -22.0)
+    roll = mix(*[(celesta(n, 1.4, seed=k), 0.05 * k, -k * 1.0) for k, n in enumerate(['C6', 'E6', 'G6'])])
+    y = mix((roll, 0, 0), (lp(marimba('C4', 1.0, seed=2), 1500), 0.0, -14),
+            (hp(fade(src('windbells', 0.2, 1.2), 0.02, 0.7), 3500), 0.08, -18))
+    hub_out(length(verb(y, 0.45, 0.18, ring=0.5), 1.3, 0.6), 'chosen_chime', -24.0)
+    # A closed bubble pressed: the little lock jiggles, muffled, over a low wooden note (never a buzzer).
+    jiggle = lp(hp(trim(src('lock_up'), -40), 200), 1600)
+    y = mix((fade(jiggle, 0.0, 0.2), 0, -5), (lp(marimba('D4', 0.5, seed=5), 1800), 0.01, 0))
+    hub_out(length(y, 0.4, 0.2), 'locked_bonk', -29.0)
+    # The shackle springs open: one bright small click.
+    hub_out(fade(eq(cut(src('lock_open'), 0.015, 0.17), low=(250, -6)), 0.0, 0.08), 'lock_click', -27.0)
+    # It opened: a rising fifth and octave with a harp touch and glitter.
+    harp = fade(speed(src('harp_e', 0.0, 0.9), -4), 0.01, 0.5)
+    y = mix((plucks(['C5', 'G5', 'C6'], 0.06), 0, 0), (harp, 0.02, -12), (sparkle(0.6, seed=32), 0.1, -22))
+    hub_out(length(verb(y, 0.4, 0.16, ring=0.45), 1.1, 0.55), 'unlock', -24.0)
+    # The bubbles rise out of the brew (ImpressionRing.rise, eased out: most of the move at once): a bloop
+    # leaving the surface, a lift of air, a quick C-E-G that settles as they do.
+    bloop = lp(hp(cut(src('bubbles'), 0.29, 0.40), 250), 5000)
+    lift = fade(hp(src('soft72', 0.25, 0.85), 400), 0.02, 0.35)
+    y = mix((bloop, 0, 0), (fade(hp(speed(cut(src('bubbles'), 1.31, 1.42), 3), 400), 0, 0.05), 0.05, -6),
+            (lift, 0.0, -10), (plucks(['C5', 'E5', 'G5'], 0.07), 0.06, -4))
+    hub_out(length(verb(y, 0.3, 0.12, ring=0.4), 0.8, 0.4), 'brew_rise', -27.0)
+    # They sink back in (ImpressionRing.sink, eased in: slow, then faster): air drawn in, a falling G-E-C, and
+    # a soft low gulp as they enter the brew at BREW_LAND s (Sounds.BREW_LAND: the ring plays this so).
+    drawn = fade(hp(src('soft72', 0.25, 0.85), 400)[::-1], 0.3, 0.02)
+    gulp = mix((lp(speed(cut(src('bubbles'), 0.29, 0.40), -6), 1800), 0, 0), (lp(speed(src('pop9'), -7), 1500), 0.01, -4),
+               (lp(marimba('C4', 0.5, seed=13), 1200), 0.0, -8))
+    y = mix((drawn, 0, -12), (plucks(['G5', 'E5', 'C5'], 0.06), 0.1, -6), (gulp, BREW_LAND, 0))
+    hub_out(length(verb(y, 0.3, 0.12, ring=0.4), 0.95, 0.35), 'brew_sink', -27.0)
+    # A stone lands in the house's badge, under any voice.
+    gem = lp(fade(trim(src('gem_g'), -50), 0.0, 0.25), 7000)
+    y = mix((gem, 0, 0), (celesta('G6', 0.6, seed=6), 0.01, -4))
+    hub_out(length(verb(y, 0.25, 0.1, ring=0.3), 0.6, 0.3), 'stone_clink', -27.0)
+    # The gear lifted off the table: a light pick-up with a tiny metal tick (the set-down is gear_land).
+    y = mix((hp(cut(src('pickup4'), 0.73, 1.0), 200), 0, 0), (hp(src('gears_tick'), 1500), 0.02, -12))
+    hub_out(fade(y, 0.003, 0.12), 'gear_lift', -26.0)
+    wood = lp(cut(src('place6'), 0.1, 0.35), 2500)
+    knock = lp(trim(src('door_knock'), -40), 1800)
+    drops = mix((hp(src('pop1'), 400), 0, 0), (hp(speed(src('pop9'), 3), 600), 0.08, -3))
+    tick = hp(src('gears_tick'), 800)
+    wings = speed(hp(cut(src('wings_by'), 2.80, 3.10), 400), 9)
+    signatures = {
+        'shelf': signature(['C5', 'E5'], wood),                    # a book set on the shelf
+        'dots': signature(['G5', 'C6'], drops, under_db=-6.0),     # little lights
+        'turn_to_fit': signature(['E5', 'G5'], tick),              # the cup's click
+        'house': signature(['C4', 'G4'], knock, gap=0.09),         # a place: low, a knock on its door
+        'butterflies': signature(['E6', 'G6'], wings, gap=0.05),
+        'real_life': signature(['G4', 'C5'], wood),
+        'odd_color': signature(['A5', 'E6'], drops),
+        'help': signature(['D5', 'A5']),
+        'eye': signature(['G5', 'D6'], sparkle(0.4, seed=33), under_db=-20.0),
+        'look': signature(['E5', 'B5'], sparkle(0.4, seed=34), under_db=-20.0),
+        'stop': signature(['G4', 'C4']),
+        'finish': signature(['G5', 'E5', 'C5'], gap=0.06),
+    }
+    for kind, y in signatures.items():
+        hub_out(y, f'impression_{kind}', -25.0)
 
 
 RECIPES = {f.__name__: f for f in [good, bad, hint, win, ui, menu, transition, room, handling, butterflies, sweep,
-                                    rewards, magic, opening]}
+                                    rewards, magic, opening, hub]}
 
 if __name__ == '__main__':
     names = sys.argv[1:] or list(RECIPES)

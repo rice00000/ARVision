@@ -8,9 +8,9 @@ var entry: Entry
 
 
 ## Into the hub. [param prep] runs after boot, before the opening hands over (to set saved progress).
-func _to_hub(prep := Callable(), first := &"") -> WorkshopController:
+func _to_hub(prep := Callable(), first := &"", check_ins := false) -> WorkshopController:
 	Engine.time_scale = 1.0
-	await boot(null, &"intro")
+	await boot(null, &"intro", check_ins)
 	app.autostart = true
 	entry = app.get_node(^"Intro/Entry")
 	entry.plan_at_start = false
@@ -25,14 +25,18 @@ func _to_hub(prep := Callable(), first := &"") -> WorkshopController:
 	return app.find_child("WorkshopController", true, false) as WorkshopController
 
 
+## Games played on earlier visits.
 func _played(ids: Array[StringName]) -> void:
 	var memory := HubMemory.get_or_make()
 	for id in ids:
 		memory.played.append(id)
 
 
+## Finished, and climbed past TaskProgress.READY_AT (so the next level is the one to play).
 func _done(levels: Array[StringName]) -> void:
 	App.main.progress.done[&"tidy_shelf"] = levels.duplicate()
+	for id in levels:
+		Profile.set_level(SHELF.level_by_id(id).staircase(), TaskProgress.READY_AT)
 
 
 func _open(hub: WorkshopController) -> bool:
@@ -66,7 +70,7 @@ func _stones() -> int:
 
 
 func test_the_dots_with_nothing_right_still_earn_three_stones_and_no_trophy() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	var dots := _piece(hub, &"dots")
 	expect(dots != null and not dots.sealed, "the dots are open (the shelf was played on an earlier visit)")
@@ -100,7 +104,7 @@ func test_leaving_a_game_by_the_x_earns_one_stone_and_never_marks_it_done() -> v
 
 
 func test_the_dots_pause_bubble_has_no_eye() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"dots").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
@@ -124,7 +128,7 @@ func test_nothing_done_one_press_starts_the_first_level() -> void:
 
 func test_with_levels_done_a_press_opens_the_games_own_row_and_nothing_starts_by_itself() -> void:
 	var hub := await _to_hub(func() -> void:
-		_played([&"shelf"])
+		_played([&"shelf", &"real_life"])
 		_done([&"shadow", &"size"]))
 	expect_eq(_piece(hub, &"shelf").rows, 3, "the shelf has 3 rows (2 levels done)")
 	expect(await _open(hub), "the menu opens")
@@ -175,7 +179,7 @@ func test_the_shelf_grows_a_row_per_level_up_to_four() -> void:
 
 func test_the_eye_shows_the_looks_and_a_pinch_changes_the_real_room_and_is_saved() -> void:
 	var reported := record(Events.reported)
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	var row := hub.ring.places.map(func(p: Impression) -> StringName: return p.kind)
 	expect_eq(row, [&"help", &"eye", &"house", &"finish"], "? · eye · house · ✕")
@@ -207,7 +211,7 @@ func test_the_eye_shows_the_looks_and_a_pinch_changes_the_real_room_and_is_saved
 
 func test_the_dots_use_their_own_dim_and_the_childs_look_comes_back_after() -> void:
 	var hub := await _to_hub(func() -> void:
-		_played([&"shelf"])
+		_played([&"shelf", &"real_life"])
 		HubMemory.get_or_make().choose_look(&"high_contrast"))
 	expect(await _open(hub), "the menu opens")
 	expect_eq(App.session.base_view.title, "High contrast", "the saved look is the base view")
@@ -240,7 +244,7 @@ func test_the_shelf_pause_eye_opens_the_looks_and_the_game_carries_on_after() ->
 
 
 func test_weis_room_from_the_house_has_no_menu_a_cauldron_to_go_back_and_teal_stones() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	var home := App.module(&"Home")
 	_pinch(hub.ring.door.target)
@@ -259,7 +263,7 @@ func test_weis_room_from_the_house_has_no_menu_a_cauldron_to_go_back_and_teal_st
 
 
 func test_staff_tools_restart_fresh_child_starts_a_new_save_from_the_hello() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf", &"dots"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life", &"dots"]))
 	expect(await _open(hub), "the menu opens")
 	var before := Profile.id
 	input.menu()   # Staff tools (M)
@@ -276,7 +280,7 @@ func test_staff_tools_restart_fresh_child_starts_a_new_save_from_the_hello() -> 
 
 ## Megan, Nov 18: the dots run with the ray off, so a real pinch at the cauldron selected nothing: no way out.
 func test_a_real_pinch_at_the_cauldron_pauses_the_dots_and_the_x_ends_them() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"dots").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
@@ -315,7 +319,7 @@ func _real_pinch_at(target: Target) -> void:
 ## Megan, Nov 18 (2:04 pm): the shelf too; the cauldron only takes a pinch now (not a pass of the hand), so the
 ## pinch has to get there with the ray off.
 func test_a_real_pinch_at_the_cauldron_pauses_the_shelf() -> void:
-	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"shelf").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the shelf plays")
@@ -360,3 +364,90 @@ func test_the_hub_begins_in_the_childs_look_whatever_was_left_on_the_room() -> v
 	var hub := await _to_hub(func() -> void: App.reality.apply_view(dark))
 	expect(await until(func() -> bool: return hub.state == &"hub", 20.0), "the hub")
 	expect(is_zero_approx(App.reality.view.dim), "no dim left on the room")
+
+
+func test_real_life_opens_after_the_first_game_and_plays_weis_ready_to_study_on_the_bench() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	expect(await _open(hub), "the menu opens")
+	var real_life := _piece(hub, &"real_life")
+	expect(real_life != null and not real_life.sealed, "Real Life is open after the first game")
+	expect(_piece(hub, &"dots").sealed, "the dots open after Real Life")
+	expect(real_life.find_child("drawn_real_life", true, false) != null, "its bubble wears Ready to Study's drawing")
+	_pinch(real_life.target)
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 30.0), "Real Life plays")
+	expect_eq(hub.current.played_level.id, &"outline", "Ready to Study, the first")
+	expect(String(App.session.trial.get_script().resource_path).contains("desk"), "Wei's desk")
+	Engine.time_scale = 4.0
+	await _finish_rounds()
+	expect(await until(func() -> bool: return hub.state == &"hub", 90.0), "back at the hub")
+	Engine.time_scale = 1.0
+	expect(App.main.progress.is_done(SHELF, SHELF.level_by_id(&"outline")), "Ready to Study is marked done")
+	expect(_stones() > 0, "stones for it")
+
+
+func test_levels_megan_has_not_drawn_show_their_own_drawing_in_the_games_frame() -> void:
+	var hub := await _to_hub(func() -> void:
+		_played([&"shelf", &"real_life"])
+		_done([&"outline"]))
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"real_life").target)
+	expect(await until(func() -> bool: return hub.row != null and hub.row.opened, 10.0), "Real Life's own row rises")
+	var titles := hub.row.impressions.map(func(p: Impression) -> String: return p.title)
+	expect_eq(titles, ["Ready to Study", "Bookshelf Match"], "the finished level and the next one")
+	expect(hub.row.impressions.all(func(p: Impression) -> bool: return p.find_child("drawn_real_life", true, false) != null),
+			"each wears its level's drawing")
+	_pinch(hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.row == null and hub.ring.opened, 10.0), "back to the menu")
+
+
+func test_a_check_in_comes_before_a_game_played_before_when_one_is_due() -> void:
+	var reported := record(Events.reported)
+	var hub := await _to_hub(func() -> void: HubMemory.get_or_make().played.append_array([&"shelf", &"real_life"]), &"", true)
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"shelf").target)
+	expect(await until(func() -> bool: return reported.any(func(r: Array) -> bool: return r[0] == &"check_in_started"), 30.0),
+			"the table's check-in starts first (none done yet)")
+	expect(hub.state == &"game", "inside the game's time: the cauldron pauses it")
+
+
+## Nov 19: picking Ready to Study opened the table's shelf check-in first; it measures shelf shapes and odd colour.
+func test_real_life_goes_straight_to_its_level_with_no_check_in() -> void:
+	var reported := record(Events.reported)
+	var hub := await _to_hub(func() -> void: HubMemory.get_or_make().played.append_array([&"shelf", &"real_life"]), &"", true)
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"real_life").target)
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running(), 30.0), "a game plays")
+	expect(String(App.session.trial.get_script().resource_path).contains("desk"), "Ready to Study's desk")
+	expect(not reported.any(func(r: Array) -> bool: return r[0] == &"check_in_started"), "no check-in")
+
+
+## Nov 19 (laptop test): on Wei's desk, pinching a notebook with the cauldron behind it paused the game (Stop ·
+## Looks rose and nothing could be picked up); and pinching inside the ✕ did nothing.
+func test_picking_up_a_desk_thing_never_pauses_and_a_pinch_inside_the_x_presses_it() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf"]))
+	expect(await _open(hub), "the menu opens")
+	_pinch(_piece(hub, &"real_life").target)
+	expect(await until(func() -> bool: return hub.state == &"game" and App.session.trial != null and App.session.trial.is_running(), 30.0), "Ready to Study plays")
+	var reported := record(Events.reported)
+	var things: Array = App.session.trial.get(&"_things")
+	var thing := things[0] as Node3D
+	var at := thing.global_position
+	App.sim_input.set_hand(&"right", Transform3D(Basis.looking_at(hub.cauldron_target.global_position - at), at))
+	await frames(3)
+	App.sim_input.press(&"right", &"trigger_click", true)
+	await frames(3)
+	expect(reported.any(func(r: Array) -> bool: return r[0] == &"taken"), "the notebook is picked up")
+	await wait(0.5)
+	expect(hub.stop_bubble == null and not app.get_tree().paused, "and the game never paused")
+	App.sim_input.press(&"right", &"trigger_click", false)
+	await wait(1.0)
+	await _real_pinch_at(hub.cauldron_target)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a pinch aimed at the cauldron still pauses")
+	await wait(0.8)
+	var x := hub.stop_bubble.target.global_position
+	App.sim_input.set_hand(&"right", Transform3D(Basis.looking_at(Vector3.FORWARD), x))
+	await frames(3)
+	App.sim_input.press(&"right", &"trigger_click", true)
+	await frames(2)
+	App.sim_input.press(&"right", &"trigger_click", false)
+	expect(await until(func() -> bool: return hub.state == &"hub" and not app.get_tree().paused, 20.0), "a pinch with the fingertip in the ✕: back at the hub")

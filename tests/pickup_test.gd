@@ -25,15 +25,10 @@ func _count(key: StringName) -> int:
 
 
 func test_the_lift_and_the_set_down_are_two_different_sounds_and_neither_is_the_click() -> void:
-	var lift: Dictionary = Sounds.BORROWS.gear_lift
 	var drop: Dictionary = Sounds.BORROWS.gear_drop
-	expect(lift.file != drop.file or not is_equal_approx(lift.pitch, drop.pitch), "lift and set-down differ")
+	expect(Sounds.KEYS.has(&"gear_lift"), "the lift has its own sound")
 	expect(drop.file != &"seat", "the set-down never borrows the seating click's file (a drop is not a success)")
-	expect(lift.file != &"seat", "nor does the lift")
-	# Merge with Wei's sounds (Nov 18): every opening sound plays on his SFX bus, mixed under the voice there;
-	# the borrowed cues are never louder than their source file.
-	for sound: Dictionary in [lift, drop]:
-		expect(float(sound.db) <= 0.0, "no louder than its source on the SFX bus (%.0f dB)" % sound.db)
+	expect(float(drop.db) <= 0.0, "no louder than its source on the SFX bus (%.0f dB)" % drop.db)
 
 
 func test_picking_the_gear_up_plays_the_lift_from_the_gear() -> void:

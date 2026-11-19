@@ -44,16 +44,17 @@ static func has_picture(level_id: StringName) -> bool:
 	return PICTURES.has(level_id)
 
 
-## Gives [param piece] the picture of [param level]'s rule in place of its game piece. False (and the piece
-## left as it was) when the level has no picture yet.
+## Gives [param piece] the picture of [param level]'s rule in place of its game piece: Megan's own where she drew
+## one, else the level's drawing ([member TaskLevel.picture]) in the game's frame. False (and the piece left as
+## it was) when the level has neither.
 static func dress(piece: Impression, level: TaskLevel) -> bool:
-	if piece == null or level == null or not has_picture(level.id):
+	if piece == null or level == null or not (has_picture(level.id) or level.picture != null):
 		return false
 	var body: Node3D = piece.get(&"_body")
 	for child in body.get_children():
 		body.remove_child(child)
 		child.free()
-	body.add_child(make(level.id))
+	body.add_child(make(level.id) if has_picture(level.id) else drawn(level.picture, piece.kind))
 	piece.set_meta(&"level_picture", level.id)
 	return true
 
@@ -80,6 +81,33 @@ static func make(level_id: StringName) -> Node3D:
 		&"both_ways": p._butterflies(2)
 	return root
 
+
+## [param picture] (a level's flat drawing, Wanchun's cards) cut round on [param game]'s disc: navy for the
+## butterflies, wood for the rest. Its middle at [constant MIDDLE], like Megan's pictures.
+static func drawn(picture: Texture2D, game: StringName) -> Node3D:
+	var root := Node3D.new()
+	root.name = "drawn_%s" % game
+	var p := LevelPiece.new()
+	p._root = root
+	if game == &"butterflies":
+		p._navy_frame()
+	else:
+		p._wood_frame()
+	var face := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * 72.0 * U   # the frame's inner disc
+	var paint := ShaderMaterial.new()
+	paint.shader = ROUND
+	paint.set_shader_parameter(&"picture", picture)
+	quad.material = paint
+	face.mesh = quad
+	face.position = MIDDLE + Vector3(0, 0, FACE - 0.002)
+	root.add_child(face)
+	return root
+
+
+## The card cut to a circle just inside its own square border (0.93 of the card).
+const ROUND := preload("res://entry/fx/round_picture.gdshader")
 
 var _root: Node3D
 

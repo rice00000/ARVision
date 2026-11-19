@@ -17,6 +17,10 @@ func id() -> StringName:
 
 
 ## One fixed level (Steady Flow): the motion graphs need the same conditions every round (Megan, Nov 18).
+func place() -> Place:
+	return preload("res://content/places/motion.tres")
+
+
 func task() -> Task:
 	return MotionVisit.WALL_TASK
 

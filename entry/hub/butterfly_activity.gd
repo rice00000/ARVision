@@ -1,11 +1,11 @@
 class_name ButterflyActivity
 extends Summonable
-## Wei's "Catch the butterflies" in the hub (Megan, Nov 18): his first level (Butterfly Circle), unchanged,
+## Wei's "Catch the butterflies" in the hub (Megan, Nov 18): his four levels, unchanged,
 ## with his own narrator's instructions, and Onion's lines round them (story chat). Locked from the first visit; it opens after the dots
 ## (WorkshopController). Each go plays the first of his levels this child hasn't finished (saved).
 
 const TASK := preload("res://content/tasks/catch_butterflies.tres")
-const LEVELS: Array[StringName] = [&"one_way", &"both_ways"]
+const LEVELS: Array[StringName] = [&"one_way", &"both_ways", &"swarm", &"busy_swarm"]
 
 var _left := false
 
@@ -16,6 +16,10 @@ func _init() -> void:
 
 func id() -> StringName:
 	return &"butterflies"
+
+
+func place() -> Place:
+	return preload("res://content/places/motion.tres")
 
 
 func task() -> Task:
@@ -47,4 +51,4 @@ func summon(_workspace: Transform3D) -> void:
 ## The cauldron's ✕: the round is dropped and the game ends.
 func leave() -> void:
 	_left = true
-	App.session.skip_block()
+	App.session.stop()   # the ✕ leaves the whole level, not just its block

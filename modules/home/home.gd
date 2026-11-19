@@ -21,6 +21,7 @@ const ENTRY_FOLLOW := 6.0
 ## How far in front of the eyes the menu panel opens, metres (was 0.48; the panel scales to look the same size).
 const MENU_DISTANCE := 0.34
 ## Each shop page and the page that confirms its purchase.
+const CHEAT_STONES := 50   # the menu's Cheat button (testing)
 const CONFIRM := {&"shop": &"confirm_item", &"rooms": &"confirm_room", &"pets": &"confirm_pet"}
 ## The shop's pages, always on show along its top: page, caption, speech, icon.
 const TABS := [
@@ -171,6 +172,11 @@ func _activate() -> void:
 			App.session.stop()
 		&"menu_back": _show(&"menu")
 		&"menu_staff_tools": Events.staff_tools_requested.emit()
+		&"menu_cheat":
+			# Testing: the hub opens its games and levels on this report (WorkshopController._cheat).
+			App.module(&"Inventory").add(&"magic_stone", CHEAT_STONES)
+			Events.say("Fifty magic stones, and every level is open.")
+			_build()
 		&"menu_games":
 			_show(&"games")
 			Events.say("Choose a game. Finish it to earn magic stones.")
@@ -334,6 +340,8 @@ func _build() -> void:
 			HomeUI.button(_panel, &"menu_stop", "Stop this game", "Stop this game and go back to the levels.", Vector3(-0.14, -0.17, 0.02))
 		if App.module(&"Facilitator"):
 			HomeUI.button(_panel, &"menu_staff_tools", "Staff tools", "Open the staff tools.", Vector3(0.14 if playing else 0.0, -0.17, 0.02))
+		if App.module(&"Inventory"):
+			HomeUI.button(_panel, &"menu_cheat", "Cheat", "Fifty magic stones and every level open.", Vector3(-0.265, 0.17, 0), "stone")
 		return
 	if page == &"games":
 		HomeUI.label(_panel, "GAMES", Vector3(0, 0.10, 0), 44)

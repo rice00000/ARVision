@@ -129,7 +129,7 @@ func leave() -> void:
 	if not _in_motion and _plays == 0:
 		return
 	_left = true
-	App.session.skip_block()
+	App.session.stop()   # the ✕ leaves the whole level, not just its block
 
 
 ## The "bad energy": the room's dim fades in from 0 to 60 % over HAZE_IN s ([param on]), or back out. Only

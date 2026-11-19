@@ -350,6 +350,8 @@ func _refresh_tools() -> void:
 		actions.append(["fac_redo_setup", "Redo setup"])   # scene review, Nov 17
 	if App.module(&"Inventory"):
 		actions.append(["fac_add_stones", "+10 Magic Stones"])
+	if not can_jump:
+		actions.append(["fac_credits", "Model credits"])
 	for i in actions.size():
 		var column := -0.095 + 0.19 * (i % 2) if can_jump else 0.0
 		var row := floori(i / 2.0) if can_jump else i
@@ -360,8 +362,6 @@ func _refresh_tools() -> void:
 		_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
 	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022 if zones else -0.095, -0.16), tools)
 	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127 if zones else 0.095, -0.16), tools)
-	if not can_jump:
-		_button("fac_credits", "Model credits", Vector2(0.18, 0.038), Vector2(0, -0.015), tools)
 
 
 func _refresh_training() -> void:

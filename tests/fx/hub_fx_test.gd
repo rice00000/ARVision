@@ -45,7 +45,7 @@ func test_the_three_impressions_are_big_and_differently_shaped_and_sound_differe
 	for sounds: Sounds in app.find_children("*", "Sounds", true, false):
 		for key in sounds.played:
 			keys[key] = true
-	expect_eq(keys.size(), 3, "three different sounds (%s)" % keys.keys())
+	expect_eq(keys.size(), 3, "three different sounds (%s)" % [keys.keys()])
 
 
 func test_a_sealed_impression_is_smaller_banded_and_unlit_and_opens() -> void:

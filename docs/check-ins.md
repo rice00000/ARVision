@@ -4,7 +4,7 @@ The design brief measures success by "no-help check-ins on new objects, not game
 
 ## When
 
-`modules/check_ins/check_ins.gd` (`CheckIns`). Before a place's menu unfolds, the World asks whether one is due:
+`modules/check_ins/check_ins.gd` (`CheckIns`). Before a place's menu unfolds, the World asks whether one is due; in the workshop hub, before a game the child has played before (`Summonable.place()`: shelf and Odd Color → table, Real Life → none, dots and butterflies → motion):
 
 - the first visit to the place: the **baseline**;
 - then once **7 days** (`every_days`) have passed since the last finished one;

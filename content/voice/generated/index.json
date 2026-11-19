@@ -1,5 +1,5 @@
 {
-  "fingerprint": "b01290152e25a6631a14be264f84870fa56ed58d811a16c38c9e715d26ddd57f",
+  "fingerprint": "0eed2c826043395580481adc9de3f5f2218da366b4d02f04b00388dbd522c2e7",
   "clips": {
     "0": "res://content/voice/generated/89e11fe5c6b05d702fe71160.ogg",
     "1": "res://content/voice/generated/e03341765602c2c5374a4524.ogg",
@@ -122,6 +122,7 @@
     "exit app": "res://content/voice/generated/74b56ef698481a79856dc71c.ogg",
     "fifteen": "res://content/voice/generated/fbd7f4e2dfe34f7edd628366.ogg",
     "fifty": "res://content/voice/generated/f786255bdd69a704a07014c9.ogg",
+    "fifty magic stones and every level is open": "res://content/voice/generated/3c4c8e8d196a2f583fb4b540.ogg",
     "find objects": "res://content/voice/generated/9ed7125966e6310115844237.ogg",
     "find the": "res://content/voice/generated/4d11b17b961ee72b97442c86.ogg",
     "find the object": "res://content/voice/generated/fb2f102cd7089ee8bbac7f5e.ogg",
@@ -261,6 +262,7 @@
     "oh i'd nearly forgotten about these": "res://content/voice/generated/35c220142eae71d34fcaae03.ogg",
     "oh look some magic stones": "res://content/voice/generated/104f27ac33e992b06e8eeb48.ogg",
     "oh looks like we've woken another one": "res://content/voice/generated/6e5397f1dae33876f89d5064.ogg",
+    "oh these look just like things at home": "res://content/voice/generated/4b8ed5a0efa54ef95c042016.ogg",
     "on your": "res://content/voice/generated/56095db4fe7e520890129ecd.ogg",
     "one": "res://content/voice/generated/21c2a24dc0186bd8c96f9707.ogg",
     "one magic stone": "res://content/voice/generated/6b3bfe6bf5c84d740ec82be3.ogg",
@@ -307,6 +309,7 @@
     "put each thing back on its shadow": "res://content/voice/generated/31b53473c5c511e671bf1043.ogg",
     "put it in the marked cubby": "res://content/voice/generated/9e0862c4690b50a5c8b8662c.ogg",
     "ready to study": "res://content/voice/generated/8ec273359463ead5818a2c2c.ogg",
+    "real life": "res://content/voice/generated/e811671862cc6b2d5055f83d.ogg",
     "refrigerator": "res://content/voice/generated/91e224617202cdfe294f82f7.ogg",
     "remote": "res://content/voice/generated/34aa41d5ae5e79d9f6d8997f.ogg",
     "replay tutorial": "res://content/voice/generated/146fb0d803a1cb0101b55ead.ogg",
@@ -350,6 +353,7 @@
     "smaller things": "res://content/voice/generated/fc0426d0c0a34d2487e1fb0d.ogg",
     "snowboard": "res://content/voice/generated/881a5fe475374ad942330f15.ogg",
     "so many little dots it all looks a bit jumbled doesn't it": "res://content/voice/generated/505fa06fa7fe5a9c8b75200a.ogg",
+    "someone has mixed up the colours can you spot the odd one": "res://content/voice/generated/5b5236a74ffb8bea56f1397d.ogg",
     "soon": "res://content/voice/generated/5f5ae5d70994f1fa0b7dd3ca.ogg",
     "space": "res://content/voice/generated/d0f4ed57175d41c56fdb58fa.ogg",
     "speech": "res://content/voice/generated/4f3dc531d2a1bd964563d5ba.ogg",

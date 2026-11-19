@@ -8,6 +8,6 @@ Buses (`default_bus_layout.tres`): **Voice** (−2 dB, light compressor), then *
 
 ## Making them
 
-`python tools/sound/design.py [name]` rebuilds them from the team's SFX library (`E:\SFXs`) plus tuned mallet and glass tones. Everything tonal is in C major, the key of the piano. Sources, by pack: Cinetools (Books & Magazines, Clinks & Clanks, Overtonics, Treasure Chest, Climax, Fantasy Game), CB Sounddesign Dreamcatcher (harp, guitar chord, bells), Deb Sound Pops-UI, Accusonus SFX Cellar whooshes, Articulated Sound (dice, kitchen), aXLsound (wing flaps), Carma Studio (crystal tick), Blue box (wood block), Sonniss GDC 2024 Bluezone Tiny Gears, FilmCow (bubbles). Exact files: `SRC` in `design.py`.
+`python tools/sound/design.py [name]` rebuilds them from the team's SFX library (`E:\SFXs`) plus tuned mallet and glass tones. Everything tonal is in C major, the key of the piano. Sources, by pack: Cinetools (Books & Magazines, Clinks & Clanks, Overtonics, Treasure Chest, Climax, Fantasy Game), CB Sounddesign Dreamcatcher (harp, guitar chord, bells), Deb Sound Pops-UI, Accusonus SFX Cellar whooshes, Articulated Sound (dice, kitchen), aXLsound (wing flaps), Carma Studio (crystal tick, door knock), Cinetools Treasure Chest (lock), aXLsound bubble burst, Blue box (wood block), Sonniss GDC 2024 Bluezone Tiny Gears, FilmCow (bubbles). Exact files: `SRC` in `design.py`.
 
 Not put on targets on purpose: butterflies, toys and dots have no sound of their own, so children find them by looking, not by ear.

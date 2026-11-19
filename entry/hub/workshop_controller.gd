@@ -46,12 +46,14 @@ const BREATH := 0.7             # seconds between Onion's lines (story chat: ~0.
 ## The other games' first unlocks (story chat revision, Nov 18), once per child.
 const BUTTERFLIES_BACK := "The butterflies have returned. I wonder where they've been."
 const CUP_DIFFERENT := "This one's a little different. We'll need something from your world."
+## Placeholders for the story chat: Real Life and Odd Color's first unlocks.
+const REAL_LIFE_AWAKE := "Oh! These look just like things at home."
+const ODD_COLOR_AWAKE := "Someone has mixed up the colours. Can you spot the odd one?"
 ## The first time the child picks the house (not waited for: the child goes in at once).
 const COME_ALONG := "Come along. There's something I'd like to show you."
 const ROW_WAIT := 8.0           # a game's own row or the looks: this long with no press, they sink
 const LEFT_EARLY := "We can come back to these."
 const ALL_DONE := "All done for today?"
-const ORDER: Array[StringName] = [&"shelf", &"dots", &"turn_to_fit"]
 const GLOW := Color(1.0, 0.86, 0.55)    # HubGlow's warm tint
 const GLOW_NEAR_FROM := 0.35            # a hand this close to the cauldron starts its glow...
 const GLOW_NEAR_FULL := 0.12            # ...fully at this distance
@@ -75,10 +77,16 @@ const LABEL_QUIET := 1.2        # seconds of Onion's quiet before a label may pl
 const LABEL_SETTLE := 2.0       # no label in the hub's first seconds (a resting hand sits near)
 ## Games whose bubble shows a bud (their next level, as a silhouette).
 const BUDS: Array[StringName] = []   # Megan, Nov 18: "get rid of buds in menu" (Impression.set_bud stays for later)
-## What opens when (Megan, Nov 18): the dots after the first game, the butterflies after the dots, Turn to fit
-## (the cup, the last game) after the butterflies and only once it can run (a saved cup setup and the CV server
-## answering). One unlock per return to the hub. Locked games show with a padlock from the first visit.
-const UNLOCKS: Array[Array] = [[&"dots", &""], [&"butterflies", &"dots"], [&"turn_to_fit", &"butterflies"]]                # Entry.SOCKET_SINK: the seated gear sits this far down in its socket
+## What opens when: Real Life after the first game (Nov 18: the most fun, so it comes first), then the dots, the
+## butterflies, Odd Color, and Turn to fit (the cup, the last game) only once it can run (a saved cup setup and
+## the CV server answering). One unlock per return to the hub. Locked games show with a padlock from the first visit.
+const UNLOCKS: Array[Array] = [[&"real_life", &""], [&"dots", &"real_life"], [&"butterflies", &"dots"],
+		[&"odd_color", &"butterflies"], [&"turn_to_fit", &"odd_color"]]
+## Games played on Wei's bench (the socket fades under it; the pause offers the eye).
+const BENCH_GAMES: Array[StringName] = [&"shelf", &"real_life", &"odd_color"]
+const REAL_LIFE_HALF := 0.42    # half the widest Real Life board (the desk, 0.82 m)
+const REAL_LIFE_DEEP := 0.6     # how far out its far edge reaches from the eyes
+const CAULDRON_CLEAR := 0.14    # the pot's half width and a gap
 
 var workshop: Workshop
 var activities: Array[Summonable] = []
@@ -133,6 +141,9 @@ var _tour_id := 0
 var _cauldron_hover := false
 var _row_pressed: Impression
 var _row_since := 0.0
+var _pause_lit: Impression          # the pause bubble lit now (✕ or eye), or null
+var _pinch_frame := -1              # the frame a lit bubble last took a pinch (the ray's select of it is the same pinch)
+var _taken_frame: Dictionary = {}   # hand -> the frame a game last reported a pick-up ("taken")
 var _stop_pick := &""            # the pause bubbles' answer: &"stop", &"eye" or &"" (carry on)
 var _looking := false            # the looks row is up (from the hub's eye)
 
@@ -292,7 +303,6 @@ func _restart() -> bool:
 	await get_tree().create_timer(0.8, false).timeout
 	state = &"hub"
 	_hub_since = _clock
-	_play(&"menu_open", _mouth())
 	await ring.rise(_mouth())
 	ring.wake()
 	return true
@@ -351,7 +361,6 @@ func _open_menu() -> void:
 	_demo.stop()
 	print("HUB menu opens")
 	Events.report(&"hub_menu_opened", {})
-	_play(&"menu_open", _mouth())
 	await ring.rise(_mouth())
 	_opening = false
 
@@ -364,6 +373,9 @@ func _offer(activity: Summonable, welcome := false, locked := false) -> void:
 	var impression := activity.make_impression() as Impression
 	if impression == null:
 		return
+	var levels := activity.levels()
+	if levels.size() == 1:
+		impression.level = levels[0]
 	await ring.add(impression, _mouth())
 	if locked:
 		impression.set_sealed(true)   # shown, not open yet: a press says "Soon" (Megan: there's more to explore)
@@ -390,21 +402,28 @@ func _run(activity: Summonable) -> void:
 	ring.quiet(0.3)
 	await HubGlow.quiet_all(0.3)
 	if ring.opened or ring.visible:
-		_play(&"menu_close", _mouth())
 		await ring.sink(_mouth(), 0.9)   # Megan, Nov 18: the pieces sink into the cauldron with the fog during a game
 	if workshop != null:
 		workshop.attend(null)
 	print("HUB game: ", activity.id())
 	# Wei's bench board can reach the socket at the front right too (Megan's laptop test, Nov 18): it always fades
 	# under the board during the shelf, as before (the layout's zones miss the board's real edge on some tables).
-	var under_bench := activity.id() == &"shelf" and workshop != null
+	var under_bench := activity.id() in BENCH_GAMES and workshop != null
 	if under_bench:
 		workshop.hide_socket(true)
-	activity.summon(_workspace())
+	var aside := _cauldron_aside() if activity.id() == &"real_life" and workshop != null else Vector3.ZERO
+	if aside != Vector3.ZERO:
+		await _slide_cauldron(aside)
 	_watch_cauldron()
-	var outcome: StringName = await activity.finished
+	var outcome := &"left"
+	await _check_in(activity)
+	if not _exited:
+		activity.summon(_workspace())
+		outcome = await activity.finished
 	if under_bench:
 		workshop.hide_socket(false)
+	if aside != Vector3.ZERO:
+		_slide_cauldron(-aside)
 	_drop_stop_bubble()
 	print("HUB ", activity.id(), " finished: ", outcome)
 	Events.report(&"hub_activity_finished", {activity = activity.id(), outcome = outcome})
@@ -416,7 +435,6 @@ func _run(activity: Summonable) -> void:
 	activity.fold()
 	current = null
 	ever_opened = true
-	_play(&"menu_open", _mouth())
 	await ring.rise(_mouth())   # and the menu rises again by itself, back at the hub
 	if memory != null:
 		memory.mark_played(activity.id())
@@ -433,6 +451,16 @@ func _run(activity: Summonable) -> void:
 		if a.is_available() and _impression_of(a) == null and a.id() != &"dots":
 			await _offer(a)
 	_after_game(woke, stones, grew)   # not awaited: presses on the bubbles work while Onion talks and stones fly
+
+
+## Wanchun's no-help check-in for [param activity]'s place (CheckIns: the first time, then weekly), before the game,
+## once the child has played the game before (so they know how it works). The ✕ leaves it like a game.
+func _check_in(activity: Summonable) -> void:
+	var check_ins := App.module(&"CheckIns") as CheckIns
+	var place := activity.place()
+	if check_ins != null and place != null and activity.id() in played and check_ins.due(place):
+		print("HUB check-in: ", CheckIns.key(place))
+		await check_ins.run(place)
 
 
 ## Opens the next locked game whose time has come (UNLOCKS), once per return: its lock clicks open and drops away,
@@ -477,7 +505,6 @@ func _closing_starts() -> void:
 	_drop_stop_bubble()
 	ambience.fade_out(3.0)
 	if ring.visible:
-		_play(&"menu_close", _mouth())
 		await ring.sink(_mouth())   # Scene 10: the bubbles sink quietly into the cauldron first
 
 
@@ -499,9 +526,9 @@ func _build_ring() -> void:
 			return
 		_pick(&"gear_home" if impression == ring.door else impression.kind))
 	ring.hovered.connect(func(impression: Impression) -> void:
-		# A soft glass tink, a little higher for each bubble along the arc, then its name.
+		# A soft glass tink, a note higher up the scale for each bubble along the arc, then its name.
 		var step := ring.impressions.find(impression)
-		_play(&"hover_tink", impression.global_position, 1.0 + 0.08 * (step if step >= 0 else -2))
+		_play(&"hover_tink", impression.global_position, Sounds.step(step if step >= 0 else -2))
 		if impression == ring.door:
 			# Its name, then the count (design chat, Nov 18: "Seven stones"). The teaser line is cut.
 			_label(impression.label(), false, StonesBadge.spoken(badge.count if badge != null else _stones()))
@@ -510,34 +537,55 @@ func _build_ring() -> void:
 	Events.selected.connect(func(_hand: StringName, target: Target, _o: Vector3, _d: Vector3) -> void: _on_press(target, true))
 	Events.touched.connect(func(_hand: StringName, target: Target) -> void: _on_press(target, false))
 	Events.button.connect(_on_pinch_without_ray)
+	Events.reported.connect(func(what: StringName, data: Dictionary) -> void:
+		if what == &"taken":
+			_taken_frame[StringName(str(data.get("hand", "")))] = Engine.get_process_frames()
+		elif what == &"player_menu" and data.get("button") == &"menu_cheat":
+			_cheat())
 
 
 ## Megan, Nov 18: in the dots the pinch never reached the cauldron, so there was no way out. The dots run with
 ## the pointing ray off (a sweep is the answer), and with it off a pinch selects nothing. During a game the
 ## hub's own few targets (the cauldron, the ☰, the ✕ and the eye) still take a pinch aimed at them.
+## Nov 19: a pinch that picks a game's thing up (a notebook on Wei's desk, with the cauldron behind it) is the
+## game's, never a pause; and a fingertip already inside a bubble still presses it.
 func _on_pinch_without_ray(side: StringName, action: StringName, pressed: bool) -> void:
-	if not pressed or action != &"trigger_click" or state not in [&"game", &"asking"] or App.rig == null:
+	if not pressed or action != &"trigger_click" or App.rig == null:
+		return
+	# Nov 19: a lit bubble (a row's, the pause's, or the menu's in the hub) takes any pinch, ray or not.
+	var lit := _lit()
+	if lit != null:
+		_on_press(lit.target, true)
+		_pinch_frame = Engine.get_process_frames()
+		return
+	if state not in [&"game", &"asking"]:
 		return
 	var pointer := App.rig.pointer(side)
 	if pointer == null or pointer.ray_on() or not pointer.tracked():
 		return   # with the ray on, the pointer selects it itself
+	var pinched_at := Engine.get_process_frames()
 	var query := PhysicsRayQueryParameters3D.create(pointer.global_position,
 			pointer.global_position - pointer.global_basis.z * pointer.length, Pointer.TARGET_LAYER)
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
+	query.hit_from_inside = true
 	var hit: Dictionary = pointer.get_world_3d().direct_space_state.intersect_ray(query)
 	var target: Target = hit.collider as Target if not hit.is_empty() else null
 	var ours: Array[Target] = [cauldron_target, sign_target]
 	for bubble: Impression in [stop_bubble, eye_bubble]:
 		if bubble != null and is_instance_valid(bubble):
 			ours.append(bubble.target)
-	if target != null and target in ours:
-		_on_press(target, true)
+	if target == null or target not in ours:
+		return
+	await get_tree().process_frame   # the game hears the same pinch: did it pick something up?
+	if _taken_frame.get(side, -1) >= pinched_at:
+		return
+	_on_press(target, true)
 
 
 func _on_press(target: Target, pinched: bool) -> void:
-	if target == null:
-		return
+	if target == null or (pinched and _pinch_frame == Engine.get_process_frames()):
+		return   # this pinch already went to the lit bubble
 	if stop_bubble != null and is_instance_valid(stop_bubble) and target == stop_bubble.target:
 		if pinched and _clock_real - _stop_since >= STOP_GUARD:
 			_stop_chosen = true   # pinch only: a sweep through it never counts
@@ -582,6 +630,17 @@ func _on_press(target: Target, pinched: bool) -> void:
 	if impression != null and ring.press(impression) == &"sealed":
 		_play(&"locked_bonk", impression.global_position)
 		_label(SOON)
+
+
+## The bubble a pinch takes now: the pause's lit one, else the open row's, else (in the hub) the menu's.
+func _lit() -> Impression:
+	if stop_bubble != null:
+		return _pause_lit
+	if row != null:
+		return row.lit
+	if state == &"hub" and ring != null and not get_tree().paused:
+		return ring.lit
+	return null
 
 
 ## The cauldron's tap target (the whole pot and a margin, like the opening's) and its warm glow on the brew.
@@ -718,6 +777,7 @@ func _build_carry() -> void:
 		Onion.line(ALL_DONE, self))
 	carry.docked.connect(func() -> void:
 		_play(&"seat", _gear_at())
+		_play(&"power_up", _gear_at())
 		if workshop != null:
 			workshop.start_gears()
 		_spin_gear(true))
@@ -887,6 +947,24 @@ func _show_places(stones := -1) -> void:
 	badge = StonesBadge.attach(house, stones if stones >= 0 else _stones())
 
 
+## The menu's Cheat button (testing; Home adds the 50 stones): every game played and open, every level finished.
+func _cheat() -> void:
+	for activity in activities:
+		if memory != null:
+			memory.mark_played(activity.id())
+		elif not played.has(activity.id()):
+			played.append(activity.id())
+		if activity.task() != null:
+			App.main.progress.finish_all(activity.task())
+		var piece := _impression_of(activity)
+		if piece != null:
+			piece.unseal()
+			if piece.kind == &"shelf":
+				piece.set_rows(_shelf_rows(), 0.4)
+	if badge != null:
+		(func() -> void: badge.set_count(_stones())).call_deferred()   # Home adds the stones after its report
+
+
 ## The shelf piece's rows: 1 + shelf levels finished, at most 4.
 func _shelf_rows() -> int:
 	var shelf := _activity(&"shelf")
@@ -947,7 +1025,8 @@ func _welcome() -> void:
 ## After a game, once the menu is back (not awaited): a game that just opened gets its lines (the dots, the first
 ## time: "Oh! Looks like we've woken another one!" / "The Dots are awake…"; story chat, Nov 18), then the stones.
 func _after_game(woke: Summonable, stones: int, grew: bool) -> void:
-	var other_line := {&"butterflies": BUTTERFLIES_BACK, &"turn_to_fit": CUP_DIFFERENT}
+	var other_line := {&"butterflies": BUTTERFLIES_BACK, &"turn_to_fit": CUP_DIFFERENT, &"real_life": REAL_LIFE_AWAKE,
+			&"odd_color": ODD_COLOR_AWAKE}
 	if woke != null and woke.id() in other_line and (memory == null or memory.first_time(StringName("%s_awake" % woke.id()))):
 		var piece := _impression_of(woke)
 		if piece != null:
@@ -1042,7 +1121,6 @@ func _choose_level(activity: Summonable) -> bool:
 	var level: TaskLevel = picked.level if picked != null else null
 	await _close_row()
 	if level == null:
-		_play(&"menu_open", _mouth())
 		await ring.rise(_mouth(), 0.6)
 		return false
 	activity.level = level
@@ -1063,10 +1141,9 @@ func _open_row(kind: StringName, pieces: Array[Impression], middle := -1) -> voi
 	row.visible = false
 	row.opened = false
 	row.hovered.connect(func(piece: Impression) -> void:
-		_play(&"hover_tink", piece.global_position, 1.0 + 0.08 * row.impressions.find(piece))
+		_play(&"hover_tink", piece.global_position, Sounds.step(row.impressions.find(piece)))
 		_label(piece.label(), true))
 	row.chosen.connect(func(piece: Impression) -> void: _row_pressed = piece)
-	_play(&"menu_open", _mouth())
 	await row.rise(_mouth(), 0.4)
 	_row_since = _clock_real
 
@@ -1089,7 +1166,6 @@ func _close_row() -> void:
 	if row == null:
 		return
 	var leaving := row
-	_play(&"menu_close", _mouth())
 	await leaving.sink(_mouth(), 0.4)
 	leaving.queue_free()
 	if row == leaving:
@@ -1107,7 +1183,6 @@ func _looks_from_hub() -> void:
 	await ring.sink(_mouth(), 0.4)
 	await _show_looks()
 	if state == &"hub":
-		_play(&"menu_open", _mouth())
 		await ring.rise(_mouth(), 0.6)
 	_looking = false
 
@@ -1136,7 +1211,7 @@ func _press_look(piece: Impression) -> void:
 	for other in row.impressions:
 		other.set_picked(other == piece)
 	piece.touched()
-	_play(&"hover_tink", piece.global_position, 1.1)
+	_play(&"hover_tink", piece.global_position, Sounds.step(1))
 
 
 # --- The ✕ bubble: pausing a game, the finish check (design chat, Nov 18) -------------------------------
@@ -1155,7 +1230,7 @@ func _watch_cauldron() -> void:
 		if current != null:
 			current.pause()
 		# The eye beside the ✕ in the shelf and Turn to fit (not the dots: their dim must stay the same every round).
-		var with_eye := current != null and current.id() in [&"shelf", &"turn_to_fit"]
+		var with_eye := current != null and (current.id() in BENCH_GAMES or current.id() == &"turn_to_fit")
 		var chosen := await _offer_stop(&"stop", with_eye)
 		if _stop_pick == &"eye":
 			await _show_looks(true)   # still paused; leaving the looks, the game carries on
@@ -1187,6 +1262,29 @@ func _ask_finish() -> bool:
 ## Raises one ✕ bubble of [param kind] from the brew (with the eye on its left when [param with_eye]: eye · ✕)
 ## and waits: true if the ✕ was pinched (it pops), false after STOP_WAIT s, a tap on the cauldron (they sink) or
 ## a pinch on the eye ([member _stop_pick] = &"eye"). Runs while the world is paused.
+## Lights the one pause bubble aimed at or nearest a hand (as the menu's), so the lit one is what a pinch takes.
+func _light_pause(bubbles: Array[Impression]) -> void:
+	var best := 0.0
+	_pause_lit = null
+	if _clock_real - _stop_since < STOP_GUARD:
+		bubbles = []   # still rising: nothing lit yet, so nothing lit ever ignores a pinch
+	for piece in bubbles:
+		var near := 0.0
+		for hand: StringName in [&"left", &"right"]:
+			var pointer := App.rig.pointer(hand)
+			if pointer == null or not pointer.tracked():
+				continue
+			if pointer.aimed == piece.target:
+				near = 1.0
+			var gap := pointer.global_position.distance_to(piece.target.global_position)
+			near = maxf(near, clampf(inverse_lerp(ImpressionRing.NEAR_FROM, ImpressionRing.NEAR_FULL, gap), 0.0, 1.0))
+		if near > best:
+			best = near
+			_pause_lit = piece
+	for piece in bubbles:
+		piece.set_near(best if piece == _pause_lit else 0.0)
+
+
 func _offer_stop(kind: StringName, with_eye := false) -> bool:
 	_stop_chosen = false
 	_stop_pick = &""
@@ -1215,16 +1313,18 @@ func _offer_stop(kind: StringName, with_eye := false) -> bool:
 			piece.global_position = _mouth().lerp(spots[i], k) - Vector3.UP * Impression.MIDDLE.y * size * lerpf(0.2, 1.0, k)
 			piece.look_at(piece.global_position + toward, Vector3.UP, true)
 			piece.scale = Vector3.ONE * size * lerpf(0.2, 1.0, k), 0.0, 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_play(&"menu_open", _mouth())
+	_play(&"brew_rise", _mouth())
 	_stop_since = _clock_real
 	var labelled := {}
 	while _clock_real - _stop_since < STOP_WAIT:
 		await get_tree().process_frame
 		if _stop_chosen or _stop_pick != &"" or _cauldron_tapped:
 			break
+		_light_pause(bubbles)
 		for piece in bubbles:
 			if not labelled.get(piece, false) and _hand_near(piece.target.global_position, 0.12):
 				labelled[piece] = _label(piece.label(), true)
+	_pause_lit = null
 	var chosen := _stop_chosen
 	var popped: Impression = stop_bubble if chosen else (eye_bubble if _stop_pick == &"eye" else null)
 	if chosen:
@@ -1235,6 +1335,7 @@ func _offer_stop(kind: StringName, with_eye := false) -> bool:
 	var starts: Array[Vector3] = []
 	for piece in bubbles:
 		starts.append(piece.global_position)
+	_play(&"brew_sink", _mouth())   # 0.4 s: shorter than its BREW_LAND, so it starts at once
 	var sink := create_tween()
 	sink.tween_method(func(k: float) -> void:
 		for i in bubbles.size():
@@ -1292,7 +1393,7 @@ func _tour() -> void:
 			3: shown = ring.place_of(&"finish")
 		for piece in ring._all():
 			piece.set_dim(0.0 if piece == shown else TOUR_DIM)
-		_play(&"hover_tink", _mouth(), 0.9)
+		_play(&"hover_tink", _mouth(), Sounds.step(-1))
 		match step:
 			0: _demo.tap(_rim())
 			1, 2:
@@ -1382,6 +1483,30 @@ func _onion_spot() -> Vector3:
 
 
 ## Wei's bench frame (where the opening planned the shelf), or straight ahead.
+## Real Life's boards (Wei's desk, bookshelf, sandwich counter: up to 0.82 m wide) stand straight ahead toward
+## the table and would swallow the cauldron: it glides sideways, on its own side, until it is clear of them.
+## Zero when it already is.
+func _cauldron_aside() -> Vector3:
+	var head := App.head().global_position
+	var toward := App.reality.work_surface().transform.origin - head
+	var ahead := Vector3(toward.x, 0.0, toward.z).normalized()
+	var side := ahead.cross(Vector3.UP)   # the child's right
+	var pot := workshop.cauldron().global_position
+	var across := (pot - head).dot(side)
+	var clear := REAL_LIFE_HALF + CAULDRON_CLEAR
+	if absf(across) >= clear or (pot - head).dot(ahead) > REAL_LIFE_DEEP + CAULDRON_CLEAR:
+		return Vector3.ZERO
+	return side * ((signf(across) if across != 0.0 else -1.0) * clear - across)
+
+
+## Glides the cauldron and its tap targets and glow by [param offset].
+func _slide_cauldron(offset: Vector3) -> void:
+	for part: Node3D in [cauldron_target, _glow_quad, sign_target]:
+		create_tween().tween_property(part, "global_position", part.global_position + offset, 0.6).set_trans(Tween.TRANS_SINE)
+	_play(&"rattle_soft", workshop.cauldron().global_position)
+	await workshop.slide_cauldron(offset, 0.6).finished
+
+
 func _workspace() -> Transform3D:
 	if workshop != null and workshop.layout != null:
 		return workshop.layout.bench

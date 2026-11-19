@@ -39,7 +39,7 @@ const JITTER := {grab = 0.06, place = 0.05, slide = 0.05, drop = 0.08, swish = 0
 	hop = 0.08}
 ## The shortest time between two plays of a cue, s: a ray sliding over a row of buttons or a
 ## swarm flying off stays one gentle sound.
-const GAP := {ui_hover = 0.06, swish = 0.22, sweep = 0.3, flutter_away = 0.6, hop = 0.2}
+const GAP := {ui_hover = 0.06, catch = 0.15, swish = 0.22, sweep = 0.3, flutter_away = 0.6, hop = 0.2}
 
 var _last_take: Dictionary[StringName, int] = {}
 var _last_time: Dictionary[StringName, float] = {}

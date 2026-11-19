@@ -150,7 +150,8 @@
     "Stuck? Raise your hand up high, and I'll help.",
     "Last one!",
     "Stop this game",
-    "Stop this game and go back to the levels."
+    "Stop this game and go back to the levels.",
+    "Someone has mixed up the colours. Can you spot the odd one?"
   ],
   "say_sources": [
     "core",

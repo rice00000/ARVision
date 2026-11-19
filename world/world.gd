@@ -11,9 +11,6 @@ extends Node
 
 ## Degrees within which the head faces a place (left-right only).
 const FACING := 25.0
-## How far up an adaptive level's range (0 to 1) the child climbs before the
-## menu lights up the next level instead.
-const READY_AT := 0.7
 ## Seconds the child keeps facing a place before its menu unfolds.
 const FACING_SECONDS := 0.5
 ## How far behind the child a place "behind" is, metres.
@@ -78,16 +75,10 @@ func _check_in() -> void:
 		await check_ins.run(place)
 
 
-## The level the menu lights up for [param task], or null: the first not yet
-## finished, or finished but not yet climbed to [constant READY_AT] of its
-## range (an adaptive level), so the menu follows the child. Every level stays open.
+## The level the menu lights up for [param task], or null ([method TaskProgress.next]): the menu follows the child.
+## Every level stays open.
 func current(task: Task) -> TaskLevel:
-	for level in task.levels:
-		if level.plan.is_endless():
-			continue
-		if not App.main.progress.is_done(task, level) or (level.climbed() >= 0.0 and level.climbed() < READY_AT):
-			return level
-	return null
+	return App.main.progress.next(task, task.levels)
 
 
 ## A level at [param where] has not been seen on a menu yet.

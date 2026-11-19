@@ -11,14 +11,21 @@ Built by `tools/sound/design.py` (`opening`) from the team's SFX library, Novemb
 | pop.ogg | Onion rises over the rim | a mouth pop (Deb Sound), bubbles (FilmCow), a glass C6, shaken bells (CB Sounddesign) |
 | gear_land.ogg | the gear lands on the table | tiny gear click (Bluezone, Sonniss GDC 2024), a wooden placement |
 | seat.ogg | the gear seats in the socket | gear clicks, a wooden thud, celesta G5→C6 |
-| reveal.ogg | the ripple shows the workshop | soft air swell (Cinetools Overtonics), harp glissando and C-major guitar chord (CB Sounddesign Dreamcatcher), wind bells |
+| reveal.ogg | the light spreads from the socket (5 s front, 2 s afterglow) | a deep C2/G2 bloom, harp glissando, C-major strings pad and enchanted bells swelling to a crest mid-front (CB Sounddesign Dreamcatcher), glitter thinning as the front slows, wind bells as it settles |
+| power_up.ogg | the gear seated: the mechanism runs (after `seat`; also the hub's gear set back) | a weighty clunk, plastic gear clicks winding faster (Cinetools Clinks & Clanks), a glass C-G hum swelling, celesta C-E-G-C |
+| glint.ogg | each glint of light on a real surface during the reveal, from where it lights | celesta C6 with a glass octave; pitched up the pentatonic as the light spreads (`Entry._glint_sound`) |
 | onion-touch.ogg | touching Onion | made by the team (November 7, 2026), own work |
 
-## The hub's extra cues (merge, Nov 18)
-No files of their own yet: they borrow Wei's sounds in `Sounds.BORROWS`, with pitch and level. Shelf piece = `knock`;
-dots piece = `pop` at pitch 1.4; cup piece = `seat` at pitch 1.6; "found its place" = `seat`; the gear lifted =
-`pop` at pitch 1.3, quiet; the gear set down away from the socket = `gear_land` (never the seating click: a drop
-must not sound like success). To audition in the headset.
+## The hub (Nov 18)
+Built by `design.py hub`, in C major. `hover_tink` = glass pluck, pitched up the pentatonic bubble by bubble
+(`Sounds.step`). `bubble_pop` = a small bubble burst (aXLsound UI) with a pop and glint. `chosen_chime` = a rolled
+celesta C-E-G with wind bells. `locked_bonk` = a chest lock jiggling, muffled, on a low wooden D (never a buzzer);
+`lock_click` = one chest-lock click (Cinetools Treasure Chest); `unlock` = C-G-C plucks, harp, glitter. `brew_rise` = a bloop
+leaving the brew, air, a quick C-E-G (front-loaded, like the rise's ease-out); `brew_sink` = air drawn in, G-E-C
+falling, a low gulp at 0.42 s (`Sounds.BREW_LAND`) that `ImpressionRing.sink` lands on the bubbles meeting the brew. `stone_clink` = a gem clink and G6. `gear_lift` = a book
+pick-up and a tiny gear tick. `impression_<kind>` = each bubble's own two-note pluck motif over a hint of its game
+(a book thud, droplets, a gear tick, a door knock, wing beats). "Found its place" borrows `seat`; the gear set down
+borrows `gear_land` (a drop must not sound like success). To audition in the headset.
 
 The calm piano (`entry/assets/calm-piano-1.mp3`, CC0, see `entry/assets/CREDITS.md`) stays under the opening (Megan,
 Nov 18) until she has asked Wei why his commit removed it.

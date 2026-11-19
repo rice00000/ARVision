@@ -10,7 +10,7 @@ A level's block names what adapts and its easiest and hardest values (`Block.dri
 - **Quick start:** until the child's first miss on a level, every right round steps up twice as far, so a strong child reaches their level in a few rounds.
 - **Fair to slow children:** a round solved first time with only the help that came by itself after a wait does not move the level (`outcome` "neutral" in the log). Help the child asked for (raised hand), a wrong try or a fail moves it down. The research log keeps the strict `first_try` either way.
 - **Finished** (reward, medal) when at least half the level's rounds were solved; check-ins and skipped levels never finish.
-- **Menu follows the child:** a gold bar on each played card shows how far up its range the child has climbed. The card that glows ("play next") is the first level not yet finished, or finished but not yet climbed to 70% (`World.READY_AT`): practise it, then move on. Every level stays open.
+- **Menu follows the child:** a gold bar shows each played adaptive level's current difficulty. In the workshop it curves under the picture inside the bubble. The next recommendation is the first level unfinished or below 70% of its range (`TaskProgress.READY_AT`).
 - **Staff:** Vision page → Difficulty moves this level's staircase; **Adaptive off** plays every level fixed at its start plus the child's offset. Training → Easier / Harder pins the level for the session, as before.
 
 Research session plans (`content/sessions/`) keep the textbook staircase (by skill, no quick start); only blocks with `drive` are adaptive levels.

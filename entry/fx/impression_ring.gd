@@ -17,6 +17,8 @@ extends Node3D
 ## * **Chosen:** the bubble pops into droplets with a pop sound; the game's name appears over it in big retro
 ##   letters with a chime ([ChosenTitle]).
 ## * **Buds** under a bubble show the game's next level as a silhouette ([method Impression.set_bud]).
+## * **Sound:** [method rise] and [method sink] play the brew's own (Sounds `brew_rise`, `brew_sink`), the sink's
+##   gulp timed to the bubbles meeting the brew whatever the duration.
 ## * **Rest:** after [constant REST_AFTER] s with no hand near, the bubbles shrink to [constant REST_SCALE] in
 ##   place (still pressable); a hand coming near wakes them in ~0.5 s.
 ## * [signal hovered] when a hand comes to a bubble: the hub says its name (a sound label).
@@ -87,6 +89,9 @@ var _quiet := false
 var _waiting := 1.0
 var _idle := 0.0
 var _rest_tween: Tween
+var _sounds: Sounds
+## The one bubble lit now (aimed at or a hand near; Nov 19: lit means a pinch takes it), or null.
+var lit: Impression
 var _hovering: Dictionary = {}   # impression -> its name was said for this visit of the hand
 
 
@@ -326,6 +331,7 @@ func sink(mouth: Vector3, seconds := 1.0) -> void:
 	for impression in pieces:
 		starts.append(impression.global_position)
 		sizes.append(impression.scale)
+	_sound(&"brew_sink", mouth, maxf(0.0, seconds - Sounds.BREW_LAND))   # its gulp as they meet the brew
 	var tween := create_tween()
 	tween.tween_method(func(k: float) -> void:
 		for i in pieces.size():
@@ -361,6 +367,7 @@ func rise(mouth: Vector3, seconds := OPEN_SECONDS) -> void:
 	for impression in pieces:
 		ends.append(impression.global_position)
 		sizes.append(impression.scale)
+	_sound(&"brew_rise", mouth)
 	var tween := create_tween()
 	tween.tween_method(func(k: float) -> void:
 		for i in pieces.size():
@@ -372,6 +379,16 @@ func rise(mouth: Vector3, seconds := OPEN_SECONDS) -> void:
 	opened = true
 	turning = false
 	wake()
+
+
+## Plays [param key] at [param at] after [param delay] s.
+func _sound(key: StringName, at: Vector3, delay := 0.0) -> void:
+	if _sounds == null:
+		_sounds = Sounds.new()
+		add_child(_sounds)
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+	_sounds.play(key, at)
 
 
 ## Lights the middle bubble again (after [method quiet]).
@@ -420,6 +437,7 @@ func _process(delta: float) -> void:
 		nears[impression] = near
 		if near > 0.0 and not impression.sealed and (nearest == null or near > nears[nearest]):
 			nearest = impression
+	lit = nearest if opened and not turning else null
 	for impression in _all():
 		var near: float = nears[impression]
 		if not impression.sealed:

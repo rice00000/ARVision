@@ -61,7 +61,12 @@ func run() -> void:
 	start_with = &""
 	var welcome := invite
 	invite = false
-	await controller.run(_onion, [shelf, dots, ButterflyActivity.new(), TurnToFitActivity.new()], first, welcome, _motion.closing, _go_home)
+	# Real Life has no check-in: the table's (shelf shapes, odd colour) is not its skill.
+	var real_life := TaskActivity.new(&"real_life", SHELF_TASK, [&"outline", &"bookshelf", &"sandwich"], null)
+	var odd_color := TaskActivity.new(&"odd_color", SHELF_TASK, [&"odd_color_1", &"odd_color_2"],   # not the endless one
+			preload("res://content/places/table.tres"))
+	await controller.run(_onion, [shelf, real_life, dots, ButterflyActivity.new(), odd_color, TurnToFitActivity.new()],
+			first, welcome, _motion.closing, _go_home)
 
 
 ## Scene 11: Home on the gear → Wei's room and back (MotionVisit has the fade).
@@ -168,7 +173,7 @@ func _more_shelf(level: TaskLevel) -> StringName:
 func leave_shelf() -> void:
 	_left = true
 	_started = true
-	App.session.skip_block()
+	App.session.stop()   # the ✕ leaves the whole level, not just its block
 
 
 func _on_reported(what: StringName, data: Dictionary) -> void:

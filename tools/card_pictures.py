@@ -153,4 +153,8 @@ svg("swarm", ring_path(128, 128, 88, True) + on_ring(128, 128, 88, 10, True, 22,
     + on_ring(128, 128, 54, 6, True, 18, ORANGE, start=30), SKY)
 svg("busy_swarm", ring_path(128, 128, 88, True) + on_ring(128, 128, 92, 14, True, 18, ORANGE, start=5, jitter=.45, rng=rng)
     + on_ring(128, 128, 56, 9, True, 16, ORANGE, start=20, jitter=.45, rng=rng), SKY)
+cup = f'<path d="M150 70 h72 l-10 110 h-52 Z" fill="{SIL}" transform="rotate(14 186 125)"/>'
+cup += f'<path d="M44 92 h72 l-10 110 h-52 Z" fill="{ORANGE}" stroke="{INK}" stroke-width="5"/><ellipse cx="80" cy="92" rx="36" ry="10" fill="#c8641f" stroke="{INK}" stroke-width="5"/>'
+cup += f'<path d="M62 52 a40 40 0 0 1 56 6" fill="none" stroke="{INK}" stroke-width="8"/><path d="M122 46 l2 22 l-20 -6 Z" fill="{INK}"/>'
+svg("turn_to_fit", cup)
 print("\n".join(sorted(p.name for p in OUT.glob("*.svg"))))

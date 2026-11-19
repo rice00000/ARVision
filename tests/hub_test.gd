@@ -64,10 +64,10 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.WELCOME), 20.0), "Onion: \"Welcome to the workshop.\"")
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.PARTICULAR), 20.0), "\"It's a bit particular, this place…\" (story chat, Nov 18)")
 	expect(await until(func() -> bool: return _said_line(said, WorkshopController.READY), 20.0), "the cauldron clicks ready: \"Well, this one's ready for us!\"")
-	expect_eq(hub.ring.impressions.size(), 4, "the shelf, then the dots, the butterflies and the cup, locked")
+	expect_eq(hub.ring.impressions.size(), 6, "the shelf, then Real Life, the dots, the butterflies, Odd Color and the cup, locked")
 	expect_eq(hub.ring.impressions[0].kind, &"shelf", "the shelf")
 	expect(not hub.ring.impressions[0].sealed, "the shelf is open")
-	expect(hub.ring.impressions[1].kind == &"dots" and hub.ring.impressions[1].sealed, "the dots wait in a closed bubble (there's more)")
+	expect(hub.ring.impressions[1].kind == &"real_life" and hub.ring.impressions[1].sealed, "Real Life waits in a closed bubble (there's more)")
 	expect(hub.ring.impressions.all(func(i: Impression) -> bool: return i.bud == null), "no buds in the menu (Megan, Nov 18)")
 	expect(await until(func() -> bool: return hub.state == &"hub", 10.0), "the hub waits")
 	# Megan, Nov 18: on "Well, this one's ready for us!" the menu opens by itself, Find Objects waiting in front.
@@ -87,7 +87,7 @@ func test_the_first_visit_waits_for_a_tap_on_the_cauldron_then_offers_the_shelf_
 	expect(hub.stop_bubble == null, "no ✕ bubble in the hub")
 
 
-func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_waits_below() -> void:
+func test_after_the_first_shelf_real_life_opens_with_its_line_and_the_door_waits_below() -> void:
 	var said := record(Events.said)
 	var hub := await _to_hub()
 	expect(await _choose(hub, &"shelf"), "the child pinches the shelf")
@@ -98,14 +98,14 @@ func test_after_the_first_shelf_the_dots_rise_in_with_their_line_and_the_door_wa
 	expect(not hub.carry.enabled, "the gear can't be lifted during a game")
 	Engine.time_scale = 4.0
 	await _finish_rounds()
-	expect(await until(func() -> bool: return _said_line(said, WorkshopController.DOTS_WOKE), 40.0), "Onion: \"Oh! Looks like we've woken another one!\"")
-	expect(await until(func() -> bool: return _said_line(said, WorkshopController.DOTS_AWAKE), 10.0), "\"The Dots are awake. Shall we see what they're up to?\"")
+	expect(await until(func() -> bool: return _said_line(said, WorkshopController.REAL_LIFE_AWAKE), 40.0), "Onion: Real Life's line")
 	expect(await until(func() -> bool: return _in_hub(hub), 20.0), "back at the hub")
 	Engine.time_scale = 1.0
 	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)
 	expect(hub.ring.opened and hub.ring.visible, "the menu rose again by itself")
-	expect(kinds.has(&"dots"), "the dots are in the menu (%s)" % [kinds])
-	expect(not hub.ring.impressions[1].sealed, "the dots' bubble opened")
+	expect(kinds.has(&"real_life"), "Real Life is in the menu (%s)" % [kinds])
+	expect(not hub.ring.impressions[1].sealed, "Real Life's bubble opened")
+	expect(hub.ring.impressions[2].sealed, "the dots wait for the next return")
 	var cup := hub.ring.impressions.filter(func(i: Impression) -> bool: return i.kind == &"turn_to_fit")
 	expect(cup.size() == 1 and cup[0].sealed, "Turn to fit waits locked, the last game")
 	expect(hub.ring.door != null and hub.ring.door.visible, "the Virtual Workshop house waits below the tasks now")
@@ -431,17 +431,17 @@ func test_the_butterflies_wait_locked_then_open_after_the_dots_and_play() -> voi
 	var hub := await _to_hub()
 	await until(func() -> bool: return hub.state == &"hub" and not hub.ring.turning, 30.0)
 	var kinds := hub.ring.impressions.map(func(i: Impression) -> StringName: return i.kind)
-	expect_eq(kinds, [&"shelf", &"dots", &"butterflies", &"turn_to_fit"], "the games in order, the cup last")
-	var butterflies := hub.ring.impressions[2]
+	expect_eq(kinds, [&"shelf", &"real_life", &"dots", &"butterflies", &"odd_color", &"turn_to_fit"], "the games in order, the cup last")
+	var butterflies := hub.ring.impressions[3]
 	expect(butterflies.sealed and butterflies.find_child("lock", true, false).visible, "the butterflies wait locked")
-	for kind: StringName in [&"shelf", &"dots"]:
+	for kind: StringName in [&"shelf", &"real_life", &"dots"]:
 		expect(await _choose(hub, kind), "%s is chosen" % kind)
 		await until(func() -> bool: return hub.state == &"game" and App.session.running, 60.0)
 		await _finish_rounds()
 		expect(await until(func() -> bool: return _in_hub(hub) and hub.ring.opened, 90.0), "back at the hub after %s" % kind)
 		await wait(2.0)
-		if kind == &"shelf":
-			expect(butterflies.sealed, "still locked after the first game (the dots open first)")
+		if kind != &"dots":
+			expect(butterflies.sealed, "still locked until the dots are played")
 	expect(not butterflies.sealed, "the butterflies opened after the dots")
 	expect(await _choose(hub, &"butterflies"), "the butterflies are chosen")
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running, 30.0), "Wei's butterflies play")

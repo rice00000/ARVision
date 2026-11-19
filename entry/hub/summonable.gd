@@ -40,6 +40,11 @@ var level: TaskLevel
 var played_level: TaskLevel
 
 
+## Where this game's check-ins come from (CheckIns), or null: none.
+func place() -> Place:
+	return null
+
+
 ## Wei's task this game's levels live in, or null (no stones by level).
 func task() -> Task:
 	return null
@@ -68,13 +73,14 @@ func done_levels() -> Array[TaskLevel]:
 		return App.main != null and App.main.progress.is_done(task(), l))
 
 
-## The first level not finished yet, else the last.
+## The level to play next ([method TaskProgress.next]: not finished, or not yet climbed to 70 % of its range),
+## else the last.
 func recommended() -> TaskLevel:
 	var list := levels()
-	for candidate in list:
-		if App.main == null or not App.main.progress.is_done(task(), candidate):
-			return candidate
-	return list.back() if not list.is_empty() else null
+	if list.is_empty():
+		return null
+	var next := App.main.progress.next(task(), list) if App.main != null else list[0]
+	return next if next != null else list.back()
 
 
 ## What the next go plays (and forgets the hub's pick).

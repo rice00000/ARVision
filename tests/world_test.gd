@@ -25,7 +25,7 @@ func test_the_current_level_follows_the_child() -> void:
 	expect_eq([world.current(TIDY).id, world.current(WALL).id], [&"shadow", &"steady_flow"], "level 1 of each")
 	await world._complete(TIDY, TIDY.levels[0])
 	expect_eq(world.current(TIDY).id, &"shadow", "finished, but low in its range: practise it more")
-	Profile.set_level(TIDY.levels[0].staircase(), World.READY_AT)
+	Profile.set_level(TIDY.levels[0].staircase(), TaskProgress.READY_AT)
 	expect_eq([world.current(TIDY).id, world.current(WALL).id], [&"similar_shadows", &"steady_flow"], "climbed: the shelf moves on, the wall does not")
 	await world._complete(TIDY, TIDY.levels[2])
 	Profile.set_level(TIDY.levels[2].staircase(), 1.0)
