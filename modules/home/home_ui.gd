@@ -50,7 +50,7 @@ static func label(parent: Node3D, text: String, at: Vector3, font_size := 36) ->
 	return node
 
 
-static func button(parent: Node3D, id: StringName, caption: String, speech: String, at: Vector3, icon := "") -> Target:
+static func button(parent: Node3D, id: StringName, caption: String, speech: String, at: Vector3, icon := "") -> UITarget:
 	var node := UITarget.new()
 	node.collision_layer = Pointer.MENU_LAYER
 	node.id = id
@@ -61,7 +61,7 @@ static func button(parent: Node3D, id: StringName, caption: String, speech: Stri
 	box.size = Vector3(face_size.x + 0.02, face_size.y + 0.02, 0.04)
 	shape.shape = box
 	node.add_child(shape)
-	node.set_meta(&"speech", speech)
+	node.speech = speech
 	node.position = at
 	parent.add_child(node)
 	var face := box(node, Vector3(face_size.x, face_size.y, 0.025), Vector3.ZERO, CREAM)

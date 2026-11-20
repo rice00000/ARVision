@@ -57,8 +57,6 @@ var _drag_row := 0
 ## The next level's face and glow, which breathe.
 var _breathing: Array[Node3D] = []
 var _time := 0.0
-## The button under a hand ray, or null.
-var _hovered: Target
 
 
 func _init(where: Place, world: World, row: int) -> void:
@@ -89,7 +87,6 @@ func _notification(what: int) -> void:
 		# Switching between modal menus keeps the world paused.
 		visible = what == NOTIFICATION_UNPAUSED
 		_drag_hand = &""
-		_hover(null)
 		_update_rows()
 
 
@@ -108,31 +105,6 @@ func _process(delta: float) -> void:
 			var row: float = _drag_row + (_drag_y - hit.y) / DRAG_STEP
 			if absf(row - first_row) > 0.6:
 				_scroll_to(roundi(row))
-	elif _open:
-		_hover(_under_ray())
-
-
-## The button aimed at by a tracked hand.
-func _under_ray() -> Target:
-	for side: StringName in [&"left", &"right"]:
-		var target := App.rig.pointer(side).aimed
-		if is_instance_valid(target) and _buttons.has(target) and target.collision_layer != 0:
-			return target
-	return null
-
-
-func _hover(button: Target) -> void:
-	if button == _hovered:
-		return
-	_lift(_hovered, false)
-	_hovered = button
-	_lift(button, true)
-
-
-## Lifts the aimed button while its ray hit box stays put.
-func _lift(button: Target, up: bool) -> void:
-	if button:
-		(button.get_node(^"Look") as Node3D).position.z = LIFT if up else 0.0
 
 
 ## Stands the menu in front of the eyes at [param eye], toward [param ahead] (level).
@@ -146,7 +118,6 @@ func place_at(eye: Vector3, ahead: Vector3) -> void:
 func fold() -> void:
 	_open = false
 	_drag_hand = &""
-	_hover(null)
 	_update_rows()
 	Events.play(&"menu_close")
 	var tween := create_tween()
@@ -168,7 +139,6 @@ func _press(hand: StringName, target: Target, origin: Vector3, direction: Vector
 			_drag_hand = hand
 			_drag_y = hit.y
 			_drag_row = first_row
-			_hover(null)
 	elif _buttons.has(target) and target.collision_layer != 0:
 		_open = false
 		chosen.emit(_buttons[target])
@@ -183,7 +153,6 @@ func _scroll_to(row: int) -> void:
 	row = clampi(row, 0, _last_row)
 	if first_row != row:
 		first_row = row
-		_hover(null)
 		_update_rows()
 
 
@@ -298,6 +267,7 @@ func _button(task: Task, level: TaskLevel, next: bool) -> Target:
 	var look := Node3D.new()
 	look.name = "Look"
 	button.add_child(look)
+	button.hover_changed.connect(func(on: bool) -> void: look.position.z = LIFT if on else 0.0)
 	var face := _face(CARD, NEXT_COLOR if next else CARD_COLOR)
 	look.add_child(face)
 	if next:

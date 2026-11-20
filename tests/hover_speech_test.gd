@@ -70,6 +70,32 @@ func test_a_silent_or_disabled_button_says_nothing() -> void:
 	expect(said.is_empty(), "nothing said")
 
 
+func test_player_menu_speech_follows_button_focus() -> void:
+	await boot()
+	var home := App.module(&"Home")
+	home.open(true)
+	var voice := App.module(&"Voice")
+	var said := record(Events.said)
+	var button := home.find_child("menu_resume", true, false) as UITarget
+	var at := button.global_position
+	Events.say(GUIDE_LINE)
+	input.point(&"right", at + button.global_basis.z * 0.2, at)
+	await wait(UITarget.SPEAK_AFTER + 0.1)
+	expect(button.hovered, "the ray lights the close button")
+	expect_eq(_said(said), [GUIDE_LINE], "the button label waits for quiet")
+	input.track(&"right", false)
+	await frames(3)
+	expect(await until(func() -> bool: return voice.speaking().is_empty()), "the guide finishes")
+	input.track(&"right", true)
+	await wait(UITarget.SPEAK_AFTER + 0.1)
+	expect_eq(_said(said), [GUIDE_LINE, "Return to your game."], "the lit button speaks once")
+	expect_eq(voice.speaking(), button.speech, "the voice reads that button")
+	input.track(&"right", false)
+	await frames(3)
+	expect(not button.hovered and voice.speaking().is_empty(), "the highlight and label clear together")
+	home.close()
+
+
 func test_every_staff_panel_name_is_baked() -> void:
 	await boot()
 	var facilitator := App.module(&"Facilitator")

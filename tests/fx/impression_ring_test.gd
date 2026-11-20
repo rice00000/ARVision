@@ -140,6 +140,30 @@ func test_quiet_all_darkens_the_bubbles_before_a_task() -> void:
 	expect(not HubGlow.any_lit(), "dark before the task")
 
 
+func test_only_the_focused_bubble_is_announced_when_another_is_near() -> void:
+	await boot(null, &"intro")
+	var ring := _ring()
+	await _hands_away(ring)
+	var nearby := ring.impressions[0]
+	var aimed_at := ring.impressions[2]
+	var announced := record(ring.hovered)
+	var from := nearby.target.global_position + Vector3.BACK * 0.07
+	input.point(&"left", from, from + Vector3.BACK)
+	var at := aimed_at.target.global_position
+	input.point(&"right", at + aimed_at.global_basis.z * 0.4, at)
+	await frames(4)
+	expect_eq(ring.lit, aimed_at, "a ray hit outranks the other hand's proximity")
+	expect(not nearby._outer_glow.visible, "only the aimed-at bubble glows")
+	expect_eq(announced, [[aimed_at]], "only the glowing bubble is announced")
+	input.track(&"right", false)
+	await frames(4)
+	expect_eq(ring.lit, nearby, "nearby takes focus after the ray is gone")
+	expect_eq(announced, [[aimed_at], [nearby]], "the new focus is announced once")
+	input.track(&"left", false)
+	await frames(4)
+	expect(ring.lit == null, "a lost hand pose cannot keep a bubble focused")
+
+
 func test_the_cup_has_no_base() -> void:
 	await boot(null, &"intro")
 	var cup := Impression.make(&"turn_to_fit")

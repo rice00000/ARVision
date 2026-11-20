@@ -91,7 +91,7 @@ var _rest_tween: Tween
 var _sounds: Sounds
 ## The one bubble lit now (aimed at or a hand near; Nov 19: lit means a pinch takes it), or null.
 var lit: Impression
-var _hovering: Dictionary = {}   # impression -> its name was said for this visit of the hand
+var _announced: Impression
 
 
 ## The menu facing [param eye], its tasks' middle at [param middle] ([method spot] gives the usual place),
@@ -311,6 +311,8 @@ func add(impression: Impression, from: Vector3) -> void:
 ## Fades every halo; the menu stays and can be woken with [method wake].
 func quiet(seconds := 0.8) -> void:
 	_quiet = true
+	lit = null
+	_announced = null
 	var tween := create_tween()
 	tween.tween_method(func(f: float) -> void:
 		_waiting = f
@@ -324,6 +326,8 @@ func quiet(seconds := 0.8) -> void:
 func sink(mouth: Vector3, seconds := 1.0) -> void:
 	_quiet = true
 	turning = true
+	lit = null
+	_announced = null
 	var pieces := _all()
 	var starts: Array[Vector3] = []
 	var sizes: Array[Vector3] = []
@@ -354,7 +358,6 @@ func rise(mouth: Vector3, seconds := OPEN_SECONDS) -> void:
 	_waiting = 1.0
 	_idle = 0.0
 	rest = 0.0
-	_hovering.clear()
 	for impression in _all():
 		impression.reset_bubble()
 	if App.rig and App.head() != null:
@@ -418,39 +421,42 @@ func _process(delta: float) -> void:
 	if App.rig:
 		for hand: StringName in [&"left", &"right"]:
 			var pointer := App.rig.pointer(hand)
-			if pointer:
+			if pointer and pointer.tracked():
 				pointers.append(pointer)
 	var hand_near := false
 	for pointer in pointers:
 		if pointer.global_position.distance_to(global_position) < WAKE_NEAR:
 			hand_near = true
-	var nears := {}
-	var nearest: Impression = null   # the hover cue lights one bubble only, the nearest (the others are ~15 cm away)
-	for impression in _all():
-		var near := 0.0
-		for pointer in pointers:
-			if pointer.aimed == impression.target:
-				near = 1.0
-			var gap := pointer.global_position.distance_to(impression.target.global_position)
-			near = maxf(near, clampf(inverse_lerp(NEAR_FROM, NEAR_FULL, gap), 0.0, 1.0))
-		nears[impression] = near
-		if near > 0.0 and not impression.sealed and (nearest == null or near > nears[nearest]):
-			nearest = impression
-	lit = nearest if opened and not turning else null
-	for impression in _all():
-		var near: float = nears[impression]
-		if not impression.sealed:
-			var cue := near if impression == nearest else 0.0
-			impression.set_near(cue)
-			_swell(impression, cue if opened and not turning else 0.0, delta)
-		# The sound label: once each time a hand comes to it (sealed ones too: "Soon").
-		if near >= HOVER_AT and opened and not turning and not _hovering.get(impression, false):
-			_hovering[impression] = true
-			hovered.emit(impression)
-		elif near < 0.15:
-			_hovering.erase(impression)
-		if near > 0.0:
-			hand_near = true
+	var pieces := _all()
+	var focus: Impression
+	var best := 0.0
+	if opened and not turning:
+		for impression in pieces:
+			if not impression.is_visible_in_tree():
+				continue
+			var score := 0.0
+			for pointer in pointers:
+				if pointer.aimed == impression.target:
+					score = 2.0 # A ray hit wins over proximity, which tops out at 1.0.
+					break
+				var gap := pointer.global_position.distance_to(impression.target.global_position)
+				score = maxf(score, clampf(inverse_lerp(NEAR_FROM, NEAR_FULL, gap), 0.0, 1.0))
+			if score > best:
+				best = score
+				focus = impression
+	var strength := minf(best, 1.0)
+	lit = focus if focus != null and not focus.sealed else null
+	for impression in pieces:
+		var cue := strength if impression == lit else 0.0
+		impression.set_near(cue)
+		_swell(impression, cue, delta)
+	if focus != _announced or strength < 0.15:
+		_announced = null
+	# A sealed bubble may say "Soon" when focused. It stays dark and unselectable.
+	if strength >= HOVER_AT and _announced == null:
+		_announced = focus
+		hovered.emit(focus)
+	hand_near = hand_near or focus != null
 	# Follow the child (only when calm: open, still, no hand near).
 	if opened and not turning and not hand_near and App.rig and App.head() != null:
 		var eye := App.head().global_position

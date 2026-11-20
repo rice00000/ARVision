@@ -15,8 +15,6 @@ var hovered := false
 ## (content/voice/speech.tts lines), as every spoken line.
 var speech := ""
 
-## Every name said on hover: one may cut off another, never the guide.
-static var _names: Dictionary[String, bool] = {}
 ## Seconds aimed at, counting to [constant SPEAK_AFTER]; negative once said or not aimed.
 var _aimed := -1.0
 var _hands: Dictionary[StringName, bool] = {}
@@ -67,7 +65,14 @@ func focus(hand: StringName, on: bool) -> void:
 		hovered = hot
 		hover_changed.emit(hot)
 		_aimed = 0.0 if hot else -1.0
-		if hot: Events.play(&"ui_hover", global_position)
+		if hot:
+			Events.play(&"ui_hover", global_position)
+		else:
+			_stop_speech()
+
+
+func _exit_tree() -> void:
+	_stop_speech()
 
 
 func confirm() -> void:
@@ -87,10 +92,16 @@ func _process(delta: float) -> void:
 
 
 func _speak() -> void:
-	if speech.is_empty() or collision_layer == 0:
+	if speech.is_empty() or collision_layer == 0 or not is_visible_in_tree():
 		return
 	var voice := App.module(&"Voice")
-	if voice != null and not voice.speaking().is_empty() and not _names.has(voice.speaking()):
-		return # the guide is talking
-	_names[speech] = true
-	Events.say(speech)
+	if voice:
+		voice.say_hover(self)
+	else:
+		Events.say(speech)
+
+
+func _stop_speech() -> void:
+	var voice := App.module(&"Voice")
+	if voice:
+		voice.stop_hover(self)

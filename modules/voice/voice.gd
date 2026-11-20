@@ -47,6 +47,7 @@ var _gliding := 0.0                  # seconds left of a glide to a new place
 var _player := AudioStreamPlayer.new()
 var _hide_at := 0.0
 var _speaking := ""
+var _hover_target: UITarget
 var _finish_at := INF
 var _suspended_line := ""
 var _simulate_audio := false
@@ -97,6 +98,8 @@ func _ready() -> void:
 ## Keep an awaited story line pending while the player menu speaks.
 func _player_menu(open: bool) -> void:
 	if open:
+		if _hover_target != null:
+			skip()
 		_suspended_line = _speaking
 		_player.stop()
 		_speaking = ""
@@ -220,6 +223,19 @@ func speaking() -> String:
 	return _speaking
 
 
+## A focused button can replace another button's label. Guide lines take priority.
+func say_hover(button: UITarget) -> void:
+	if _speaking != "" and _hover_target == null:
+		return
+	Events.say(button.speech)
+	_hover_target = button
+
+
+func stop_hover(button: UITarget) -> void:
+	if _hover_target == button:
+		skip()
+
+
 ## Cuts the line being spoken short (a child pressed Onion): the audio stops, the subtitle goes and
 ## [signal line_finished] says (text, false). False when nothing was being spoken.
 func skip() -> bool:
@@ -232,6 +248,7 @@ func skip() -> bool:
 
 
 func _end_line(completed: bool) -> void:
+	_hover_target = null
 	if _speaking == "":
 		return
 	var text := _speaking

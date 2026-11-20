@@ -348,28 +348,35 @@ func _refresh_tools() -> void:
 	_clear_buttons(tools)
 	var can_jump := intro != null and intro.tools_ready
 	_intro_status.text = "Intro: " + intro.beat if can_jump else "Tools"
-	var actions := []
+	var top := 0.068
 	if can_jump:
+		var jumps := []
 		for part: String in Entry.PARTS:
-			actions.append(["fac_jump_" + part, Entry.PARTS[part]])
-	actions.append(["fac_room_intro", "Room intro"])
-	actions.append(["fac_mode", "Mode: " + PlayMode.name()])   # Megan, Nov 10
+			jumps.append(["fac_jump_" + part, Entry.PARTS[part]])
+		top = _place_tool_rows(tools, jumps, 3, top) - 0.004
+	var actions := [["fac_room_intro", "Room intro"], ["fac_mode", "Mode: " + PlayMode.name()]]
 	if can_jump:
 		actions.append(["fac_redo_setup", "Redo setup"])   # scene review, Nov 17
 	if App.module(&"Inventory"):
 		actions.append(["fac_add_stones", "+10 Magic Stones"])
+	if can_jump and intro.zones_available():
+		actions.append(["fac_zones", "Zones"])
 	if not can_jump:
 		actions.append(["fac_credits", "Model credits"])
+	top = _place_tool_rows(tools, actions, 2, top)
+	_place_tool_rows(tools, [["fac_restart", "Restart scene"], ["fac_exit", "Exit app"]], 2, top)
+
+
+## Place a group of tools and return the centre of the next free row.
+func _place_tool_rows(page: Node3D, actions: Array, columns: int, top: float) -> float:
+	const ROW_PITCH := 0.042
+	var column_pitch := (WIDTH - 0.04) / columns
+	var size := Vector2(column_pitch - 0.02, 0.032)
 	for i in actions.size():
-		var column := -0.095 + 0.19 * (i % 2) if can_jump else 0.0
-		var row := floori(i / 2.0) if can_jump else i
-		_button(actions[i][0], actions[i][1], Vector2(0.18, 0.032),
-			Vector2(column, 0.065 - 0.038 * row), tools)
-	var zones := can_jump and intro.zones_available()
-	if zones:
-		_button("fac_zones", "Zones", Vector2(0.095, 0.045), Vector2(-0.153, -0.16), tools)
-	_button("fac_restart", "Restart scene", Vector2(0.154, 0.045), Vector2(-0.022 if zones else -0.095, -0.16), tools)
-	_button("fac_exit", "Exit app", Vector2(0.12, 0.045), Vector2(0.127 if zones else 0.095, -0.16), tools)
+		var x := (i % columns - (columns - 1) * 0.5) * column_pitch
+		var y := top - floori(float(i) / columns) * ROW_PITCH
+		_button(actions[i][0], actions[i][1], size, Vector2(x, y), page)
+	return top - ceili(float(actions.size()) / columns) * ROW_PITCH
 
 
 func _refresh_training() -> void:

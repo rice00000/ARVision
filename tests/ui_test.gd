@@ -91,6 +91,34 @@ func test_intro_tools_follow_setup_and_scene_changes() -> void:
 	expect(facilitator.find_child("fac_room_intro", true, false) != null, "room intro still works from any scene")
 
 
+func test_intro_tools_hit_boxes_stay_separate_when_all_actions_are_visible() -> void:
+	await boot(null, &"intro")
+	var intro := App.main.intro()
+	intro.plan_at_start = false
+	intro.run()
+	expect(await until(func() -> bool: return intro.zones_available(), 20.0), "the room is ready for Zones")
+	await open_intro_tools()
+	var facilitator := App.module(&"Facilitator")
+	var tools := facilitator.find_child("Tools", true, false)
+	var hit_boxes: Dictionary[StringName, Rect2] = {}
+	for child in tools.get_children():
+		if child is not UITarget:
+			continue
+		var collider := child.get_child(0) as CollisionShape3D
+		var box := collider.shape as BoxShape3D
+		var size := Vector2(box.size.x, box.size.y)
+		var center := Vector2(child.position.x, child.position.y)
+		var bounds := Rect2(center - size * 0.5, size)
+		for id in hit_boxes:
+			expect(not bounds.intersects(hit_boxes[id]), "%s and %s have separate hit areas" % [child.name, id])
+		hit_boxes[child.name] = bounds
+	expect(hit_boxes.has(&"fac_zones") and hit_boxes.has(&"fac_add_stones"), "the busiest Tools layout is shown")
+	var inventory := App.module(&"Inventory")
+	var before: int = inventory.count(&"magic_stone")
+	await press_facilitator("fac_add_stones")
+	expect_eq(inventory.count(&"magic_stone"), before + 10, "an aimed pinch adds exactly ten stones")
+
+
 func test_shared_ray_focus_feedback_and_tracking_loss_work_while_paused() -> void:
 	await boot()
 	input.menu()

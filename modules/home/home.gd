@@ -33,15 +33,13 @@ var is_open := false
 var page := &"menu"
 var _in_room := false
 var _index := 0
-var _entry: Target
+var _entry: UITarget
 var _entry_face: StandardMaterial3D
 var _panel := Node3D.new()
 var _preview: Node3D
 var _view: View
 var _pending: StringName
 var _cooldown := 0.0
-var _hover: Target
-var _hover_seconds := 0.0
 var _entry_frame := Transform3D.IDENTITY
 var _offscreen := 0.0
 var _wallet := Node3D.new()   # the magic stones the child has, beside the Menu button (Megan, Nov 10)
@@ -290,7 +288,6 @@ func _subtitle_slot(top: float) -> void:
 
 
 func _clear_panel() -> void:
-	_hover = null
 	_preview = null
 	for child in _panel.get_children(): child.free()
 
@@ -427,20 +424,6 @@ func _process(delta: float) -> void:
 				text.no_depth_test = in_header
 		_entry.global_transform = slot.global_transform if slot else Transform3D(_entry_frame.basis.scaled(Vector3.ONE * ENTRY_SCALE), _entry_frame.origin)
 	if _preview: _preview.rotation.y += delta * 0.18
-	var near: Target
-	for side in [&"left", &"right"]:
-		var pointer := App.rig.pointer(side)
-		if not pointer.tracked(): continue
-		var target := pointer.aimed
-		if target and ((_entry.visible and target == _entry) or (is_open and _panel.is_ancestor_of(target))):
-			near = target
-	if near != _hover:
-		_hover = near
-		_hover_seconds = 0
-	elif near:
-		var before := _hover_seconds
-		_hover_seconds += delta
-		if before < 0.6 and _hover_seconds >= 0.6: Events.say(near.get_meta(&"speech"))
 
 
 ## Where the Menu button wants to be: left of the gaze and a little above it, never below the horizon.

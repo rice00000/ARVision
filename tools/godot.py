@@ -20,7 +20,7 @@ def executable(console=False):
     return Path(shutil.which("godot") or "godot")
 
 
-def headless(*args):
+def headless(*args, console=True):
     """Command line for a headless, XR-off run of this project."""
-    return [str(executable(console=True)), "--headless", "--xr-mode", "off", "--audio-driver", "Dummy",
+    return [str(executable(console=console)), "--headless", "--xr-mode", "off", "--audio-driver", "Dummy",
             "--path", str(ROOT), *args]

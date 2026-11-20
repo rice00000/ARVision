@@ -1,5 +1,5 @@
 {
-  "fingerprint": "293e2a619974024ddf4cbd1c207653ce476af20803711eb283fe1c1f384a883c",
+  "fingerprint": "42b73305bd63f97f011f49214ffe1062852536c959d65b44ce38fab2a8af38f2",
   "clips": {
     "0": "res://content/voice/generated/89e11fe5c6b05d702fe71160.ogg",
     "1": "res://content/voice/generated/e03341765602c2c5374a4524.ogg",
@@ -370,7 +370,6 @@
     "someone has mixed up the colours can you spot the odd one": "res://content/voice/generated/5b5236a74ffb8bea56f1397d.ogg",
     "soon": "res://content/voice/generated/5f5ae5d70994f1fa0b7dd3ca.ogg",
     "space": "res://content/voice/generated/d0f4ed57175d41c56fdb58fa.ogg",
-    "speech": "res://content/voice/generated/4f3dc531d2a1bd964563d5ba.ogg",
     "spell wall": "res://content/voice/generated/9e996bb2804c446fbf8c573b.ogg",
     "spoon": "res://content/voice/generated/31abaca65b3ca42be0d87881.ogg",
     "sports ball": "res://content/voice/generated/e07514c9d103369174f44f10.ogg",
