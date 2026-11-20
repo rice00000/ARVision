@@ -400,14 +400,66 @@ func test_levels_megan_has_not_drawn_show_their_own_drawing_in_the_games_frame()
 	expect(await until(func() -> bool: return hub.row == null and hub.ring.opened, 10.0), "back to the menu")
 
 
-func test_a_check_in_comes_before_a_game_played_before_when_one_is_due() -> void:
+func test_a_due_check_in_is_optional_and_its_offer_is_outside_the_game() -> void:
 	var reported := record(Events.reported)
-	var hub := await _to_hub(func() -> void: HubMemory.get_or_make().played.append_array([&"shelf", &"real_life"]), &"", true)
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]), &"", true)
+	var offer := hub.check_in_board.offer
+	expect(not offer.visible and offer.target.collision_layer == 0, "no target while the menu is closed")
 	expect(await _open(hub), "the menu opens")
+	expect(await until(func() -> bool: return offer.visible), "the due check-in appears in the hub")
 	_pinch(_piece(hub, &"shelf").target)
-	expect(await until(func() -> bool: return reported.any(func(r: Array) -> bool: return r[0] == &"check_in_started"), 30.0),
-			"the table's check-in starts first (none done yet)")
-	expect(hub.state == &"game", "inside the game's time: the cauldron pauses it")
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running(), 30.0), "the game plays")
+	expect(not App.session.trial.condition.probe, "choosing Shelf starts regular training")
+	expect(not offer.visible and offer.target.collision_layer == 0, "no check-in target during a game")
+	expect(not reported.any(func(r: Array) -> bool: return r[0] == &"check_in_started"), "no automatic check-in")
+
+
+func test_the_check_in_keeps_progress_across_blocks_and_returns_without_game_rewards() -> void:
+	var spoken := record(Events.said)
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]), &"", true)
+	expect(await _open(hub), "the menu opens")
+	var board := hub.check_in_board
+	expect(await until(func() -> bool: return board.offer.visible), "the table check-in is due")
+	await _real_pinch_at(board.offer.target)
+	expect(await until(func() -> bool: return board.back.is_visible_in_tree() and App.session.trial != null, 10.0),
+			"pinching the separate entry starts the check-in")
+	var progress := board.find_child("Progress", true, false) as Label3D
+	expect_eq(progress.text, "Round 1 of 7", "shows the whole plan")
+	expect(hub.current == null and not hub.ring.opened, "no game selected")
+	for i in 3:
+		App.session.trial.finish(true)
+		expect(await until(func() -> bool: return progress.text == "Round %d of 7" % (i + 2), 10.0), "next round")
+	expect_eq(App.session.trial.def.skill, &"colour_discrimination", "the fourth round starts the colour tasks")
+	expect(spoken.has(["Pinch the block with a different colour."]), "the colour instruction is read aloud")
+	expect(not spoken.any(func(line: Array) -> bool: return "End practice" in line[0]), "no training exit instructions")
+	await _finish_rounds()
+	expect(await until(func() -> bool: return hub.state == &"hub" and hub.ring.opened, 10.0), "completion returns to the games")
+	var check_ins := App.module(&"CheckIns") as CheckIns
+	expect_eq(check_ins.history.size(), 1, "one saved assessment")
+	expect(check_ins.history[0].done, "all rounds are recorded")
+	expect_eq(_stones(), 0, "a check-in earns no game reward")
+	expect(not board.offer.visible and not board.back.is_visible_in_tree(), "completed offer and status are cleared")
+
+
+func test_back_to_games_stops_a_motion_check_in_with_the_ray_off() -> void:
+	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life", &"dots"]), &"", true)
+	var check_ins := App.module(&"CheckIns") as CheckIns
+	var motion := preload("res://content/places/motion.tres")
+	check_ins.ask(motion)
+	expect(await _open(hub), "the menu opens")
+	var board := hub.check_in_board
+	expect(await until(func() -> bool: return board.offer.visible), "the requested check-in appears")
+	await _real_pinch_at(board.offer.target)
+	expect(await until(func() -> bool: return App.session.trial != null and App.session.trial.is_running(), 10.0),
+			"the selected check-in starts")
+	expect_eq(App.session.trial.def.skill, &"global_motion", "the request takes priority")
+	expect(not App.rig.pointer(&"right").ray_on(), "motion play has no regular ray")
+	await _real_pinch_at(board.back.target)
+	expect(await until(func() -> bool: return hub.state == &"hub" and hub.ring.opened, 10.0), "back returns to the game menu")
+	expect(not App.session.running and App.session.trial == null, "no round left running")
+	expect_eq(check_ins.history.size(), 1, "one attempt recorded")
+	expect(not check_ins.history[0].done and not check_ins.due(motion), "unfinished and eligible again after a delay")
+	expect_eq(_stones(), 0, "leaving a check-in earns no game reward")
 
 
 ## Nov 19: picking Ready to Study opened the table's shelf check-in first; it measures shelf shapes and odd colour.

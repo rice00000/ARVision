@@ -16,6 +16,7 @@ extends Node
 ##   joins only when it can run.
 ## * **Places:** below the tasks from after the first game: ? (the controls tour) · eye (the child's look for the
 ##   real room) · the Virtual Workshop house (with the stones badge) · ✕ (finish, after Onion asks).
+## * **Check-in:** when due, its own optional button above the games. It returns directly to this menu.
 ## * **Stones and levels** (design chat, Nov 18, `claude/DESIGN_STONES_AND_LEVELS.md`): after every game its
 ##   stones rise from the brew into the house's badge (effort, not accuracy: 3 first time, 2 on a repeat, 1 for
 ##   leaving early); the first time Onion says what they're for. Pressing a game with a finished level opens its
@@ -96,7 +97,9 @@ var carry: Carry
 var lanterns: Array[Lantern] = []   # the workshop's warm lanterns (decor only, never pressed)
 var ambience: HubAmbience           # the quiet fireplace crackle under the hub
 var current: Summonable
-var state := &"idle"            # &"hub", &"game", &"home", &"closing", &"closed"
+var state := &"idle"            # &"hub", &"game", &"check_in", &"home", &"closing", &"closed"
+var check_in_board: WorkshopCheckIn
+var _offered_check_in: Place
 var played: Array[StringName] = []
 ## Saved per child: games played, one-time lines, the look (design chat, Nov 18).
 var memory: HubMemory
@@ -163,6 +166,9 @@ func run(on: Workshop, list: Array, first := &"", welcome := false, closing := C
 	if memory != null:
 		played = memory.played   # the same array: what's played is saved as it happens
 	_build_ring()
+	check_in_board = WorkshopCheckIn.new()
+	add_child(check_in_board)
+	Events.trial_started.connect(_on_check_in_round)
 	cauldron_menu = WorkshopCauldronMenu.new()
 	add_child(cauldron_menu)
 	cauldron_menu.build(workshop.cauldron() if workshop != null else null, _mouth(), App.head().global_position)
@@ -203,6 +209,9 @@ func _visit(home: Callable) -> void:
 	while true:
 		_picked = &""
 		var choice := await _hub()
+		if choice == &"check_in":
+			await _run_check_in(_offered_check_in)
+			continue
 		if choice not in [&"gear_finish", &"finish", &"gear_home"] and not await _choose_level(_activity(choice)):
 			continue
 		if choice == &"gear_finish":
@@ -312,6 +321,7 @@ func _hub() -> StringName:
 	Lantern.quiet = false   # the lanterns breathe again (and the odd ember rises)
 	ambience.hub()
 	SceneMarker.show_text("Hub")
+	_refresh_check_in_offer()
 	if ring.opened:
 		ring.wake()
 	_begin_carry()
@@ -353,6 +363,7 @@ func _open_menu() -> void:
 	print("HUB menu opens")
 	Events.report(&"hub_menu_opened", {})
 	await ring.rise(_mouth())
+	_refresh_check_in_offer()
 	_opening = false
 
 
@@ -404,11 +415,8 @@ func _run(activity: Summonable) -> void:
 	if aside != Vector3.ZERO:
 		await _slide_cauldron(aside)
 	_watch_cauldron()
-	var outcome := &"left"
-	await _check_in(activity)
-	if not _exited:
-		activity.summon(_workspace())
-		outcome = await activity.finished
+	activity.summon(_workspace())
+	var outcome: StringName = await activity.finished
 	if under_bench:
 		workshop.hide_socket(false)
 	if aside != Vector3.ZERO:
@@ -442,14 +450,72 @@ func _run(activity: Summonable) -> void:
 	_after_game(woke, stones, grew)   # not awaited: presses on the bubbles work while Onion talks and stones fly
 
 
-## Wanchun's no-help check-in for [param activity]'s place (CheckIns: the first time, then weekly), before the game,
-## once the child has played the game before (so they know how it works). The ✕ leaves it like a game.
-func _check_in(activity: Summonable) -> void:
+## Offer one due check-in at a time, once the child has played a game at its place.
+## A staff request takes precedence. Either way, the player starts it explicitly.
+func _refresh_check_in_offer() -> void:
+	_offered_check_in = null
 	var check_ins := App.module(&"CheckIns") as CheckIns
-	var place := activity.place()
-	if check_ins != null and place != null and activity.id() in played and check_ins.due(place):
-		print("HUB check-in: ", CheckIns.key(place))
-		await check_ins.run(place)
+	if check_ins == null:
+		return
+	for activity in activities:
+		if activity.id() not in played:
+			continue
+		var place := activity.place()
+		if place == null or not check_ins.due(place) or place.check_in.round_count() <= 0:
+			continue
+		if check_ins.requested_for(place):
+			_offered_check_in = place
+			return
+		if _offered_check_in == null:
+			_offered_check_in = place
+
+
+func _can_pick_check_in() -> bool:
+	return state == &"hub" and _picked == &"" and ring.opened and not ring.turning \
+			and row == null and not _looking and not _touring and not carry.held and not get_tree().paused
+
+
+func _run_check_in(place: Place) -> void:
+	var check_ins := App.module(&"CheckIns") as CheckIns
+	if check_ins == null or place == null or not check_ins.due(place):
+		return
+	state = &"check_in"
+	SceneMarker.show_text("Check-in")
+	carry.stop()
+	Lantern.quiet = true
+	ambience.game()
+	await HubGlow.quiet_all(0.15)
+	await ring.sink(_mouth(), 0.45)
+	var at_bench := workshop != null and CheckIns.key(place) == &"table"
+	if workshop != null:
+		workshop.attend(null)
+	if at_bench:
+		workshop.hide_socket(true)
+	check_in_board.begin(place)
+	var completed := await check_ins.run(place, false)
+	if at_bench:
+		workshop.hide_socket(false)
+	if completed:
+		check_in_board.complete()
+		Events.say(place.check_in.farewell)
+	else:
+		check_in_board.returning()
+	await ring.rise(_mouth(), 0.8)
+	check_in_board.clear_status()
+
+
+func _on_check_in_round(_trial: StringName, condition: Dictionary) -> void:
+	if state != &"check_in" or not condition.probe:
+		return
+	var session := App.session
+	var index: int = condition.round
+	for i in session.block_index:
+		index += session.plan.blocks[i].rounds
+	if index == 0:
+		check_in_board.place_status(session.trial.focus_point())
+	check_in_board.show_round(index, condition.skill)
+	if index == 0 and condition.skill == &"global_motion":
+		Events.say("Magic dots! Sweep your hand the way they flow.")
 
 
 ## Opens the next locked game whose time has come (UNLOCKS), once per return: its lock clicks open and drops away,
@@ -529,6 +595,8 @@ func _build_ring() -> void:
 	Events.reported.connect(func(what: StringName, data: Dictionary) -> void:
 		if what == &"taken":
 			_taken_frame[StringName(str(data.get("hand", "")))] = Engine.get_process_frames()
+		elif what == &"check_in_asked":
+			_refresh_check_in_offer()
 		elif what == &"player_menu" and data.get("button") == &"menu_cheat":
 			_cheat())
 
@@ -539,7 +607,7 @@ func _build_ring() -> void:
 ## Nov 19: a pinch that picks a game's thing up (a notebook on Wei's desk, with the cauldron behind it) is the
 ## game's, never a pause; and a fingertip already inside a bubble still presses it.
 func _on_pinch_without_ray(side: StringName, action: StringName, pressed: bool) -> void:
-	if not pressed or action != &"trigger_click" or App.rig == null:
+	if not pressed or action != &"trigger_click" or App.rig == null or _pinch_frame == Engine.get_process_frames():
 		return
 	# Nov 19: a lit bubble (a row's, the pause's, or the menu's in the hub) takes any pinch, ray or not.
 	var lit := _lit()
@@ -575,6 +643,22 @@ func _on_pinch_without_ray(side: StringName, action: StringName, pressed: bool) 
 func _on_press(target: Target, pinched: bool) -> void:
 	if target == null or (pinched and _pinch_frame == Engine.get_process_frames()):
 		return   # this pinch already went to the lit bubble
+	if check_in_board != null and target == check_in_board.offer.target:
+		if pinched and _offered_check_in != null and _can_pick_check_in() and check_in_board.offer.visible:
+			_pinch_frame = Engine.get_process_frames()
+			check_in_board.show_offer(null)
+			_pick(&"check_in")
+		return
+	if check_in_board != null and target == check_in_board.back.target:
+		if pinched and state == &"check_in" and not get_tree().paused \
+				and check_in_board.back.is_visible_in_tree() and App.session.running:
+			_pinch_frame = Engine.get_process_frames()
+			check_in_board.returning()
+			var voice := App.module(&"Voice")
+			if voice != null:
+				voice.skip()
+			App.session.stop()
+		return
 	if stop_bubble != null and is_instance_valid(stop_bubble) and target == stop_bubble.target:
 		if pinched and _clock_real - _stop_since >= STOP_GUARD:
 			_stop_chosen = true   # pinch only: a sweep through it never counts
@@ -716,6 +800,12 @@ func _process(delta: float) -> void:
 	if not get_tree().paused:
 		_clock += delta
 	_cauldron_step(delta)
+	if check_in_board != null:
+		check_in_board.visible = not get_tree().paused
+		var offer := _offered_check_in if _can_pick_check_in() else null
+		if offer != null:
+			check_in_board.place_offer(ring.global_position)
+		check_in_board.show_offer(offer)
 
 
 ## The cauldron glows while the menu is closed in the hub and a hand comes near or aims at it; a fingertip
@@ -828,6 +918,7 @@ func _cheat() -> void:
 			piece.unseal()
 			if piece.kind == &"shelf":
 				piece.set_rows(_shelf_rows(), 0.4)
+	_refresh_check_in_offer()
 	if badge != null:
 		(func() -> void: badge.set_count(_stones())).call_deferred()   # Home adds the stones after its report
 

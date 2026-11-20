@@ -8,7 +8,8 @@ extends Module
 ## asks [method due] before a place's menu unfolds: the first visit (the
 ## baseline), then once [member every_days] days have passed since the last
 ## finished one. A check-in that was skipped is not asked again the same day.
-## Staff can ask for one now (facilitator → Training → Check-in).
+## In the Workshop Hub, a due check-in appears as a separate activity. Staff
+## can request a check-in from Progress to make it due.
 ##
 ## Results are saved with the child (key "check_ins") and logged as "check_in"
 ## events; tools/progress.py and the facilitator's Progress page read them.
@@ -71,11 +72,11 @@ static func skill_name(skill: StringName) -> String:
 	return name if parts.size() == 1 else "%s · %s" % [name, parts[1].replace("_", " ").capitalize()]
 
 
-## Whether [param place] should check in before its menu unfolds.
+## Whether a check-in is due for [param place].
 func due(place: Place, now := Time.get_unix_time_from_system()) -> bool:
 	if place.check_in == null:
 		return false
-	if _asked.has(key(place)) or _asked.has(&"*"):
+	if requested_for(place):
 		return true
 	var tried := last(place, false)
 	if not tried.is_empty() and now - float(tried.time) < RETRY_HOURS * 3600.0:
@@ -103,26 +104,29 @@ func asked() -> bool:
 	return not _asked.is_empty()
 
 
+func requested_for(place: Place) -> bool:
+	return _asked.has(key(place)) or _asked.has(&"*")
+
+
 ## Plays [param place]'s check-in and records it, finished or not.
-func run(place: Place) -> void:
+func run(place: Place, use_session_presentation := true) -> bool:
 	_asked.erase(key(place))
 	_asked.erase(&"*")
 	var plan := place.check_in
-	var expected := 0
-	for block in plan.blocks:
-		expected += block.rounds
 	_current = {place = String(key(place)), title = place.title, time = Time.get_unix_time_from_system(),
 		done = false, scores = {}, vision = Vision.to_log()}
 	Events.report(&"check_in_started", {place = _current.place})
-	await App.session.play(plan)
+	await App.session.play(plan, use_session_presentation, use_session_presentation)
 	var scored := 0
 	for skill: String in _current.scores:
 		scored += _current.scores[skill].rounds
-	_current.done = scored == expected
+	var done := scored == plan.round_count()
+	_current.done = done
 	history.append(_current)
 	Events.report(&"check_in", _current.duplicate(true))
 	_current = {}
 	Save.request()
+	return done
 
 
 ## Finished check-ins of [param skill], oldest first: [{time, rounds, right}].

@@ -206,7 +206,8 @@ func _setup(round_condition: TrialCondition) -> void:
 		ODD_COLOUR:
 			instruct("Pinch the block with a different colour.", not onion_voice)
 		COLOUR_PRACTICE:
-			instruct("Pinch the block with a different colour. To finish, open Menu and choose End practice.", not onion_voice)
+			instruct("Pinch the block with a different colour." if round_condition.probe
+					else "Pinch the block with a different colour. To finish, open Menu and choose End practice.", not onion_voice)
 		_:
 			instruct("Put each thing back on its outline!" if _outline else "Put each thing back on its shadow!", not onion_voice)
 

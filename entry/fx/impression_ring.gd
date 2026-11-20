@@ -436,6 +436,8 @@ func _process(delta: float) -> void:
 				continue
 			var score := 0.0
 			for pointer in pointers:
+				if pointer.aimed is UITarget:
+					continue
 				if pointer.aimed == impression.target:
 					score = 2.0 # A ray hit wins over proximity, which tops out at 1.0.
 					break

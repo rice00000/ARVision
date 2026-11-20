@@ -10,8 +10,8 @@ extends Module
 ##   Skip block        drop the running round unscored and move on
 ## Progress
 ##   this child's levels and check-ins (CheckIns) per skill: first and latest
-##   check-in score, so staff see change at a glance; "Check-in next time" asks
-##   for one before the next menu. The full report: python3 tools/progress.py.
+##   check-in score, so staff see change at a glance; "Check-in next time" makes
+##   one due at the next eligible menu. The full report: python3 tools/progress.py.
 ## Vision (this child's profile, saved with them; see Vision)
 ##   left: the filter, from a preset then contrast, brightness, colour, dim,
 ##   spotlight, black and white, edges. Right: start from a profile preset,
@@ -443,7 +443,7 @@ func _refresh_progress() -> void:
 		lines.append("Last check-in: %s" % ("none yet" if latest.is_empty() else "%s, %s%s" % [_when(int(latest.time)),
 			latest.title, "" if latest.done else " (not finished)"]))
 		if check_ins.asked():
-			lines.append("A check-in comes before the next menu.")
+			lines.append("Check-in requested for the next eligible menu.")
 		_enable(_button("fac_check_in", "Check-in next time", Vector2(0.22, 0.045), Vector2(0.0, -0.17), page), not check_ins.asked())
 	lines.append("")
 	var skills: Array[StringName] = Profile.skills()

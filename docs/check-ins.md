@@ -4,14 +4,16 @@ The design brief measures success by "no-help check-ins on new objects, not game
 
 ## When
 
-`modules/check_ins/check_ins.gd` (`CheckIns`). Before a place's menu unfolds, the World asks whether one is due; in the workshop hub, before a game the child has played before (`Summonable.place()`: shelf and Odd Color → table, Real Life → none, dots and butterflies → motion):
+`modules/check_ins/check_ins.gd` (`CheckIns`) makes a plan due on the following schedule:
 
 - the first visit to the place: the **baseline**;
 - then once **7 days** (`every_days`) have passed since the last finished one;
 - a check-in that was skipped or left unfinished is not asked again for 12 hours;
-- staff: **Menu → Staff tools → Progress → Check-in next time** runs one before the next menu.
+- staff can make one due through **Menu → Staff tools → Progress → Check-in next time**.
 
-Probe rounds never move the staircase and earn no stones. The child hears "Check-in time! … No help this time. Just try your best." and a thank-you at the end.
+In the Workshop Hub, **Quick check-in** appears above the game buttons once the child has played at the relevant place. Shelf and Odd Color use the table plan. Dots and Butterflies use the motion plan. The button shows the subject and the number of rounds. Choosing a game opens that game. Choosing the check-in shows instructions and progress for the full plan. **Back to games** returns to the same menu at any time.
+
+In the World place menus, a due check-in runs before the menu opens. Probe rounds leave the training level and stone balance unchanged.
 
 ## What
 

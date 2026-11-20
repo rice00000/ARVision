@@ -54,12 +54,14 @@ func run() -> void:
 	_offer_replay()
 
 
-## Plays [param session_plan] once. A story can provide its own announcements.
-func play(session_plan: SessionPlan, announce_plan := true) -> void:
+## Plays [param session_plan] once. The caller can show its own instructions and progress.
+func play(session_plan: SessionPlan, announce_plan := true, show_round_dots := true) -> void:
 	plan = session_plan
 	pinned = NAN
 	running = true
 	won = not plan.blocks.is_empty() and not plan.is_endless()
+	block_index = -1
+	_skip = false
 	_stop = false
 	if announce_plan:
 		await Events.say(plan.greeting, self)
@@ -70,7 +72,7 @@ func play(session_plan: SessionPlan, announce_plan := true) -> void:
 			break
 		block_index = index
 		block = plan.blocks[index]
-		await _run_block(announce_plan)
+		await _run_block(announce_plan, show_round_dots)
 	block = null
 	running = false
 	if announce_plan:
@@ -176,7 +178,7 @@ func skip_block() -> void:
 		trial.abandon()
 
 
-func _run_block(announce_plan: bool) -> void:
+func _run_block(announce_plan: bool, show_round_dots: bool) -> void:
 	var def := block.trial
 	var missing := def.requires.filter(func(module_name: StringName) -> bool: return App.module(module_name) == null)
 	if not missing.is_empty():
@@ -191,7 +193,7 @@ func _run_block(announce_plan: bool) -> void:
 	trial.grab = not block.ray
 	trial.tutorial_intro = block.intro
 	App.stage.add_child(trial)
-	if block.rounds > 1:
+	if show_round_dots and block.rounds > 1:
 		_dots = RoundDots.new(block.rounds)
 		App.stage.add_child(_dots)
 		_dots.place(trial.in_front(0.85, -0.36))
@@ -226,7 +228,7 @@ func _run_block(announce_plan: bool) -> void:
 		if round_index == block.rounds and block.pause_after >= 0.0:
 			delay = block.pause_after
 		# Levels that flow round to round with no pause (the swarm) keep flowing: the dots show it.
-		if not _skip and block.rounds > 2 and round_index == block.rounds - 1 and block.pause_between > 0.0:
+		if show_round_dots and not _skip and block.rounds > 2 and round_index == block.rounds - 1 and block.pause_between > 0.0:
 			await _say_last_round()
 		if not _skip and delay > 0.0:
 			await get_tree().create_timer(delay, false).timeout

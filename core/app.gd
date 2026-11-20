@@ -66,8 +66,10 @@ func player_menu_slot() -> Marker3D:
 
 ## The open panel's subtitle spot, or null when no panel reserves one.
 func subtitle_slot() -> Marker3D:
-	var slot := get_tree().get_first_node_in_group(SUBTITLE_SLOT) as Marker3D
-	return slot if slot and slot.is_visible_in_tree() else null
+	for slot: Marker3D in get_tree().get_nodes_in_group(SUBTITLE_SLOT):
+		if slot.is_visible_in_tree():
+			return slot
+	return null
 
 
 func menu_active() -> bool:

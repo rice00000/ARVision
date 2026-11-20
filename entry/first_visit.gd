@@ -36,8 +36,8 @@ func run() -> void:
 	if not App.reality.is_settled:
 		await App.reality.settled
 	Events.reported.connect(_on_reported)
-	Events.trial_ended.connect(func(_skill: StringName, success: bool, _data: Dictionary) -> void:
-		if not _motion.in_motion():
+	Events.trial_ended.connect(func(_skill: StringName, success: bool, data: Dictionary) -> void:
+		if not data.get("probe", false) and not _motion.in_motion():
 			_rounds_ended += 1
 			if success:
 				_rounds_won += 1)
@@ -177,6 +177,8 @@ func leave_shelf() -> void:
 
 
 func _on_reported(what: StringName, data: Dictionary) -> void:
+	if App.session.block != null and App.session.block.probe:
+		return
 	if what == &"taken" or what == &"put":
 		_started = true
 	if what == &"put" and data.get("correct", false) and not _motion.in_motion():

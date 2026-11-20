@@ -120,7 +120,7 @@ func test_the_progress_page_shows_levels_and_check_ins() -> void:
 	expect(text.contains("Shapes on the shelf:  level 0.20   check-in 2/5 -> 4/5"), "first and latest: %s" % text)
 	await press_facilitator("fac_check_in")
 	expect(_check_ins().asked(), "staff asked for a check-in")
-	expect((App.module(&"Facilitator").get("_progress") as Label3D).text.contains("before the next menu"), "and the page says so")
+	expect((App.module(&"Facilitator").get("_progress") as Label3D).text.contains("Check-in requested"), "and the page says so")
 
 
 func test_tidy_can_use_shapes_never_trained_on() -> void:
