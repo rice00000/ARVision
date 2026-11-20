@@ -1,6 +1,6 @@
 # ARVision
 
-AR vision training for children who gained sight late (Project Prakash, ages 8–18). Measured trials run over the Quest 3's passthrough: virtual stimuli on the real table, real objects found by computer vision, and the real world itself filtered (contrast, greyscale, edges, dimming). Sister project of XRVision (VR), same stack.
+AR vision training for children who gained sight late (Project Prakash, ages 8–18). Measured trials run over the Quest 3's passthrough: virtual stimuli on the real table, real objects found by computer vision, and the real world itself filtered (contrast, greyscale, edges, dimming).
 
 Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0**, Meta Quest 3.
 
