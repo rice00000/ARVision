@@ -5,6 +5,8 @@ extends Node3D
 const TINT := Color(1.0, 0.86, 0.55)
 const GAME_SCALE := 0.6
 const DRAG_DISTANCE := 0.03
+const DRAG_STEP := 0.01
+const MAX_DRAG_SAMPLE := 0.05
 const CLEARANCE := 0.018
 const POT_RADIUS := EntryLayout.CAULDRON_WIDTH * GAME_SCALE * 0.5 + CLEARANCE
 
@@ -24,8 +26,7 @@ var _footprints: Array[Rect2] = []
 var _parked := Vector2.INF
 var _landing_ring: MeshInstance3D
 var _hand := &""
-var _hand_start := Vector2.ZERO
-var _drag_start := Vector2.ZERO
+var _hand_position := Vector2.ZERO
 var _dragging := false
 var _pressed_paused := false
 var _mouth_local: Vector3
@@ -62,7 +63,7 @@ func begin_game(activity: Node3D, reach: float) -> void:
 
 
 func end_game() -> void:
-	_cancel_pinch()
+	_finish_pinch()
 	in_game = false
 	_activity = null
 	_place(_table_pose)
@@ -71,8 +72,8 @@ func end_game() -> void:
 
 ## Settle when the game builds its layout. A usable parking spot survives the next round.
 func place_clear() -> void:
-	_cancel_pinch()
-	var clear := _find_clear(_parked, _reach * 2.0)
+	_finish_pinch()
+	var clear := _find_parking_spot()
 	if clear.is_finite():
 		_parked = clear
 	_place_on_table(_parked)
@@ -83,8 +84,7 @@ func pinch(hand: StringName, pressed: bool) -> bool:
 	if pressed:
 		if _hand == &"":
 			_hand = hand
-			_hand_start = _table_point(App.rig.pointer(hand).grip().origin)
-			_drag_start = _table_point(global_position)
+			_hand_position = _table_point(App.rig.pointer(hand).grip().origin)
 			_pressed_paused = get_tree().paused
 			set_physics_process(true)
 		return false
@@ -94,10 +94,8 @@ func pinch(hand: StringName, pressed: bool) -> bool:
 	if _hand == &"":
 		return false
 	var confirm := not _dragging
-	if _dragging:
-		_parked = _table_point(global_position)
-		if _landing_ring.visible:
-			Events.play(&"place", global_position)
+	if _landing_ring.visible:
+		Events.play(&"place", global_position)
 	_finish_pinch()
 	return confirm
 
@@ -109,23 +107,41 @@ func _physics_process(_delta: float) -> void:
 func _update_pinch() -> void:
 	var pointer := App.rig.pointer(_hand)
 	if not pointer.tracked() or App.menu_layer() == Pointer.MENU_LAYER or get_tree().paused != _pressed_paused:
-		_cancel_pinch()
+		_finish_pinch()
 		return
-	var delta := _table_point(pointer.grip().origin) - _hand_start
-	_dragging = _dragging or delta.length_squared() >= DRAG_DISTANCE * DRAG_DISTANCE
-	if not _dragging or _pressed_paused:
+	var hand_position := _table_point(pointer.grip().origin)
+	var motion := hand_position - _hand_position
+	if not _dragging:
+		if motion.length_squared() < DRAG_DISTANCE * DRAG_DISTANCE:
+			return
+		_dragging = true
+		motion -= motion.normalized() * DRAG_DISTANCE
+	# Consume blocked hand movement too, so letting go or reversing cannot pull the pot forward.
+	_hand_position = hand_position
+	if _pressed_paused:
 		return
-	var clear := _find_clear(_drag_start + delta, POT_RADIUS * 2.0)
-	_place_on_table(clear if clear.is_finite() else _drag_start)
-	_landing_ring.visible = clear.is_finite()
-	if _landing_ring.visible:
-		_landing_ring.global_transform = Transform3D(_table.transform.basis, global_position + _table.transform.basis.y * 0.003)
+	if not motion.is_zero_approx():
+		_slide_on_table(motion.limit_length(MAX_DRAG_SAMPLE))
+	_landing_ring.global_transform = Transform3D(_table.transform.basis, global_position + _table.transform.basis.y * 0.003)
+	_landing_ring.show()
 
 
-func _cancel_pinch() -> void:
-	if _dragging:
-		_place_on_table(_drag_start)
-	_finish_pinch()
+## Try small steps so a fast drag still stops at obstacles. Keep the free component at contact.
+func _slide_on_table(motion: Vector2) -> void:
+	_read_footprints()
+	var steps := ceili(motion.length() / DRAG_STEP)
+	var step := motion / steps
+	for index in steps:
+		var next := _parked + step
+		if _fits(next):
+			_parked = next
+			continue
+		for axis in 2:
+			var slide := _parked
+			slide[axis] += step[axis]
+			if step[axis] != 0.0 and _fits(slide):
+				_parked = slide
+	_place_on_table(_parked)
 
 
 func _finish_pinch() -> void:
@@ -148,14 +164,15 @@ func _place_on_table(spot: Vector2) -> void:
 	_place(Transform3D(_table_pose.basis.scaled(Vector3.ONE * GAME_SCALE), _table_world(spot)))
 
 
-## Use the same clearances on the tabletop and on the extension of its plane.
-func _find_clear(wanted: Vector2, distance: float) -> Vector2:
+## Prefer the tabletop when parking at the start of a round.
+func _find_parking_spot() -> Vector2:
 	_read_footprints()
-	var reachable := _eye + (wanted - _eye).limit_length(_reach)
+	var reachable := _eye + (_parked - _eye).limit_length(_reach)
 	var half := _table.size * 0.5 - Vector2.ONE * POT_RADIUS
 	var on_table := reachable.clamp(-half.max(Vector2.ZERO), half.max(Vector2.ZERO))
-	var clear := Surface.nearest_free(on_table, distance, _fits.bind(half))
-	return clear if clear.is_finite() else Surface.nearest_free(reachable, distance, _fits.bind(Vector2.INF))
+	var clear := Surface.nearest_free(on_table, _reach * 2.0,
+		func(spot: Vector2) -> bool: return absf(spot.x) <= half.x and absf(spot.y) <= half.y and _fits(spot))
+	return clear if clear.is_finite() else Surface.nearest_free(reachable, _reach * 2.0, _fits)
 
 
 func _read_footprints() -> void:
@@ -177,8 +194,8 @@ func _add_footprints(root: Node, from_world: Transform3D) -> void:
 			_footprints.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))
 
 
-func _fits(spot: Vector2, limits: Vector2) -> bool:
-	if absf(spot.x) > limits.x or absf(spot.y) > limits.y or spot.distance_to(_eye) > _reach:
+func _fits(spot: Vector2) -> bool:
+	if spot.distance_to(_eye) > _reach:
 		return false
 	for footprint in _footprints:
 		if spot.distance_squared_to(spot.clamp(footprint.position, footprint.end)) < POT_RADIUS * POT_RADIUS:

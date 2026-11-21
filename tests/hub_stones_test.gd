@@ -290,7 +290,7 @@ func test_the_cauldron_relocates_and_drags_clear_of_obstacles_before_a_release_c
 	var original := pot.global_position
 	var obstacle := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(0.06, 0.12, 0.06)
+	box.size = Vector3(0.06, 0.12, 0.4)
 	obstacle.mesh = box
 	App.stage.add_child(obstacle)
 	obstacle.global_position = original + Vector3.UP * 0.06
@@ -304,15 +304,35 @@ func test_the_cauldron_relocates_and_drags_clear_of_obstacles_before_a_release_c
 	await frames(3)
 	expect(hub.stop_bubble == null, "reaching and pinching begins a hold without pausing")
 	var sweeps := record(Events.sweeping)
-	for step in range(1, 7):
-		input.set_hand(&"right", hand.translated((original - moved) * (step / 6.0)))
+	var into_wall := (original - moved).normalized()
+	var previous := moved
+	var held_pose := hand
+	for step in range(1, 13):
+		held_pose = hand.translated(into_wall * (step * 0.03))
+		input.set_hand(&"right", held_pose)
 		await frames(2)
-	expect(pot.global_position.distance_to(original) > 0.10, "the held pot still clears the obstacle")
+		expect(pot.global_position.distance_to(previous) <= 0.031, "drag motion stays within the hand movement")
+		previous = pot.global_position
+	var blocked := pot.global_position
+	expect((blocked - original).dot(into_wall) < -0.10, "the pot stops on the near side even as the hand crosses the obstacle")
+	# Push farther into the wall while moving towards the child. Only the sideways motion should carry through.
+	held_pose = held_pose.translated(into_wall * 0.02 + Vector3.BACK * 0.04)
+	input.set_hand(&"right", held_pose)
+	await frames(3)
+	var slid := pot.global_position
+	expect(slid.z > blocked.z + 0.025, "the pot slides along the wall")
+	expect((slid - blocked).dot(into_wall) <= 0.01, "sliding does not step through the wall")
+	held_pose = held_pose.translated(-into_wall * 0.04)
+	input.set_hand(&"right", held_pose)
+	await frames(3)
+	var pulled_back := pot.global_position
+	expect((pulled_back - slid).dot(into_wall) < -0.025, "pulling back moves the pot immediately")
 	expect(sweeps.is_empty(), "dragging the pot is not a dots answer")
 	obstacle.free()
 	await frames(3)
-	expect(pot.global_position.is_equal_approx(original), "the pot slides into the now-clear spot")
+	expect(pot.global_position.is_equal_approx(pulled_back), "the stationary hand does not make the pot jump when an obstacle clears")
 	input.press(&"right", &"trigger_click", false)
+	expect(pot.global_position.is_equal_approx(pulled_back), "release keeps the last position")
 	expect(hub.stop_bubble == null and not app.get_tree().paused, "releasing after a drag parks the pot")
 
 	var table := App.reality.work_surface()
