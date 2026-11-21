@@ -257,15 +257,7 @@ func hide_socket(hidden: bool, seconds := 0.4) -> void:
 			tween.tween_callback(func() -> void: part.visible = false)
 
 
-## The cauldron glides along the table by [param offset] (its brew with it), out of a game board's way and back.
-func slide_cauldron(offset: Vector3, seconds := 0.6) -> Tween:
-	_mouth += offset
-	var tween := create_tween()
-	tween.tween_property(_cauldron, "global_position", _cauldron.global_position + offset, seconds).set_trans(Tween.TRANS_SINE)
-	return tween
-
-
-## Where the cauldron's mouth is.
+## The cauldron's mouth in the workshop.
 func mouth() -> Vector3:
 	return _mouth
 

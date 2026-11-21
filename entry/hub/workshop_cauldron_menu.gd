@@ -1,23 +1,41 @@
 class_name WorkshopCauldronMenu
 extends Node3D
-## The hub's cauldron targets, engraved menu sign and glow.
+## The cauldron's interaction and placement on the workshop table.
 
 const TINT := Color(1.0, 0.86, 0.55)
+const GAME_SCALE := 0.6
+const DRAG_DISTANCE := 0.03
+const CLEARANCE := 0.018
+const POT_RADIUS := EntryLayout.CAULDRON_WIDTH * GAME_SCALE * 0.5 + CLEARANCE
 
 var target: Target
-var sign_target: Target
 var engraving: Node3D
 var radius: float
 var glow := 0.0
+var in_game := false
+var _pot: Node3D
+var _table_pose: Transform3D
+var _table: Surface
+var _activity: Node3D
+var _reach := 0.0
+var _eye := Vector2.ZERO
+var _pot_height := 0.0
+var _footprints: Array[Rect2] = []
+var _parked := Vector2.INF
+var _landing_ring: MeshInstance3D
+var _hand := &""
+var _hand_start := Vector2.ZERO
+var _drag_start := Vector2.ZERO
+var _dragging := false
+var _pressed_paused := false
+var _mouth_local: Vector3
 var _glow_light: StandardMaterial3D
 var _glow_quad: MeshInstance3D
 var _groove_light: StandardMaterial3D
 
 
-func set_targetable(on: bool) -> void:
-	var layer := Pointer.TARGET_LAYER if on else 0
+func set_target_layer(layer: int) -> void:
 	target.collision_layer = layer
-	sign_target.collision_layer = layer
 
 
 func is_lit() -> bool:
@@ -31,18 +49,166 @@ func update_glow(want: float, delta: float) -> void:
 	_glow_quad.visible = is_lit()
 
 
-func slide(offset: Vector3, seconds: float) -> void:
-	var tween := create_tween().set_parallel().set_trans(Tween.TRANS_SINE)
-	for part: Node3D in [target, _glow_quad, sign_target]:
-		tween.tween_property(part, "global_position", part.global_position + offset, seconds)
+func begin_game(activity: Node3D, reach: float) -> void:
+	in_game = true
+	_activity = activity
+	_table = App.reality.work_surface()
+	_eye = _table_point(App.head().global_position)
+	_reach = reach
+	if not _parked.is_finite():
+		_parked = _table_point(_table_pose.origin)
+	place_clear()
+	set_target_layer(Pointer.SIDE_MENU_LAYER)
+
+
+func end_game() -> void:
+	_cancel_pinch()
+	in_game = false
+	_activity = null
+	_place(_table_pose)
+	set_target_layer(0)
+
+
+## Settle when the game builds its layout. A usable parking spot survives the next round.
+func place_clear() -> void:
+	_cancel_pinch()
+	var clear := _find_clear(_parked, _reach * 2.0)
+	if clear.is_finite():
+		_parked = clear
+	_place_on_table(_parked)
+
+
+## A stationary release confirms. Once the hand has dragged, release only parks the pot.
+func pinch(hand: StringName, pressed: bool) -> bool:
+	if pressed:
+		if _hand == &"":
+			_hand = hand
+			_hand_start = _table_point(App.rig.pointer(hand).grip().origin)
+			_drag_start = _table_point(global_position)
+			_pressed_paused = get_tree().paused
+			set_physics_process(true)
+		return false
+	if _hand != hand:
+		return false
+	_update_pinch()
+	if _hand == &"":
+		return false
+	var confirm := not _dragging
+	if _dragging:
+		_parked = _table_point(global_position)
+		if _landing_ring.visible:
+			Events.play(&"place", global_position)
+	_finish_pinch()
+	return confirm
+
+
+func _physics_process(_delta: float) -> void:
+	_update_pinch()
+
+
+func _update_pinch() -> void:
+	var pointer := App.rig.pointer(_hand)
+	if not pointer.tracked() or App.menu_layer() == Pointer.MENU_LAYER or get_tree().paused != _pressed_paused:
+		_cancel_pinch()
+		return
+	var delta := _table_point(pointer.grip().origin) - _hand_start
+	_dragging = _dragging or delta.length_squared() >= DRAG_DISTANCE * DRAG_DISTANCE
+	if not _dragging or _pressed_paused:
+		return
+	var clear := _find_clear(_drag_start + delta, POT_RADIUS * 2.0)
+	_place_on_table(clear if clear.is_finite() else _drag_start)
+	_landing_ring.visible = clear.is_finite()
+	if _landing_ring.visible:
+		_landing_ring.global_transform = Transform3D(_table.transform.basis, global_position + _table.transform.basis.y * 0.003)
+
+
+func _cancel_pinch() -> void:
+	if _dragging:
+		_place_on_table(_drag_start)
+	_finish_pinch()
+
+
+func _finish_pinch() -> void:
+	_hand = &""
+	_dragging = false
+	_landing_ring.hide()
+	set_physics_process(false)
+
+
+func _table_point(world: Vector3) -> Vector2:
+	var local := _table.transform.affine_inverse() * world
+	return Vector2(local.x, local.z)
+
+
+func _table_world(spot: Vector2) -> Vector3:
+	return _table.transform * Vector3(spot.x, 0, spot.y)
+
+
+func _place_on_table(spot: Vector2) -> void:
+	_place(Transform3D(_table_pose.basis.scaled(Vector3.ONE * GAME_SCALE), _table_world(spot)))
+
+
+## Use the same clearances on the tabletop and on the extension of its plane.
+func _find_clear(wanted: Vector2, distance: float) -> Vector2:
+	_read_footprints()
+	var reachable := _eye + (wanted - _eye).limit_length(_reach)
+	var half := _table.size * 0.5 - Vector2.ONE * POT_RADIUS
+	var on_table := reachable.clamp(-half.max(Vector2.ZERO), half.max(Vector2.ZERO))
+	var clear := Surface.nearest_free(on_table, distance, _fits.bind(half))
+	return clear if clear.is_finite() else Surface.nearest_free(reachable, distance, _fits.bind(Vector2.INF))
+
+
+func _read_footprints() -> void:
+	_footprints.clear()
+	var from_world := _table.transform.affine_inverse()
+	_add_footprints(App.stage, from_world)
+	_add_footprints(_activity, from_world)
+	if _pot != null:
+		_add_footprints(_pot.get_parent(), from_world)
+
+
+## Include the board and empty visual guides as well as the things the child picks up.
+func _add_footprints(root: Node, from_world: Transform3D) -> void:
+	for mesh: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		if not mesh.is_visible_in_tree() or mesh.mesh == null or (_pot != null and _pot.is_ancestor_of(mesh)):
+			continue
+		var box := (from_world * mesh.global_transform) * mesh.get_aabb()
+		if box.end.y >= -CLEARANCE and box.position.y <= _pot_height + CLEARANCE:
+			_footprints.append(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))
+
+
+func _fits(spot: Vector2, limits: Vector2) -> bool:
+	if absf(spot.x) > limits.x or absf(spot.y) > limits.y or spot.distance_to(_eye) > _reach:
+		return false
+	for footprint in _footprints:
+		if spot.distance_squared_to(spot.clamp(footprint.position, footprint.end)) < POT_RADIUS * POT_RADIUS:
+			return false
+	return App.reality.is_free(_table_world(spot), POT_RADIUS)
+
+
+func mouth_position() -> Vector3:
+	return to_global(_mouth_local)
+
+
+func _place(pose: Transform3D) -> void:
+	global_transform = pose
+	if _pot != null:
+		_pot.global_transform = pose
 
 
 func build(pot: Node3D, mouth: Vector3, eye: Vector3) -> void:
+	_pot = pot
+	global_transform = pot.global_transform if pot != null else Transform3D(Basis.IDENTITY, mouth)
+	_table_pose = global_transform
+	_mouth_local = to_local(mouth)
+	var box := _bounds(pot) if pot != null else AABB(Vector3.ZERO, Vector3.UP * EntryLayout.CAULDRON_RIM)
+	_pot_height = box.size.y * GAME_SCALE
 	var width := 0.3
 	if pot != null:
 		width = maxf(0.2, (mouth.y - pot.global_position.y) * 2.0 + 0.1)
 	radius = width * 0.5
 	target = Target.sphere(&"hub_cauldron", radius)
+	target.near_pinch = true
 	add_child(target)
 	target.global_position = (pot.global_position + mouth) * 0.5 if pot != null else mouth
 	_glow_light = StandardMaterial3D.new()
@@ -62,18 +228,36 @@ func build(pot: Node3D, mouth: Vector3, eye: Vector3) -> void:
 	add_child(_glow_quad)
 	_glow_quad.global_position = mouth + Vector3.UP * 0.01
 	_glow_quad.rotation = Vector3(-PI * 0.5, 0.0, 0.0)   # lies on the brew
-	_build_engraving(pot, mouth, eye)
+	_build_engraving(pot, mouth, eye, box)
+	_build_landing_ring()
+	set_physics_process(false)
+	set_target_layer(0)
 
 
-## The engraving follows the pot as it moves. Its target stays in the hub.
-func _build_engraving(pot: Node3D, mouth: Vector3, eye: Vector3) -> void:
+func _build_landing_ring() -> void:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = TINT
+	var ring := TorusMesh.new()
+	ring.inner_radius = POT_RADIUS - 0.005
+	ring.outer_radius = POT_RADIUS
+	ring.material = material
+	_landing_ring = MeshInstance3D.new()
+	_landing_ring.mesh = ring
+	_landing_ring.top_level = true
+	_landing_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_landing_ring)
+	_landing_ring.hide()
+
+
+## The engraving follows the pot as it moves.
+func _build_engraving(pot: Node3D, mouth: Vector3, eye: Vector3, box: AABB) -> void:
 	engraving = Node3D.new()
 	engraving.name = "menu_engraving"
 	var toward := Vector3(eye.x - mouth.x, 0.0, eye.z - mouth.z).normalized()
 	var belly := mouth + Vector3.DOWN * 0.05
 	var belly_radius := 0.06
 	if pot != null:
-		var box := _bounds(pot)
 		if box.size != Vector3.ZERO:
 			# Measured without the legs and handles: the belly's middle is a little under the rim, and its radius
 			# is the narrower of the pot's two widths (the handles stick out sideways).
@@ -102,9 +286,6 @@ func _build_engraving(pot: Node3D, mouth: Vector3, eye: Vector3) -> void:
 		groove.scale = Vector3(1.0, 1.0, 0.45)   # cut into the surface, not standing on it
 		groove.position = Vector3(0.0, (1 - row) * size * 0.36, 0.0)
 		engraving.add_child(groove)
-	sign_target = Target.sphere(&"hub_menu_sign", 0.04)
-	add_child(sign_target)   # under the hub, not the pot: the workshop itself carries no touch targets
-	sign_target.global_position = engraving.global_position
 
 
 ## How far the pot's own surface reaches from [param centre] along [param toward], at that height: its mesh points
@@ -135,3 +316,10 @@ func _bounds(node: Node3D) -> AABB:
 		box = b if first else box.merge(b)
 		first = false
 	return box
+
+
+func _exit_tree() -> void:
+	if is_instance_valid(_pot):
+		if in_game:
+			_pot.global_transform = _table_pose
+		engraving.queue_free()

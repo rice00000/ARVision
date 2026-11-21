@@ -54,6 +54,8 @@ var base_size := 0.0
 ## What a pinch or touch hits: id [code]impression_<kind>[/code] (the hub hears it through
 ## [signal Events.selected] / [signal Events.touched] and passes it to [method ImpressionRing.press]).
 var target: Target
+## The target's layer while the piece is visible.
+var target_layer := Pointer.TARGET_LAYER
 
 const OUTLINE := Color(0.06, 0.05, 0.05)
 const WOOD := Color(0.42, 0.25, 0.12)
@@ -95,6 +97,15 @@ static func make(of_kind: StringName) -> Impression:
 	impression.target.position.y = 0.075
 	impression.add_child(impression.target)
 	return impression
+
+
+func _ready() -> void:
+	visibility_changed.connect(_sync_target)
+	_sync_target()
+
+
+func _sync_target() -> void:
+	target.collision_layer = target_layer if is_visible_in_tree() else 0
 
 
 ## A game's impression drawn from a level's card ([param picture], LevelPiece.drawn): the games made from Wei's

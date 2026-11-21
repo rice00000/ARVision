@@ -16,3 +16,5 @@
 6. **Test:** a `tests/<kind>_test.gd` extending `TestCase` that plays rounds through `input` (SimInput). For whole sessions, teach `tools/sim/child.py` how to answer it and add a scenario in `tests/sim/` ([testing](testing.md)).
 
 Use only `Events`, `App` and the Reality API. No headset checks, no input polling, no own logging.
+
+In workshop games, the cauldron uses tabletop mesh bounds to find space. Keep placement guides in the trial scene so their space is included.

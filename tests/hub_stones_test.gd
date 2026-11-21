@@ -279,14 +279,68 @@ func test_staff_tools_restart_fresh_child_starts_a_new_save_from_the_hello() -> 
 
 
 ## Megan, Nov 18: the dots run with the ray off, so a real pinch at the cauldron selected nothing: no way out.
-func test_a_real_pinch_at_the_cauldron_pauses_the_dots_and_the_x_ends_them() -> void:
+func test_the_cauldron_relocates_and_drags_clear_of_obstacles_before_a_release_can_pause() -> void:
 	var hub := await _to_hub(func() -> void: _played([&"shelf", &"real_life"]))
 	expect(await _open(hub), "the menu opens")
 	_pinch(_piece(hub, &"dots").target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 60.0), "the dots play")
-	expect(not App.rig.pointer(&"right").ray_on(), "the dots run with the ray off")
-	await _real_pinch_at(hub.cauldron_menu.target)
-	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a real pinch at the cauldron: paused, the ✕ rises")
+	var pointer := App.rig.pointer(&"right")
+	expect(not pointer.ray_on(), "the dots run with the ray off")
+	var pot := hub.cauldron_menu
+	var original := pot.global_position
+	var obstacle := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.06, 0.12, 0.06)
+	obstacle.mesh = box
+	App.stage.add_child(obstacle)
+	obstacle.global_position = original + Vector3.UP * 0.06
+	pot.place_clear()
+	var moved := pot.global_position
+	expect(moved.distance_to(original) > 0.10, "the next layout parks the pot clear of a mesh even with no hitbox")
+	var hand := Transform3D(Basis.IDENTITY, pot.target.global_position + Vector3.BACK * pointer.tip_reach)
+	input.set_hand(&"right", hand)
+	await frames(3)
+	input.press(&"right", &"trigger_click", true)
+	await frames(3)
+	expect(hub.stop_bubble == null, "reaching and pinching begins a hold without pausing")
+	var sweeps := record(Events.sweeping)
+	for step in range(1, 7):
+		input.set_hand(&"right", hand.translated((original - moved) * (step / 6.0)))
+		await frames(2)
+	expect(pot.global_position.distance_to(original) > 0.10, "the held pot still clears the obstacle")
+	expect(sweeps.is_empty(), "dragging the pot is not a dots answer")
+	obstacle.free()
+	await frames(3)
+	expect(pot.global_position.is_equal_approx(original), "the pot slides into the now-clear spot")
+	input.press(&"right", &"trigger_click", false)
+	expect(hub.stop_bubble == null and not app.get_tree().paused, "releasing after a drag parks the pot")
+
+	var table := App.reality.work_surface()
+	var cover := MeshInstance3D.new()
+	var whole_top := BoxMesh.new()
+	whole_top.size = Vector3(table.size.x, 0.12, table.size.y)
+	cover.mesh = whole_top
+	App.stage.add_child(cover)
+	cover.global_transform = table.transform.translated_local(Vector3.UP * 0.06)
+	pot.place_clear()
+	var extended := table.transform.affine_inverse() * pot.global_position
+	var point := Vector2(extended.x, extended.z)
+	var half := table.size * 0.5
+	expect(is_zero_approx(extended.y), "the extension uses the same plane")
+	expect(point.distance_to(point.clamp(-half, half)) >= WorkshopCauldronMenu.POT_RADIUS,
+		"with the entire tabletop occupied the pot clears it on the extended plane")
+	input.set_hand(&"right", Transform3D(Basis.IDENTITY, pot.target.global_position + Vector3.BACK * pointer.tip_reach))
+	await frames(3)
+	input.press(&"right", &"trigger_click", true)
+	await frames(3)
+	expect(hub.stop_bubble == null, "a steady pinch waits for the release")
+	input.press(&"right", &"trigger_click", false)
+	expect(await until(func() -> bool: return hub.stop_bubble != null, 5.0), "a steady near-hand pinch release opens the ✕")
+	var staff := App.module(&"Facilitator")
+	input.menu()
+	expect(staff.is_open and App.menu_layer() == Pointer.MENU_LAYER, "the left-hand menu pinch still opens Staff tools")
+	input.menu()
+	expect(not staff.is_open and App.menu_layer() == Pointer.SIDE_MENU_LAYER, "closing Staff tools gives control back to the cauldron")
 	await wait(0.8)
 	await _real_pinch_at(hub.stop_bubble.target)
 	expect(await until(func() -> bool: return hub.state == &"hub" and not app.get_tree().paused, 20.0), "the ✕: back at the hub")
@@ -373,14 +427,32 @@ func test_real_life_opens_after_the_first_game_and_plays_weis_ready_to_study_on_
 	expect(real_life != null and not real_life.sealed, "Real Life is open after the first game")
 	expect(_piece(hub, &"dots").sealed, "the dots open after Real Life")
 	expect(real_life.find_child("drawn_real_life", true, false) != null, "its bubble wears Ready to Study's drawing")
+	var pot := hub.workshop.cauldron()
+	var table_pose := pot.global_transform
 	_pinch(real_life.target)
 	expect(await until(func() -> bool: return hub.state == &"game" and App.session.running and App.session.trial != null, 30.0), "Real Life plays")
+	expect(pot.is_visible_in_tree(), "the same pot stays visible during play")
+	expect_eq(hub.cauldron_menu.target.collision_layer, Pointer.SIDE_MENU_LAYER, "the cauldron is out of gameplay physics queries")
+	expect_eq(real_life.target.collision_layer, 0, "the hidden workshop bubbles leave no colliders on the table")
+	var table := App.reality.work_surface()
+	var parked := pot.global_position
+	expect(is_zero_approx((table.transform.affine_inverse() * parked).y), "the pot rests on the work surface")
+	var board := App.session.trial.get_node(^"Desk").get_child(0) as MeshInstance3D
+	var bounds := board.get_aabb()
+	var at := board.to_local(parked)
+	var nearest := at.clamp(bounds.position, bounds.end)
+	expect(Vector2(at.x - nearest.x, at.z - nearest.z).length() >= WorkshopCauldronMenu.POT_RADIUS,
+		"the parked pot clears the desk board")
+	input.look_at(App.head().global_position + Vector3(0.3, -0.45, -0.6))
+	await frames(3)
+	expect(pot.global_position.is_equal_approx(parked), "turning the head leaves the pot parked")
 	expect_eq(hub.current.played_level.id, &"outline", "Ready to Study, the first")
 	expect(String(App.session.trial.get_script().resource_path).contains("desk"), "Wei's desk")
 	Engine.time_scale = 4.0
 	await _finish_rounds()
 	expect(await until(func() -> bool: return hub.state == &"hub", 90.0), "back at the hub")
 	Engine.time_scale = 1.0
+	expect(pot.global_transform.is_equal_approx(table_pose), "the pot returns to its original table pose")
 	expect(App.main.progress.is_done(SHELF, SHELF.level_by_id(&"outline")), "Ready to Study is marked done")
 	expect(_stones() > 0, "stones for it")
 

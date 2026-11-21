@@ -63,6 +63,37 @@ func test_the_ray_hits_targets_only() -> void:
 	expect_eq(pointer.cast(), null, "beyond the ray's length")
 
 
+func test_a_side_menu_yields_to_gameplay_and_owns_its_own_pinch() -> void:
+	await boot(plan_of(FIND, 1))
+	var selected := record(Events.selected)
+	var side_menu := record(Events.side_menu_pinch)
+	var buttons := record(Events.button)
+	var pointer := App.rig.pointer(&"right")
+	var hand := Vector3(0.0, 1.0, 0.0)
+	var menu := Target.sphere(&"side_menu", 0.06)
+	menu.collision_layer = Pointer.SIDE_MENU_LAYER
+	app.add_child(menu)
+	menu.global_position = hand + Vector3.FORWARD * 0.6
+	var game := Target.sphere(&"game", 0.05)
+	app.add_child(game)
+	game.global_position = hand + Vector3.FORWARD * 0.9
+	input.point(&"right", hand, menu.global_position)
+	await frames(3)
+	expect_eq(pointer.cast(), game, "the game target wins even behind the menu")
+	input.click(&"right", &"trigger_click")
+	expect_eq(selected.back()[1], game, "the game gets the pinch")
+	expect(side_menu.is_empty(), "no menu selection")
+	game.free()
+	await frames(2)
+	expect_eq(pointer.cast(), menu, "the menu can be aimed at on its own")
+	selected.clear()
+	buttons.clear()
+	input.click(&"right", &"trigger_click")
+	expect_eq(side_menu, [[&"right", menu, true], [&"right", menu, false]], "the same menu owns both edges")
+	expect(selected.is_empty(), "the menu is outside gameplay selections")
+	expect(buttons.is_empty(), "neither press nor release reaches gameplay")
+
+
 func test_the_fingertip_touches_targets() -> void:
 	await boot(plan_of(FIND, 1))
 	var touched := record(Events.touched)

@@ -25,7 +25,7 @@ const PEEK_LIFT := 0.06
 
 ## The cauldron (CC0) and how wide it should be on the table, metres.
 const CAULDRON := preload("res://entry/assets/cauldron-cream-sage.glb")
-const CAULDRON_WIDTH := 0.22
+const CAULDRON_WIDTH := EntryLayout.CAULDRON_WIDTH
 
 ## DEMO: the child stays seated. Everything to reach or look at closely sits inside
 ## this circle around the head (seen from above). TO TEST: comfortable reach and view.

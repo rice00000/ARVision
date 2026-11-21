@@ -14,6 +14,8 @@ signal button(hand: StringName, action: StringName, pressed: bool)
 ## the ray hit, or null; the ray itself always comes along, so a trial can judge
 ## pointing at a real object that has no collider.
 signal selected(hand: StringName, target: Target, origin: Vector3, direction: Vector3)
+## Press and release on a side menu. Both belong to the target picked at press.
+signal side_menu_pinch(hand: StringName, target: Target, pressed: bool)
 ## A fingertip entered a Target.
 signal touched(hand: StringName, target: Target)
 ## A hand is sweeping: in [param seconds] it has gone from [param from] to

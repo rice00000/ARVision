@@ -425,20 +425,10 @@ func _finish_settle(token: int) -> void:
 ## reach and clear of the cauldron and the panel.
 func _settle_spot(p: Vector3) -> Vector3:
 	var wanted := Vector3(p.x, table_y, p.z)
-	if _spot_is_free(wanted):
-		return wanted
-	var best := wanted
-	var best_gap := INF
-	for ring in range(1, 17):
-		for step in 24:
-			var offset := Vector3.RIGHT.rotated(Vector3.UP, step * TAU / 24.0) * (ring * 0.025)
-			var spot := wanted + offset
-			var gap := offset.length()
-			if gap < best_gap and _spot_is_free(spot):
-				best = spot
-				best_gap = gap
-		if best_gap < INF:
-			return best   # nothing farther out can be nearer
+	var clear := Surface.nearest_free(Vector2(p.x, p.z), 0.4,
+		func(spot: Vector2) -> bool: return _spot_is_free(Vector3(spot.x, table_y, spot.y)))
+	if clear.is_finite():
+		return Vector3(clear.x, table_y, clear.y)
 	# Nowhere free (a room too small for it): at least within reach.
 	var out := Vector3(wanted.x - reach_from.x, 0.0, wanted.z - reach_from.z)
 	if reach_radius > 0.0 and out.length() > reach_radius:

@@ -73,7 +73,13 @@ func subtitle_slot() -> Marker3D:
 
 
 func menu_active() -> bool:
-	return _pause_holds.has(&"player_menu") or _pause_holds.has(&"facilitator")
+	return menu_layer() != 0
+
+
+func menu_layer() -> int:
+	if _pause_holds.has(&"player_menu") or _pause_holds.has(&"facilitator"):
+		return Pointer.MENU_LAYER
+	return Pointer.SIDE_MENU_LAYER if _pause_holds.has(&"cauldron") else 0
 
 
 ## Pauses the world for [param who] ([param on]) or lets go of that pause.

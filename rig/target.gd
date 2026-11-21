@@ -5,6 +5,8 @@ extends Area3D
 ## the trial (and the tests) which one it was.
 
 @export var id: StringName
+## Side-menu targets can accept a pinch at the hand as well as an aimed pinch.
+var near_pinch := false
 
 
 ## A Target named [param target_id] with a sphere of [param radius] around its origin.

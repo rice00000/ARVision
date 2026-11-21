@@ -27,6 +27,21 @@ func point(u: float, v: float) -> Vector3:
 	return transform * Vector3(u * size.x * 0.5, 0.0, v * size.y * 0.5)
 
 
+## Nearest sampled point on a plane accepted by [param free], or Vector2.INF.
+static func nearest_free(wanted: Vector2, distance: float, free: Callable) -> Vector2:
+	if free.call(wanted):
+		return wanted
+	const STEP := 0.025
+	const DIRECTIONS := 24
+	for ring in range(1, ceili(distance / STEP) + 1):
+		var radius := minf(ring * STEP, distance)
+		for direction in DIRECTIONS:
+			var spot := wanted + Vector2.from_angle(direction * TAU / DIRECTIONS) * radius
+			if free.call(spot):
+				return spot
+	return Vector2.INF
+
+
 ## Up to [param count] random points on the top, at least [param spacing] apart,
 ## [param margin] from the edges and where [param free] (a point -> bool) allows,
 ## e.g. not on a real cup. Fewer when they do not fit.

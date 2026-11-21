@@ -65,11 +65,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_reach_to_target(event.position)
-			elif _rest_depth > 0.0:
-				depth = _rest_depth   # let go: back to the usual depth
-				_rest_depth = -1.0
 			_place_hand(event.position)
 			input.press(&"right", &"trigger_click", event.pressed)
+			if not event.pressed and _rest_depth > 0.0:
+				depth = _rest_depth   # let go: back to the usual depth
+				_rest_depth = -1.0
+				_place_hand(event.position)
 		elif event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			depth = clampf(depth + (0.03 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -0.03), 0.2, 0.9)
 			_place_hand(event.position)

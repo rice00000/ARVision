@@ -15,7 +15,9 @@ Godot **4.7.2**, GDScript, Mobile renderer, OpenXR, Godot OpenXR Vendors **5.1.0
 
 **Quest controls (hands, no controllers):** aim the hand ray at UI and pinch to confirm; touching a button does nothing. UI rays appear for open panels and aimed side entries. In tidy up, reach and pinch a thing, carry it to its sticker, then release. Sweep a hand to answer the dots; no pinch. For butterflies, pinch the net on the table, then swing it to meet them. Raise a hand above your eyes to ask for help. At the end, point at the yellow ball and pinch to play again.
 
-Point and pinch **Menu** on the upper right. **Close** (×) resumes the same round; **Stop this game** (any level) goes back to the levels. Dots at the upper right show a level's rounds (gold done, ringed now); the guide says "Last one!" before the last. In games where help only comes when asked, a child who has not tried for 8 s is told once to raise a hand. **Games** offers Find the object and Global motion. **My room** opens the room to arrange it; its **Shop** sells furniture, pets and rooms. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
+In standalone games, point and pinch **Menu**. **Close** (×) resumes the same round; **Stop this game** (any level) goes back to the levels. Dots at the upper right show a level's rounds (gold done, ringed now); the guide says "Last one!" before the last. In games where help only comes when asked, a child who has not tried for 8 s is told once to raise a hand. **Games** offers Find the object and Global motion. **My room** opens the room to arrange it; its **Shop** sells furniture, pets and rooms. Completed levels and replays earn magic stones. [Home and rewards](docs/home.md).
+
+In workshop games, pinch the cauldron and let go in place to pause. Drag it to move it along the tabletop plane. Pinch × to leave a paused game.
 
 Run a fixed session with `--plan=res://content/sessions/tech_demo.tres` or `demo.tres`.
 

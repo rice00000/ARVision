@@ -17,6 +17,8 @@ const TARGET_LAYER := 1
 const MENU_LAYER := 4
 ## In-world UI (setup, level choices, replay), excluded by modal panels.
 const UI_LAYER := 16
+## Side menus yield to world targets during play and own their own layer while open.
+const SIDE_MENU_LAYER := 32
 ## Radius of the fingertip's contact area, metres.
 const TIP_RADIUS := 0.02
 ## How close the fingertip must be to a Target to grab it, metres.
@@ -73,6 +75,8 @@ var _dot := MeshInstance3D.new()
 var _landing_ring := MeshInstance3D.new()
 var _ray_material := StandardMaterial3D.new()
 var _hit_at := Vector3.ZERO
+var _side_menu_pinch := false
+var _side_menu_target: Target
 var _last_tip := Vector3.INF
 var _tip_moved := false
 ## Where the fingertip last moved to, and for how long it has stayed near it.
@@ -103,7 +107,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_finger.collision_mask = 0 if App.menu_active() else TARGET_LAYER
+	_finger.collision_mask = 0 if App.menu_active() or _side_menu_pinch else TARGET_LAYER
 	_set_aim(cast() if ui_available and tracked() else null)
 	_marker.visible = App.xr == null and tracked()
 	_draw_ui_ray()
@@ -123,7 +127,8 @@ func _exit_tree() -> void:
 
 
 func _draw_ui_ray() -> void:
-	var show := aimed is UITarget or App.menu_active()
+	var on_ui := aimed is UITarget or (aimed != null and aimed.collision_layer == SIDE_MENU_LAYER)
+	var show := on_ui or App.menu_active()
 	if not show:
 		for target: UITarget in get_tree().get_nodes_in_group(UITarget.GROUP):
 			if target.show_ray and target.is_visible_in_tree() and target.collision_layer != 0:
@@ -131,14 +136,14 @@ func _draw_ui_ray() -> void:
 				break
 	show = show and ui_available and tracked() and (App.xr != null or side == &"right")
 	_beam.visible = show
-	_dot.visible = show and aimed is UITarget
+	_dot.visible = show and on_ui
 	_landing_ring.visible = false
 	if not show: return
 	var from := global_position
 	var direction := -global_basis.z
 	var distance := minf(length, 1.0)
 	var landing := App.reality.home_landing(from, direction, length) if aimed == null and App.reality else Vector3.INF
-	if aimed is UITarget:
+	if on_ui:
 		distance = from.distance_to(_hit_at)
 	elif landing.is_finite():
 		distance = from.distance_to(landing)
@@ -149,7 +154,7 @@ func _draw_ui_ray() -> void:
 		from = App.head().global_transform * Vector3(0.22, -0.3, -0.2)
 		distance = from.distance_to(end)
 		direction = (end - from).normalized()
-	_ray_material.albedo_color = Color(1.0, 0.9, 0.45) if aimed is UITarget or landing.is_finite() else Color(0.75, 0.85, 1.0)
+	_ray_material.albedo_color = Color(1.0, 0.9, 0.45) if on_ui or landing.is_finite() else Color(0.75, 0.85, 1.0)
 	var across := direction.cross(Vector3.UP if absf(direction.y) < 0.99 else Vector3.RIGHT).normalized()
 	_beam.global_transform = Transform3D(Basis(across, direction * distance, across.cross(direction)), from + direction * distance * 0.5)
 	_dot.global_position = end
@@ -173,7 +178,7 @@ func _physics_process(delta: float) -> void:
 		_rest_for = 0.0
 	else:
 		_rest_for += delta
-	var up := _controller.get_has_tracking_data() and global_position.y > App.head().global_position.y + raise_height
+	var up := not _side_menu_pinch and _controller.get_has_tracking_data() and global_position.y > App.head().global_position.y + raise_height
 	_raised_for = _raised_for + delta if up else 0.0
 	_asked = _asked and up
 	if _raised_for >= raise_seconds and not _asked:
@@ -186,7 +191,7 @@ func _track_sweep(delta: float) -> void:
 	var here := global_position
 	var step := here - _last_position
 	_last_position = here
-	if get_tree().paused or not _controller.get_has_tracking_data() or step.length() > sweep_jump:
+	if get_tree().paused or _side_menu_pinch or not _controller.get_has_tracking_data() or step.length() > sweep_jump:
 		_velocity = Vector3.ZERO
 		_set_off(here, _clock)
 		return
@@ -229,19 +234,24 @@ func resting() -> bool:
 
 ## The Target under the ray, or null.
 func cast() -> Target:
+	var modal := App.menu_layer()
+	var world_layer := UI_LAYER | MENU_LAYER | (TARGET_LAYER if ray_on() else 0)
 	var query := PhysicsRayQueryParameters3D.create(global_position,
-		global_position - global_basis.z * length, _input_layer())
+		global_position - global_basis.z * length, modal if modal != 0 else world_layer | SIDE_MENU_LAYER)
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	query.hit_from_inside = modal == SIDE_MENU_LAYER
+	var space := get_world_3d().direct_space_state
+	var hit := space.intersect_ray(query)
+	if modal == 0 and hit and hit.collider.collision_layer == SIDE_MENU_LAYER:
+		var side_hit := hit
+		query.collision_mask = world_layer
+		hit = space.intersect_ray(query)
+		# Check reach even in ray-off rounds. Hand grabs have priority over the side menu.
+		if not hit and _nearest_target(grip().origin) == null:
+			hit = side_hit
 	if hit: _hit_at = hit.position
 	return hit.collider as Target if hit else null
-
-
-## The open panel owns input, even when a game target sits in front of it.
-func _input_layer() -> int:
-	if App.menu_active(): return MENU_LAYER
-	return UI_LAYER | MENU_LAYER | (TARGET_LAYER if ray_on() else 0)
 
 
 ## Where the fingertip is.
@@ -279,9 +289,22 @@ func tracked() -> bool:
 
 
 func _on_button(action: String, pressed: bool) -> void:
+	if action == "trigger_click" and not pressed and _side_menu_pinch:
+		var held := _side_menu_target
+		_side_menu_target = null
+		_side_menu_pinch = false
+		if is_instance_valid(held):
+			Events.side_menu_pinch.emit(side, held, false)
+		return
 	if not ui_available: return
 	var active := pressed and tracked()
-	var target := cast() if active and action == "trigger_click" else null
+	var target := _pinch_target() if active and action == "trigger_click" else null
+	if action == "trigger_click":
+		_side_menu_pinch = target != null and target.collision_layer == SIDE_MENU_LAYER
+		if _side_menu_pinch:
+			_side_menu_target = target
+			Events.side_menu_pinch.emit(side, target, true)
+			return
 	if active and action == "trigger_click" and target == null and App.reality:
 		var landing := App.reality.home_landing(global_position, -global_basis.z, length)
 		if landing.is_finite():
@@ -304,23 +327,41 @@ func _on_button(action: String, pressed: bool) -> void:
 		_grab()
 
 
+func _pinch_target() -> Target:
+	var target := cast()
+	if target != null or App.menu_layer() == MENU_LAYER:
+		return target
+	var at := grip().origin
+	var near := _nearest_target(at, SIDE_MENU_LAYER, TIP_RADIUS)
+	if near != null and near.near_pinch and (App.menu_active() or _nearest_target(at) == null):
+		return near
+	return null
+
+
 ## Takes the Target nearest the fingertip, if one is within [constant GRAB_RADIUS].
 func _grab() -> void:
+	if App.menu_active():
+		return
+	var near := _nearest_target(tip())
+	if near:
+		Events.touched.emit(side, near)
+
+
+func _nearest_target(at: Vector3, layer := TARGET_LAYER, radius := GRAB_RADIUS) -> Target:
 	var ball := SphereShape3D.new()
-	ball.radius = GRAB_RADIUS
+	ball.radius = radius
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = ball
-	query.transform = Transform3D(Basis.IDENTITY, tip())
-	query.collision_mask = 0 if App.menu_active() else TARGET_LAYER
+	query.transform = Transform3D(Basis.IDENTITY, at)
+	query.collision_mask = layer
 	query.collide_with_areas = true
 	query.collide_with_bodies = false
 	var near: Target
 	for hit in get_world_3d().direct_space_state.intersect_shape(query, 8):
 		var target := hit.collider as Target
-		if target and (near == null or target.global_position.distance_to(tip()) < near.global_position.distance_to(tip())):
+		if target and (near == null or target.global_position.distance_to(at) < near.global_position.distance_to(at)):
 			near = target
-	if near:
-		Events.touched.emit(side, near)
+	return near
 
 
 func _build() -> void:
@@ -346,7 +387,7 @@ func _build() -> void:
 	_finger = finger
 	_marker = ball
 	finger.area_entered.connect(func(area: Area3D) -> void:
-		if area is Target and _tip_moved and not resting():
+		if area is Target and not _side_menu_pinch and _tip_moved and not resting():
 			Events.touched.emit(side, area))
 	add_child(finger)
 	_ray_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
